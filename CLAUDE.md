@@ -20,7 +20,7 @@ Reflex's signals on Derive (derive.xyz), plus an options layer: perps and the op
 
 ## Next steps (agreed)
 
-1. Design doc for the signal port (owner approves before code): which Reflex engines and inputs, the pinned Reflex commit, Derive's candle source (verify in Derive's docs), a parity check against Reflex on the same candles, and what is left out.
+1. Design doc for the signal port, `docs/signal-port.md` (owner approves before code): which Reflex engines and inputs, the pinned Reflex commit, Derive's candle source (verify in Derive's docs), a parity check against Reflex on the same candles, and what is left out.
 2. Own frontend (same stack as Reflex, new design from the owner's guidelines, given first): Reflex's signals on Derive plus the options screens, starting with the volatility surface: term structure by expiry, 25-delta skew, priced 30-day range, and the 30-day history as it builds.
 3. After 4-6 weeks of recorded data: a declared study (rules committed first) of whether the options features add to Reflex's signals on Derive (the original plan's Phase 3). Until then every feature is "context, not a signal".
 4. Execution on Derive perps (original Phase 2): testnet and dry-run first, only with the owner's explicit approval. Options structures (Phase 4) design only until the study reports.
