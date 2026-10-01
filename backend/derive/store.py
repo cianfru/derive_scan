@@ -41,6 +41,7 @@ class Store:
     def __init__(self, path: Path | str):
         if str(path) != ":memory:":
             Path(path).parent.mkdir(parents=True, exist_ok=True)
+        self.path = str(path)
         self._lock = threading.Lock()
         self._db = sqlite3.connect(str(path), check_same_thread=False, isolation_level=None)
         self._db.execute("PRAGMA journal_mode=WAL")
@@ -101,6 +102,13 @@ class Store:
         with self._lock:
             return {t: self._db.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
                     for t in ("features", "expiry_slices", "chains")}
+
+    def file_bytes(self) -> int:
+        """The database on disk, including its write-ahead log."""
+        if self.path == ":memory:":
+            return 0
+        return sum(Path(self.path + suffix).stat().st_size for suffix in ("", "-wal", "-shm")
+                   if Path(self.path + suffix).exists())
 
     def chain_bytes(self) -> int:
         with self._lock:

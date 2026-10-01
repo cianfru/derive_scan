@@ -19,9 +19,11 @@ Measured on 1 October 2026: one snapshot of BTC and ETH from V2 mainnet takes ~1
 ## API
 
 - `GET /health`
-- `GET /api/status`: sources, row counts, last run per source and underlying, request counts
-- `GET /api/surface/{underlying}?source=`: latest features and term structure
-- `GET /api/features/{underlying}?feature=atm_iv_30d&from=&to=&source=`: time series (unix seconds; default last 30 days)
+- `GET /api/status`: sources, row counts, database size, bytes sent per route, last run per source and underlying, request counts
+- `GET /api/surface/{underlying}?source=`: latest features and term structure (`stale` when the newest snapshot is overdue)
+- `GET /api/features/{underlying}?feature=atm_iv_30d&from=&to=&source=`: time series (unix seconds; default last 30 days, at most 400)
+
+JSON responses carry ETags: a repeat request with `If-None-Match` gets an empty 304. `/api/status` also shows the database size on disk (`db_bytes`) and bytes sent per route (`egress`).
 
 ## Run
 

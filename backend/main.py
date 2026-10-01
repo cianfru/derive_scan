@@ -14,6 +14,7 @@ load_dotenv()
 
 from derive.api import router  # noqa: E402
 from derive.config import Settings  # noqa: E402
+from derive.egress import ConditionalGetMiddleware, EgressCounterMiddleware  # noqa: E402
 from derive.recorder import Recorder  # noqa: E402
 from derive.store import Store  # noqa: E402
 
@@ -38,7 +39,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Derive Scan", lifespan=lifespan)
+# Order matters: ETags see the plain body (inside gzip); the counter is outermost.
+app.add_middleware(ConditionalGetMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+app.add_middleware(EgressCounterMiddleware)
 app.include_router(router)
 
 
