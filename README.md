@@ -14,7 +14,7 @@ Recording runs as a scheduled GitHub Action (`.github/workflows/record.yml`) tha
 | `{source}/{UND}/latest.json` | newest features and term structure |
 | `runs/YYYY-MM-DD.csv`, `status.json` | every attempt with its real fetch time; last result per source and underlying |
 
-Snapshots are labelled with their 15-minute slot (unix seconds, UTC). The workflow fires every 5 minutes and records only slots not yet recorded, so a late or skipped scheduled run is caught by the next one. Failures show in the repo's Actions tab. Newest data: `https://raw.githubusercontent.com/cianfru/derive_scan/data/v2_mainnet/BTC/latest.json`.
+Snapshots are labelled with their 15-minute slot (unix seconds, UTC). An external cron service starts the workflow every 5 minutes (GitHub's own schedule is kept as a backup) and it records only slots not yet recorded, so a late or skipped scheduled run is caught by the next one. Failures show in the repo's Actions tab. Newest data: `https://raw.githubusercontent.com/cianfru/derive_scan/data/v2_mainnet/BTC/latest.json`.
 
 ## What it records
 
