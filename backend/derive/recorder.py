@@ -72,12 +72,15 @@ class Recorder:
                                   chain={"options": chain, "perp": perp} if keep_chain else None)
         return {"expiries": len(slices), "options": len(chain), "features": len(feats)}
 
-    async def run_once(self, ts: int | None = None) -> None:
+    async def run_once(self, ts: int | None = None, only: set[str] | None = None) -> None:
+        """Record every source:underlying, or only the keys in `only`."""
         ts = int(ts or time.time())
         keep_chain = ts % self.s.chain_every_sec < self.s.interval_sec
         for source in self.s.sources:
             for und in self.s.underlyings:
                 key = f"{source}:{und}"
+                if only is not None and key not in only:
+                    continue
                 t0 = time.monotonic()
                 try:
                     info = await self.snapshot(source, und, ts, keep_chain)
