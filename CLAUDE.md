@@ -1,11 +1,13 @@
 # Derive Scan
 
-Options-aware scanner for Derive (derive.xyz): perps plus the options volatility surface. Its own product, separate from Reflex (`cianfru/RCCE_Scanner`). Backend: FastAPI in `backend/`. No frontend yet.
+Reflex's signals on Derive (derive.xyz), plus an options layer: perps and the options volatility surface. Its own product in its own repo, separate from Reflex (`cianfru/RCCE_Scanner`). Backend: FastAPI in `backend/`. No frontend yet.
 
 ## Scope: what comes from Reflex and what does not
 
-- Copy Reflex's infrastructure and data-ingestion patterns only: fetch once and serve everyone, ETag/304, serving the last good data with its time, egress and storage readouts, rate limits, edge cache and access codes when there are users, the frontend stack and visual style.
-- Do not copy Reflex's analysis or anything Hyperliquid-specific: no RCCE regime/signal logic, no Reflex executor rules, no wallet tracking, no Hyperliquid market quirks (e.g. its `k` markets). Do not read Reflex's API.
+- Goal (owner, 1 October 2026; this was the plan all along): reproduce Reflex's signals on Derive, independently of Reflex, since they are venue-agnostic; add what Derive's options make possible; new design.
+- Port, do not link: copy Reflex's venue-agnostic signal code (the price-based engines and the signal synthesizer) into this repo, pinned to a named Reflex commit, and run it on Derive's own data. Do not call Reflex's API or depend on its servers.
+- Leave out anything Hyperliquid-specific: wallet tracking and smart-money consensus, Hyperliquid market quirks (e.g. its `k` markets), Hyperliquid data feeds. Leave out the Larsson engine and its paid data entirely.
+- Also copy Reflex's infrastructure and data-ingestion patterns: fetch once and serve everyone, ETag/304, last good data with its time, egress and storage readouts, rate limits, edge cache and access codes when there are users, the frontend stack.
 - Do not change the Reflex repo for Derive work. An options panel was added to Reflex (#197) and reverted (#198) for this reason.
 
 ## Where things stand (1 October 2026)
@@ -14,13 +16,15 @@ Options-aware scanner for Derive (derive.xyz): perps plus the options volatility
 - Railway is being retired to cut cost (owner's request, 1 October 2026): the service recorded from 1 October 12:00 UTC until the Action took over; that early SQLite data was not migrated. The FastAPI app (`backend/main.py`) stays for local use, not deployed.
 - Repo growth: ~2 MB/day of chains plus ~0.5 MB/day of CSV, about 100 MB over the 6-week study window. Past ~6 months move old chains out of git (e.g. release assets) before the repo nears 1 GB.
 - Not built: frontend (plan: static site reading the `data` branch files, so users never reach Derive and nothing runs per user), V3 source (one setting, `DERIVE_SNAPSHOT_SOURCES=v3_mainnet`, once V3 mainnet is live).
-- Trading (plan Phase 2) is not in the repo. It needs the owner's explicit approval and starts from Derive's docs, not from Reflex's strategy.
+- Trading (plan Phase 2) is not in the repo. It needs the owner's explicit approval; order mechanics come from Derive's docs.
 
 ## Next steps (agreed)
 
-1. Own small frontend (same stack and style as Reflex, Derive screens only; owner gives design guidelines first), starting with the volatility surface: term structure by expiry, 25-delta skew, priced 30-day range, and the 30-day history as it builds.
-2. After 4-6 weeks of recorded data: a declared study (rules committed first) of what the surface features tell us. Until then every feature is "context, not a signal".
-3. Later, only with evidence and V3 mainnet live: a vault on Derive V3 (design doc first).
+1. Design doc for the signal port, `docs/signal-port.md` (owner approves before code): which Reflex engines and inputs, the pinned Reflex commit, Derive's candle source (verify in Derive's docs), a parity check against Reflex on the same candles, and what is left out.
+2. Own frontend (same stack as Reflex, new design from the owner's guidelines, given first): Reflex's signals on Derive plus the options screens, starting with the volatility surface: term structure by expiry, 25-delta skew, priced 30-day range, and the 30-day history as it builds.
+3. After 4-6 weeks of recorded data: a declared study (rules committed first) of whether the options features add to Reflex's signals on Derive (the original plan's Phase 3). Until then every feature is "context, not a signal".
+4. Execution on Derive perps (original Phase 2): testnet and dry-run first, only with the owner's explicit approval. Options structures (Phase 4) design only until the study reports.
+5. Later, only with evidence and V3 mainnet live: a vault on Derive V3 (design doc first).
 
 ## Findings so far
 

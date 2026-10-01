@@ -4,7 +4,7 @@
 > Target venue: **Derive V3 API — testnet only** (`https://testnet.api.derive.xyz/v3`, `wss://testnet.api.derive.xyz/v3/ws`)
 > Status context: Derive V3 + Derive Chain wind-down is a **governance proposal (DIP, 14 Sep 2026), not yet approved**. No mainnet date. Build against V3 testnet; mainnet switch is a config change later.
 
-> **Status, 1 October 2026.** Phase 1 (recorder) is built and live; see CLAUDE.md for where things stand. This is its own product in its own repo and does not use Reflex's signals (Phase 2 as written below, which routes Reflex signals, is superseded: any trading work starts from Derive's docs and needs the owner's approval). Open question 4 is answered yes: V2 mainnet public data is recorded now.
+> **Status, 1 October 2026.** Phase 1 (recorder) is built and live; see CLAUDE.md for where things stand. This is its own product in its own repo. Reflex's venue-agnostic signals are ported into this repo (pinned copy, no calls to Reflex), not read from Reflex; the rest of the phases stand in that form. Trading needs the owner's approval. Open question 4 is answered yes: V2 mainnet public data is recorded now.
 
 ---
 
