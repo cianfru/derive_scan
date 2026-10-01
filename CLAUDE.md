@@ -6,25 +6,25 @@ Reflex's signals on Derive (derive.xyz), plus an options layer: perps and the op
 
 - Goal (owner, 1 October 2026; this was the plan all along): reproduce Reflex's signals on Derive, independently of Reflex, since they are venue-agnostic; add what Derive's options make possible; new design.
 - Port, do not link: copy Reflex's venue-agnostic signal code (the price-based engines and the signal synthesizer) into this repo, pinned to a named Reflex commit, and run it on Derive's own data. Do not call Reflex's API or depend on its servers.
-- Leave out anything Hyperliquid-specific: wallet tracking and smart-money consensus, Hyperliquid market quirks (e.g. its `k` markets), Hyperliquid data feeds. Leave out the Larsson engine and its paid data entirely.
+- Leave out anything Hyperliquid-specific: wallet tracking and smart-money consensus, Hyperliquid market quirks (e.g. its `k` markets), Hyperliquid data feeds. The Larsson engine (four EMAs of the close, Reflex's `larsson_engine.py`) is kept (owner, 1 October 2026), outside the signal path as in Reflex, and published as `ribbon`; the word never appears in the UI or in published files, and the paid data it refers to stays out of the repo.
 - Also copy Reflex's infrastructure and data-ingestion patterns: fetch once and serve everyone, ETag/304, last good data with its time, egress and storage readouts, rate limits, edge cache and access codes when there are users, the frontend stack.
 - Do not change the Reflex repo for Derive work. An options panel was added to Reflex (#197) and reverted (#198) for this reason.
 
 ## Where things stand (1 October 2026)
 
-- Recorder: scheduled GitHub Action `.github/workflows/record.yml` (fires every 5 minutes, records each 15-minute slot once) committing plain files to the `data` branch; layout in README. Free on a public repo; no server. Records Derive V2 mainnet (`api.lyra.finance`) BTC and ETH; raw chains hourly. Scheduled workflows only run from the default branch.
-- Railway is being retired to cut cost (owner's request, 1 October 2026): the service recorded from 1 October 12:00 UTC until the Action took over; that early SQLite data was not migrated. The FastAPI app (`backend/main.py`) stays for local use, not deployed.
+- Signals: built (1 October 2026). Reflex's signal code copied unchanged into `backend/reflex` (commit e45ed97; `reflex/SOURCE.md`, hash test), glue in `backend/derive/signals.py`, job `backend/signal_once.py` in the same Action: after each 4H and 1D close (+3 min), every Derive perp (15 on V2 today), Derive index candles with perp volume, Derive funding/OI, Fear & Greed, stablecoins, BTC dominance. Output `signals/` on the `data` branch (README). `tests/test_signal_parity.py` shows the glue reproduces Reflex's scanner exactly on saved candles; `docs/parity-report.md` compares a year of signals on Derive's vs Reflex's candles. Left out: HyperLens, CoinGlass, CVD (Reflex's defaults when missing), the CTO overlay (shadow in Reflex by default) and the range forecast (a forecast).
+- Recorder: GitHub Action `.github/workflows/record.yml`, started every 5 minutes by an external cron service (cron-job.org, owner's account) through the workflow-dispatch API; GitHub's own schedule never fired and stays only as a backup. Records each 15-minute slot once, committing plain files to the `data` branch; layout in README. Free on a public repo; no server. Records Derive V2 mainnet (`api.lyra.finance`) BTC and ETH; raw chains hourly. Scheduled workflows only run from the default branch.
+- Railway retired to cut cost (owner's request, 1 October 2026): it recorded from 1 October 12:00 UTC until the Action took over at 20:15 UTC; that early SQLite data was not migrated. The cron service's access token expires about 30 December 2026; the owner renews it. The FastAPI app (`backend/main.py`) stays for local use, not deployed.
 - Repo growth: ~2 MB/day of chains plus ~0.5 MB/day of CSV, about 100 MB over the 6-week study window. Past ~6 months move old chains out of git (e.g. release assets) before the repo nears 1 GB.
 - Not built: frontend (plan: static site reading the `data` branch files, so users never reach Derive and nothing runs per user), V3 source (one setting, `DERIVE_SNAPSHOT_SOURCES=v3_mainnet`, once V3 mainnet is live).
 - Trading (plan Phase 2) is not in the repo. It needs the owner's explicit approval; order mechanics come from Derive's docs.
 
 ## Next steps (agreed)
 
-1. Design doc for the signal port, `docs/signal-port.md` (owner approves before code): which Reflex engines and inputs, the pinned Reflex commit, Derive's candle source (verify in Derive's docs), a parity check against Reflex on the same candles, and what is left out.
-2. Own frontend (same stack as Reflex, new design from the owner's guidelines, given first): Reflex's signals on Derive plus the options screens, starting with the volatility surface: term structure by expiry, 25-delta skew, priced 30-day range, and the 30-day history as it builds.
-3. After 4-6 weeks of recorded data: a declared study (rules committed first) of whether the options features add to Reflex's signals on Derive (the original plan's Phase 3). Until then every feature is "context, not a signal".
-4. Execution on Derive perps (original Phase 2): testnet and dry-run first, only with the owner's explicit approval. Options structures (Phase 4) design only until the study reports.
-5. Later, only with evidence and V3 mainnet live: a vault on Derive V3 (design doc first).
+1. Own frontend (same stack as Reflex, new design from the owner's guidelines, given first): Reflex's signals on Derive plus the options screens, starting with the volatility surface: term structure by expiry, 25-delta skew, priced 30-day range, and the 30-day history as it builds.
+2. After 4-6 weeks of recorded data: a declared study (rules committed first) of whether the options features add to Reflex's signals on Derive (the original plan's Phase 3). Until then every feature is "context, not a signal".
+3. Execution on Derive perps (original Phase 2): testnet and dry-run first, only with the owner's explicit approval. Options structures (Phase 4) design only until the study reports.
+4. Later, only with evidence and V3 mainnet live: a vault on Derive V3 (design doc first).
 
 ## Findings so far
 
@@ -39,7 +39,7 @@ Reflex's signals on Derive (derive.xyz), plus an options layer: perps and the op
 - No emojis. No pills: tabs are underlined text.
 - No blinking or pulsing status dots. Price flashes and loading spinners are fine.
 - No forecast words in the UI (will, expect, likely, predict, target, probability, odds): show what happened, not what will. Options screens usually show "probability ITM"; this one does not. The priced range is labelled as what option prices imply, not our view.
-- Never show the word "Larsson" in the UI; keep the paid data it refers to out of the repo.
+- Never show the word "Larsson" in the UI; keep the paid data it refers to out of the repo. Its engine is kept and published as `ribbon`.
 - Research follows a declared-study protocol: rules committed before results are computed; verdicts only when the declared bar is met, otherwise "context, not a signal".
 - Costs stay low (target: zero added cost): fetch once, serve everyone; users never trigger their own exchange reads.
 - No security details in code comments or docs.
