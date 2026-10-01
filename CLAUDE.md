@@ -10,19 +10,17 @@ Options-aware scanner for Derive (derive.xyz): perps plus the options volatility
 
 ## Where things stand (1 October 2026)
 
-- Recorder live on Railway: https://derivescan-production.up.railway.app (`/health`, `/api/status`, `/api/surface/{btc|eth}`, `/api/features/{btc|eth}?feature=&from=&to=`). Records Derive V2 mainnet (`api.lyra.finance`) BTC and ETH every 15 minutes since 1 October 2026 12:00 UTC; raw chains hourly.
-- Railway: service root directory `backend` (Dockerfile), 5 GB volume mounted at `/app/data` (checked on the volume's settings page). No variables set; defaults are in `.env.example`. Railway's plan has no usage alerts: watch `db_bytes` in `/api/status`.
-- Storage: ~2.4 MB/day of raw chains (hourly, both coins, ~98 KB per hour), pruned after 365 days, so chains level off under 1 GB; feature and expiry rows ~0.5 MB/day, kept. About 1.1 GB after a year. Each extra underlying or source adds roughly half again.
-- API responses carry ETags (empty 304 on repeat), `/api/status` shows database size and bytes sent per route, `/api/surface` marks `stale` when the newest snapshot is more than three intervals old, `/api/features` ranges are capped at 400 days.
-- Not built: frontend, rate limits (routes are cheap indexed reads; add them before users arrive), V3 source (one setting, `DERIVE_SNAPSHOT_SOURCES=v3_mainnet`, once V3 mainnet is live).
+- Recorder: scheduled GitHub Action `.github/workflows/record.yml` (fires every 5 minutes, records each 15-minute slot once) committing plain files to the `data` branch; layout in README. Free on a public repo; no server. Records Derive V2 mainnet (`api.lyra.finance`) BTC and ETH; raw chains hourly. Scheduled workflows only run from the default branch.
+- Railway is being retired to cut cost (owner's request, 1 October 2026): the service recorded from 1 October 12:00 UTC until the Action took over; that early SQLite data was not migrated. The FastAPI app (`backend/main.py`) stays for local use, not deployed.
+- Repo growth: ~2 MB/day of chains plus ~0.5 MB/day of CSV, about 100 MB over the 6-week study window. Past ~6 months move old chains out of git (e.g. release assets) before the repo nears 1 GB.
+- Not built: frontend (plan: static site reading the `data` branch files, so users never reach Derive and nothing runs per user), V3 source (one setting, `DERIVE_SNAPSHOT_SOURCES=v3_mainnet`, once V3 mainnet is live).
 - Trading (plan Phase 2) is not in the repo. It needs the owner's explicit approval and starts from Derive's docs, not from Reflex's strategy.
 
 ## Next steps (agreed)
 
-1. Own small frontend (same stack and style as Reflex, Derive screens only), starting with the volatility surface: term structure by expiry, 25-delta skew, priced 30-day range, and the 30-day history as it builds.
-2. Rate limits on the API before it is shared.
-3. After 4-6 weeks of recorded data: a declared study (rules committed first) of what the surface features tell us. Until then every feature is "context, not a signal".
-4. Later, only with evidence and V3 mainnet live: a vault on Derive V3 (design doc first).
+1. Own small frontend (same stack and style as Reflex, Derive screens only; owner gives design guidelines first), starting with the volatility surface: term structure by expiry, 25-delta skew, priced 30-day range, and the 30-day history as it builds.
+2. After 4-6 weeks of recorded data: a declared study (rules committed first) of what the surface features tell us. Until then every feature is "context, not a signal".
+3. Later, only with evidence and V3 mainnet live: a vault on Derive V3 (design doc first).
 
 ## Findings so far
 
