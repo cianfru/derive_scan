@@ -1,7 +1,8 @@
-# Records Derive's options surface every 15 minutes into the `data` branch.
-# Fires every 5 minutes (minutes 2, 7, ..., 57, off the busy top of the hour): scheduled runs
-# can start late or be skipped, and a slot that is already recorded is not fetched again,
-# so each slot gets up to three chances.
+# Records Derive's options surface every 15 minutes and computes Reflex's signals on Derive's
+# perps after each 4H and daily close, into the `data` branch.
+# Started every 5 minutes by an external cron service through workflow_dispatch; GitHub's own
+# schedule below is a backup (minutes 2, 7, ..., 57). Each 15-minute slot and each closed bar
+# is processed once, so repeated starts do no harm.
 name: record
 
 on:
@@ -19,7 +20,7 @@ permissions:
 jobs:
   record:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -34,24 +35,33 @@ jobs:
       - name: Due?
         id: due
         working-directory: backend
-        run: python3 record_once.py --out ../store --due
+        run: |
+          python3 record_once.py --out ../store --due
+          python3 signal_once.py --out ../store --due
 
       - uses: actions/setup-python@v5
-        if: steps.due.outputs.due == 'true'
+        if: steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true'
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
+      - name: Install
+        if: steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true'
+        run: pip install -q httpx numpy
+
       - name: Record
         if: steps.due.outputs.due == 'true'
         working-directory: backend
-        run: |
-          pip install -q httpx
-          python record_once.py --out ../store
+        run: python record_once.py --out ../store
+
+      - name: Signals
+        if: always() && steps.due.outputs.signals_due == 'true'
+        working-directory: backend
+        run: python signal_once.py --out ../store
 
       - name: Commit
-        if: always() && steps.due.outputs.due == 'true'
+        if: always() && (steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true')
         working-directory: store
         run: |
           git add -A

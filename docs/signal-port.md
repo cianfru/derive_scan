@@ -1,6 +1,6 @@
 # Reflex signals on Derive: port design
 
-Status: draft for the owner's approval, 1 October 2026. No code until approved.
+Status: approved by the owner and built, 1 October 2026. Owner's changes to the draft: keep the Larsson engine (published as `ribbon`, outside the signal path as in Reflex; the word never appears in the UI or published files); list every Derive perp and label the ones with too little data. Decisions taken as recommended: Derive's own perp volume, market-wide inputs included.
 
 ## Goal
 
@@ -23,7 +23,6 @@ Timeframes: 4H and 1D, as in Reflex. Only closed candles are used, as in Reflex 
 
 Left out:
 - Hyperliquid-specific: HyperLens smart-money consensus (`has_hyperlens=False`), wallet tracking, Hyperliquid candle and market feeds, `k` markets.
-- The Larsson engine and its paid data.
 - CoinGlass inputs (paid key): ETF flows, Coinbase premium (`has_coinglass=False`, as Reflex runs without the key).
 - The executor and everything after the signal (trading is a separate, approved step).
 - CTO, levels, patterns, SMC and spike-zone engines: not part of the signal itself. Can follow later if wanted.
@@ -78,7 +77,7 @@ The port stays pinned. Updating to a newer Reflex commit is a deliberate step th
 
 ## Words on screen
 
-Reflex's signal labels are kept. Reflex also produces an `expected_range` ("calibrated next-bar range forecast"): on this product it is not shown, or is shown only as the past realised range, per the no-forecast-words rule. Larsson never appears.
+Reflex's signal labels are kept. Reflex also produces an `expected_range` ("calibrated next-bar range forecast"): on this product it is not shown, or is shown only as the past realised range, per the no-forecast-words rule. The Larsson engine's output is published as `ribbon`; the word never appears.
 
 ## Not in this step
 
