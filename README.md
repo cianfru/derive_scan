@@ -1,6 +1,6 @@
 # Torq
 
-Repository `derive_scan`. Landing page: `frontend/index.html` (static; open it in a browser).
+Repository `derive_scan`. Torq’s landing page and market workspace live in `frontend/` (React + Vite, deployed as static files).
 
 Reflex's signals on Derive's perps, plus Derive's options volatility surface.
 
@@ -8,6 +8,23 @@ Reflex's signals on Derive's perps, plus Derive's options volatility surface.
 - Options: Derive does not serve past volatility surfaces, so the recorder builds the history every 15 minutes.
 
 Both run in one GitHub Action (`.github/workflows/record.yml`) that commits plain files to the `data` branch: no server, no cost on a public repo. The FastAPI app in `backend/` serves the options data from SQLite and is kept for local use; it is not deployed.
+
+## Frontend
+
+```sh
+cd frontend
+npm ci
+npm run dev       # http://127.0.0.1:5173
+npm test
+npm run build     # static output in frontend/dist
+npm run preview   # serve the production build locally
+```
+
+Use Node.js 22 LTS. Publish `frontend/dist` to a static host after building; the source `index.html` requires Vite and is not opened directly. Relative asset paths and hash navigation support deployment under a subdirectory. Routes: `#home`, `#scanner`, `#surface`, `#watchlist`.
+
+The workspace includes market search, sorting, active-signal filters, 4H/1D switching, a browser-local watchlist, CSV export of the current view, market detail charts, and BTC/ETH options term structures. The palette follows Derive’s charcoal and orange, with responsive layouts and reduced-motion support.
+
+Data comes from this repository’s public `data` branch, refreshed on load, manually, and every five minutes. Each feed refreshes independently. Bundled, timestamped real snapshots provide a first render and fallback; an unavailable feed retains the last good data and is marked offline. Signals use closed-bar prices, and the 24h change compares six 4H bars or one daily bar. The charts show 24 closed bars, not a streaming price feed. Insufficient history and thin volume are shown in market details. Options are context, not signals. No exchange reads, account connections, or order execution are performed by the browser.
 
 ## Signal files (`data` branch)
 
