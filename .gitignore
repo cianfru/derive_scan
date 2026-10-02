@@ -9,3 +9,5 @@ data/
 *.db-shm
 node_modules/
 frontend/dist/
+!frontend/src/data/
+!frontend/src/data/*.json
