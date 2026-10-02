@@ -24,7 +24,8 @@ Torq is the product name (owner, 1 October 2026). Reflex's signals on Derive (de
 ## Product direction (owner, 2 October 2026)
 
 - Torq is an independent product: Reflex-grade feel and quality, its own identity. No mention of Reflex in the UI, landing page or public copy; the link to Reflex lives only in internal docs (code provenance).
-- Core: the signal engine (ported from Reflex) on Derive's perps. Differentiator: options, shown as visual market structure (what traders pay for protection, where open interest sits, how the surface is shaped), made easy to read. No options study: options are context presented visually, never a claimed edge. Any claim that a feature improves the signals would still need a declared study.
+- Core: the signal engine (ported from Reflex) on Derive's perps. Differentiator: options, shown as visual market structure (what traders pay for protection, where open interest sits, how the surface is shaped, the price ranges option prices imply per expiry), made easy to read, labelled as market pricing, never as a forecast.
+- Options traders (owner, 2 October 2026): rebuild Derive's options trade history by wallet (since mid-2024) and study whether skilled directional options wallets lead price, the options counterpart of Reflex's profitable traders. Market makers, income sellers and hedgers are filtered out first. Declared study: `docs/options-traders-study.md` (rules need the owner's approval before any result is computed); until a verdict, positioning is context.
 - Quality bar: excellent UI, refined, fast, clean, no friction, easy to understand.
 
 ## Roadmap (approved 2 October 2026)
@@ -33,7 +34,8 @@ Torq is the product name (owner, 1 October 2026). Reflex's signals on Derive (de
 2. Torq design system: first version done 2 October 2026 (`frontend/src/styles.css`); refine with the owner.
 3. The app: first version live 2 October 2026 (markets, coin pages with options panel, options overview, flow). Next: regime history replayed over past bars for the chart, refinement to Reflex-grade polish.
 4. Radar from Derive's wallet-level trade flow (best wallets over time, large options flow); a first Flow page exists. Landing rebuilt with the brand (done); keep refining. Derive's V3 docs describe public trades as anonymised, so the radar may lose wallet detail when V3 replaces V2.
-5. Later, with the owner's explicit approval: execution on Derive perps (testnet, dry-run first); a vault on Derive V3 (design doc first).
+5. Options traders: priced-outcome cone and taker positioning built 2 October 2026; next the history rebuild (part 1 of `docs/options-traders-study.md`), then the study once its rules are approved.
+6. Later, with the owner's explicit approval: execution on Derive perps (testnet, dry-run first); a vault on Derive V3 (design doc first).
 
 ## Findings so far
 

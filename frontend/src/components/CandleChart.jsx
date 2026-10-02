@@ -17,8 +17,11 @@ function ema(values, n) {
 
 const TONE_VAR = { strong: "--sig-strong", long: "--sig-long", acc: "--sig-acc", wait: "--sig-wait", exit: "--sig-exit" };
 
-/** Candles with volume, the ribbon (fast and slow EMAs) and a marker wherever the signal changed. */
-export default function CandleChart({ candles, signals, tf, theme, backfilled = 0 }) {
+const HORIZON_DAYS = { "4h": 21, "1d": 120 };
+
+/** Candles with volume, the ribbon (fast and slow EMAs), a marker wherever the signal changed and,
+ * when options exist, the price ranges option prices imply for each upcoming expiry. */
+export default function CandleChart({ candles, signals, tf, theme, backfilled = 0, implied = null }) {
   const box = useRef(null);
   useEffect(() => {
     if (!box.current || !candles?.length) return;
@@ -33,7 +36,14 @@ export default function CandleChart({ candles, signals, tf, theme, backfilled = 
     });
     const up = c("--up"), down = c("--down");
     const candle = chart.addSeries(CandlestickSeries, { upColor: up, downColor: down, borderVisible: false, wickUpColor: up, wickDownColor: down });
-    candle.setData(candles.map(([t, o, h, l, cl]) => ({ time: t, open: o, high: h, low: l, close: cl })));
+    const bars = candles.map(([t, o, h, l, cl]) => ({ time: t, open: o, high: h, low: l, close: cl }));
+    const step = TF_SEC[tf], lastT = candles[candles.length - 1][0], lastC = candles[candles.length - 1][4];
+    const cone = (implied || []).filter((e) => e.days <= HORIZON_DAYS[tf]);
+    if (cone.length) { // empty future bars so dates in the future sit at their true distance
+      const end = cone[cone.length - 1].expiry;
+      for (let t = lastT + step; t <= end + step; t += step) bars.push({ time: t });
+    }
+    candle.setData(bars);
     const vol = chart.addSeries(HistogramSeries, { priceScaleId: "", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
     vol.priceScale().applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
     vol.setData(candles.map(([t, o, , , cl, v], i) => ({ time: t, value: v, color: (cl >= o ? up : down) + (i < backfilled ? "00" : "55") })));
@@ -43,6 +53,14 @@ export default function CandleChart({ candles, signals, tf, theme, backfilled = 
       const s = chart.addSeries(LineSeries, { color: j ? c("--faint") : c("--orange"), lineWidth: j ? 1 : 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
       s.setData(candles.map((k, i) => (e[i] == null ? null : { time: k[0], value: e[i] })).filter(Boolean));
     });
+    if (cone.length) {
+      const snap = (t) => lastT + Math.max(1, Math.round((t - lastT) / step)) * step;
+      const band = [[0, c("--orange-lo"), 1, 2], [1, c("--orange"), 2, 0], [2, c("--fg"), 1, 1], [3, c("--orange"), 2, 0], [4, c("--orange-lo"), 1, 2]];
+      band.forEach(([qi, color, width, style]) => {
+        const s = chart.addSeries(LineSeries, { color, lineWidth: width, lineStyle: style, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
+        s.setData([{ time: lastT, value: lastC }, ...cone.map((e) => ({ time: snap(e.expiry), value: e.q[qi] }))]);
+      });
+    }
     // A marker on each bar where the published signal changed.
     const markers = [];
     let prev = null;
@@ -57,8 +75,9 @@ export default function CandleChart({ candles, signals, tf, theme, backfilled = 
       prev = sig;
     }
     createSeriesMarkers(candle, markers);
-    chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles.length - (tf === "4h" ? 180 : 160)), to: candles.length + 3 });
+    const ahead = bars.length - candles.length;
+    chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles.length - (tf === "4h" ? 180 : 160)), to: candles.length + Math.max(3, ahead + 2) });
     return () => chart.remove();
-  }, [candles, signals, tf, theme, backfilled]);
+  }, [candles, signals, tf, theme, backfilled, implied]);
   return <div ref={box} className="chart-box" />;
 }

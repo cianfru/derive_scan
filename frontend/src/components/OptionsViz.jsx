@@ -1,6 +1,6 @@
 // Options shown as structure: where open interest sits, how volatility is priced across expiries and strikes.
 import { useMemo } from "react";
-import { price, pct } from "../lib/format.js";
+import { price, pct, usd } from "../lib/format.js";
 
 const W = 640;
 
@@ -141,6 +141,63 @@ export function PricedRange({ index, iv30 }) {
       <div className="mono" style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)" }}>
         <span>{price(lo)}</span><span style={{ color: "var(--fg)" }}>{price(index)}</span><span>{price(hi)}</span>
       </div>
+    </div>
+  );
+}
+
+/** One row per expiry: the priced ranges as bars on a shared price axis, with the index marked. */
+export function PricedByDate({ implied, index }) {
+  const rows = (implied || []).slice(0, 9);
+  if (!rows.length) return <p className="status">Too few expiries.</p>;
+  const lo = Math.min(...rows.map((r) => r.q[0]), index), hi = Math.max(...rows.map((r) => r.q[4]), index);
+  const W2 = 640, L = 64, R = 12, rowH = 26, H = rows.length * rowH + 26;
+  const X = (v) => L + ((v - lo) / (hi - lo || 1)) * (W2 - L - R);
+  return (
+    <svg className="viz" viewBox={`0 0 ${W2} ${H}`} role="img" aria-label="Price ranges option prices imply, by expiry">
+      <line x1={X(index)} x2={X(index)} y1={4} y2={H - 20} stroke="var(--fg)" strokeDasharray="4 3" />
+      {rows.map((r, i) => {
+        const y = 8 + i * rowH;
+        return (
+          <g key={r.expiry}>
+            <text x={0} y={y + 13}>{new Date(r.expiry * 1000).toISOString().slice(5, 10)}</text>
+            <rect x={X(r.q[0])} y={y + 7} width={X(r.q[4]) - X(r.q[0])} height={4} fill="var(--orange-lo)" opacity=".7" />
+            <rect x={X(r.q[1])} y={y + 3} width={X(r.q[3]) - X(r.q[1])} height={12} fill="var(--orange)" />
+            <rect x={X(r.q[2]) - 1} y={y + 1} width={2} height={16} fill="var(--fg)" />
+            <title>{`${Math.round(r.days)} days: middle ${price(r.q[2])}; half between ${price(r.q[1])} and ${price(r.q[3])}; eight in ten between ${price(r.q[0])} and ${price(r.q[4])}`}</title>
+          </g>);
+      })}
+      <text x={X(lo)} y={H - 4}>{price(lo)}</text>
+      <text x={X(index)} y={H - 4} textAnchor="middle" style={{ fill: "var(--fg)" }}>{price(index)}</text>
+      <text x={X(hi)} y={H - 4} textAnchor="end">{price(hi)}</text>
+    </svg>
+  );
+}
+
+/** Taker buying vs selling of calls, puts and the perp, as mirrored bars (notional). */
+export function TakerFlow({ flow }) {
+  const kinds = [["call", "Calls"], ["put", "Puts"], ["perp", "Perp"]].filter(([k]) => flow?.[k]);
+  if (!kinds.length) return <p className="status">Builds as trades are recorded.</p>;
+  const max = Math.max(...kinds.map(([k]) => Math.max(flow[k].buy_notional_usd, flow[k].sell_notional_usd)), 1);
+  return (
+    <div style={{ display: "grid", gap: 12 }}>
+      <div className="mono" style={{ display: "grid", gridTemplateColumns: "56px 1fr 1fr", fontSize: 11, color: "var(--muted)" }}>
+        <span /><span style={{ textAlign: "right", paddingRight: 8 }}>Sold</span><span style={{ paddingLeft: 8 }}>Bought</span>
+      </div>
+      {kinds.map(([k, label]) => {
+        const f = flow[k];
+        return (
+          <div key={k} style={{ display: "grid", gridTemplateColumns: "56px 1fr 1fr", alignItems: "center", gap: 0 }}>
+            <span className="label" style={{ color: "var(--fg-2)" }}>{label}</span>
+            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, borderRight: "1px solid var(--seam-hi)", paddingRight: 6 }}>
+              <span className="mono dim" style={{ fontSize: 12 }}>{usd(f.sell_notional_usd)}</span>
+              <i style={{ height: 14, width: `${(f.sell_notional_usd / max) * 70}%`, background: "var(--sig-exit)", display: "block" }} />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 6 }}>
+              <i style={{ height: 14, width: `${(f.buy_notional_usd / max) * 70}%`, background: "var(--orange)", display: "block" }} />
+              <span className="mono dim" style={{ fontSize: 12 }}>{usd(f.buy_notional_usd)}</span>
+            </div>
+          </div>);
+      })}
     </div>
   );
 }

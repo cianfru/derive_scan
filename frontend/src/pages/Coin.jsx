@@ -4,7 +4,7 @@ import { useData } from "../lib/data.js";
 import { price, chg, pct, usd, title, utc, REGIME, DATA_LABEL } from "../lib/format.js";
 import { Signal, Tabs, Plate, Loading, Failed, Info } from "../components/ui.jsx";
 import CandleChart from "../components/CandleChart.jsx";
-import { OIWall, Smile, TermStructure, MiniSeries, PricedRange } from "../components/OptionsViz.jsx";
+import { OIWall, Smile, TermStructure, MiniSeries, PricedRange, PricedByDate, TakerFlow } from "../components/OptionsViz.jsx";
 
 function Readout({ row }) {
   if (!row) return <p className="status">No signal yet.</p>;
@@ -28,7 +28,8 @@ function Readout({ row }) {
   );
 }
 
-function OptionsPanel({ opts, und }) {
+function OptionsPanel({ opts, und, flow }) {
+  const [win, setWin] = useState("24h");
   const exps = opts.strikes?.expiries || {};
   const keys = Object.keys(exps).sort();
   const [sel, setSel] = useState("all");
@@ -73,6 +74,15 @@ function OptionsPanel({ opts, und }) {
           </Plate>
         </div>
       </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 460px), 1fr))", gap: 16 }}>
+        <Plate title="Priced outcomes by date" info="For each expiry: the range holding half of the outcomes option prices imply (thick) and eight in ten (thin), with the middle marked. Market pricing, not a view.">
+          <PricedByDate implied={opts.implied} index={index} />
+        </Plate>
+        <Plate title="Who is buying" info="Trades that crossed the spread, by side. Takers are the aggressive side: buying calls or selling puts leans up, buying puts or selling calls leans down. Hedges and income selling are mixed in."
+          right={<Tabs label="Window" value={win} onChange={setWin} items={[["24h", "24h"], ["7d", "7d"]]} />}>
+          <TakerFlow flow={flow?.[win]} />
+        </Plate>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", gap: 16 }}>
         <Plate title="ATM 30d, last 14 days"><MiniSeries points={hist.map((h) => [h[0], h[2]])} /></Plate>
         <Plate title="Skew 30d, last 14 days"><MiniSeries points={hist.map((h) => [h[0], h[4]])} zero color="var(--sig-exit)" format={(v) => (v * 100).toFixed(1)} /></Plate>
@@ -114,7 +124,15 @@ export default function Coin() {
       <Readout row={row} />
       <Plate title={`${und} · ${tf.toUpperCase()}`} info={<>Derive's index price with traded volume. Orange line: fast average; grey: slow. Markers show where the signal changed. {data.backfilled?.[tf] ? `The first ${data.backfilled[tf]} bars come from an external market, before Derive listed ${und}.` : ""}</>}
         right={<span className="status">{row?.signal_bar_close_time ? `Bar closed ${utc(row.signal_bar_close_time)}` : ""}</span>}>
-        <CandleChart candles={candles} signals={data.signals?.[tf]} tf={tf} theme={theme} backfilled={data.backfilled?.[tf] || 0} />
+        <CandleChart candles={candles} signals={data.signals?.[tf]} tf={tf} theme={theme} backfilled={data.backfilled?.[tf] || 0}
+          implied={data.options?.implied} />
+        {data.options?.implied?.length > 0 && (
+          <div className="chart-legend">
+            <span><i style={{ background: "var(--orange)" }} />Middle half of priced outcomes</span>
+            <span><i style={{ background: "var(--orange-lo)" }} />Eight in ten</span>
+            <span><i style={{ background: "var(--fg)" }} />Middle</span>
+            <Info>What option prices imply for each upcoming expiry, read from prices across all strikes. It shows where traders are paying for the price to be, not a view. Options tend to over-price large moves.</Info>
+          </div>)}
       </Plate>
       {pos && (
         <div className="figs">
@@ -130,7 +148,7 @@ export default function Coin() {
           <p className="mono" style={{ margin: 0, fontSize: 12.5, color: "var(--fg-2)", whiteSpace: "pre-wrap" }}>{data.latest[tf].signal_reason}</p>
         </Plate>
       )}
-      {data.options ? <OptionsPanel opts={data.options} und={und} /> : <p className="status">{und} has no options on Derive.</p>}
+      {data.options ? <OptionsPanel opts={data.options} und={und} flow={data.taker_flow} /> : <p className="status">{und} has no options on Derive.</p>}
     </div>
   );
 }
