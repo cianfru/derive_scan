@@ -1,0 +1,186 @@
+"""Build the app's data files from the data branch, for the `site-data` branch.
+
+    python publish_site.py --data DATA_DIR --site SITE_DIR
+
+The app reads only these files (one request per screen); nothing runs per user and users
+never reach Derive. The site-data branch is force-pushed with a single commit each run, so it
+keeps no history. Files:
+
+  markets.json        every perp: price, change, signals, regime, heat, z, ribbon, funding, OI,
+                      data status, options summary, sparkline; market-wide context
+  coins/{UND}.json    candles (4H, 1D) with signal history, latest rows, options detail
+                      (term structure, per-strike open interest and IV, 14-day IV history)
+  flow.json           last 24 hours: large trades, most active wallets
+  strikes/{UND}.json  written by record_once.py (per-strike view of the newest chain)
+"""
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import time
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from derive.candles import CandleCache
+
+SOURCE = "v2_mainnet"
+CANDLES_KEEP = {"4h": 500, "1d": 400}
+SIGNAL_DAYS = 120
+IV_DAYS = 14
+FLOW_LARGE = 80
+FLOW_WALLETS = 30
+
+
+def _days(n: int, now: float) -> list[str]:
+    d0 = datetime.fromtimestamp(now, timezone.utc).date()
+    return [(d0 - timedelta(days=i)).isoformat() for i in range(n - 1, -1, -1)]
+
+
+def _read_csv(p: Path) -> list[dict]:
+    return list(csv.DictReader(p.open())) if p.exists() else []
+
+
+def _num(x):
+    try:
+        v = float(x)
+        return int(v) if v.is_integer() and abs(v) < 1e15 else v
+    except (TypeError, ValueError):
+        return None
+
+
+def _write(path: Path, obj) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(obj, separators=(",", ":"), default=float))
+
+
+def signal_history(data: Path, now: float) -> dict:
+    """{UND: {tf: [[bar_close, signal, regime, zscore, heat, heat_phase, exhaustion, ribbon, unified]]}}"""
+    out: dict = defaultdict(lambda: defaultdict(list))
+    for tf in ("4h", "1d"):
+        for day in _days(SIGNAL_DAYS, now):
+            for r in _read_csv(data / "signals" / tf / f"{day}.csv"):
+                und = r["symbol"].split("-")[0]
+                out[und][tf].append([int(r["bar_close"]), r["signal"], r["regime"], _num(r["zscore"]), _num(r["heat"]),
+                                     r["heat_phase"], r["exhaustion_state"], r["ribbon"] or None, r["unified_signal"]])
+    return out
+
+
+def iv_history(data: Path, und: str, now: float) -> list[list]:
+    """[[ts, atm_iv_7d, atm_iv_30d, atm_iv_90d, rr25_30d, bf25_30d, pc_oi_ratio]] from the features files."""
+    keys = ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d", "bf25_30d", "pc_oi_ratio")
+    by: dict[int, dict] = defaultdict(dict)
+    for day in _days(IV_DAYS, now):
+        for r in _read_csv(data / SOURCE / und / "features" / f"{day}.csv"):
+            if r["feature"] in keys:
+                by[int(r["ts"])][r["feature"]] = _num(r["value"])
+    return [[ts, *[by[ts].get(k) for k in keys]] for ts in sorted(by)]
+
+
+def options_block(data: Path, site: Path, und: str, now: float) -> dict | None:
+    latest = data / SOURCE / und / "latest.json"
+    if not latest.exists():
+        return None
+    doc = json.loads(latest.read_text())
+    strikes_p = site / "strikes" / f"{und}.json"
+    strikes = json.loads(strikes_p.read_text()) if strikes_p.exists() else None
+    return {"ts": doc["ts"], "features": doc["features"], "expiries": doc["expiries"],
+            "strikes": strikes, "iv_history": iv_history(data, und, now)}
+
+
+def change_pct(closes: list[float], bars: int) -> float | None:
+    if len(closes) <= bars or not closes[-1 - bars]:
+        return None
+    return (closes[-1] / closes[-1 - bars] - 1) * 100
+
+
+def flow_block(data: Path, now: float) -> dict:
+    since_ms = (now - 86_400) * 1000
+    large = []
+    for day in _days(2, now):
+        for r in _read_csv(data / "flow" / "large" / f"{day}.csv"):
+            if int(r["ts"]) >= since_ms:
+                large.append(r)
+    large.sort(key=lambda r: float(r["notional_usd"]), reverse=True)
+    large = sorted(large[:FLOW_LARGE], key=lambda r: int(r["ts"]), reverse=True)
+    wallets: dict = defaultdict(lambda: defaultdict(float))
+    for day in _days(2, now):
+        for r in _read_csv(data / "flow" / "wallets" / f"{day}.csv"):
+            if int(r["run_ts"]) * 1000 < since_ms:
+                continue
+            w = wallets[r["wallet"]]
+            for k in ("legs", "perp_notional_usd", "option_notional_usd", "premium_bought_usd", "premium_sold_usd",
+                      "realized_pnl_usd", "fees_usd"):
+                w[k] += float(r[k] or 0)
+    top = sorted(wallets.items(), key=lambda kv: kv[1]["perp_notional_usd"] + kv[1]["option_notional_usd"],
+                 reverse=True)[:FLOW_WALLETS]
+    return {"since": int(since_ms // 1000),
+            "large": [{k: (_num(v) if k not in ("instrument", "kind", "underlying", "direction", "wallet") else v)
+                       for k, v in r.items()} for r in large],
+            "wallets": [{"wallet": a, **{k: round(v, 2) for k, v in w.items()}} for a, w in top]}
+
+
+def build(data: Path, site: Path, now: float | None = None) -> dict:
+    now = time.time() if now is None else now
+    sig_p = data / "signals" / "latest.json"
+    sig = json.loads(sig_p.read_text()) if sig_p.exists() else {"timeframes": {}, "universe": [], "context": {}}
+    rows = {tf: {r["symbol"]: r for r in (sig["timeframes"].get(tf) or {}).get("rows", [])} for tf in ("4h", "1d")}
+    cache = CandleCache(data)
+    history = signal_history(data, now)
+    markets = []
+    for sym in sig.get("universe", []):
+        und = sym.split("-")[0]
+        r4, r1 = rows["4h"].get(sym) or {}, rows["1d"].get(sym) or {}
+        candles = {}
+        for tf, keep in CANDLES_KEEP.items():
+            c = cache.load(und, tf)
+            candles[tf] = [] if c is None else [[int(c["timestamp"][i] // 1000), *(round(float(c[k][i]), 8) for k in
+                                                ("open", "high", "low", "close", "volume"))]
+                                                for i in range(max(0, len(c["close"]) - keep), len(c["close"]))]
+        closes4 = [b[4] for b in candles["4h"]]
+        opts = options_block(data, site, und, now)
+        pos = r4.get("positioning") or {}
+        price = (opts or {}).get("features", {}).get("index_price") or (closes4[-1] if closes4 else None)
+        markets.append({
+            "und": und, "symbol": sym, "price": price,
+            "chg_24h": change_pct(closes4, 6), "chg_7d": change_pct(closes4, 42),
+            "signal_4h": r4.get("signal"), "signal_1d": r1.get("signal"), "unified": r4.get("unified_signal"),
+            "regime_4h": r4.get("regime"), "regime_1d": r1.get("regime"), "z_4h": r4.get("zscore"),
+            "heat_4h": r4.get("heat"), "heat_phase_4h": r4.get("heat_phase"),
+            "ribbon_1d": (r1.get("ribbon") or {}).get("state"), "ribbon_4h": (r4.get("ribbon") or {}).get("state"),
+            "data_4h": r4.get("data_status"), "data_1d": r1.get("data_status"), "volume_status": r4.get("volume_status"),
+            "funding_ann": pos.get("funding_rate", 0) * 24 * 365 if pos else None,
+            "oi_usd": pos.get("oi_value"), "has_options": opts is not None,
+            "atm_iv_30d": (opts or {}).get("features", {}).get("atm_iv_30d"),
+            "rr25_30d": (opts or {}).get("features", {}).get("rr25_30d"),
+            "options": None if not opts else {
+                "ts": opts["ts"], **{k: opts["features"].get(k) for k in ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d",
+                                                                           "bf25_30d", "pc_oi_ratio", "option_oi_contracts")},
+                "term": [[round(e["tenor_days"], 3), e["atm_iv"]] for e in opts["expiries"] if e.get("atm_iv") is not None],
+                "iv30_hist": [[h[0], h[2]] for h in opts["iv_history"][-96 * 7:] if h[2] is not None][::4]},
+            "spark": closes4[-42:],
+        })
+        _write(site / "coins" / f"{und}.json", {
+            "und": und, "symbol": sym, "generated_at": int(now), "candles": candles,
+            "backfilled": {tf: cache.counts(und, tf)[1] for tf in CANDLES_KEEP},
+            "signals": history.get(und, {}), "latest": {"4h": r4 or None, "1d": r1 or None}, "options": opts,
+        })
+    meta = {"generated_at": int(now), "bars": {tf: (sig["timeframes"].get(tf) or {}).get("bar_close") for tf in ("4h", "1d")},
+            "consensus": {tf: ((sig["timeframes"].get(tf) or {}).get("consensus") or {}).get("consensus") for tf in ("4h", "1d")},
+            "context": sig.get("context", {})}
+    _write(site / "markets.json", {**meta, "coins": markets})
+    _write(site / "flow.json", {"generated_at": int(now), **flow_block(data, now)})
+    return {"coins": len(markets)}
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--data", required=True)
+    ap.add_argument("--site", required=True)
+    a = ap.parse_args()
+    print(build(Path(a.data), Path(a.site)))
+
+
+if __name__ == "__main__":
+    main()

@@ -65,7 +65,8 @@ def due_keys(settings: Settings, store: FileStore, slot: int) -> set[str]:
     return {k for k in keys if not (status.get(k, {}).get("ok") and status[k].get("ts") == slot)}
 
 
-async def record(settings: Settings, store: FileStore, slot: int, keys: set[str]) -> dict[str, dict]:
+async def record(settings: Settings, store: FileStore, slot: int, keys: set[str],
+                 site: Path | None = None) -> dict[str, dict]:
     from derive.recorder import Recorder  # needs httpx; the --due check does not
 
     rec = Recorder(settings, store)
@@ -74,6 +75,13 @@ async def record(settings: Settings, store: FileStore, slot: int, keys: set[str]
     finally:
         await rec.close()
     store.record_runs(slot, rec.status)
+    if site is not None:  # per-strike views for the app (published, not kept in the data branch)
+        for key, doc in rec.strikes.items():
+            source, und = key.split(":")
+            if source == settings.sources[0]:
+                p = site / "strikes" / f"{und}.json"
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text(json.dumps(doc, separators=(",", ":")))
     return rec.status
 
 
@@ -81,6 +89,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", required=True, help="data directory (the checked-out data branch)")
     ap.add_argument("--due", action="store_true", help="print due=true|false and exit")
+    ap.add_argument("--site", help="also write per-strike views here (the site-data checkout)")
     args = ap.parse_args()
     logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(levelname)s %(name)s %(message)s")
 
@@ -111,7 +120,7 @@ def main() -> int:
     if not keys:
         print(f"slot {slot} already recorded")
         return 0
-    status = asyncio.run(record(settings, store, slot, keys))
+    status = asyncio.run(record(settings, store, slot, keys, Path(args.site) if args.site else None))
     try:
         print("flow:", asyncio.run(record_flow(settings, out)))
     except Exception as e:  # the radar's feed must never stop the options recording

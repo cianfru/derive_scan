@@ -22,6 +22,18 @@ log = logging.getLogger(__name__)
 INSTRUMENTS_TTL = 3600
 
 
+def strike_rows(quotes: list[OptionQuote]) -> list[list]:
+    """[strike, call_oi, put_oi, call_iv, put_iv, call_delta] per strike, ascending."""
+    by: dict[float, list] = {}
+    for q in quotes:
+        row = by.setdefault(q.strike, [q.strike, 0.0, 0.0, None, None, None])
+        if q.kind == "C":
+            row[1], row[3], row[5] = q.oi, q.iv, q.delta
+        else:
+            row[2], row[4] = q.oi, q.iv
+    return [by[k] for k in sorted(by)]
+
+
 class Recorder:
     def __init__(self, settings: Settings, store: Store, clients: dict[str, DeriveClient] | None = None):
         self.s = settings
@@ -29,6 +41,8 @@ class Recorder:
         self.clients = clients or {src: DeriveClient(SOURCES[src]["base"]) for src in settings.sources}
         self._instruments: dict[tuple[str, str], tuple[float, list[dict]]] = {}
         self.status: dict[str, dict] = {}
+        # Per-strike view of the newest chain, per source:underlying (published for the app, not stored).
+        self.strikes: dict[str, dict] = {}
         self._lock_file = None
 
     # -- one snapshot -------------------------------------------------------
@@ -54,6 +68,7 @@ class Recorder:
             return {"expiries": 0, "options": 0, "features": 0}
         chain: dict[str, dict] = {}
         slices = []
+        strikes: dict[str, list] = {}
         index = None
         for exp in expiries:
             res = await client.public("get_tickers", {"instrument_type": "option", "currency": underlying,
@@ -70,11 +85,13 @@ class Recorder:
             chain.update(tickers)
             if quotes:
                 slices.append(expiry_slice(exp, ts, quotes))
+                strikes[str(exp)] = strike_rows(quotes)
         perp_res = await client.public("get_tickers", {"instrument_type": "perp", "currency": underlying})
         perp = (perp_res.get("tickers") or {}).get(perp_name(underlying))
         if perp and perp.get("I"):
             index = float(perp["I"])
         feats = surface_features(slices, index, perp)
+        self.strikes[f"{source}:{underlying}"] = {"ts": ts, "index": index, "expiries": strikes}
         chain_doc = {"options": chain, "perp": perp} if keep_chain else None
         if keep_slices:
             self.store.write_snapshot(ts, source, underlying, feats, slices, chain=chain_doc)
