@@ -107,3 +107,25 @@ def test_history_once_reads_days_and_checks_counts(tmp_path):
         assert len(fh.read().strip().splitlines()) == 3
     doc = json.loads((tmp_path / "history" / "wallets.json").read_text())
     assert doc["through"] == "2024-06-03" and doc["wallets"] == {}  # perp-only wallets are not classed
+
+
+def test_traders_leaderboard_and_cohorts(tmp_path):
+    from derive import traders
+    opt, live = "ETH-20240628-4000-C", "ETH-20991231-5000-C"
+    rows = []
+    for i in range(12):
+        rows += [{"wallet": "0xW", "instrument": opt, "buy_contracts": 1, "buy_value_usd": 50, "taker_legs": 1},
+                 {"wallet": "0xL", "instrument": opt, "sell_contracts": 1, "sell_value_usd": 50, "taker_legs": 1},
+                 {"wallet": "0xM", "instrument": opt, "buy_contracts": 1, "sell_contracts": 1, "maker_legs": 2}]
+    rows.append({"wallet": "0xW", "instrument": live, "buy_contracts": 2, "buy_value_usd": 300, "taker_legs": 1})
+    _write(tmp_path, date(2024, 6, 1), rows)
+    scan = history.scan_days(tmp_path)
+    cls = history.classify(tmp_path, {"ETH": {"20240628": 4300.0}}, as_of=1.75e9, scan=scan)
+    out = traders.build(scan, cls, as_of=1.75e9)
+    assert [t["address"] for t in out["traders"]] == ["0xW", "0xL"]  # market maker left out
+    w = out["traders"][0]
+    assert w["option_pnl"] == 12 * 250 and w["win_rate"] == 1.0 and w["pnl_cohort"] == "Humble Earner"
+    assert w["open"] == [[live, 2.0, 150.0]]
+    assert out["cohort_positions"]["pnl"]["Humble Earner"]["ETH"][live] == [2.0, 1]
+    pos = traders.mark_position(live, 2.0, 150.0, None, 3000.0, 1.75e9)
+    assert pos["delta_usd"] > 0 and pos["mark"] is None

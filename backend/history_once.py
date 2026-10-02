@@ -5,7 +5,8 @@
 Reads the oldest day not yet done (from December 2023), up to yesterday, until the budget is used;
 the next run carries on. Once caught up it reads each new day once, an hour after it ends. When
 any day was added, wallet classes and tiers are recomputed (history/wallets.json), with the
-open option positions of each tier (history/positions.json). See derive/history.py.
+open option positions of each tier (history/positions.json) and the traders' leaderboard and
+cohorts (history/traders.json, derive/traders.py). See derive/history.py.
 """
 from __future__ import annotations
 
@@ -16,7 +17,7 @@ import logging
 import time
 from pathlib import Path
 
-from derive import history
+from derive import history, traders
 from derive.client import DeriveClient
 from derive.config import SOURCES, Settings
 
@@ -43,11 +44,14 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
             unds = json.loads(uni.read_text()).get("underlyings", []) if uni.exists() else ["BTC", "ETH"]
             settlements = await history.update_settlements(client, out, unds)
             held: dict = {}
-            classes = history.classify(out, settlements, now, held)
+            scan = history.scan_days(out)
+            classes = history.classify(out, settlements, now, held, scan=scan)
             meta = {"as_of": int(now), "through": state["done_through"]}
             (out / "history" / "wallets.json").write_text(json.dumps({**meta, "wallets": classes}, separators=(",", ":")))
             (out / "history" / "positions.json").write_text(json.dumps(
                 {**meta, "positions": history.tier_positions(held, classes)}, separators=(",", ":")))
+            (out / "history" / "traders.json").write_text(json.dumps(
+                {**meta, **traders.build(scan, classes, now)}, separators=(",", ":")))
     finally:
         if own:
             await client.close()

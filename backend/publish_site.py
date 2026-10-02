@@ -11,6 +11,8 @@ keeps no history. Files:
   coins/{UND}.json    candles (4H, 1D) with signal history, latest rows, options detail
                       (term structure, per-strike open interest and IV, 14-day IV history,
                       implied ranges, open-interest levels, options lean), alignment by horizon
+  traders.json        options traders' leaderboard (market makers left out) and cohorts by results
+                      and size with their positioning; traders/{address}.json per ranked trader
   flow.json           last 24 hours: large trades, most active wallets (market makers left out once
                       the rebuilt history has classed them), with each wallet's class
   strikes/{UND}.json  written by record_once.py (per-strike view of the newest chain)
@@ -27,7 +29,8 @@ from pathlib import Path
 
 from derive.candles import CandleCache
 from derive.implied import implied_by_expiry, option_levels
-from derive.lean import alignment, options_lean
+from derive.lean import alignment, options_lean, state_of
+from derive import traders as traders_mod
 
 SOURCE = "v2_mainnet"
 CANDLES_KEEP = {"4h": 500, "1d": 400}
@@ -116,9 +119,9 @@ def change_pct(closes: list[float], bars: int) -> float | None:
 
 
 def wallet_classes(data: Path) -> dict[str, str]:
-    """{wallet: class} from the rebuilt history (derive/history.py); empty until it exists."""
+    """{wallet: tier or class} from the rebuilt history (derive/history.py); empty until it exists."""
     p = data / "history" / "wallets.json"
-    return {w: v["class"] for w, v in json.loads(p.read_text()).get("wallets", {}).items()} if p.exists() else {}
+    return {w: v.get("tier") or v["class"] for w, v in json.loads(p.read_text()).get("wallets", {}).items()} if p.exists() else {}
 
 
 def tier_positions(data: Path) -> dict:
@@ -156,6 +159,60 @@ def flow_block(data: Path, now: float) -> dict:
             "wallets": [{"wallet": a, "class": classes.get(a), **{k: round(v, 2) for k, v in w.items()}} for a, w in top]}
 
 
+COHORT_COINS = ("BTC", "ETH")
+
+
+def _book(open_rows: list, chains: dict, now: float) -> list[dict]:
+    out = []
+    for name, net, entry in open_rows:
+        und = name.split("-")[0]
+        strikes, index, _ = chains.get(und, (None, None, None))
+        out.append(traders_mod.mark_position(name, net, entry, strikes, index, now))
+    return out
+
+
+def _lean(book: list[dict]) -> dict:
+    net = sum(p["delta_usd"] or 0 for p in book)
+    gross = sum(abs(p["delta_usd"] or 0) for p in book)
+    score = round(net / gross, 3) if gross else None
+    return {"net_delta_usd": round(net, 2), "gross_delta_usd": round(gross, 2), "score": score, "state": state_of(score)}
+
+
+def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) -> None:
+    """traders.json (leaderboard and cohorts) and traders/{address}.json (one per ranked trader)."""
+    p = data / "history" / "traders.json"
+    if not p.exists():
+        _write(site / "traders.json", {"generated_at": int(now), "ready": False})
+        return
+    doc = json.loads(p.read_text())
+    rows = []
+    for t in doc["traders"]:
+        book = _book(t["open"], chains, now)
+        summary = {k: v for k, v in t.items() if k not in ("open", "recent")}
+        summary.update({"open_count": len(book), "lean": _lean(book),
+                        "upnl": round(sum(b["upnl"] for b in book if b["upnl"] is not None), 2)
+                        if any(b["upnl"] is not None for b in book) else None})
+        rows.append(summary)
+        large = [r for r in flow.get("large", []) if (r.get("wallet") or "").lower() == t["address"].lower()]
+        _write(site / "traders" / f"{t['address'].lower()}.json",
+               {"generated_at": int(now), "through": doc.get("through"), **summary, "book": book, "recent": t["recent"],
+                "large_24h": large})
+    cohorts = {}
+    order = {"pnl": [c[0] for c in traders_mod.PNL_COHORTS][::-1], "size": [c[0] for c in traders_mod.SIZE_COHORTS][::-1]}
+    for dim, names in order.items():
+        cohorts[dim] = []
+        for name in names:
+            per = doc["cohort_positions"].get(dim, {}).get(name, {})
+            coins = {}
+            for und in list(COHORT_COINS) + ["Other"]:
+                insts = per.get(und, {}) if und != "Other" else {i: c for u, d in per.items() if u not in COHORT_COINS for i, c in d.items()}
+                book = _book([[i, c[0], None] for i, c in insts.items()], chains, now)
+                coins[und] = {**_lean(book), "positions": sum(c[1] for c in insts.values())}
+            cohorts[dim].append({"name": name, "wallets": doc["cohort_counts"].get(dim, {}).get(name, 0), "coins": coins})
+    _write(site / "traders.json", {"generated_at": int(now), "ready": True, "through": doc.get("through"),
+                                   "ranked_total": doc.get("ranked_total"), "traders": rows, "cohorts": cohorts})
+
+
 def build(data: Path, site: Path, now: float | None = None) -> dict:
     now = time.time() if now is None else now
     sig_p = data / "signals" / "latest.json"
@@ -165,6 +222,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     history = signal_history(data, now)
     flows = taker_sides(data, now)
     held = tier_positions(data)
+    chains: dict = {}  # und -> (strikes, index, ts) for valuing traders' positions
     markets = []
     for sym in sig.get("universe", []):
         und = sym.split("-")[0]
@@ -179,6 +237,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
         opts = options_block(data, site, und, now)
         align = None
         if opts:
+            chains[und] = (opts["strikes"], opts["features"].get("index_price"), opts["ts"])
             opts["lean"] = options_lean(opts["features"], opts["iv_history"], (flows.get(und) or {}).get("7d"))
             align = alignment(r4.get("signal"), r1.get("signal"), opts["features"], opts["iv_history"], flows.get(und),
                               (held.get("positions") or {}).get(und), opts["strikes"], opts["features"].get("index_price"),
@@ -218,7 +277,13 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "consensus": {tf: ((sig["timeframes"].get(tf) or {}).get("consensus") or {}).get("consensus") for tf in ("4h", "1d")},
             "context": sig.get("context", {})}
     _write(site / "markets.json", {**meta, "coins": markets})
-    _write(site / "flow.json", {"generated_at": int(now), **flow_block(data, now)})
+    flow = flow_block(data, now)
+    tp = data / "history" / "traders.json"
+    ranked = {t["address"].lower() for t in json.loads(tp.read_text())["traders"]} if tp.exists() else set()
+    for r in flow["large"] + flow["wallets"]:
+        r["ranked"] = (r.get("wallet") or "").lower() in ranked
+    _write(site / "flow.json", {"generated_at": int(now), **flow})
+    traders_block(data, site, chains, flow, now)
     return {"coins": len(markets)}
 
 

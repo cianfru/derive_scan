@@ -12,6 +12,7 @@ history/days/YYYY-MM-DD.csv.gz   one row per wallet and instrument traded that d
 history/settlements/{UND}.json   option settlement prices per expiry (Derive)
 history/wallets.json             each wallet's class and tier from all days so far (rules in the study doc)
 history/positions.json           open option contracts per instrument held by each tier's wallets
+history/traders.json             leaderboard, open positions, recent activity, cohorts (derive/traders.py)
 history/state.json               days done
 
 Positions are not stored: a wallet's open contracts in an instrument are the running sum of its
@@ -218,7 +219,57 @@ async def update_settlements(client, root: Path, unds: list[str]) -> dict[str, d
     return out
 
 
-def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float, held: dict | None = None) -> dict:
+RECENT_DAYS = 45
+
+
+def scan_days(root: Path) -> dict:
+    """One pass over every day file: per-wallet and per-(wallet, instrument) totals, the days each
+    wallet traded options, option and perp delta per wallet, day and coin, and the last
+    RECENT_DAYS days of option rows (for trader pages)."""
+    w: dict = defaultdict(lambda: defaultdict(float))
+    inst: dict = defaultdict(lambda: defaultdict(float))  # (wallet, instrument) -> totals
+    days_seen: dict = defaultdict(set)
+    day_delta: dict = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))  # wallet -> (day, und) -> [opt, perp]
+    coins: dict = defaultdict(lambda: defaultdict(float))  # wallet -> und -> premium traded
+    files = sorted((root / "history" / "days").glob("*.csv.gz"))
+    recent_from = files[-RECENT_DAYS].name[:10] if len(files) >= RECENT_DAYS else ""
+    recent: dict = defaultdict(list)  # wallet -> [[day, instrument, buy, sell, buy_value, sell_value]]
+    for p in files:
+        day = p.name[:10]
+        for r in read_day(p):
+            wallet, name = r["wallet"], r["instrument"]
+            und = name.split("-")[0]
+            buy, sell = _f(r["buy_contracts"]), _f(r["sell_contracts"])
+            if name.endswith("-PERP"):
+                w[wallet]["perp_pnl"] += _f(r["realized_pnl_usd"])
+                day_delta[wallet][(day, und)][1] += _f(r["delta_usd"])
+                continue
+            a = w[wallet]
+            bv, sv = _f(r["buy_value_usd"]), _f(r["sell_value_usd"])
+            a["legs"] += _f(r["maker_legs"]) + _f(r["taker_legs"])
+            a["maker_legs"] += _f(r["maker_legs"])
+            a["bought"] += bv
+            a["sold"] += sv
+            a["otm_sold"] += _f(r["otm_sell_usd"])
+            coins[wallet][und] += bv + sv
+            days_seen[wallet].add(day)
+            i = inst[(wallet, name)]
+            i["net"] += buy - sell
+            i["cash"] += sv - bv
+            i["buy"] += buy
+            i["sell"] += sell
+            i["buy_value"] += bv
+            i["sell_value"] += sv
+            i["days"] += 1
+            i["both"] += 1 if buy > 0 and sell > 0 else 0
+            day_delta[wallet][(day, und)][0] += _f(r["delta_usd"])
+            if day >= recent_from:
+                recent[wallet].append([day, name, round(buy, 6), round(sell, 6), round(bv, 2), round(sv, 2)])
+    return {"w": w, "inst": inst, "days_seen": days_seen, "day_delta": day_delta, "coins": coins, "recent": recent}
+
+
+def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float, held: dict | None = None,
+             scan: dict | None = None) -> dict:
     """Each wallet's class from every day file, using information up to as_of only.
 
     Market maker: > 60% of option legs as maker, or both sides of the same instrument on the same
@@ -231,34 +282,8 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float,
     the top fifth of all directional wallets, "smart" for the best 50, "profitable" for the rest.
     held, when given, receives {(wallet, instrument): net contracts} for instruments not yet expired.
     """
-    w: dict = defaultdict(lambda: defaultdict(float))
-    inst: dict = defaultdict(lambda: defaultdict(float))  # (wallet, instrument) -> totals
-    days_seen: dict = defaultdict(set)
-    day_delta: dict = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))  # wallet -> (day, und) -> [opt, perp]
-    for p in sorted((root / "history" / "days").glob("*.csv.gz")):
-        day = p.name[:10]
-        for r in read_day(p):
-            wallet, name = r["wallet"], r["instrument"]
-            und = name.split("-")[0]
-            buy, sell = _f(r["buy_contracts"]), _f(r["sell_contracts"])
-            if name.endswith("-PERP"):
-                w[wallet]["perp_pnl"] += _f(r["realized_pnl_usd"])
-                day_delta[wallet][(day, und)][1] += _f(r["delta_usd"])
-                continue
-            a = w[wallet]
-            legs = _f(r["maker_legs"]) + _f(r["taker_legs"])
-            a["legs"] += legs
-            a["maker_legs"] += _f(r["maker_legs"])
-            a["bought"] += _f(r["buy_value_usd"])
-            a["sold"] += _f(r["sell_value_usd"])
-            a["otm_sold"] += _f(r["otm_sell_usd"])
-            days_seen[wallet].add(day)
-            i = inst[(wallet, name)]
-            i["net"] += buy - sell
-            i["cash"] += _f(r["sell_value_usd"]) - _f(r["buy_value_usd"])
-            i["days"] += 1
-            i["both"] += 1 if buy > 0 and sell > 0 else 0
-            day_delta[wallet][(day, und)][0] += _f(r["delta_usd"])
+    scan = scan or scan_days(root)
+    w, inst, days_seen, day_delta = scan["w"], scan["inst"], scan["days_seen"], scan["day_delta"]
     for (wallet, name), i in inst.items():
         a = w[wallet]
         if held is not None and abs(i["net"]) > 1e-9:
@@ -272,7 +297,10 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float,
             settle = settlements.get(opt[0], {}).get(name.split("-")[1])
             if settle is not None:
                 payoff = max(settle - opt[2], 0.0) if opt[3] == "C" else max(opt[2] - settle, 0.0)
-                a["option_pnl"] += i["cash"] + i["net"] * payoff
+                pnl = i["cash"] + i["net"] * payoff
+                a["option_pnl"] += pnl
+                a["expired"] += 1
+                a["wins"] += 1 if pnl > 0 else 0
     out = {}
     for wallet, a in w.items():
         if not a["legs"]:
@@ -288,7 +316,9 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float,
                  "otm_sold_share": round(a["otm_sold"] / a["sold"], 3) if a["sold"] else 0,
                  "hedged_days_share": round(hedged / len(opt_days), 3) if opt_days else 0,
                  "first": days[0], "last": days[-1], "active_days": span,
-                 "option_pnl": round(a["option_pnl"], 2), "perp_pnl": round(a["perp_pnl"], 2)}
+                 "option_pnl": round(a["option_pnl"], 2), "perp_pnl": round(a["perp_pnl"], 2),
+                 "expired": int(a["expired"]), "win_rate": round(a["wins"] / a["expired"], 3) if a["expired"] else None,
+                 "premium_traded": round(premium, 2)}
         if stats["maker_share"] > MM_MAKER_SHARE or stats["both_sides_share"] > MM_BOTH_SIDES_SHARE:
             cls = "market_maker"
         elif stats["sold_share"] > INCOME_SOLD_SHARE and stats["otm_sold_share"] >= INCOME_OTM_SHARE:

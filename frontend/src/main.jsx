@@ -8,6 +8,8 @@ import Markets from "./pages/Markets.jsx";
 import Coin from "./pages/Coin.jsx";
 import Options from "./pages/Options.jsx";
 import Flow from "./pages/Flow.jsx";
+import Traders from "./pages/Traders.jsx";
+import Trader from "./pages/Trader.jsx";
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -18,6 +20,8 @@ createRoot(document.getElementById("root")).render(
           <Route path="markets" element={<Markets />} />
           <Route path="coin/:und" element={<Coin />} />
           <Route path="options" element={<Options />} />
+          <Route path="traders" element={<Traders />} />
+          <Route path="trader/:address" element={<Trader />} />
           <Route path="flow" element={<Flow />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
