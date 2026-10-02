@@ -27,6 +27,8 @@ Torq is the product name (owner, 1 October 2026). Reflex's signals on Derive (de
 - Core: the signal engine (ported from Reflex) on Derive's perps. Differentiator: options, shown as visual market structure (what traders pay for protection, where open interest sits, how the surface is shaped, the price ranges option prices imply per expiry), made easy to read, labelled as market pricing, never as a forecast.
 - Options traders (owner, 2 October 2026): rebuild Derive's options trade history by wallet (since mid-2024) and study whether skilled directional options wallets lead price, the options counterpart of Reflex's profitable traders. Market makers, income sellers and hedgers are filtered out first. Declared study: `docs/options-traders-study.md`, rules approved by the owner 2 October 2026 before any result; until a verdict, positioning is context. Market makers are noise to the owner: never shown in the app (Flow, taker sides).
 - Options on the chart (owner, 2 October 2026): no single price path (option prices encode a spread, not a direction). The chart shows the middle half of priced outcomes with the upside edge green and the downside red (asymmetry visible), and the call wall, put wall and max pain. An "options lean" (skew vs its range, taker premium, put/call change, short-dated stress) sits beside the engine's signal, never inside it.
+- Focus (owner, 2 October 2026): Torq is built around the coins with options on Derive; perps without options stay available (no cost) behind "Perps only" on Markets but get no new work. The core view is alignment: for the next 7 and 30 days, the engine's direction, option prices and smart wallets' positions side by side (`derive/lean.py`), shown on coin pages and sorting Markets.
+- Smart wallets (owner, 2 October 2026): tiers among profitable directional options wallets, Top (best fifth, the study's set), Smart (best 50, the app's default), Profitable (all in profit).
 - Quality bar: excellent UI, refined, fast, clean, no friction, easy to understand.
 
 ## Roadmap (approved 2 October 2026)
@@ -35,7 +37,7 @@ Torq is the product name (owner, 1 October 2026). Reflex's signals on Derive (de
 2. Torq design system: first version done 2 October 2026 (`frontend/src/styles.css`); refine with the owner.
 3. The app: first version live 2 October 2026 (markets, coin pages with options panel, options overview, flow). Next: regime history replayed over past bars for the chart, refinement to Reflex-grade polish.
 4. Radar from Derive's wallet-level trade flow (best wallets over time, large options flow); a first Flow page exists. Landing rebuilt with the brand (done); keep refining. Derive's V3 docs describe public trades as anonymised, so the radar may lose wallet detail when V3 replaces V2.
-5. Options traders: cone, option levels, options lean, taker positioning and the history rebuild (`history_once.py`, from December 2023, catching up in the Action) built 2 October 2026; study rules approved. Next: positioning by wallet class on coin pages, then the study (part 2) once the history has caught up.
+5. Options traders: cone, option levels, options lean, taker positioning and the history rebuild (`history_once.py`, from December 2023, catching up in the Action) built 2 October 2026; study rules approved. Alignment grid and wallet tiers built 2 October 2026. Next: the study (part 2) once the history has caught up.
 6. Later, with the owner's explicit approval: execution on Derive perps (testnet, dry-run first); a vault on Derive V3 (design doc first).
 
 ## Findings so far
@@ -43,6 +45,7 @@ Torq is the product name (owner, 1 October 2026). Reflex's signals on Derive (de
 - Derive's surface tracks the wider market closely; V3 testnet copies mainnet prices almost exactly (only open interest differs). Build on testnet, research on mainnet data only.
 - ETH open interest on Derive is mostly calls (put/call ~0.07 vs ~0.38 for BTC), probably call-selling vaults (unverified): treat ETH put/call as structure, not sentiment.
 - V2 refuses some default library user agents (HTTP 403); the client sends its own.
+- V3 public trades (checked 2 October 2026): the docs call them "anonymized", yet the response schema still requires `wallet` and `subaccount_id`, and V3 testnet returns addresses (mostly one testing wallet). Whether mainnet keeps real wallets is unknown until it launches. The V2 history already rebuilt stays; only live wallet tracking is at risk. Unfiltered V3 queries are limited to a 30-day window (the recorder reads every 15 minutes, so unaffected).
 - V3 mainnet has no date in Derive's docs; the move is described as awaiting a governance vote.
 
 ## Owner's standing rules

@@ -10,7 +10,7 @@ keeps no history. Files:
                       data status, options summary, sparkline; market-wide context
   coins/{UND}.json    candles (4H, 1D) with signal history, latest rows, options detail
                       (term structure, per-strike open interest and IV, 14-day IV history,
-                      implied ranges, open-interest levels, options lean)
+                      implied ranges, open-interest levels, options lean), alignment by horizon
   flow.json           last 24 hours: large trades, most active wallets (market makers left out once
                       the rebuilt history has classed them), with each wallet's class
   strikes/{UND}.json  written by record_once.py (per-strike view of the newest chain)
@@ -27,7 +27,7 @@ from pathlib import Path
 
 from derive.candles import CandleCache
 from derive.implied import implied_by_expiry, option_levels
-from derive.lean import options_lean
+from derive.lean import alignment, options_lean
 
 SOURCE = "v2_mainnet"
 CANDLES_KEEP = {"4h": 500, "1d": 400}
@@ -72,8 +72,8 @@ def signal_history(data: Path, now: float) -> dict:
 
 
 def iv_history(data: Path, und: str, now: float) -> list[list]:
-    """[[ts, atm_iv_7d, atm_iv_30d, atm_iv_90d, rr25_30d, bf25_30d, pc_oi_ratio]] from the features files."""
-    keys = ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d", "bf25_30d", "pc_oi_ratio")
+    """[[ts, atm_iv_7d, atm_iv_30d, atm_iv_90d, rr25_30d, bf25_30d, pc_oi_ratio, rr25_7d]] from the features files."""
+    keys = ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d", "bf25_30d", "pc_oi_ratio", "rr25_7d")
     by: dict[int, dict] = defaultdict(dict)
     for day in _days(IV_DAYS, now):
         for r in _read_csv(data / SOURCE / und / "features" / f"{day}.csv"):
@@ -121,6 +121,12 @@ def wallet_classes(data: Path) -> dict[str, str]:
     return {w: v["class"] for w, v in json.loads(p.read_text()).get("wallets", {}).items()} if p.exists() else {}
 
 
+def tier_positions(data: Path) -> dict:
+    """history/positions.json (open option positions of each wallet tier); empty until it exists."""
+    p = data / "history" / "positions.json"
+    return json.loads(p.read_text()) if p.exists() else {}
+
+
 def flow_block(data: Path, now: float) -> dict:
     """Large taker trades and the most active wallets, market makers left out."""
     since_ms = (now - 86_400) * 1000
@@ -158,6 +164,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     cache = CandleCache(data)
     history = signal_history(data, now)
     flows = taker_sides(data, now)
+    held = tier_positions(data)
     markets = []
     for sym in sig.get("universe", []):
         und = sym.split("-")[0]
@@ -170,8 +177,13 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                                                 for i in range(max(0, len(c["close"]) - keep), len(c["close"]))]
         closes4 = [b[4] for b in candles["4h"]]
         opts = options_block(data, site, und, now)
+        align = None
         if opts:
             opts["lean"] = options_lean(opts["features"], opts["iv_history"], (flows.get(und) or {}).get("7d"))
+            align = alignment(r4.get("signal"), r1.get("signal"), opts["features"], opts["iv_history"], flows.get(und),
+                              (held.get("positions") or {}).get(und), opts["strikes"], opts["features"].get("index_price"),
+                              opts["ts"])
+            align["positions_through"] = held.get("through")
         pos = r4.get("positioning") or {}
         price = (opts or {}).get("features", {}).get("index_price") or (closes4[-1] if closes4 else None)
         markets.append({
@@ -187,6 +199,8 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "atm_iv_30d": (opts or {}).get("features", {}).get("atm_iv_30d"),
             "rr25_30d": (opts or {}).get("features", {}).get("rr25_30d"),
             "lean": ((opts or {}).get("lean") or {}).get("state"),
+            "align": None if not align else {"score": align["score"], **{h: [row[k]["state"] for k in ("engine", "options", "wallets")]
+                                                                          for h, row in align["horizons"].items()}},
             "options": None if not opts else {
                 "ts": opts["ts"], **{k: opts["features"].get(k) for k in ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d",
                                                                            "bf25_30d", "pc_oi_ratio", "option_oi_contracts")},
@@ -198,7 +212,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "und": und, "symbol": sym, "generated_at": int(now), "candles": candles,
             "backfilled": {tf: cache.counts(und, tf)[1] for tf in CANDLES_KEEP},
             "signals": history.get(und, {}), "latest": {"4h": r4 or None, "1d": r1 or None}, "options": opts,
-            "taker_flow": flows.get(und),
+            "taker_flow": flows.get(und), "alignment": align,
         })
     meta = {"generated_at": int(now), "bars": {tf: (sig["timeframes"].get(tf) or {}).get("bar_close") for tf in ("4h", "1d")},
             "consensus": {tf: ((sig["timeframes"].get(tf) or {}).get("consensus") or {}).get("consensus") for tf in ("4h", "1d")},

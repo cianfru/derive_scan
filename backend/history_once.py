@@ -4,7 +4,8 @@
 
 Reads the oldest day not yet done (from December 2023), up to yesterday, until the budget is used;
 the next run carries on. Once caught up it reads each new day once, an hour after it ends. When
-any day was added, wallet classes are recomputed (history/wallets.json). See derive/history.py.
+any day was added, wallet classes and tiers are recomputed (history/wallets.json), with the
+open option positions of each tier (history/positions.json). See derive/history.py.
 """
 from __future__ import annotations
 
@@ -41,9 +42,12 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
             uni = out / "universe.json"
             unds = json.loads(uni.read_text()).get("underlyings", []) if uni.exists() else ["BTC", "ETH"]
             settlements = await history.update_settlements(client, out, unds)
-            classes = history.classify(out, settlements, now)
-            (out / "history" / "wallets.json").write_text(json.dumps(
-                {"as_of": int(now), "through": state["done_through"], "wallets": classes}, separators=(",", ":")))
+            held: dict = {}
+            classes = history.classify(out, settlements, now, held)
+            meta = {"as_of": int(now), "through": state["done_through"]}
+            (out / "history" / "wallets.json").write_text(json.dumps({**meta, "wallets": classes}, separators=(",", ":")))
+            (out / "history" / "positions.json").write_text(json.dumps(
+                {**meta, "positions": history.tier_positions(held, classes)}, separators=(",", ":")))
     finally:
         if own:
             await client.close()

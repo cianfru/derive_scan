@@ -4,11 +4,11 @@ import { useData } from "../lib/data.js";
 import { usd, shortAddr, ago, price } from "../lib/format.js";
 import { Plate, Tabs, Loading, Failed, Info } from "../components/ui.jsx";
 
-const CLASS = { skilled: "Skilled", directional: "Directional", income: "Income", hedger: "Hedger", occasional: "Occasional" };
-const CLASS_INFO = "Wallet types from every trade on Derive since December 2023. Skilled: directional traders with the best results on options that have expired. Directional: regular traders taking a view. Income: mostly sells out-of-the-money options. Hedger: offsets its options with perps. Occasional: too few trades to tell. Market makers are left out.";
+const CLASS = { top: "Top", smart: "Smart", profitable: "Profitable", directional: "Directional", income: "Income", hedger: "Hedger", occasional: "Occasional" };
+const CLASS_INFO = "Wallet types from every trade on Derive since December 2023. Directional traders who are in profit on options that have expired are ranked: Top (best fifth), Smart (best 50), Profitable (the rest in profit). Directional: taking a view, not in profit. Income: mostly sells out-of-the-money options. Hedger: offsets its options with perps. Occasional: too few trades to tell. Market makers are left out.";
 
 function Kind({ c }) {
-  return c ? <span className={c === "skilled" ? "orange" : "dim"} style={{ fontSize: 12 }}>{CLASS[c] || c}</span> : <span className="faint">-</span>;
+  return c ? <span className={c === "top" || c === "smart" ? "orange" : "dim"} style={{ fontSize: 12 }}>{CLASS[c] || c}</span> : <span className="faint">-</span>;
 }
 
 export default function Flow() {

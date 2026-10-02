@@ -34,7 +34,8 @@ Built 2 October 2026: `backend/derive/history.py`, run by `history_once.py` in t
 - Income sellers (vaults, covered calls, cash-secured puts): more than 80% of option premium sold, mostly out-of-the-money. Excluded from the directional set; shown separately as structure.
 - Hedgers: a perp position opposite to their option delta covering at least half of it. Excluded.
 - Directional: the rest, with at least 20 option legs and at least 90 days active.
-- Skilled directional: the top fifth of directional wallets by realised PnL in the training window, using only trades closed inside it.
+- Skilled directional: the top fifth of directional wallets by realised PnL in the training window, using only trades closed inside it. This is the "Top" tier and the set the verdict is decided on.
+- Added by the owner on 2 October 2026, before any result: two wider tiers for depth, ranked the same way and among wallets with positive PnL only. "Smart": the best 50 (and every Top wallet). "Profitable": every directional wallet in profit. The test reports the main statistic for both; they do not decide the verdict. The app shows Smart by default.
 
 ### Measure and outcome
 
@@ -70,4 +71,4 @@ Otherwise the result is "context, not a signal", and positioning is shown withou
 - Option levels (built 2 October 2026): call wall, put wall and max pain over the next 30 days, on the coin chart.
 - Options lean (built 2 October 2026): skew against its own range, taker premium (market makers left out), put/call change, short-dated stress; beside the engine's signal, never part of it.
 - Market makers left out of Flow and of taker sides as soon as the rebuilt history classes them; every other wallet shows its type.
-- Next: positioning by wallet class (skilled directional, income sellers, hedgers) per coin, as context.
+- Alignment (built 2 October 2026): for the next 7 and 30 days, the engine (4H, 1D), option prices and the Smart tier's open positions on expiries inside the window (net delta as a share of gross, from `history/positions.json`), each read as up, neutral or defensive. Side by side, never combined into a signal.

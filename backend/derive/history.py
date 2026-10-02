@@ -10,7 +10,8 @@ history/days/YYYY-MM-DD.csv.gz   one row per wallet and instrument traded that d
     each trade's price, on the index; perps: contracts x index), contract-weighted implied
     volatility, premium sold out of the money, realised PnL and fees as Derive reports them
 history/settlements/{UND}.json   option settlement prices per expiry (Derive)
-history/wallets.json             each wallet's class from all days so far (rules in the study doc)
+history/wallets.json             each wallet's class and tier from all days so far (rules in the study doc)
+history/positions.json           open option contracts per instrument held by each tier's wallets
 history/state.json               days done
 
 Positions are not stored: a wallet's open contracts in an instrument are the running sum of its
@@ -44,7 +45,9 @@ HEDGE_COVER = 0.50
 HEDGE_DAYS_SHARE = 0.50
 MIN_LEGS = 20
 MIN_ACTIVE_DAYS = 90
-SKILLED_FRACTION = 0.20
+TOP_FRACTION = 0.20   # tier "top": the study's main set
+SMART_COUNT = 50      # tier "smart": the 50 best profitable directional wallets
+TIERS = ("top", "smart", "profitable")
 
 
 def _f(x) -> float:
@@ -215,7 +218,7 @@ async def update_settlements(client, root: Path, unds: list[str]) -> dict[str, d
     return out
 
 
-def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float) -> dict:
+def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float, held: dict | None = None) -> dict:
     """Each wallet's class from every day file, using information up to as_of only.
 
     Market maker: > 60% of option legs as maker, or both sides of the same instrument on the same
@@ -223,8 +226,10 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float)
     sold, and at least half of it out of the money. Hedger: on more than half of the days it
     traded options, its perp trades that day offset at least half of the option delta added.
     Directional: the rest with at least 20 option legs over at least 90 days. Skilled: directional
-    wallets with positive option PnL in the top fifth by option PnL. Option PnL counts instruments
-    already expired: premium received minus paid plus contracts held at expiry x settlement value.
+    wallets get a tier by option PnL (instruments already expired: premium received minus paid
+    plus contracts held at expiry x settlement value), among those with positive PnL: "top" for
+    the top fifth of all directional wallets, "smart" for the best 50, "profitable" for the rest.
+    held, when given, receives {(wallet, instrument): net contracts} for instruments not yet expired.
     """
     w: dict = defaultdict(lambda: defaultdict(float))
     inst: dict = defaultdict(lambda: defaultdict(float))  # (wallet, instrument) -> totals
@@ -256,6 +261,10 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float)
             day_delta[wallet][(day, und)][0] += _f(r["delta_usd"])
     for (wallet, name), i in inst.items():
         a = w[wallet]
+        if held is not None and abs(i["net"]) > 1e-9:
+            o = parse_option(name)
+            if o and o[1] > as_of:
+                held[(wallet, name)] = i["net"]
         a["instruments"] += 1
         a["both_instruments"] += 1 if i["both"] else 0
         opt = parse_option(name)
@@ -291,9 +300,23 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float)
         else:
             cls = "occasional"
         out[wallet] = {"class": cls, **stats}
-    directional = sorted((v["option_pnl"], k) for k, v in out.items() if v["class"] == "directional")
-    n = max(1, round(len(directional) * SKILLED_FRACTION)) if directional else 0
-    for pnl, k in directional[::-1][:n]:
-        if pnl > 0:
-            out[k]["class"] = "skilled"
+    directional = sorted(((v["option_pnl"], k) for k, v in out.items() if v["class"] == "directional"), reverse=True)
+    n_top = max(1, round(len(directional) * TOP_FRACTION)) if directional else 0
+    for rank, (pnl, k) in enumerate(directional):
+        out[k]["tier"] = None if pnl <= 0 else "top" if rank < n_top else "smart" if rank < SMART_COUNT else "profitable"
     return out
+
+
+def tier_positions(held: dict, wallets: dict) -> dict:
+    """{UND: {instrument: {tier: [net contracts, wallets]}}} for open instruments, per tier and the
+    tiers above it (smart includes top; profitable includes both)."""
+    out: dict = defaultdict(lambda: defaultdict(lambda: {t: [0.0, 0] for t in TIERS}))
+    for (wallet, name), net in held.items():
+        tier = (wallets.get(wallet) or {}).get("tier")
+        if tier not in TIERS:
+            continue
+        for t in TIERS[TIERS.index(tier):]:
+            cell = out[name.split("-")[0]][name][t]
+            cell[0] = round(cell[0] + net, 6)
+            cell[1] += 1
+    return {u: dict(v) for u, v in out.items()}

@@ -4,6 +4,7 @@ import { useData } from "../lib/data.js";
 import { price, chg, pct, usd, title, utc, REGIME, DATA_LABEL } from "../lib/format.js";
 import { Signal, Tabs, Plate, Loading, Failed, Info } from "../components/ui.jsx";
 import CandleChart from "../components/CandleChart.jsx";
+import AlignmentGrid, { ALIGN_INFO } from "../components/Alignment.jsx";
 import { OIWall, Smile, TermStructure, MiniSeries, PricedRange, PricedByDate, TakerFlow } from "../components/OptionsViz.jsx";
 
 function Readout({ row }) {
@@ -173,6 +174,10 @@ export default function Coin() {
         </div>
       </div>
       <Readout row={row} />
+      {data.alignment && (
+        <Plate title="Alignment" info={ALIGN_INFO}>
+          <AlignmentGrid alignment={data.alignment} />
+        </Plate>)}
       <Plate title={`${und} · ${tf.toUpperCase()}`} info={<>Derive's index price with traded volume. Orange line: fast average; grey: slow. Markers show where the signal changed. {data.backfilled?.[tf] ? `The first ${data.backfilled[tf]} bars come from an external market, before Derive listed ${und}.` : ""}</>}
         right={<span className="status">{row?.signal_bar_close_time ? `Bar closed ${utc(row.signal_bar_close_time)}` : ""}</span>}>
         <CandleChart candles={candles} signals={data.signals?.[tf]} tf={tf} theme={theme} backfilled={data.backfilled?.[tf] || 0}

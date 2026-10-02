@@ -64,11 +64,23 @@ def test_classify(tmp_path):
                          "delta_usd": 1000})
             rows.append({"wallet": "0xH", "instrument": "ETH-PERP", "sell_contracts": 0.3, "delta_usd": -900})
         _write(tmp_path, d, rows)
-    cls = history.classify(tmp_path, {"ETH": {"20240628": 4300.0}}, as_of=2e9)
+    held = {}
+    cls = history.classify(tmp_path, {"ETH": {"20240628": 4300.0}}, as_of=2e9, held=held)
     assert cls["0xM"]["class"] == "market_maker"
     assert cls["0xS"]["class"] == "income"
     assert cls["0xH"]["class"] == "hedger"
-    assert cls["0xD"]["class"] == "skilled" and cls["0xD"]["option_pnl"] == 25 * 300 - 25 * 50
+    assert cls["0xD"]["class"] == "directional" and cls["0xD"]["tier"] == "top"
+    assert cls["0xD"]["option_pnl"] == 25 * 300 - 25 * 50
+    assert held == {}  # everything expired by as_of
+
+
+def test_tiers_and_positions():
+    wallets = {f"0x{i}": {"class": "directional", "tier": "top" if i < 2 else "smart" if i < 5 else "profitable"}
+               for i in range(8)}
+    held = {(f"0x{i}", "BTC-20991231-100000-C"): 1.0 for i in range(8)} | {("0xM", "BTC-20991231-100000-C"): 50.0}
+    pos = history.tier_positions(held, wallets | {"0xM": {"class": "market_maker"}})
+    cell = pos["BTC"]["BTC-20991231-100000-C"]
+    assert cell == {"top": [2.0, 2], "smart": [5.0, 5], "profitable": [8.0, 8]}
 
 
 def test_history_once_reads_days_and_checks_counts(tmp_path):
