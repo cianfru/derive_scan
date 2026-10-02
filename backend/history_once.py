@@ -50,19 +50,26 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
             history.save_state(out, state)
             added.append(day.isoformat())
             day = history.next_day(state)
-        if added:
+        snapshots = [out / "history" / f"{name}.json" for name in ("wallets", "positions", "traders")]
+        needs_rebuild = False
+        for p in snapshots:
+            doc = json.loads(p.read_text()) if p.exists() else {}
+            if doc.get("schema_version") != 2 or doc.get("through") != state.get("done_through"):
+                needs_rebuild = True
+        if state.get("done_through") and (added or needs_rebuild):
             uni = out / "universe.json"
             unds = json.loads(uni.read_text()).get("underlyings", []) if uni.exists() else ["BTC", "ETH"]
             settlements = await history.update_settlements(client, out, unds)
             held: dict = {}
-            scan = history.scan_days(out)
-            classes = history.classify(out, settlements, now, held, scan=scan)
-            meta = {"as_of": int(now), "through": state["done_through"]}
+            as_of = min(now, datetime.fromisoformat(state["done_through"]).replace(tzinfo=timezone.utc).timestamp() + 86400)
+            scan = history.scan_days(out, as_of)
+            classes = history.classify(out, settlements, as_of, held, scan=scan)
+            meta = {"as_of": int(as_of), "through": state["done_through"], "schema_version": 2}
             (out / "history" / "wallets.json").write_text(json.dumps({**meta, "wallets": classes}, separators=(",", ":")))
             (out / "history" / "positions.json").write_text(json.dumps(
                 {**meta, "positions": history.tier_positions(held, classes)}, separators=(",", ":")))
             (out / "history" / "traders.json").write_text(json.dumps(
-                {**meta, **traders.build(scan, classes, now)}, separators=(",", ":")))
+                {**meta, **traders.build(scan, classes, as_of)}, separators=(",", ":")))
     finally:
         if own:
             await client.close()

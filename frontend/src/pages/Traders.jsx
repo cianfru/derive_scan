@@ -6,6 +6,7 @@ import { TYPE, TYPE_INFO, typeOf } from "../lib/traders.js";
 import { Plate, Tabs, Loading, Failed, Info } from "../components/ui.jsx";
 import WalletTag from "../components/WalletTag.jsx";
 import LeanBar from "../components/LeanBar.jsx";
+import HistoryStatus, { coverageReady } from "../components/HistoryStatus.jsx";
 
 const COHORT_INFO = {
   pnl: "Options traders grouped by their results on options that have expired, from Money Printer (over $1M) to Giga-Rekt (over $1M lost). Each cell is the net delta of the cohort's open options on that coin: right and green when their positions gain from a rise, left and red when they gain from a fall. Market makers are left out.",
@@ -40,8 +41,8 @@ export default function Traders() {
   const [all, setAll] = useState(false);
   if (error && !data) return <div className="wrap page"><Failed error={error} /></div>;
   if (!data) return <div className="wrap page"><Loading /></div>;
-  if (!data.ready) return (
-    <div className="wrap page"><h1>Traders</h1><p className="sub">Derive's options history is being rebuilt, a day at a time since December 2023. The ranking appears here as it fills in.</p></div>);
+  if (!coverageReady(data)) return (
+    <div className="wrap page"><h1>Traders</h1><HistoryStatus data={data} /></div>);
   const list = data.traders.filter((t) => kind === "all" || (kind === "directional" ? t.class === "directional" : t.class === kind));
   const shown = all ? list : list.slice(0, 50);
   return (
@@ -49,7 +50,7 @@ export default function Traders() {
       <div style={{ display: "flex", alignItems: "end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
           <h1>Traders</h1>
-          <p className="sub">Options traders on Derive, ranked by results on options that have expired. Market makers left out.</p>
+          <p className="sub">Options traders on Derive, ranked by gross results on expired options, before fees. Market makers left out.</p>
         </div>
         <div className="figs" style={{ minWidth: "min(480px, 100%)" }}>
           <div className="fig"><span>Ranked</span><strong>{data.ranked_total?.toLocaleString() ?? "-"}</strong></div>
@@ -58,11 +59,11 @@ export default function Traders() {
         </div>
       </div>
       <Cohorts cohorts={data.cohorts} />
-      <Plate title="Leaderboard" info={<>{TYPE_INFO} Options PnL counts options that have expired: premium received minus premium paid plus what was held at expiry, at the settlement price. Win rate: share of those options closed in profit. Book: net delta of open options now.</>}
+      <Plate title="Leaderboard" info={<>{TYPE_INFO} Gross options PnL counts expired options: premium received minus premium paid plus settlement value, before fees. Win rate: share of expired instruments with positive gross PnL. Book: positions reconstructed through the displayed UTC close and valued on the newest chain; subsequent trades are not included.</>}
         right={<Tabs label="Type" value={kind} onChange={(k) => { setKind(k); setAll(false); }} items={[["all", "All"], ["directional", "Directional"], ["income", "Income"], ["hedger", "Hedger"]]} />}
         bodyClass="table-wrap">
         <table className="grid" style={{ minWidth: 900 }}>
-          <thead><tr><th>Trader</th><th>Type</th><th className="num">Options PnL</th><th className="num">Win rate</th><th className="num">Premium traded</th>
+          <thead><tr><th>Trader</th><th>Type</th><th className="num">Gross options PnL</th><th className="num">Win rate</th><th className="num">Premium traded</th>
             <th>Results</th><th>Size</th><th>Book</th><th className="num">Last trade</th></tr></thead>
           <tbody>
             {shown.map((t) => (
@@ -75,7 +76,7 @@ export default function Traders() {
                 <td className="num">{usd(t.premium_traded)}</td>
                 <td className="dim">{t.pnl_cohort || "-"}</td>
                 <td className="dim">{t.size_cohort || "-"}</td>
-                <td>{t.open_count ? <LeanBar lean={t.lean} width={56} /> : <span className="faint">Flat</span>}</td>
+                <td>{t.open_count ? <LeanBar lean={t.lean} width={56} /> : <span className="faint">No unexpired positions</span>}</td>
                 <td className="num dim">{t.last}</td>
               </tr>))}
           </tbody>

@@ -54,3 +54,31 @@ def test_market_makers_left_out_of_taker_sides(tmp_path):
     assert mms == {"0xA"}
     kinds = {r[2] for r in flow.sides(TRADES, 5, mms)}
     assert kinds == {"perp"} and all(r[1] == "BTC" for r in flow.sides(TRADES, 5, mms))
+
+
+def test_reverted_trades_do_not_enter_any_flow_totals():
+    reverted = [{**t, "tx_status": "reverted"} for t in TRADES]
+    assert flow.sides(reverted, 5) == []
+    assert flow.summarise(reverted, 5) == ([], [])
+
+
+def test_late_trade_at_same_watermark_is_counted_once(tmp_path):
+    a = TRADES[0]
+    b = {**a, "trade_id": "late"}
+    feed = [a, a]
+
+    def handler(request):
+        return httpx.Response(200, json={"result": {"trades": feed, "pagination": {"num_pages": 1}}})
+
+    async def go():
+        client = DeriveClient("https://x/", transport=httpx.MockTransport(handler))
+        try:
+            assert (await flow.update(client, tmp_path, 2000))["legs"] == 1
+            feed.append(b)
+            assert (await flow.update(client, tmp_path, 3000))["legs"] == 1
+            assert (await flow.update(client, tmp_path, 4000))["legs"] == 0
+        finally:
+            await client.close()
+    asyncio.run(go())
+    rows = list(csv.DictReader(next((tmp_path / "flow" / "wallets").glob("*.csv")).open()))
+    assert sum(int(r["legs"]) for r in rows) == 2

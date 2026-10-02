@@ -131,16 +131,22 @@ def wallets_reading(positions: dict | None, strikes: dict | None, index: float |
     from .history import parse_option
     net = gross = 0.0
     held = 0
+    complete = True
     for name, cells in (positions or {}).items():
         o = parse_option(name)
         cell = (cells or {}).get(tier)
         if not o or not cell or not index or not now < o[1] <= now + days * 86400:
             continue
-        d = cell[0] * _delta(strikes, o[1], o[2], o[3], index, now) * index
-        net, gross, held = net + d, gross + abs(d), held + cell[1]
-    score = round(net / gross, 3) if gross >= WALLET_MIN_USD and held >= WALLET_MIN_POSITIONS else None
-    return {"state": state_of(score), "score": score, "net_delta_usd": round(net, 2), "gross_delta_usd": round(gross, 2),
-            "positions": held}
+        unit_delta = _delta(strikes, o[1], o[2], o[3], index, now) * index
+        net += cell[0] * unit_delta
+        held += cell[1]
+        if len(cell) < 3:
+            complete = False  # Legacy snapshots do not retain gross exposure.
+        else:
+            gross += cell[2] * abs(unit_delta)
+    score = round(net / gross, 3) if complete and gross >= WALLET_MIN_USD and held >= WALLET_MIN_POSITIONS else None
+    return {"state": state_of(score), "score": score, "net_delta_usd": round(net, 2), "gross_delta_usd": round(gross, 2) if complete else None,
+            "positions": held, "gross_complete": complete}
 
 
 def alignment(signal_4h: str | None, signal_1d: str | None, features: dict, iv_history: list[list], flows: dict | None,

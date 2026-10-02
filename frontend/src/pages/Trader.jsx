@@ -5,6 +5,7 @@ import { TYPE, TYPE_INFO, typeOf } from "../lib/traders.js";
 import { Plate, Loading, Failed, Info } from "../components/ui.jsx";
 import WalletTag from "../components/WalletTag.jsx";
 import LeanBar from "../components/LeanBar.jsx";
+import HistoryStatus, { coverageReady } from "../components/HistoryStatus.jsx";
 
 const day = (t) => new Date(t * 1000).toISOString().slice(0, 10);
 
@@ -13,6 +14,7 @@ export default function Trader() {
   const { data, error } = useData(`traders/${address.toLowerCase()}.json`, 5 * 60_000);
   if (error && !data) return <div className="wrap page"><Link to="/traders" className="status">Traders /</Link><Failed error={error} /></div>;
   if (!data) return <div className="wrap page"><Loading /></div>;
+  if (!coverageReady(data)) return <div className="wrap page"><Link to="/traders">Traders /</Link><HistoryStatus data={data} /></div>;
   const book = data.book || [];
   return (
     <div className="wrap page">
@@ -25,7 +27,7 @@ export default function Trader() {
         </div>
       </div>
       <div className="figs">
-        <div className="fig"><span>Options PnL <Info>Options that have expired: premium received minus premium paid plus what was held at expiry, at the settlement price.</Info></span>
+        <div className="fig"><span>Gross options PnL <Info label="About gross options PnL">Expired options: premium received minus premium paid plus settlement value. Fees are excluded, matching the documented ranking rules.</Info></span>
           <strong className={data.option_pnl > 0 ? "up" : data.option_pnl < 0 ? "down" : ""}>{usd(data.option_pnl)}</strong></div>
         <div className="fig"><span>Win rate</span><strong>{pct(data.win_rate, 0)}</strong></div>
         <div className="fig"><span>Expired options</span><strong>{data.expired}</strong></div>
@@ -33,7 +35,7 @@ export default function Trader() {
         <div className="fig"><span>Perp PnL</span><strong className={data.perp_pnl > 0 ? "up" : data.perp_pnl < 0 ? "down" : ""}>{usd(data.perp_pnl)}</strong></div>
         <div className="fig"><span>Active</span><strong style={{ fontSize: 13 }}>{data.first} to {data.last}</strong></div>
       </div>
-      <Plate title="Open options" info="Positions held at the end of the newest rebuilt day, valued on the newest options chain. Entry is the average price paid (long) or received (short). Delta: the position's dollar exposure to the coin's price; positive gains when the price rises."
+      <Plate title="Open options" info="Positions reconstructed through the displayed UTC close, valued on the newest options chain. Later trades are not included, and expired instruments are omitted. Entry is the average cost of the remaining position where daily records determine it. When buys and sells lose their order in a daily aggregate, entry and unrealised PnL are unavailable until a later close or reversal establishes a known basis. Delta is dollar exposure to the coin; positive gains when the price rises."
         right={book.length ? <LeanBar lean={data.lean} /> : null} bodyClass="table-wrap">
         {book.length ? (
           <table className="grid" style={{ minWidth: 720 }}>
@@ -44,10 +46,10 @@ export default function Trader() {
                   <td><Link to={`/coin/${p.und}`} style={{ fontWeight: 600 }}>{p.und}</Link> <span className="mono">{p.strike.toLocaleString()} {p.type === "C" ? "call" : "put"}</span> <span className="dim mono">{day(p.expiry)}</span></td>
                   <td className={p.net > 0 ? "up" : "down"}>{p.net > 0 ? "Long" : "Short"}</td>
                   <td className="num">{Math.abs(p.net).toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
-                  <td className="num">{price(p.entry)}</td>
+                  <td className="num">{p.entry == null ? <span className="faint">Unavailable</span> : price(p.entry)}</td>
                   <td className="num">{price(p.mark)}</td>
                   <td className={`num ${p.delta_usd > 0 ? "up" : p.delta_usd < 0 ? "down" : ""}`}>{usd(p.delta_usd)}</td>
-                  <td className={`num ${p.upnl > 0 ? "up" : p.upnl < 0 ? "down" : ""}`}>{p.upnl == null ? <span className="faint">-</span> : usd(p.upnl)}</td>
+                  <td className={`num ${p.upnl > 0 ? "up" : p.upnl < 0 ? "down" : ""}`}>{p.upnl == null ? <span className="faint">Unavailable</span> : usd(p.upnl)}</td>
                 </tr>))}
             </tbody>
           </table>) : <p className="status">No open options.</p>}

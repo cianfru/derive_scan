@@ -195,7 +195,7 @@ tr.dim td { opacity: .55; }
 .info { all: unset; cursor: pointer; display: inline-grid; place-items: center; width: 15px; height: 15px; border: 1px solid var(--faint);
   font: 600 9.5px/1 var(--font-mono); color: var(--muted); text-transform: none; letter-spacing: 0; }
 .info:hover, .info[aria-expanded="true"] { color: var(--fg); border-color: var(--orange); }
-.pop { position: absolute; z-index: 50; width: min(300px, 82vw); background: var(--plate-3); border: 1px solid var(--seam-hi);
+.pop { position: fixed; z-index: 50; width: min(300px, 82vw); white-space: normal; max-height: calc(100dvh - 24px); overflow-y: auto; background: var(--plate-3); border: 1px solid var(--seam-hi);
   color: var(--fg); padding: 12px 14px; font: 400 13px/1.5 var(--font-body); box-shadow: 0 14px 40px rgb(0 0 0 / .4); }
 
 /* ---------- key figures ---------- */

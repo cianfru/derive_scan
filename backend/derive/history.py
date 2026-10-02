@@ -25,6 +25,7 @@ import gzip
 import io
 import json
 import math
+from copy import deepcopy
 from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -222,7 +223,32 @@ async def update_settlements(client, root: Path, unds: list[str]) -> dict[str, d
 RECENT_DAYS = 45
 
 
-def scan_days(root: Path) -> dict:
+def advance_entry(net: float, entry: float | None, buy: float, sell: float, bv: float, sv: float,
+                  single_fill: bool = False) -> float | None:
+    """Average cost when daily totals determine it; mixed-side days lose execution order.
+
+    Unknown cost stays unknown until the position closes or reverses in a single fill.
+    Never infer the remaining lot's cost from lifetime purchases/sales.
+    """
+    after = net + buy - sell
+    if abs(after) < 1e-9 or (buy and sell):
+        return None
+    change = buy - sell
+    if not change:
+        return entry
+    price = bv / buy if buy else sv / sell
+    if abs(net) < 1e-9:
+        return price
+    if net * after < 0:
+        # Several buys covering a short and opening a long may have different prices.
+        # The daily average cannot identify the cost of just the newly opened contracts.
+        return price if single_fill else None
+    if net * change < 0:
+        return entry
+    return None if entry is None else (abs(net) * entry + abs(change) * price) / abs(after)
+
+
+def scan_days(root: Path, as_of: float | None = None) -> dict:
     """One pass over every day file: per-wallet and per-(wallet, instrument) totals, the days each
     wallet traded options, option and perp delta per wallet, day and coin, and the last
     RECENT_DAYS days of option rows (for trader pages)."""
@@ -232,6 +258,9 @@ def scan_days(root: Path) -> dict:
     day_delta: dict = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))  # wallet -> (day, und) -> [opt, perp]
     coins: dict = defaultdict(lambda: defaultdict(float))  # wallet -> und -> premium traded
     files = sorted((root / "history" / "days").glob("*.csv.gz"))
+    # Daily aggregates cannot answer an intraday cutoff. Use completed UTC days only.
+    if as_of is not None:
+        files = [p for p in files if datetime.fromisoformat(p.name[:10]).replace(tzinfo=timezone.utc).timestamp() + 86400 <= as_of]
     recent_from = files[-RECENT_DAYS].name[:10] if len(files) >= RECENT_DAYS else ""
     recent: dict = defaultdict(list)  # wallet -> [[day, instrument, buy, sell, buy_value, sell_value]]
     for p in files:
@@ -254,6 +283,8 @@ def scan_days(root: Path) -> dict:
             coins[wallet][und] += bv + sv
             days_seen[wallet].add(day)
             i = inst[(wallet, name)]
+            i["entry"] = advance_entry(i["net"], i.get("entry"), buy, sell, bv, sv,
+                                       single_fill=_f(r["maker_legs"]) + _f(r["taker_legs"]) == 1)
             i["net"] += buy - sell
             i["cash"] += sv - bv
             i["buy"] += buy
@@ -265,7 +296,8 @@ def scan_days(root: Path) -> dict:
             day_delta[wallet][(day, und)][0] += _f(r["delta_usd"])
             if day >= recent_from:
                 recent[wallet].append([day, name, round(buy, 6), round(sell, 6), round(bv, 2), round(sv, 2)])
-    return {"w": w, "inst": inst, "days_seen": days_seen, "day_delta": day_delta, "coins": coins, "recent": recent}
+    return {"w": w, "inst": inst, "days_seen": days_seen, "day_delta": day_delta, "coins": coins, "recent": recent,
+            "cutoff": as_of}
 
 
 def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float, held: dict | None = None,
@@ -282,8 +314,9 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float,
     the top fifth of all directional wallets, "smart" for the best 50, "profitable" for the rest.
     held, when given, receives {(wallet, instrument): net contracts} for instruments not yet expired.
     """
-    scan = scan or scan_days(root)
-    w, inst, days_seen, day_delta = scan["w"], scan["inst"], scan["days_seen"], scan["day_delta"]
+    if scan is None or scan.get("cutoff") != as_of:
+        scan = scan_days(root, as_of)
+    w, inst, days_seen, day_delta = deepcopy(scan["w"]), scan["inst"], scan["days_seen"], scan["day_delta"]
     for (wallet, name), i in inst.items():
         a = w[wallet]
         if held is not None and abs(i["net"]) > 1e-9:
@@ -338,9 +371,9 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float,
 
 
 def tier_positions(held: dict, wallets: dict) -> dict:
-    """{UND: {instrument: {tier: [net contracts, wallets]}}} for open instruments, per tier and the
+    """{UND: {instrument: {tier: [net contracts, wallets, gross contracts]}}} for open instruments, per tier and the
     tiers above it (smart includes top; profitable includes both)."""
-    out: dict = defaultdict(lambda: defaultdict(lambda: {t: [0.0, 0] for t in TIERS}))
+    out: dict = defaultdict(lambda: defaultdict(lambda: {t: [0.0, 0, 0.0] for t in TIERS}))
     for (wallet, name), net in held.items():
         tier = (wallets.get(wallet) or {}).get("tier")
         if tier not in TIERS:
@@ -349,4 +382,5 @@ def tier_positions(held: dict, wallets: dict) -> dict:
             cell = out[name.split("-")[0]][name][t]
             cell[0] = round(cell[0] + net, 6)
             cell[1] += 1
+            cell[2] = round(cell[2] + abs(net), 6)
     return {u: dict(v) for u, v in out.items()}
