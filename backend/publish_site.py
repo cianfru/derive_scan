@@ -24,6 +24,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from derive.candles import CandleCache
+from derive.implied import implied_by_expiry
 
 SOURCE = "v2_mainnet"
 CANDLES_KEEP = {"4h": 500, "1d": 400}
@@ -86,7 +87,22 @@ def options_block(data: Path, site: Path, und: str, now: float) -> dict | None:
     strikes_p = site / "strikes" / f"{und}.json"
     strikes = json.loads(strikes_p.read_text()) if strikes_p.exists() else None
     return {"ts": doc["ts"], "features": doc["features"], "expiries": doc["expiries"],
-            "strikes": strikes, "iv_history": iv_history(data, und, now)}
+            "strikes": strikes, "iv_history": iv_history(data, und, now),
+            "implied": implied_by_expiry(strikes, doc["expiries"], doc["ts"])}
+
+
+def taker_sides(data: Path, now: float) -> dict:
+    """{UND: {"24h"|"7d": {kind: {buy_notional_usd, sell_notional_usd, buy_premium_usd, sell_premium_usd}}}}"""
+    out: dict = defaultdict(lambda: {"24h": defaultdict(lambda: defaultdict(float)), "7d": defaultdict(lambda: defaultdict(float))})
+    for day in _days(8, now):
+        for r in _read_csv(data / "flow" / "sides" / f"{day}.csv"):
+            age = now - int(r["run_ts"])
+            for window, limit in (("24h", 86_400), ("7d", 7 * 86_400)):
+                if age <= limit:
+                    a = out[r["underlying"]][window][r["kind"]]
+                    for k in ("buy_notional_usd", "sell_notional_usd", "buy_premium_usd", "sell_premium_usd"):
+                        a[k] += float(r[k] or 0)
+    return {u: {w: {k: dict(v) for k, v in kinds.items()} for w, kinds in d.items()} for u, d in out.items()}
 
 
 def change_pct(closes: list[float], bars: int) -> float | None:
@@ -128,6 +144,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     rows = {tf: {r["symbol"]: r for r in (sig["timeframes"].get(tf) or {}).get("rows", [])} for tf in ("4h", "1d")}
     cache = CandleCache(data)
     history = signal_history(data, now)
+    flows = taker_sides(data, now)
     markets = []
     for sym in sig.get("universe", []):
         und = sym.split("-")[0]
@@ -165,6 +182,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "und": und, "symbol": sym, "generated_at": int(now), "candles": candles,
             "backfilled": {tf: cache.counts(und, tf)[1] for tf in CANDLES_KEEP},
             "signals": history.get(und, {}), "latest": {"4h": r4 or None, "1d": r1 or None}, "options": opts,
+            "taker_flow": flows.get(und),
         })
     meta = {"generated_at": int(now), "bars": {tf: (sig["timeframes"].get(tf) or {}).get("bar_close") for tf in ("4h", "1d")},
             "consensus": {tf: ((sig["timeframes"].get(tf) or {}).get("consensus") or {}).get("consensus") for tf in ("4h", "1d")},

@@ -6,6 +6,9 @@ once per side, with the side's wallet) and appends:
 flow/large/YYYY-MM-DD.csv    taker legs at or above the size thresholds, one row each
 flow/wallets/YYYY-MM-DD.csv  one row per wallet per run: legs, perp and option notional,
                              option premium bought and sold, realised PnL, fees
+flow/sides/YYYY-MM-DD.csv    per run, per coin and kind (call, put, perp): what takers bought and sold
+                             (notional and option premium); takers crossed the spread, so this is
+                             the aggressive side of the market
 flow/state.json              newest trade time read, and trade keys at that time
 
 Only the taker leg of a trade enters the large list (the side that crossed the spread).
@@ -31,6 +34,8 @@ LARGE_OPTION_USD = 100_000       # option notional (contracts x index)
 LARGE_PREMIUM_USD = 2_000        # option premium paid or received
 LARGE_FIELDS = ("ts", "instrument", "kind", "underlying", "direction", "amount", "price", "index_price",
                 "notional_usd", "premium_usd", "wallet", "subaccount_id", "rfq", "realized_pnl")
+SIDE_FIELDS = ("run_ts", "underlying", "kind", "buy_notional_usd", "sell_notional_usd", "buy_premium_usd",
+               "sell_premium_usd", "legs")
 WALLET_FIELDS = ("run_ts", "wallet", "legs", "perp_notional_usd", "option_notional_usd", "premium_bought_usd",
                  "premium_sold_usd", "realized_pnl_usd", "fees_usd")
 
@@ -66,6 +71,32 @@ def _append(path: Path, fields, rows) -> None:
 
 def leg_key(t: dict) -> str:
     return f"{t.get('trade_id')}:{t.get('wallet')}:{t.get('subaccount_id')}:{t.get('direction')}"
+
+
+def option_kind(name: str) -> str:
+    return "call" if name.endswith("-C") else "put" if name.endswith("-P") else "perp"
+
+
+def sides(trades: list[dict], run_ts: int) -> list[list]:
+    """Taker buying and selling per coin and kind."""
+    agg: dict = defaultdict(lambda: defaultdict(float))
+    for t in trades:
+        if t.get("liquidity_role") != "taker":
+            continue
+        name = t.get("instrument_name", "")
+        if kind_of(name) == "other":
+            continue
+        kind = option_kind(name)
+        amount, price, index = _f(t.get("trade_amount")), _f(t.get("trade_price")), _f(t.get("index_price"))
+        notional = amount * (price if kind == "perp" else index)
+        a = agg[(name.split("-")[0], kind)]
+        side = "buy" if t.get("direction") == "buy" else "sell"
+        a[f"{side}_notional_usd"] += notional
+        if kind != "perp":
+            a[f"{side}_premium_usd"] += amount * price
+        a["legs"] += 1
+    return [[run_ts, und, kind, *[round(v[k], 2) for k in SIDE_FIELDS[3:7]], int(v["legs"])]
+            for (und, kind), v in sorted(agg.items())]
 
 
 def summarise(trades: list[dict], run_ts: int) -> tuple[list[list], list[list]]:
@@ -118,6 +149,7 @@ async def update(client: DeriveClient, root: Path | str, now_ms: int) -> dict:
         for day in sorted({_day(r[0]) for r in large}):
             _append(root / "large" / f"{day}.csv", LARGE_FIELDS, [r for r in large if _day(r[0]) == day])
         _append(root / "wallets" / f"{_day(now_ms)}.csv", WALLET_FIELDS, wallets)
+        _append(root / "sides" / f"{_day(now_ms)}.csv", SIDE_FIELDS, sides(trades, now_ms // 1000))
         last = max(int(t["timestamp"]) for t in trades)
         state = {"last_ms": last, "keys_at_last": sorted(leg_key(t) for t in trades if int(t["timestamp"]) == last)}
         root.mkdir(parents=True, exist_ok=True)

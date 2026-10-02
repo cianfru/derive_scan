@@ -282,3 +282,7 @@ svg.viz .gridline { stroke: var(--seam); stroke-width: 1; }
   .chart-box { height: 340px; }
 }
 @media (max-width: 600px) { svg.viz text { font-size: 17px; } }
+
+.chart-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; margin-top: 10px; font: 500 11px/1 var(--font-mono); color: var(--muted); }
+.chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.chart-legend i { width: 14px; height: 3px; display: inline-block; }
