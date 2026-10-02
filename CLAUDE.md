@@ -1,6 +1,6 @@
 # Torq (repo: derive_scan)
 
-Torq is the product name (owner, 1 October 2026). Reflex's signals on Derive (derive.xyz), plus an options layer: perps and the options volatility surface. Its own product in its own repo, separate from Reflex (`cianfru/RCCE_Scanner`). Backend: FastAPI in `backend/` (local use). Frontend: `frontend/` on Vercel (project `torq`).
+Torq is the product name (owner, 1 October 2026). Reflex's signals on Derive (derive.xyz), plus an options layer: perps and the options volatility surface. Its own product in its own repo, separate from Reflex (`cianfru/RCCE_Scanner`). Backend: Python jobs in `backend/` run by GitHub Actions (FastAPI app for local use only). Frontend: `frontend/`, React + Vite, on Vercel (project `torq`).
 
 ## Scope: what comes from Reflex and what does not
 
@@ -16,8 +16,9 @@ Torq is the product name (owner, 1 October 2026). Reflex's signals on Derive (de
 - Recorder: GitHub Action `.github/workflows/record.yml`, started every 5 minutes by an external cron service (cron-job.org, owner's account) through the workflow-dispatch API; GitHub's own schedule never fired and stays only as a backup. Records each 15-minute slot once, committing plain files to the `data` branch; layout in README. Free on a public repo; no server. Records Derive V2 mainnet (`api.lyra.finance`) for every coin with options (discovered hourly via `public/get_all_currencies`, 12 live on 2 October 2026): features every 15 minutes for all; expiry rows every 15 minutes and raw chains hourly for BTC and ETH, expiry rows hourly and chains daily for the rest. The same run appends trade flow for the radar (`flow/`: large taker trades, per-wallet summaries per run; Derive V2's public trades carry the wallet). Scheduled workflows only run from the default branch.
 - Railway retired to cut cost (owner's request, 1 October 2026): it recorded from 1 October 12:00 UTC until the Action took over at 20:15 UTC; that early SQLite data was not migrated. The cron service's access token expires about 30 December 2026; the owner renews it. The FastAPI app (`backend/main.py`) stays for local use, not deployed.
 - Repo growth (2 October 2026): roughly 4 MB/day (chains ~2.3, option CSV ~1.5, flow ~0.5), about 1.4 GB a year. Before the repo nears 1 GB (around month 8), move old chains and flow out of git (e.g. release assets).
-- Landing page: `frontend/index.html` (Torq: dark-first, red/orange accents, Archivo display with Geist and Geist Mono from Reflex). Static, embeds a data snapshot and reads the newest `data` branch files when served where that is allowed. Deployed on Vercel, project `torq` (root directory `frontend`, no build, production from `main`, preview builds off because the `data` branch has no frontend); the old FastAPI deployment there is gone.
-- Not built: the app (roadmap 2-4; static site reading the `data` branch files, so users never reach Derive and nothing runs per user), V3 source (one setting, `DERIVE_SNAPSHOT_SOURCES=v3_mainnet`, once V3 mainnet is live).
+- App (2 October 2026): `frontend/` React + Vite + lightweight-charts, deployed on Vercel (project `torq`, root `frontend`, framework vite, production from `main`, previews off). Routes: `/` landing, `/markets`, `/coin/:und` (candles, ribbon, signal markers, readout, positioning, options panel: open interest by strike, term structure, volatility by strike, 14-day IV and skew, priced range), `/options`, `/flow`. Reads only the `site-data` branch (`backend/publish_site.py`, rebuilt every run and force-pushed as one commit, so it keeps no history); `VITE_DATA_URL` overrides for local previews.
+- Brand (owner, 2 October 2026): logo files in `frontend/public/brand` (on-dark and on-light versions, mark for icons). Corporate colours orange and dark grey; very dark graphite ground with an industrial plate/rivet pattern; chamfered corners echo the logo. Type: Chakra Petch (display, blocky, cut corners, close to the logo), Barlow (body), IBM Plex Mono (numbers). Tokens in `frontend/src/styles.css`; dark first, light supported.
+- Not built: the radar proper, V3 source (one setting, `DERIVE_SNAPSHOT_SOURCES=v3_mainnet`, once V3 mainnet is live).
 - Trading (plan Phase 2) is not in the repo. It needs the owner's explicit approval; order mechanics come from Derive's docs.
 
 ## Product direction (owner, 2 October 2026)
@@ -29,9 +30,9 @@ Torq is the product name (owner, 1 October 2026). Reflex's signals on Derive (de
 ## Roadmap (approved 2 October 2026)
 
 1. Data foundations: done 2 October 2026 (backfill, options for every coin, trade flow).
-2. Torq design system: tokens, type, spacing, chart styles, components, defined once.
-3. The app (React, Vercel, zero added cost): markets list; a page per coin with candle chart, signal and regime history, heat, z-score, ribbon, funding and open interest, and the options panel for coins with options.
-4. Radar from Derive's wallet-level trade flow (best wallets, large options flow); the landing page rebuilt from the design system without Reflex references. Derive's V3 docs describe public trades as anonymised, so the radar may lose wallet detail when V3 replaces V2.
+2. Torq design system: first version done 2 October 2026 (`frontend/src/styles.css`); refine with the owner.
+3. The app: first version live 2 October 2026 (markets, coin pages with options panel, options overview, flow). Next: regime history replayed over past bars for the chart, refinement to Reflex-grade polish.
+4. Radar from Derive's wallet-level trade flow (best wallets over time, large options flow); a first Flow page exists. Landing rebuilt with the brand (done); keep refining. Derive's V3 docs describe public trades as anonymised, so the radar may lose wallet detail when V3 replaces V2.
 5. Later, with the owner's explicit approval: execution on Derive perps (testnet, dry-run first); a vault on Derive V3 (design doc first).
 
 ## Findings so far

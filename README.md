@@ -1,6 +1,10 @@
 # Torq
 
-Repository `derive_scan`. Landing page: `frontend/index.html`, deployed on Vercel (project `torq`) from `main`.
+Repository `derive_scan`. App and landing page: `frontend/` (React + Vite), deployed on Vercel (project `torq`) from `main`; it reads the `site-data` branch built by `backend/publish_site.py`.
+
+```
+cd frontend && npm install && npm run dev      # app against the live site-data branch
+```
 
 Reflex's signals on Derive's perps, plus Derive's options volatility surface.
 

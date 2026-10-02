@@ -128,3 +128,20 @@ def test_signal_job_end_to_end(tmp_path):
     latest2 = json.loads((tmp_path / "signals" / "latest.json").read_text())
     assert latest2["timeframes"]["4h"]["bar_close"] == latest["timeframes"]["4h"]["bar_close"] + 14_400
     assert latest2["timeframes"]["1d"]["rows"] and latest2["timeframes"]["1d"]["bar_close"] == latest["timeframes"]["1d"]["bar_close"]
+
+
+def test_publish_site_builds_app_files(tmp_path):
+    import publish_site
+
+    client = DeriveClient("https://x/", transport=httpx.MockTransport(derive_handler), retries=0, backoff=0)
+    asyncio.run(signal_once.run(tmp_path, NOW, ["4h", "1d"], client=client, clock=lambda: NOW + 30,
+                                context_transport=httpx.MockTransport(context_handler),
+                                backfill_transport=httpx.MockTransport(okx_handler)))
+    site = tmp_path / "site"
+    assert publish_site.build(tmp_path, site, now=NOW + 60) == {"coins": 3}
+    markets = json.loads((site / "markets.json").read_text())
+    btc = next(c for c in markets["coins"] if c["und"] == "BTC")
+    assert btc["signal_4h"] and len(btc["spark"]) == 42 and btc["has_options"] is False
+    coin = json.loads((site / "coins" / "NEW.json").read_text())
+    assert coin["backfilled"]["4h"] > 0 and len(coin["candles"]["4h"]) == 500 and coin["signals"]["4h"]
+    assert json.loads((site / "flow.json").read_text())["large"] == []

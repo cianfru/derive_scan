@@ -1,5 +1,6 @@
-# Records Derive's options surface every 15 minutes and computes Reflex's signals on Derive's
-# perps after each 4H and daily close, into the `data` branch.
+# Records Derive's options surface and trade flow every 15 minutes and computes the signals on
+# Derive's perps after each 4H and daily close, into the `data` branch; then rebuilds the app's
+# data files on the `site-data` branch.
 # Started every 5 minutes by an external cron service through workflow_dispatch; GitHub's own
 # schedule below is a backup (minutes 2, 7, ..., 57). Each 15-minute slot and each closed bar
 # is processed once, so repeated starts do no harm.
@@ -32,6 +33,11 @@ jobs:
             git worktree add -q --orphan -b data store
           fi
 
+      - name: Previous app data
+        run: |
+          mkdir -p site
+          if git fetch -q --depth 1 origin site-data; then git archive FETCH_HEAD | tar -x -C site; fi
+
       - name: Due?
         id: due
         working-directory: backend
@@ -53,12 +59,17 @@ jobs:
       - name: Record
         if: steps.due.outputs.due == 'true'
         working-directory: backend
-        run: python record_once.py --out ../store
+        run: python record_once.py --out ../store --site ../site
 
       - name: Signals
         if: always() && steps.due.outputs.signals_due == 'true'
         working-directory: backend
         run: python signal_once.py --out ../store
+
+      - name: Build app data
+        if: always() && (steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true')
+        working-directory: backend
+        run: python publish_site.py --data ../store --site ../site
 
       - name: Commit
         if: always() && (steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true')
@@ -69,3 +80,15 @@ jobs:
           git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
             commit -qm "record $(date -u +%Y-%m-%dT%H:%MZ)"
           git push -q origin data
+
+      # The app reads site-data only; it is replaced with a single commit each run (no history).
+      - name: Publish app data
+        if: always() && (steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true')
+        run: |
+          git worktree add -q --orphan -b site-out site-out
+          cp -r site/. site-out/
+          cd site-out
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "app data $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -qf origin HEAD:site-data
