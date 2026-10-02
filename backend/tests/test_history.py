@@ -80,7 +80,7 @@ def test_tiers_and_positions():
     held = {(f"0x{i}", "BTC-20991231-100000-C"): 1.0 for i in range(8)} | {("0xM", "BTC-20991231-100000-C"): 50.0}
     pos = history.tier_positions(held, wallets | {"0xM": {"class": "market_maker"}})
     cell = pos["BTC"]["BTC-20991231-100000-C"]
-    assert cell == {"top": [2.0, 2], "smart": [5.0, 5], "profitable": [8.0, 8]}
+    assert cell == {"top": [2.0, 2, 2.0], "smart": [5.0, 5, 5.0], "profitable": [8.0, 8, 8.0]}
 
 
 def test_history_once_reads_days_and_checks_counts(tmp_path):
@@ -126,6 +126,6 @@ def test_traders_leaderboard_and_cohorts(tmp_path):
     w = out["traders"][0]
     assert w["option_pnl"] == 12 * 250 and w["win_rate"] == 1.0 and w["pnl_cohort"] == "Humble Earner"
     assert w["open"] == [[live, 2.0, 150.0]]
-    assert out["cohort_positions"]["pnl"]["Humble Earner"]["ETH"][live] == [2.0, 1]
+    assert out["cohort_positions"]["pnl"]["Humble Earner"]["ETH"][live] == [2.0, 1, 2.0]
     pos = traders.mark_position(live, 2.0, 150.0, None, 3000.0, 1.75e9)
     assert pos["delta_usd"] > 0 and pos["mark"] is None

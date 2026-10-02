@@ -50,7 +50,7 @@ def open_positions(scan: dict, as_of: float) -> dict:
         o = parse_option(name)
         if not o or o[1] <= as_of or abs(i["net"]) < 1e-9:
             continue
-        entry = i["buy_value"] / i["buy"] if i["net"] > 0 and i["buy"] else i["sell_value"] / i["sell"] if i["sell"] else None
+        entry = i.get("entry")
         out[wallet].append([name, round(i["net"], 6), None if entry is None else round(entry, 4)])
     for rows in out.values():
         rows.sort(key=lambda r: (parse_option(r[0])[1], r[0]))
@@ -72,8 +72,8 @@ def build(scan: dict, wallets: dict, as_of: float) -> dict:
             "pnl_cohort": pnl_cohort(v), "size_cohort": size_cohort(v),
             "coins": {u: round(x, 2) for u, x in sorted(coins.items(), key=lambda kv: -kv[1])[:4]},
             "open": held.get(a, []), "recent": sorted(scan["recent"].get(a, []), reverse=True)[:120]})
-    cohorts = {"pnl": defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [0.0, 0]))),
-               "size": defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [0.0, 0])))}
+    cohorts = {"pnl": defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [0.0, 0, 0.0]))),
+               "size": defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [0.0, 0, 0.0])))}
     counts = {"pnl": defaultdict(int), "size": defaultdict(int)}
     for a, v in eligible.items():
         for dim, name in (("pnl", pnl_cohort(v)), ("size", size_cohort(v))):
@@ -84,6 +84,7 @@ def build(scan: dict, wallets: dict, as_of: float) -> dict:
                 cell = cohorts[dim][name][inst.split("-")[0]][inst]
                 cell[0] = round(cell[0] + net, 6)
                 cell[1] += 1
+                cell[2] = round(cell[2] + abs(net), 6)
     return {"ranked_total": len(ranked), "traders": traders,
             "cohort_counts": {d: dict(c) for d, c in counts.items()},
             "cohort_positions": {d: {c: {u: dict(i) for u, i in us.items()} for c, us in cs.items()} for d, cs in cohorts.items()}}

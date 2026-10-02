@@ -31,6 +31,7 @@ from derive.candles import CandleCache
 from derive.implied import implied_by_expiry, option_levels
 from derive.lean import alignment, options_lean, state_of
 from derive import traders as traders_mod
+from derive.history import last_complete_day, parse_option
 
 SOURCE = "v2_mainnet"
 CANDLES_KEEP = {"4h": 500, "1d": 400}
@@ -165,6 +166,8 @@ COHORT_COINS = ("BTC", "ETH")
 def _book(open_rows: list, chains: dict, now: float) -> list[dict]:
     out = []
     for name, net, entry in open_rows:
+        if parse_option(name)[1] <= now:
+            continue
         und = name.split("-")[0]
         strikes, index, _ = chains.get(und, (None, None, None))
         out.append(traders_mod.mark_position(name, net, entry, strikes, index, now))
@@ -174,28 +177,75 @@ def _book(open_rows: list, chains: dict, now: float) -> list[dict]:
 def _lean(book: list[dict]) -> dict:
     net = sum(p["delta_usd"] or 0 for p in book)
     gross = sum(abs(p["delta_usd"] or 0) for p in book)
-    score = round(net / gross, 3) if gross else None
+    score = round(net / gross, 3) if gross and all(p["delta_usd"] is not None for p in book) else None
     return {"net_delta_usd": round(net, 2), "gross_delta_usd": round(gross, 2), "score": score, "state": state_of(score)}
+
+
+def history_coverage(doc: dict, now: float) -> dict:
+    """Readiness is about source coverage, never the publish timestamp."""
+    expected = last_complete_day(now).isoformat()
+    through = doc.get("through")
+    caught_up = bool(through and through >= expected)
+    ready = caught_up and doc.get("schema_version", 0) >= 2
+    status = "ready" if ready else "updating" if caught_up else "backfilling"
+    return {"ready": ready, "status": status, "through": through, "expected_through": expected}
+
+
+def cohort_lean(insts: dict, chains: dict, now: float) -> dict:
+    net = gross = 0.0
+    positions = 0
+    complete = True
+    for name, cell in insts.items():
+        if parse_option(name)[1] <= now:
+            continue
+        und = name.split("-")[0]
+        strikes, index, _ = chains.get(und, (None, None, None))
+        delta = traders_mod.mark_position(name, 1, None, strikes, index, now)["delta_usd"]
+        positions += cell[1]
+        if delta is None or len(cell) < 3:
+            complete = False
+            continue
+        net += cell[0] * delta
+        gross += cell[2] * abs(delta)
+    score = round(net / gross, 3) if complete and gross else None
+    return {"net_delta_usd": round(net, 2), "gross_delta_usd": round(gross, 2) if complete else None,
+            "score": score, "state": state_of(score), "positions": positions}
 
 
 def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) -> None:
     """traders.json (leaderboard and cohorts) and traders/{address}.json (one per ranked trader)."""
     p = data / "history" / "traders.json"
     if not p.exists():
-        _write(site / "traders.json", {"generated_at": int(now), "ready": False})
+        unavailable = {"generated_at": int(now), **history_coverage({}, now)}
+        _write(site / "traders.json", unavailable)
+        for old in (site / "traders").glob("*.json"):
+            _write(old, unavailable)
         return
     doc = json.loads(p.read_text())
+    coverage = history_coverage(doc, now)
+    if not coverage["ready"]:
+        _write(site / "traders.json", {"generated_at": int(now), **coverage})
+        # Existing direct links must not continue serving a stale, apparently current book.
+        for old in (site / "traders").glob("*.json"):
+            _write(old, {"generated_at": int(now), **coverage})
+        for t in doc["traders"]:
+            _write(site / "traders" / f"{t['address'].lower()}.json", {"generated_at": int(now), **coverage})
+        return
+    addresses = {t["address"].lower() for t in doc["traders"]}
+    for old in (site / "traders").glob("*.json"):
+        if old.stem not in addresses:
+            _write(old, {"generated_at": int(now), **coverage, "ready": False, "status": "not_ranked"})
     rows = []
     for t in doc["traders"]:
         book = _book(t["open"], chains, now)
         summary = {k: v for k, v in t.items() if k not in ("open", "recent")}
         summary.update({"open_count": len(book), "lean": _lean(book),
                         "upnl": round(sum(b["upnl"] for b in book if b["upnl"] is not None), 2)
-                        if any(b["upnl"] is not None for b in book) else None})
+                        if book and all(b["upnl"] is not None for b in book) else None})
         rows.append(summary)
         large = [r for r in flow.get("large", []) if (r.get("wallet") or "").lower() == t["address"].lower()]
         _write(site / "traders" / f"{t['address'].lower()}.json",
-               {"generated_at": int(now), "through": doc.get("through"), **summary, "book": book, "recent": t["recent"],
+               {"generated_at": int(now), **coverage, **summary, "book": book, "recent": t["recent"],
                 "large_24h": large})
     cohorts = {}
     order = {"pnl": [c[0] for c in traders_mod.PNL_COHORTS][::-1], "size": [c[0] for c in traders_mod.SIZE_COHORTS][::-1]}
@@ -206,10 +256,9 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
             coins = {}
             for und in list(COHORT_COINS) + ["Other"]:
                 insts = per.get(und, {}) if und != "Other" else {i: c for u, d in per.items() if u not in COHORT_COINS for i, c in d.items()}
-                book = _book([[i, c[0], None] for i, c in insts.items()], chains, now)
-                coins[und] = {**_lean(book), "positions": sum(c[1] for c in insts.values())}
+                coins[und] = cohort_lean(insts, chains, now)
             cohorts[dim].append({"name": name, "wallets": doc["cohort_counts"].get(dim, {}).get(name, 0), "coins": coins})
-    _write(site / "traders.json", {"generated_at": int(now), "ready": True, "through": doc.get("through"),
+    _write(site / "traders.json", {"generated_at": int(now), **coverage,
                                    "ranked_total": doc.get("ranked_total"), "traders": rows, "cohorts": cohorts})
 
 
@@ -222,6 +271,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     history = signal_history(data, now)
     flows = taker_sides(data, now)
     held = tier_positions(data)
+    coverage = history_coverage(held, now)
     chains: dict = {}  # und -> (strikes, index, ts) for valuing traders' positions
     markets = []
     for sym in sig.get("universe", []):
@@ -240,9 +290,10 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             chains[und] = (opts["strikes"], opts["features"].get("index_price"), opts["ts"])
             opts["lean"] = options_lean(opts["features"], opts["iv_history"], (flows.get(und) or {}).get("7d"))
             align = alignment(r4.get("signal"), r1.get("signal"), opts["features"], opts["iv_history"], flows.get(und),
-                              (held.get("positions") or {}).get(und), opts["strikes"], opts["features"].get("index_price"),
+                              (held.get("positions") or {}).get(und) if coverage["ready"] else None, opts["strikes"], opts["features"].get("index_price"),
                               opts["ts"])
             align["positions_through"] = held.get("through")
+            align["wallet_coverage"] = coverage
         pos = r4.get("positioning") or {}
         price = (opts or {}).get("features", {}).get("index_price") or (closes4[-1] if closes4 else None)
         markets.append({
@@ -258,7 +309,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "atm_iv_30d": (opts or {}).get("features", {}).get("atm_iv_30d"),
             "rr25_30d": (opts or {}).get("features", {}).get("rr25_30d"),
             "lean": ((opts or {}).get("lean") or {}).get("state"),
-            "align": None if not align else {"score": align["score"], **{h: [row[k]["state"] for k in ("engine", "options", "wallets")]
+            "align": None if not align else {"score": align["score"], "wallet_coverage": coverage, **{h: [row[k]["state"] for k in ("engine", "options", "wallets")]
                                                                           for h, row in align["horizons"].items()}},
             "options": None if not opts else {
                 "ts": opts["ts"], **{k: opts["features"].get(k) for k in ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d",

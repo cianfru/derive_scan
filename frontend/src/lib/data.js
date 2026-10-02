@@ -16,15 +16,16 @@ export async function load(path) {
 }
 
 export function useData(path, refreshMs = 5 * 60_000) {
-  const [state, setState] = useState({ data: cache.get(path)?.data ?? null, error: null });
+  const [state, setState] = useState({ path, data: cache.get(path)?.data ?? null, error: null });
   useEffect(() => {
     let live = true;
+    setState({ path, data: cache.get(path)?.data ?? null, error: null });
     const get = () => load(path).then(
-      (data) => live && setState({ data, error: null }),
-      (error) => live && setState((s) => ({ data: s.data, error })));
+      (data) => live && setState({ path, data, error: null }),
+      (error) => live && setState((s) => ({ path, data: s.data, error })));
     get();
     const t = setInterval(get, refreshMs);
     return () => { live = false; clearInterval(t); };
   }, [path, refreshMs]);
-  return state;
+  return state.path === path ? state : { data: cache.get(path)?.data ?? null, error: null };
 }

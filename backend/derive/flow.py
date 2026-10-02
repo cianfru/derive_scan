@@ -90,6 +90,8 @@ def sides(trades: list[dict], run_ts: int, exclude: set[str] = frozenset()) -> l
     """Taker buying and selling per coin and kind, without the excluded wallets."""
     agg: dict = defaultdict(lambda: defaultdict(float))
     for t in trades:
+        if t.get("tx_status") == "reverted":
+            continue
         if t.get("liquidity_role") != "taker" or t.get("wallet") in exclude:
             continue
         name = t.get("instrument_name", "")
@@ -111,6 +113,8 @@ def sides(trades: list[dict], run_ts: int, exclude: set[str] = frozenset()) -> l
 def summarise(trades: list[dict], run_ts: int) -> tuple[list[list], list[list]]:
     large, wallets = [], defaultdict(lambda: defaultdict(float))
     for t in trades:
+        if t.get("tx_status") == "reverted":
+            continue
         name = t.get("instrument_name", "")
         kind = kind_of(name)
         amount, price, index = _f(t.get("trade_amount")), _f(t.get("trade_price")), _f(t.get("index_price"))
@@ -153,7 +157,8 @@ async def update(client: DeriveClient, root: Path | str, now_ms: int) -> dict:
     state = json.loads(state_p.read_text()) if state_p.exists() else {}
     since = state.get("last_ms", now_ms - FIRST_LOOKBACK_MS)
     seen = set(state.get("keys_at_last", []))
-    trades = [t for t in await fetch_since(client, since, now_ms) if leg_key(t) not in seen]
+    # Deduplicate within the response too, preserving all keys at an unchanged watermark.
+    trades = list({leg_key(t): t for t in await fetch_since(client, since, now_ms) if leg_key(t) not in seen}.values())
     if trades:
         large, wallets = summarise(trades, now_ms // 1000)
         for day in sorted({_day(r[0]) for r in large}):
@@ -161,7 +166,10 @@ async def update(client: DeriveClient, root: Path | str, now_ms: int) -> dict:
         _append(root / "wallets" / f"{_day(now_ms)}.csv", WALLET_FIELDS, wallets)
         _append(root / "sides" / f"{_day(now_ms)}.csv", SIDE_FIELDS, sides(trades, now_ms // 1000, exclude))
         last = max(int(t["timestamp"]) for t in trades)
-        state = {"last_ms": last, "keys_at_last": sorted(leg_key(t) for t in trades if int(t["timestamp"]) == last)}
+        keys = {leg_key(t) for t in trades if int(t["timestamp"]) == last}
+        if last == since:
+            keys |= seen
+        state = {"last_ms": last, "keys_at_last": sorted(keys)}
         root.mkdir(parents=True, exist_ok=True)
         state_p.write_text(json.dumps(state))
     return {"legs": len(trades)}

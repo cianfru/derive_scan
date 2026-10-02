@@ -30,7 +30,7 @@ def test_alignment_by_horizon():
 
     exp7, exp30 = now + 5 * 86400, now + 20 * 86400
     e7, e30 = parse_option(name(exp7, 90000, "C"))[1], parse_option(name(exp30, 80000, "P"))[1]  # 08:00 UTC
-    positions = {name(exp7, 90000, "C"): {"smart": [5.0, 4]}, name(exp30, 80000, "P"): {"smart": [20.0, 6]}}
+    positions = {name(exp7, 90000, "C"): {"smart": [5.0, 4, 5.0]}, name(exp30, 80000, "P"): {"smart": [20.0, 6, 20.0]}}
     strikes = {"expiries": {str(e7): [[90000, 0, 0, 0.5, 0.5, 0.4]], str(e30): [[80000, 0, 0, 0.5, 0.5, 0.8]]}}
     feats = {"rr25_7d": 0.02, "rr25_30d": -0.03, "atm_iv_7d": 0.4, "atm_iv_30d": 0.45, "pc_oi_ratio": 0.5}
     flows = {"24h": {"call": {"buy_premium_usd": 9000}}, "7d": {"put": {"buy_premium_usd": 9000}}}

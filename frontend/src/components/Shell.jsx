@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Link, Outlet, useLocation } from "react-router-dom";
+import ErrorBoundary from "./ErrorBoundary.jsx";
 
 function useTheme() {
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || "");
@@ -22,7 +23,7 @@ export function Logo({ theme, height = 24 }) {
 export default function Shell() {
   const [theme, toggle] = useTheme();
   const { pathname } = useLocation();
-  useEffect(() => window.scrollTo(0, 0), [pathname]);
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
   return (
     <>
       <div className={pathname === "/" ? "ground" : "ground quiet"} />
@@ -44,7 +45,7 @@ export default function Shell() {
           </div>
         </div>
       </header>
-      <main><Outlet context={{ theme }} /></main>
+      <main><ErrorBoundary key={pathname}><Outlet context={{ theme }} /></ErrorBoundary></main>
       <footer className="foot"><div className="wrap">
         <Logo theme={theme} height={18} />
         <span>Built on Derive · data refreshes every 15 minutes · nothing here is advice</span>
