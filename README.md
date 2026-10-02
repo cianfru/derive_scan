@@ -17,10 +17,20 @@ Both run in one GitHub Action (`.github/workflows/record.yml`) that commits plai
 | `signals/{4h,1d}/YYYY-MM-DD.csv` | one row per perp per closed bar |
 | `signals/status.json`, `signals/state.pkl` | last computed bar per timeframe; decision and agent-filter state carried between bars |
 | `candles/{UND}/{4h,1d,1w}.csv` | closed bars: Derive index OHLC, perp volume in contracts (0 when nothing traded) |
+| `candles/{UND}/{tf}.backfill.csv` | earlier bars from OKX spot, before Derive's first bar (price only); rows report `backfilled_bars` |
 
 Every Derive perp is listed. `data_status` says how far Reflex's engine can read it: `ready`, `warming up` (fewer than ~500 bars, z-scores damped by the engine) or `not enough data` (fewer than 200 bars). `volume_status` is `thin` when fewer than 90% of the last 100 bars traded; the volume-based exhaustion flags are then off. Signals are computed 3 minutes after each close, once Derive has published the bar. Newest: `https://raw.githubusercontent.com/cianfru/derive_scan/data/signals/latest.json`.
 
+## Trade flow files (`data` branch)
+
+| Path | Content |
+|---|---|
+| `flow/large/YYYY-MM-DD.csv` | taker trades at or above $25k perp notional, $100k option notional or $2k option premium, with wallet |
+| `flow/wallets/YYYY-MM-DD.csv` | one row per wallet per 15-minute run: trades, perp and option notional, premium bought and sold, realised PnL, fees |
+
 ## Options files (`data` branch)
+
+Every coin with options on Derive (`universe.json`). BTC and ETH in full detail; the others with expiry rows hourly and raw chains daily.
 
 | Path | Content |
 |---|---|

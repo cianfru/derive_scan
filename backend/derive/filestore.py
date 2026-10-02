@@ -62,13 +62,14 @@ class FileStore:
         return self.root / source / underlying
 
     def write_snapshot(self, ts: int, source: str, underlying: str, features: dict[str, float],
-                       slices: list[ExpirySlice], chain: dict | None = None) -> None:
+                       slices: list[ExpirySlice], chain: dict | None = None, keep_slices: bool = True) -> None:
         d, day = self._dir(source, underlying), _day(ts)
         _append_csv(d / "features" / f"{day}.csv", ["ts", "feature", "value"],
                     [[ts, k, repr(float(v))] for k, v in sorted(features.items())])
         rows = [asdict(s) for s in slices]
-        _append_csv(d / "expiries" / f"{day}.csv", ["ts", *SLICE_COLS],
-                    [[ts, *[r[k] for k in SLICE_COLS]] for r in rows])
+        if keep_slices:
+            _append_csv(d / "expiries" / f"{day}.csv", ["ts", *SLICE_COLS],
+                        [[ts, *[r[k] for k in SLICE_COLS]] for r in rows])
         if chain is not None:
             p = d / "chains" / day / f"{_hour(ts)}.json.gz"
             p.parent.mkdir(parents=True, exist_ok=True)

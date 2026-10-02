@@ -25,6 +25,10 @@ class Settings:
     # Raw option chains (gzip) are kept once an hour so features can be recomputed later.
     chain_every_sec: int = field(default_factory=lambda: int(os.getenv("DERIVE_CHAIN_EVERY_SEC", "3600")))
     chain_retention_days: int = field(default_factory=lambda: int(os.getenv("DERIVE_CHAIN_RETENTION_DAYS", "365")))
+    # Coins recorded in full detail; the others get expiry rows hourly and raw chains daily.
+    majors: list[str] = field(default_factory=lambda: [u.upper() for u in _csv("DERIVE_MAJORS", "BTC,ETH")])
+    minor_slice_every_sec: int = 3600
+    minor_chain_every_sec: int = 86400
     data_dir: Path = field(default_factory=lambda: Path(os.getenv("DATA_DIR", "data")))
     recorder_enabled: bool = field(default_factory=lambda: os.getenv("DERIVE_RECORDER", "on").lower() != "off")
 
@@ -35,6 +39,12 @@ class Settings:
             raise ValueError(f"unknown DERIVE_SNAPSHOT_SOURCES: {unknown}; known: {list(SOURCES)}")
         if self.interval_sec < 60:
             raise ValueError("DERIVE_SNAPSHOT_INTERVAL_SEC must be at least 60")
+
+    def chain_every(self, underlying: str) -> int:
+        return self.chain_every_sec if underlying in self.majors else self.minor_chain_every_sec
+
+    def slice_every(self, underlying: str) -> int:
+        return self.interval_sec if underlying in self.majors else self.minor_slice_every_sec
 
     @property
     def db_path(self) -> Path:
