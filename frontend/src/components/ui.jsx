@@ -10,7 +10,12 @@ export function Tabs({ items, value, onChange, label }) {
   return (
     <div className="tabs" role="tablist" aria-label={label}>
       {items.map(([v, text]) => (
-        <button key={v} role="tab" aria-selected={value === v} onClick={() => onChange(v)}>{text}</button>
+        <button key={v} role="tab" aria-selected={value === v} tabIndex={value === v ? 0 : -1} onClick={() => onChange(v)}
+          onKeyDown={e => {
+            const index = items.findIndex(([key]) => key === v);
+            const next = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : e.key === "ArrowRight" ? (index + 1) % items.length : e.key === "ArrowLeft" ? (index + items.length - 1) % items.length : null;
+            if (next !== null) { e.preventDefault(); onChange(items[next][0]); e.currentTarget.parentElement.children[next]?.focus(); }
+          }}>{text}</button>
       ))}
     </div>
   );
@@ -53,9 +58,9 @@ export function Info({ children, label = "More information" }) {
   );
 }
 
-export function Plate({ title, info, right, children, className = "", bodyClass = "" }) {
+export function Plate({ id, title, info, right, children, className = "", bodyClass = "" }) {
   return (
-    <section className={`plate ${className}`}>
+    <section id={id} className={`plate ${className}`}>
       {(title || right) && (
         <div className="plate-h">
           {title && <span className="label"><i className="tick" />{title}{info && <Info>{info}</Info>}</span>}
@@ -64,18 +69,6 @@ export function Plate({ title, info, right, children, className = "", bodyClass 
       )}
       <div className={`plate-b ${bodyClass}`}>{children}</div>
     </section>
-  );
-}
-
-export function Spark({ values, w = 96, h = 26 }) {
-  if (!values || values.length < 2) return null;
-  const lo = Math.min(...values), hi = Math.max(...values), r = hi - lo || 1;
-  const pts = values.map((v, i) => `${((i / (values.length - 1)) * w).toFixed(1)},${(h - 2 - ((v - lo) / r) * (h - 4)).toFixed(1)}`);
-  const up = values[values.length - 1] >= values[0];
-  return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
-      <polyline points={pts.join(" ")} fill="none" stroke={up ? "var(--up)" : "var(--down)"} strokeWidth="1.5" />
-    </svg>
   );
 }
 

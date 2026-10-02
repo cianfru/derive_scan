@@ -142,6 +142,8 @@ def test_publish_site_builds_app_files(tmp_path):
     markets = json.loads((site / "markets.json").read_text())
     btc = next(c for c in markets["coins"] if c["und"] == "BTC")
     assert btc["signal_4h"] and len(btc["spark"]) == 42 and btc["has_options"] is False
+    btc_detail = json.loads((site / "coins" / "BTC.json").read_text())
+    assert btc["spark_times"] == [bar[0] + 14400 for bar in btc_detail["candles"]["4h"][-42:]]
     coin = json.loads((site / "coins" / "NEW.json").read_text())
     assert coin["backfilled"]["4h"] > 0 and len(coin["candles"]["4h"]) == 500 and coin["signals"]["4h"]
     assert json.loads((site / "flow.json").read_text())["large"] == []

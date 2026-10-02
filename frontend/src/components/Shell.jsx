@@ -3,9 +3,8 @@ import { NavLink, Link, Outlet, useLocation } from "react-router-dom";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 
 function useTheme() {
-  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || "");
-  const sysDark = () => matchMedia("(prefers-color-scheme: dark)").matches;
-  const effective = theme || (sysDark() ? "dark" : "light");
+  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || "dark");
+  const effective = theme;
   const toggle = () => {
     const next = effective === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
@@ -26,12 +25,13 @@ export default function Shell() {
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
   return (
     <>
-      <div className={pathname === "/" ? "ground" : "ground quiet"} />
+      <a className="skip-link" href="#main-content">Skip to content</a>
       <header className="hdr">
         <div className="wrap">
           <Link to="/" className="logo" aria-label="Torq home"><Logo theme={theme} /></Link>
-          <nav>
+          <nav aria-label="Main navigation">
             <NavLink to="/markets">Markets</NavLink>
+            <NavLink to="/radar">Radar</NavLink>
             <NavLink to="/options">Options</NavLink>
             <NavLink to="/traders">Traders</NavLink>
             <NavLink to="/flow">Flow</NavLink>
@@ -45,10 +45,11 @@ export default function Shell() {
           </div>
         </div>
       </header>
-      <main><ErrorBoundary key={pathname}><Outlet context={{ theme }} /></ErrorBoundary></main>
+      <main id="main-content" tabIndex="-1"><ErrorBoundary key={pathname}><Outlet context={{ theme }} /></ErrorBoundary></main>
       <footer className="foot"><div className="wrap">
         <Logo theme={theme} height={18} />
-        <span>Built on Derive · data refreshes every 15 minutes · nothing here is advice</span>
+        <span>Independent analytics for Derive. Snapshots every 15 minutes.</span>
+        <a href="https://www.derive.xyz/" target="_blank" rel="noreferrer">Visit Derive ↗</a>
       </div></footer>
     </>
   );

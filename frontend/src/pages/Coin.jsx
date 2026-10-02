@@ -101,7 +101,7 @@ function OptionsPanel({ opts, und, flow }) {
   return (
     <>
       <div style={{ display: "flex", alignItems: "end", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
-        <div><h2>{und} options</h2><p className="sub">Where open interest sits and what traders pay for protection.</p></div>
+        <div id="options-detail"><h2>{und} options</h2><p className="sub">Where open interest sits and what traders pay for protection.</p></div>
         <span className="status">Updated {utc(opts.ts)}</span>
       </div>
       {opts.status !== "ready" && <p className="status warn">{QUALITY_LABEL[opts.status] || "Snapshot quality unavailable"} · values below belong to the displayed snapshot.</p>}
@@ -177,6 +177,7 @@ export default function Coin() {
           <h1 style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap" }}>{und}
             <span className="mono" style={{ fontSize: 24, fontWeight: 500 }}>{price(last?.[4])}</span>
             <span className={`mono ${dayChg > 0 ? "up" : dayChg < 0 ? "down" : ""}`} style={{ fontSize: 15 }}>{chg(dayChg)} 24h</span></h1>
+          <p className="status" style={{ margin: "6px 0 0" }}>Last {tf.toUpperCase()} close in USD. The 24h change uses closed 4H bars.</p>
         </div>
         <div style={{ display: "flex", gap: 22, alignItems: "center", flexWrap: "wrap" }}>
           <span className="label">Engine 4H + 1D <Signal s={data.latest?.["4h"]?.unified_complete ? data.latest["4h"].unified_signal : null} /></span>
@@ -184,12 +185,13 @@ export default function Coin() {
           <Tabs label="Timeframe" value={tf} onChange={setTf} items={[["4h", "4H"], ["1d", "1D"]]} />
         </div>
       </div>
+      <nav className="section-nav" aria-label="Market sections">{data.alignment && <a href="#alignment">Three perspectives</a>}<a href="#price-chart">Price chart</a><a href="#signal-evidence">Engine evidence</a>{data.options && <a href="#options-detail">Options detail</a>}</nav>
       <Readout row={row} />
       {data.alignment && (
-        <Plate title="Alignment" info={ALIGN_INFO}>
+        <Plate id="alignment" title="Three perspectives" info={ALIGN_INFO}>
           <AlignmentGrid alignment={data.alignment} />
         </Plate>)}
-      <Plate title={`${und} · ${tf.toUpperCase()}`} info={<>Derive's index price with traded volume. Orange line: fast average; grey: slow. Markers show where the signal changed. {data.backfilled?.[tf] ? `The first ${data.backfilled[tf]} bars come from an external market, before Derive listed ${und}.` : ""}</>}
+      <Plate id="price-chart" title={`${und} · ${tf.toUpperCase()}`} info={<>Derive's index price with traded volume. Orange line: fast average; grey: slow. Markers show where the signal changed. {data.backfilled?.[tf] ? `The first ${data.backfilled[tf]} bars come from an external market, before Derive listed ${und}.` : ""}</>}
         right={<span className="status">{row?.signal_bar_close_time ? `Bar closed ${utc(row.signal_bar_close_time)}` : ""}</span>}>
         <CandleChart candles={candles} signals={data.signals?.[tf]} tf={tf} theme={theme} backfilled={data.backfilled?.[tf] || 0}
           implied={data.options?.implied} levels={data.options?.levels} optionsAt={data.options?.ts} optionsIndex={data.options?.features?.index_price} />
@@ -205,7 +207,7 @@ export default function Coin() {
         </div>
       )}
       {data.latest?.[tf]?.signal_reason && (
-        <Plate title="Why this signal" info="The engine's own summary of the conditions it checked on the last closed bar.">
+        <Plate id="signal-evidence" title="Why this signal" info="The engine's own summary of the conditions it checked on the last closed bar.">
           <p className="mono" style={{ margin: 0, fontSize: 12.5, color: "var(--fg-2)", whiteSpace: "pre-wrap" }}>{data.latest[tf].signal_reason}</p>
           <Conditions row={row} />
         </Plate>
