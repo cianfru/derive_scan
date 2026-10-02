@@ -1,20 +1,23 @@
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { pct, price, utc } from "../lib/format.js";
 import { Plate, Loading, Failed, Info } from "../components/ui.jsx";
 
 function MiniTerm({ term }) {
-  if (!term || term.length < 2) return <div className="status" style={{ height: 56, display: "grid", placeItems: "center" }}>Too few expiries for a curve</div>;
-  const W = 220, H = 56, lt = (d) => Math.log(1 + d), tmax = Math.max(...term.map((t) => t[0]));
-  const ivs = term.map((t) => t[1]), lo = Math.min(...ivs), hi = Math.max(...ivs), r = hi - lo || 0.01;
-  const pts = term.map((t) => [4 + (lt(t[0]) / lt(tmax)) * (W - 8), 6 + (1 - (t[1] - lo) / r) * (H - 12)]);
-  const d = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join("");
-  return (
-    <svg className="viz" viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
-      <path d={`${d}L${pts[pts.length - 1][0]},${H}L${pts[0][0]},${H}Z`} fill="var(--orange-glow)" />
-      <path d={d} fill="none" stroke="var(--orange)" strokeWidth="2" />
-    </svg>
-  );
+  const rows = (term || []).filter(([d, iv]) => Number.isFinite(d) && d >= 0 && Number.isFinite(iv)).sort((a, b) => a[0] - b[0]);
+  if (rows.length < 2) return <div className="term-empty status">Too few expiries for a curve</div>;
+  const W = 340, H = 136, left = 38, right = 10, top = 18, bottom = 28;
+  const lastDay = rows[rows.length - 1][0], ivs = rows.map(t => t[1]), lo = Math.min(...ivs), hi = Math.max(...ivs);
+  const pad = Math.max(.01, (hi - lo) * .2);
+  const x = d => left + (d - rows[0][0]) / (lastDay - rows[0][0] || 1) * (W - left - right);
+  const y = iv => top + (hi + pad - iv) / (hi - lo + 2 * pad) * (H - top - bottom);
+  const path = rows.map(([d, iv], i) => `${i ? "L" : "M"}${x(d)},${y(iv)}`).join(" ");
+  return <figure className="term-preview"><figcaption>Volatility by expiry <Info label="About the volatility curve">Each point is an expiry's annualised at-the-money implied volatility. Days to expiry use a linear scale. The vertical scale fits this market's observed volatility range.</Info></figcaption><svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Annualised implied volatility ranges from ${pct(lo)} to ${pct(hi)} across expiries from ${rows[0][0].toFixed(0)} to ${lastDay.toFixed(0)} days`}>
+    {[lo, hi].filter((v, i, a) => a.indexOf(v) === i).map(v => <g key={v}><line x1={left} x2={W-right} y1={y(v)} y2={y(v)} className="trace-grid"/><text x={left-8} y={y(v)+4} textAnchor="end">{pct(v,0)}</text></g>)}
+    <path d={path} fill="none" stroke="var(--orange)" strokeWidth="1.7" strokeLinejoin="round"/>
+    {rows.map(([d, iv],i) => <circle key={i} cx={x(d)} cy={y(iv)} r="2.3" fill="var(--plate)" stroke="var(--orange)"><title>{d.toFixed(1)} days: {pct(iv)}</title></circle>)}
+    <text x={left} y={H-4}>{rows[0][0].toFixed(0)}d</text><text x={W-right} y={H-4} textAnchor="end">{lastDay.toFixed(0)} days</text>
+  </svg></figure>;
 }
 
 function SkewBar({ rr }) {
@@ -30,7 +33,6 @@ function SkewBar({ rr }) {
 
 export default function Options() {
   const { data, error } = useData("markets.json");
-  const nav = useNavigate();
   if (error && !data) return <div className="wrap page"><Failed error={error} /></div>;
   if (!data) return <div className="wrap page"><Loading /></div>;
   const coins = data.coins.filter((c) => c.options).sort((a, b) => (b.options.option_oi_contracts * (b.price || 0)) - (a.options.option_oi_contracts * (a.price || 0)));
@@ -46,13 +48,13 @@ export default function Options() {
           const t = (o.term || []).filter((x) => x[0] >= 1);
           const slope = t.length >= 2 ? t[t.length - 1][1] - t[0][1] : null;
           return (
-            <section key={c.und} className="plate" style={{ cursor: "pointer" }} onClick={() => nav(`/coin/${c.und}`)}
-              tabIndex={0} onKeyDown={(e) => e.key === "Enter" && nav(`/coin/${c.und}`)}>
+            <section key={c.und} className="plate option-card">
               <div className="plate-h">
-                <span style={{ font: "700 20px/1 var(--font-display)", letterSpacing: ".03em" }}>{c.und}</span>
-                <span className="mono dim" style={{ fontSize: 13 }}>{price(c.price)}</span>
+                <Link className="option-market-link" to={`/coin/${c.und}`}>{c.und}<span aria-hidden="true">↗</span></Link>
+                <span className="mono dim" style={{ fontSize: 13 }}>${price(c.price)}</span>
               </div>
               <div className="plate-b" style={{ display: "grid", gap: 12 }}>
+                <p className="option-snapshot status">Snapshot {utc(o.ts)}{Date.now() / 1000 - o.ts > 1800 ? " · historical" : ""}</p>
                 <MiniTerm term={o.term} />
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
                   <div className="fig" style={{ padding: 0, background: "none" }}><span>IV 30d</span><strong style={{ fontSize: 17 }}>{pct(o.atm_iv_30d)}</strong></div>
@@ -61,7 +63,7 @@ export default function Options() {
                   <div className="fig" style={{ padding: 0, background: "none" }}><span>Put / call</span><strong style={{ fontSize: 17 }}>{o.pc_oi_ratio?.toFixed(2) ?? "-"}</strong></div>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span className="label">Skew 30d</span><SkewBar rr={o.rr25_30d} />
+                  <span className="label">Skew 30d <Info>Call minus put implied volatility at 25 delta, in volatility points. Negative means puts are priced richer.</Info></span><SkewBar rr={o.rr25_30d} />
                 </div>
               </div>
             </section>);

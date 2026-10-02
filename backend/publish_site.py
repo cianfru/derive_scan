@@ -334,6 +334,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                 "term": [[round(e["tenor_days"], 3), e["atm_iv"]] for e in opts["expiries"] if e.get("atm_iv") is not None],
                 "iv30_hist": [[h[0], h[2]] for h in opts["iv_history"][-96 * 7:] if h[2] is not None][::4]},
             "spark": closes4[-42:],
+            "spark_times": [b[0] + 14400 for b in candles["4h"][-42:]],
         })
         _write(site / "coins" / f"{und}.json", {
             "und": und, "symbol": sym, "generated_at": int(now), "candles": candles,

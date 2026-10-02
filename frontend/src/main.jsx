@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./styles.css";
 import Shell from "./components/Shell.jsx";
 import Landing from "./pages/Landing.jsx";
+import Radar from "./pages/Radar.jsx";
 import Markets from "./pages/Markets.jsx";
 import Coin from "./pages/Coin.jsx";
 import Options from "./pages/Options.jsx";
@@ -18,6 +19,7 @@ createRoot(document.getElementById("root")).render(
         <Route element={<Shell />}>
           <Route index element={<Landing />} />
           <Route path="markets" element={<Markets />} />
+          <Route path="radar" element={<Radar />} />
           <Route path="coin/:und" element={<Coin />} />
           <Route path="options" element={<Options />} />
           <Route path="traders" element={<Traders />} />
