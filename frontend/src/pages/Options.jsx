@@ -1,7 +1,10 @@
-import { Link } from "react-router-dom";
+import { Asset } from "../components/MarketVisuals.jsx";
+import OptionsSummary from "../components/OptionsSummary.jsx";
+import { openMarketRow } from "../lib/explain.js";
+import { Link, useNavigate } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { pct, price, utc } from "../lib/format.js";
-import { Plate, Loading, Failed, Info } from "../components/ui.jsx";
+import { Loading, Failed, Info } from "../components/ui.jsx";
 
 function MiniTerm({ term }) {
   const rows = (term || []).filter(([d, iv]) => Number.isFinite(d) && d >= 0 && Number.isFinite(iv)).sort((a, b) => a[0] - b[0]);
@@ -32,15 +35,16 @@ function SkewBar({ rr }) {
 }
 
 export default function Options() {
+  const nav = useNavigate();
   const { data, error } = useData("markets.json");
   if (error && !data) return <div className="wrap page"><Failed error={error} /></div>;
   if (!data) return <div className="wrap page"><Loading /></div>;
   const coins = data.coins.filter((c) => c.options).sort((a, b) => (b.options.option_oi_contracts * (b.price || 0)) - (a.options.option_oi_contracts * (a.price || 0)));
   return (
-    <div className="wrap page">
+    <div className="wrap page options-page">
       <div>
         <h1>Options</h1>
-        <p className="sub">Every coin with options on Derive: how much volatility is priced, how the curve is shaped, and which side pays for protection.</p>
+        <p className="sub">The price of movement, by market. Open a surface to inspect strikes, expiries and exposure.</p>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 300px), 1fr))", gap: 16 }}>
         {coins.map((c) => {
@@ -48,19 +52,20 @@ export default function Options() {
           const t = (o.term || []).filter((x) => x[0] >= 1);
           const slope = t.length >= 2 ? t[t.length - 1][1] - t[0][1] : null;
           return (
-            <section key={c.und} className="plate option-card">
+            <section key={c.und} className="plate option-card" tabIndex={0} aria-label={`Open ${c.und} options`} onClick={e=>openMarketRow(e,nav,c.und)} onKeyDown={e=>openMarketRow(e,nav,c.und)}>
               <div className="plate-h">
-                <Link className="option-market-link" to={`/coin/${c.und}`}>{c.und}<span aria-hidden="true">↗</span></Link>
+                <Link className="option-market-link" to={`/coin/${c.und}`}><Asset und={c.und}/><span aria-hidden="true">↗</span></Link>
                 <span className="mono dim" style={{ fontSize: 13 }}>${price(c.price)}</span>
               </div>
               <div className="plate-b" style={{ display: "grid", gap: 12 }}>
                 <p className="option-snapshot status">Snapshot {utc(o.ts)}{Date.now() / 1000 - o.ts > 1800 ? " · historical" : ""}</p>
+                <OptionsSummary compact features={o} index={c.price}/>
                 <MiniTerm term={o.term} />
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                  <div className="fig" style={{ padding: 0, background: "none" }}><span>IV 30d</span><strong style={{ fontSize: 17 }}>{pct(o.atm_iv_30d)}</strong></div>
-                  <div className="fig" style={{ padding: 0, background: "none" }}><span>Curve</span>
-                    <strong style={{ fontSize: 13 }} className={slope < 0 ? "down" : ""}>{slope == null ? "-" : slope < 0 ? "Inverted" : "Upward"}</strong></div>
-                  <div className="fig" style={{ padding: 0, background: "none" }}><span>Put / call</span><strong style={{ fontSize: 17 }}>{o.pc_oi_ratio?.toFixed(2) ?? "-"}</strong></div>
+                  <div className="fig" style={{ padding: 0, background: "none" }}><span>IV 30d <Info>Annualised at-the-money implied volatility, interpolated to a 30-day tenor.</Info></span><strong style={{ fontSize: 17 }}>{pct(o.atm_iv_30d)}</strong></div>
+                  <div className="fig" style={{ padding: 0, background: "none" }}><span>Curve <Info>Compares the furthest expiry with the nearest expiry at least one day out. Inverted means near-term annualised volatility is higher; Upward means longer-term volatility is higher. Flat means no difference.</Info></span>
+                    <strong style={{ fontSize: 13 }} className={slope < 0 ? "down" : ""}>{slope == null ? "-" : slope < 0 ? "Inverted" : slope === 0 ? "Flat" : "Upward"}</strong></div>
+                  <div className="fig" style={{ padding: 0, background: "none" }}><span>Put / call <Info>Outstanding put contracts divided by call contracts. This is contract structure; it does not tell us who bought or sold.</Info></span><strong style={{ fontSize: 17 }}>{o.pc_oi_ratio?.toFixed(2) ?? "-"}</strong></div>
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span className="label">Skew 30d <Info>Call minus put implied volatility at 25 delta, in volatility points. Negative means puts are priced richer.</Info></span><SkewBar rr={o.rr25_30d} />
@@ -70,7 +75,7 @@ export default function Options() {
         })}
       </div>
       <p className="status" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        Curve compares the longest expiry with the nearest; inverted means short-dated options cost more, usually under stress.
+        Each surface has its own scale. Compare the labelled IV and skew values across markets.
         <Info>Skew is the 25-delta risk reversal at 30 days: below zero, puts are priced richer than calls. Put / call is open interest. On some coins most open interest comes from call-selling vaults, so read it as structure rather than sentiment.</Info>
       </p>
       {coins[0] && <p className="status">Updated {utc(coins[0].options.ts)}</p>}

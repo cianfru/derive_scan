@@ -1,16 +1,17 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
 import { ASSET_NAMES, traceGeometry, viewReading, WINDOWS } from "../lib/presentation.js";
-import { price, chg, utc } from "../lib/format.js";
+import { price, chg, utc, REGIME } from "../lib/format.js";
 import { useElementWidth } from "../lib/useElementWidth.js";
-import { Info, Tabs } from "./ui.jsx";
+import { SIGNAL_HELP, REGIME_HELP, READING_HELP } from "../lib/explain.js";
+import { Info } from "./ui.jsx";
 
 export function Asset({ und, compact = false }) {
-  return <span className="asset"><span className={`asset-mark asset-${und?.toLowerCase()}`} aria-hidden="true">{und === "BTC" ? "₿" : und === "ETH" ? "Ξ" : und === "SOL" ? "≋" : und?.slice(0, 1)}</span><span><b>{und}</b>{!compact && <small>{ASSET_NAMES[und] || "Derive market"}</small>}</span></span>;
+  const ext = ["HYPE", "PUMP"].includes(und) ? "jpg" : ["CC", "LIT", "VVV"].includes(und) ? "png" : "svg";
+  return <span className="asset"><img className="asset-icon" src={`/coins/${und}.${ext}`} alt="" width="34" height="34" /><span><b>{und}</b>{!compact && <small>{ASSET_NAMES[und] || "Derive market"}</small>}</span></span>;
 }
 export function Reading({ alignment, horizon = "30d", kind, detail = false }) {
-  const { state, label } = viewReading(alignment, horizon, kind);
-  return <span className="reading"><span className={`reading-value ${state || "unknown"}`}>{label}</span>{detail && <small>{WINDOWS[horizon][kind]}</small>}</span>;
+  const { state, label, row } = viewReading(alignment, horizon, kind);
+  return <span className="reading"><span className={`reading-value ${state || "unknown"}`}>{label}<Info label={`Explain ${kind === "engine" ? "daily engine" : kind === "wallets" ? "Smart wallets" : "options tone"}`}>{READING_HELP[kind]} {kind === "engine" && !state && row?.history_bars != null ? `The last engine evaluation used ${row.history_bars} bars. Full price normalisation needs 499; external history can extend price but never Derive volume. Open the market for its history sources.` : ""} {kind === "engine" && state && SIGNAL_HELP[row?.signal]} {kind === "engine" && state && REGIME_HELP[row?.regime]} {row?.observed_at ? `Observed ${utc(row.observed_at)}.` : ''}</Info></span>{kind === "engine" && state && row?.regime && <small>{REGIME[row.regime]}</small>}{detail && <small>{WINDOWS[horizon][kind]}</small>}</span>;
 }
 export function ThreeReadings({ alignment, horizon = "30d" }) {
   return <div className="three-readings">{[["engine", "Engine"], ["options", "Option prices"], ["wallets", "Smart wallets"]].map(([kind, label]) => <div key={kind}><span className="label">{label}</span><Reading alignment={alignment} horizon={horizon} kind={kind} detail /></div>)}</div>;
@@ -55,19 +56,6 @@ export function MarketTrace({ values, times, label = "Price history", large = fa
       {large && times?.length === values.length && <><text x="10" y={H - 2}>{dt(times[g.first])}</text><text x={W - 68} y={H - 2} textAnchor="end">{dt(times[g.last])}</text></>}
     </svg>
     {!large && <figcaption className={`trace-change ${tone}`}>{chg(change, 1)}</figcaption>}
-    {large && <div className="trace-foot"><span>{stamp ? utc(stamp) : "4-hour closing prices"}</span><span>Dashed line: first close <Info label="About the price trace">Each vertex is a recorded 4-hour close. Values are joined directly without smoothing. The vertical scale fits this asset’s range; compare the percentage change, not the steepness of different traces. Use the arrow keys on the chart to inspect samples.</Info></span></div>}
+    {large && <div className="trace-foot"><span>{stamp ? utc(stamp) : "Daily closing prices"}</span><span>Dashed line: first close <Info label="About the price trace">Each vertex is a recorded daily close. Values are joined directly without smoothing. The vertical scale fits this asset’s range; compare the percentage change, not the steepness of different traces. Use the arrow keys on the chart to inspect samples.</Info></span></div>}
   </figure>;
-}
-
-export function MarketPreview({ coins }) {
-  const [asset, setAsset] = useState("BTC");
-  const choices = ["BTC", "ETH", "SOL"].filter(u => coins.some(c => c.und === u));
-  const coin = coins.find(c => c.und === asset) || coins[0];
-  if (!coin) return <div className="market-preview empty-state"><p>Market snapshots are loading.</p><Link to="/markets" className="text-link">Open markets</Link></div>;
-  return <div className="market-preview">
-    <div className="preview-top"><Tabs label="Preview market" value={coin.und} onChange={setAsset} items={choices.map(u => [u, u])} /><span className="status">Recent 4H closes</span></div>
-    <MarketTrace key={coin.und} values={coin.spark} times={coin.spark_times} label={`${coin.und} price history`} large />
-    <ThreeReadings alignment={coin.align} />
-    <Link className="preview-link" to={`/coin/${coin.und}`}>Explore {ASSET_NAMES[coin.und] || coin.und}<span aria-hidden="true">↗</span></Link>
-  </div>;
 }

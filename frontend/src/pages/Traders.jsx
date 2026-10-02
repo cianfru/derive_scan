@@ -6,33 +6,8 @@ import { TYPE, TYPE_INFO, typeOf } from "../lib/traders.js";
 import { Plate, Tabs, Loading, Failed, Info } from "../components/ui.jsx";
 import WalletTag from "../components/WalletTag.jsx";
 import LeanBar from "../components/LeanBar.jsx";
+import CohortExplorer from "../components/CohortExplorer.jsx";
 import HistoryStatus, { coverageReady } from "../components/HistoryStatus.jsx";
-
-const COHORT_INFO = {
-  pnl: "Options traders grouped by their results on options that have expired, from Money Printer (over $1M) to Giga-Rekt (over $1M lost). Each cell is the net delta of the cohort's open options on that coin: right and green when their positions gain from a rise, left and red when they gain from a fall. Market makers are left out.",
-  size: "Options traders grouped by the premium they have traded, from Leviathan (over $10M) to Shrimp (under $10K). Each cell is the net delta of the cohort's open options on that coin: right and green when their positions gain from a rise, left and red when they gain from a fall. Market makers are left out.",
-};
-
-function Cohorts({ cohorts }) {
-  const [dim, setDim] = useState("pnl");
-  const rows = (cohorts?.[dim] || []).filter((c) => c.wallets > 0);
-  return (
-    <Plate title="Cohorts" info={COHORT_INFO[dim]} bodyClass="table-wrap"
-      right={<Tabs label="Cohorts" value={dim} onChange={setDim} items={[["pnl", "By results"], ["size", "By size"]]} />}>
-      <table className="grid cohort-grid" style={{ minWidth: 640 }}>
-        <thead><tr><th>Cohort</th><th className="num">Wallets</th><th>BTC</th><th>ETH</th><th>Other coins</th></tr></thead>
-        <tbody>
-          {rows.map((c) => (
-            <tr key={c.name} style={{ cursor: "default" }}>
-              <td style={{ fontWeight: 600 }}>{c.name}</td>
-              <td className="num">{c.wallets}</td>
-              {["BTC", "ETH", "Other"].map((u) => <td key={u}>{c.coins[u]?.positions ? <LeanBar lean={c.coins[u]} /> : <span className="faint">No positions</span>}</td>)}
-            </tr>))}
-        </tbody>
-      </table>
-    </Plate>
-  );
-}
 
 export default function Traders() {
   const { data, error } = useData("traders.json", 5 * 60_000);
@@ -52,19 +27,19 @@ export default function Traders() {
           <h1>Traders</h1>
           <p className="sub">Options traders on Derive, ranked by gross results on expired options, before fees. Market makers left out.</p>
         </div>
-        <div className="figs" style={{ minWidth: "min(480px, 100%)" }}>
-          <div className="fig"><span>Ranked</span><strong>{data.ranked_total?.toLocaleString() ?? "-"}</strong></div>
-          <div className="fig"><span>Top and Smart</span><strong>{data.traders.filter((t) => t.tier === "top" || t.tier === "smart").length}</strong></div>
+        <div className="figs trader-summary" style={{ minWidth: "min(480px, 100%)" }}>
+          <div className="fig"><span>Ranked <Info>Wallets that meet the existing minimum trade and expired-option requirements, excluding market makers. Up to 200 are published in the leaderboard.</Info></span><strong>{data.ranked_total?.toLocaleString() ?? "-"}</strong></div>
+          <div className="fig"><span>Top and Smart <Info>Number of wallets in the published leaderboard assigned either of the existing profitable directional tiers. These are separate from the results and size cohorts below.</Info></span><strong>{data.traders.filter((t) => t.tier === "top" || t.tier === "smart").length}</strong></div>
           <div className="fig"><span>History to</span><strong style={{ fontSize: 14 }}>{data.through}</strong></div>
         </div>
       </div>
-      <Cohorts cohorts={data.cohorts} />
+      <CohortExplorer cohorts={data.cohorts} through={data.through} valuedAt={data.generated_at} />
       <Plate title="Leaderboard" info={<>{TYPE_INFO} Gross options PnL counts expired options: premium received minus premium paid plus settlement value, before fees. Win rate: share of expired instruments with positive gross PnL. Book: positions reconstructed through the displayed UTC close and valued on the newest chain; subsequent trades are not included.</>}
         right={<Tabs label="Type" value={kind} onChange={(k) => { setKind(k); setAll(false); }} items={[["all", "All"], ["directional", "Directional"], ["income", "Income"], ["hedger", "Hedger"]]} />}
         bodyClass="table-wrap">
         <table className="grid" style={{ minWidth: 900 }}>
-          <thead><tr><th>Trader</th><th>Type</th><th className="num">Gross options PnL</th><th className="num">Win rate</th><th className="num">Premium traded</th>
-            <th>Results</th><th>Size</th><th>Book</th><th className="num">Last trade</th></tr></thead>
+          <thead><tr><th>Trader</th><th>Type</th><th className="num">Gross options PnL <Info>Premium received minus premium paid plus settlement value on expired options, before fees, across the collected history.</Info></th><th className="num">Win rate <Info>Share of expired option instruments with positive gross PnL. It ignores win/loss size.</Info></th><th className="num">Premium traded <Info>Total option premium bought and sold, before netting. It determines the size cohort.</Info></th>
+            <th>Results</th><th>Size</th><th>Book <Info>Net dollar delta of reconstructed unexpired options, valued at publication. Long delta gains from a small price rise; short delta gains from a fall. Perpetual hedges are excluded.</Info></th><th className="num">Last trade</th></tr></thead>
           <tbody>
             {shown.map((t) => (
               <tr key={t.address} onClick={() => nav(`/trader/${t.address.toLowerCase()}`)} tabIndex={0}

@@ -100,9 +100,9 @@ def test_options_need_both_fresh_skew_and_covered_flow_and_ignore_nondirectional
 
 def test_unavailable_wait_is_not_neutral_alignment():
     row = {**engine("WAIT"), "signal_status": "unavailable"}
-    result = alignment(row, engine("WAIT"), {}, [], {}, None, None, None, NOW, options_at=NOW)
+    result = alignment(engine("WAIT"), row, {}, [], {}, None, None, None, NOW, options_at=NOW)
     assert result["horizons"]["7d"]["engine"]["state"] is None
-    assert result["horizons"]["30d"]["engine"]["state"] == "neutral"
+    assert result["horizons"]["30d"]["engine"]["state"] is None
 
 
 def test_unquoted_wallet_exposure_does_not_assume_fifty_percent_iv():

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, useId } from "react";
 import { createPortal } from "react-dom";
+import { SIGNAL_HELP } from "../lib/explain.js";
 import { SIGNAL_LABEL, signalTone } from "../lib/format.js";
 
-export function Signal({ s }) {
-  return <span className={`sig ${signalTone(s)}`}>{s ? SIGNAL_LABEL[s] || s : "-"}</span>;
+export function Signal({ s, help = true }) {
+  return <span className={`sig ${signalTone(s)}`}>{s ? SIGNAL_LABEL[s] || s : "Unavailable"}{help && SIGNAL_HELP[s] && <Info label={`Explain ${SIGNAL_LABEL[s]}`}>{SIGNAL_HELP[s]}</Info>}</span>;
 }
 
 export function Tabs({ items, value, onChange, label }) {

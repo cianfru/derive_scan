@@ -2,7 +2,7 @@ import { Info } from "./ui.jsx";
 import { utc } from "../lib/format.js";
 
 export const QUALITY_LABEL = {
-  ready: "Ready", partial_flow: "Partial flow", insufficient_data: "Insufficient data", unknown: "Unavailable",
+  ready: "Ready", history_updated: "History recovered", partial_flow: "Partial flow", insufficient_data: "Insufficient data", unknown: "Unavailable",
   missing: "Unavailable", unavailable: "Unavailable", stale: "Stale data", future: "Timestamp mismatch",
   thin_volume: "Thin volume", "warming up": "Warming up", "not enough data": "Short history",
   missing_quotes: "Missing quotes", modelled_delta: "Estimated delta", insufficient_exposure: "Insufficient exposure",

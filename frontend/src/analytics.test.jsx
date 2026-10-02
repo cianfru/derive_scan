@@ -26,7 +26,7 @@ it("does not relabel missing or stale engine evidence as neutral", () => {
   render(<AlignmentGrid alignment={{ version: 2, horizons: { "7d": row, "30d": row } }} />);
   expect(screen.queryByText("Neutral")).toBeNull();
   expect(screen.queryByText("Next 7 days")).toBeNull();
-  expect(screen.getByText("7d tenor · 24h flow")).toBeTruthy();
+  expect(screen.getByText("7d tenor / 24h flow")).toBeTruthy();
 });
 
 it("lets the reader inspect unknown evidence and its explanation", async () => {

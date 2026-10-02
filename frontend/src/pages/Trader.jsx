@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import { usd, pct, price, ago } from "../lib/format.js";
+import { usd, pct, price, ago, utc } from "../lib/format.js";
 import { TYPE, TYPE_INFO, typeOf } from "../lib/traders.js";
 import { Plate, Loading, Failed, Info } from "../components/ui.jsx";
 import WalletTag from "../components/WalletTag.jsx";
@@ -29,10 +29,10 @@ export default function Trader() {
       <div className="figs">
         <div className="fig"><span>Gross options PnL <Info label="About gross options PnL">Expired options: premium received minus premium paid plus settlement value. Fees are excluded, matching the documented ranking rules.</Info></span>
           <strong className={data.option_pnl > 0 ? "up" : data.option_pnl < 0 ? "down" : ""}>{usd(data.option_pnl)}</strong></div>
-        <div className="fig"><span>Win rate</span><strong>{pct(data.win_rate, 0)}</strong></div>
-        <div className="fig"><span>Expired options</span><strong>{data.expired}</strong></div>
-        <div className="fig"><span>Premium traded</span><strong>{usd(data.premium_traded)}</strong></div>
-        <div className="fig"><span>Perp PnL</span><strong className={data.perp_pnl > 0 ? "up" : data.perp_pnl < 0 ? "down" : ""}>{usd(data.perp_pnl)}</strong></div>
+        <div className="fig"><span>Win rate <Info>Share of expired option instruments with positive gross PnL. It counts outcomes, not the size of wins and losses, and is not an estimate of future success.</Info></span><strong>{pct(data.win_rate, 0)}</strong></div>
+        <div className="fig"><span>Expired options <Info>Distinct expired option instruments with reconstructed results in the collected history.</Info></span><strong>{data.expired}</strong></div>
+        <div className="fig"><span>Premium traded <Info>Total option premium bought plus sold over the collected history, before netting. This determines the size cohort.</Info></span><strong>{usd(data.premium_traded)}</strong></div>
+        <div className="fig"><span>Perp PnL <Info>Reported realised perpetual PnL in the collected trade history. It is separate from the expired-options PnL used for this ranking.</Info></span><strong className={data.perp_pnl > 0 ? "up" : data.perp_pnl < 0 ? "down" : ""}>{usd(data.perp_pnl)}</strong></div>
         <div className="fig"><span>Active</span><strong style={{ fontSize: 13 }}>{data.first} to {data.last}</strong></div>
       </div>
       <Plate title="Open options" info="Positions reconstructed through the displayed UTC close, valued on fresh options quotes. Marks use a Black-76 model on the index; quoted delta is used where available, otherwise a labelled estimate from the strike IV. No default volatility is assumed. Later trades are not included, and expired instruments are omitted. Entry is the average cost of the remaining position where daily records determine it. When buys and sells lose their order in a daily aggregate, entry and unrealised PnL are unavailable until a later close or reversal establishes a known basis. Delta is dollar exposure to the coin; positive gains when the price rises."
@@ -75,7 +75,7 @@ export default function Trader() {
                 <td className="num">{price((bv + sv) / (buy + sell))}</td></tr>))}</tbody>
           </table>) : <p className="status">No trades in the last 45 days.</p>}
       </Plate>
-      <p className="status">History to {data.through} UTC</p>
+      <p className="status">History to {data.through} UTC. Book valued {utc(data.generated_at)}{Date.now()/1000-data.generated_at>1800 ? " / historical snapshot" : ""}</p>
     </div>
   );
 }

@@ -1,0 +1,80 @@
+{
+  "retrieved": "2026-10-02",
+  "assets": [
+    {
+      "symbol": "BTC",
+      "source": "https://raw.githubusercontent.com/0xa3k5/web3icons/ad3cbe05229db54931cd8b2c2a86662288a0ce50/packages/core/src/svgs/tokens/branded/BTC.svg",
+      "file": "BTC.svg"
+    },
+    {
+      "symbol": "ETH",
+      "source": "https://raw.githubusercontent.com/0xa3k5/web3icons/ad3cbe05229db54931cd8b2c2a86662288a0ce50/packages/core/src/svgs/tokens/branded/ETH.svg",
+      "file": "ETH.svg"
+    },
+    {
+      "symbol": "SOL",
+      "source": "https://raw.githubusercontent.com/0xa3k5/web3icons/ad3cbe05229db54931cd8b2c2a86662288a0ce50/packages/core/src/svgs/tokens/branded/SOL.svg",
+      "file": "SOL.svg"
+    },
+    {
+      "symbol": "XAUT",
+      "source": "https://raw.githubusercontent.com/0xa3k5/web3icons/ad3cbe05229db54931cd8b2c2a86662288a0ce50/packages/core/src/svgs/tokens/branded/XAUT.svg",
+      "file": "XAUT.svg"
+    },
+    {
+      "symbol": "ZEC",
+      "source": "https://raw.githubusercontent.com/0xa3k5/web3icons/ad3cbe05229db54931cd8b2c2a86662288a0ce50/packages/core/src/svgs/tokens/branded/ZEC.svg",
+      "file": "ZEC.svg"
+    },
+    {
+      "symbol": "ADA",
+      "source": "https://raw.githubusercontent.com/0xa3k5/web3icons/ad3cbe05229db54931cd8b2c2a86662288a0ce50/packages/core/src/svgs/tokens/branded/ADA.svg",
+      "file": "ADA.svg"
+    },
+    {
+      "symbol": "XRP",
+      "source": "https://raw.githubusercontent.com/0xa3k5/web3icons/ad3cbe05229db54931cd8b2c2a86662288a0ce50/packages/core/src/svgs/tokens/branded/XRP.svg",
+      "file": "XRP.svg"
+    },
+    {
+      "symbol": "BNB",
+      "source": "https://raw.githubusercontent.com/0xa3k5/web3icons/ad3cbe05229db54931cd8b2c2a86662288a0ce50/packages/core/src/svgs/tokens/branded/BNB.svg",
+      "file": "BNB.svg"
+    },
+    {
+      "symbol": "DOGE",
+      "source": "https://raw.githubusercontent.com/0xa3k5/web3icons/ad3cbe05229db54931cd8b2c2a86662288a0ce50/packages/core/src/svgs/tokens/branded/DOGE.svg",
+      "file": "DOGE.svg"
+    },
+    {
+      "symbol": "LINK",
+      "source": "https://raw.githubusercontent.com/0xa3k5/web3icons/ad3cbe05229db54931cd8b2c2a86662288a0ce50/packages/core/src/svgs/tokens/branded/LINK.svg",
+      "file": "LINK.svg"
+    },
+    {
+      "symbol": "HYPE",
+      "source": "https://coin-images.coingecko.com/coins/images/50882/large/hyperliquid.jpg?1729431300",
+      "file": "HYPE.jpg"
+    },
+    {
+      "symbol": "CC",
+      "source": "https://coin-images.coingecko.com/coins/images/70468/large/Canton-Ticker_%281%29.png?1762826299",
+      "file": "CC.png"
+    },
+    {
+      "symbol": "PUMP",
+      "source": "https://coin-images.coingecko.com/coins/images/67164/large/pump.jpg?1751949376",
+      "file": "PUMP.jpg"
+    },
+    {
+      "symbol": "VVV",
+      "source": "https://coin-images.coingecko.com/coins/images/54023/large/VVV_Token_Transparent.png?1741856877",
+      "file": "VVV.png"
+    },
+    {
+      "symbol": "LIT",
+      "source": "https://coin-images.coingecko.com/coins/images/71121/large/lighter.png?1765888098",
+      "file": "LIT.png"
+    }
+  ]
+}
