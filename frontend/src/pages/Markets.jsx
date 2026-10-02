@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { price, chg, pct, usd, title, ago, utc, SIGNAL_RANK, REGIME, DATA_LABEL } from "../lib/format.js";
 import { Signal, Tabs, Plate, Spark, Loading, Failed, Info } from "../components/ui.jsx";
+import { AlignSquares, ALIGN_INFO } from "../components/Alignment.jsx";
 
 const COLS = [
-  ["und", "Perp", (c) => c.und],
+  ["und", "Coin", (c) => c.und],
   ["price", "Price", (c) => c.price, "num"],
   ["chg_24h", "24h", (c) => c.chg_24h, "num"],
   ["spark", "7 days", null],
+  ["align", "Alignment 7d · 30d", (c) => c.align?.score ?? -99],
   ["signal_4h", "4H", (c) => SIGNAL_RANK[c.signal_4h] ?? -1],
   ["signal_1d", "1D", (c) => SIGNAL_RANK[c.signal_1d] ?? -1],
   ["unified", "Combined", (c) => SIGNAL_RANK[c.unified] ?? -1],
@@ -24,12 +26,12 @@ export default function Markets() {
   const { data, error } = useData("markets.json");
   const nav = useNavigate();
   const [q, setQ] = useState("");
-  const [view, setView] = useState("all");
-  const [sort, setSort] = useState(["oi_usd", -1]);
+  const [view, setView] = useState("options");
+  const [sort, setSort] = useState(["align", -1]);
   const rows = useMemo(() => {
     if (!data) return [];
     let r = data.coins.filter((c) => c.und.toLowerCase().includes(q.trim().toLowerCase()));
-    if (view === "options") r = r.filter((c) => c.has_options);
+    r = r.filter((c) => (view === "perps" ? !c.has_options : c.has_options));
     if (view === "entries") r = r.filter((c) => (SIGNAL_RANK[c.unified] ?? 0) >= 3);
     const col = COLS.find((c) => c[0] === sort[0]);
     return [...r].sort((a, b) => {
@@ -48,7 +50,7 @@ export default function Markets() {
       <div style={{ display: "flex", alignItems: "end", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>
           <h1>Markets</h1>
-          <p className="sub">Every Derive perp, read by the signal engine after each 4H and daily close.</p>
+          <p className="sub">Every coin with options on Derive: the engine's direction, option prices and smart wallets, side by side.</p>
         </div>
         <div className="figs" style={{ minWidth: "min(560px, 100%)" }}>
           <div className="fig"><span>Consensus 4H</span><strong style={{ fontSize: 16 }}>{title(data.consensus?.["4h"])}</strong></div>
@@ -58,10 +60,10 @@ export default function Markets() {
         </div>
       </div>
       <Plate
-        title="All perps"
-        info={<>Signals come from the engine on Derive's index price. 4H and 1D are each timeframe's signal; Combined joins both. Heat is distance from the long-term base, 0 to 100. Funding is annualised. Coins with little history on Derive show earlier bars from an external market, marked on their page.</>}
+        title={view === "perps" ? "Perps without options" : "Options coins"}
+        info={<>Alignment: {ALIGN_INFO} Signals come from the engine on Derive's index price. 4H and 1D are each timeframe's signal; Combined joins both. Heat is distance from the long-term base, 0 to 100. Funding is annualised. Coins with little history on Derive show earlier bars from an external market, marked on their page.</>}
         right={<div style={{ display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
-          <Tabs label="Filter" value={view} onChange={setView} items={[["all", "All"], ["entries", "Entries"], ["options", "With options"]]} />
+          <Tabs label="Filter" value={view} onChange={setView} items={[["options", "Options coins"], ["entries", "Entries"], ["perps", "Perps only"]]} />
           <input className="search" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search perps" />
         </div>}
         bodyClass="table-wrap">
@@ -75,10 +77,11 @@ export default function Markets() {
             {rows.map((c) => (
               <tr key={c.und} className={c.data_4h === "not enough data" ? "dim" : ""} onClick={() => nav(`/coin/${c.und}`)}
                 tabIndex={0} onKeyDown={(e) => e.key === "Enter" && nav(`/coin/${c.und}`)}>
-                <td className="coin">{c.und}<small>{c.has_options ? "Perp · options" : "Perp"}</small></td>
+                <td className="coin">{c.und}<small>{c.has_options ? "Perp · options" : "Perp only"}</small></td>
                 <td className="num">{price(c.price)}</td>
                 <td className={`num ${c.chg_24h > 0 ? "up" : c.chg_24h < 0 ? "down" : ""}`}>{chg(c.chg_24h)}</td>
                 <td><Spark values={c.spark} /></td>
+                <td><AlignSquares a={c.align} /></td>
                 <td><Signal s={c.signal_4h} /></td>
                 <td><Signal s={c.signal_1d} /></td>
                 <td><Signal s={c.unified} /></td>

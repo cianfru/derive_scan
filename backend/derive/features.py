@@ -8,6 +8,7 @@ Definitions (fixed before any data was looked at):
 - RR25 = call25 - put25; BF25 = (call25 + put25) / 2 - ATM.
 - Constant-maturity ATM IV (7/30/90 days): linear in total variance iv^2 * T between the
   two expiries that bracket the tenor. RR25/BF25 at 30 days: linear in T. No extrapolation.
+  RR25 at 7 days, same method (added 2 October 2026 for the 7-day options reading).
 - Put/call OI ratio: put contracts / call contracts across all live expiries.
 - Funding: Derive quotes a per-hour rate; annualised = rate * 24 * 365.
 - Perp basis: (mark - index) / index.
@@ -118,6 +119,7 @@ def surface_features(slices: list[ExpirySlice], index: float | None, perp: dict 
     out: dict[str, float | None] = {"index_price": index}
     for d in TENORS_DAYS:
         out[f"atm_iv_{d}d"] = constant_maturity_iv(slices, d)
+    out["rr25_7d"] = constant_maturity(slices, "rr25", 7)
     out["rr25_30d"] = constant_maturity(slices, "rr25", 30)
     out["bf25_30d"] = constant_maturity(slices, "bf25", 30)
     calls = sum(s.call_oi for s in slices)

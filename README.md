@@ -42,7 +42,8 @@ Every option and perp trade on Derive V2 since December 2023, one finished UTC d
 |---|---|
 | `history/days/YYYY-MM-DD.csv.gz` | per wallet and instrument for the day: contracts and value bought and sold, maker and taker legs, delta added in USD (Black-76 at each trade's implied volatility), implied volatility, out-of-the-money premium sold, realised PnL, fees |
 | `history/settlements/{UND}.json` | option settlement price per expiry |
-| `history/wallets.json` | each wallet's class from all days so far: market maker, income, hedger, directional, skilled, occasional |
+| `history/wallets.json` | each wallet's class from all days so far (market maker, income, hedger, directional, occasional) and, for profitable directional wallets, its tier (top, smart, profitable) |
+| `history/positions.json` | open option contracts per instrument held by each tier's wallets |
 | `history/state.json` | last day done |
 
 ## Options files (`data` branch)

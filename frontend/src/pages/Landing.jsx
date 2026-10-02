@@ -6,7 +6,7 @@ import { Logo } from "../components/Shell.jsx";
 
 const TONE = { strong: "var(--sig-strong)", long: "var(--sig-long)", acc: "var(--sig-acc)", wait: "var(--seam-hi)", exit: "var(--sig-exit)", na: "var(--seam)" };
 
-/** A machined gauge: one segment per perp, outer ring 4H, inner ring 1D. */
+/** A machined gauge: one segment per coin, outer ring 4H, inner ring 1D. */
 function Gauge({ coins }) {
   const S = 420, C = S / 2, n = coins.length || 1, gap = 0.045;
   const arc = (r, a0, a1) => {
@@ -16,7 +16,7 @@ function Gauge({ coins }) {
   };
   const btc = coins.find((c) => c.und === "BTC");
   return (
-    <svg className="viz" viewBox={`0 0 ${S} ${S}`} role="img" aria-label="Signals on every Derive perp: outer ring 4H, inner ring 1D">
+    <svg className="viz" viewBox={`0 0 ${S} ${S}`} role="img" aria-label="Signals on every Derive coin with options: outer ring 4H, inner ring 1D">
       <defs>
         <radialGradient id="face" cx="50%" cy="45%" r="60%"><stop offset="0" stopColor="var(--plate-3)" /><stop offset="1" stopColor="var(--plate)" /></radialGradient>
       </defs>
@@ -62,7 +62,7 @@ export default function Landing() {
   const { theme } = useOutletContext();
   const { data } = useData("markets.json");
   const { data: flow } = useData("flow.json");
-  const coins = data?.coins || [];
+  const coins = (data?.coins || []).filter((c) => c.has_options);
   const btc = coins.find((c) => c.und === "BTC");
   const withOptions = coins.filter((c) => c.options && c.options.term?.length > 1)
     .sort((a, b) => b.options.option_oi_contracts * (b.price || 0) - a.options.option_oi_contracts * (a.price || 0));
@@ -74,7 +74,7 @@ export default function Landing() {
         <div className="hero-copy">
           <h1 className="sr-only">Torq</h1>
           <Logo theme={theme} height={92} />
-          <p className="hero-line">Regime signals on every Derive perp.<br /><b>Options structure you can read at a glance.</b></p>
+          <p className="hero-line">Direction from the engine. Positioning from options.<br /><b>Side by side, for every coin with options on Derive.</b></p>
           <div className="hero-cta">
             <Link className="btn primary" to="/markets">Open markets</Link>
             <Link className="btn" to="/options">Options</Link>
@@ -83,7 +83,7 @@ export default function Landing() {
             <div><span>BTC</span><strong className="mono">{btc ? price(btc.price) : "-"}</strong></div>
             <div><span>BTC 1D</span><Signal s={btc?.signal_1d} /></div>
             <div><span>Consensus</span><strong>{title(data?.consensus?.["4h"])}</strong></div>
-            <div><span>Perps</span><strong className="mono">{coins.length || "-"}</strong></div>
+            <div><span>Coins</span><strong className="mono">{coins.length || "-"}</strong></div>
             <div><span>Updated</span><strong className="mono">{data ? ago(data.generated_at) : "-"}</strong></div>
           </div>
         </div>
@@ -103,8 +103,8 @@ export default function Landing() {
         <article className="plate feature">
           <div className="plate-b">
             <span className="label"><i className="tick" />Signals</span>
-            <h2>Every perp, every close</h2>
-            <p className="dim">A regime engine reads each market after every 4-hour and daily close: trend, heat, exhaustion and structure, combined into one call.</p>
+            <h2>Every close, every horizon</h2>
+            <p className="dim">A regime engine reads each market after every 4-hour and daily close, then sits beside what option prices and the best options traders show for the next 7 and 30 days.</p>
             <ul className="mini-list">
               {topSignals.map((c) => (
                 <li key={c.und}><Link to={`/coin/${c.und}`}><b>{c.und}</b><Signal s={c.signal_4h} /><Signal s={c.signal_1d} /></Link></li>))}
@@ -129,7 +129,7 @@ export default function Landing() {
           <div className="plate-b">
             <span className="label"><i className="tick" />Flow</span>
             <h2>Who is trading, and how big</h2>
-            <p className="dim">Derive's trades are public. Torq surfaces the largest ones and the wallets behind the volume.</p>
+            <p className="dim">Derive's trades are public. Torq ranks options traders by results, leaves market makers out and shows what the best ones hold.</p>
             <div className="flow-figs">
               <div><span>Large trades 24h</span><strong className="mono">{flow?.large?.length ?? "-"}</strong></div>
               <div><span>Largest</span><strong className="mono">{biggest ? usd(biggest.notional_usd) : "-"}</strong>{biggest && <small className="dim">{biggest.instrument}</small>}</div>
@@ -144,7 +144,7 @@ export default function Landing() {
         <ol className="steps">
           <li><b>Read</b><span>Derive's index, perp volume, funding, open interest and the full options chain.</span></li>
           <li><b>Measure</b><span>Regime and z-score, structural heat, exhaustion, trend ribbon.</span></li>
-          <li><b>Combine</b><span>Market consensus and sentiment fold into one signal per timeframe.</span></li>
+          <li><b>Align</b><span>Engine, option prices and smart wallets, read side by side for the next 7 and 30 days.</span></li>
           <li><b>Publish</b><span>Fetched once, served to everyone, refreshed every 15 minutes.</span></li>
         </ol>
       </section>

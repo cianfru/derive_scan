@@ -287,3 +287,20 @@ svg.viz .gridline { stroke: var(--seam); stroke-width: 1; }
 .chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .chart-legend i { width: 14px; height: 3px; display: inline-block; }
 .chart-legend i.dots { background: none; height: 0; border-top: 2px dotted currentColor; }
+
+/* Alignment grid: engine, option prices, smart wallets by horizon */
+.al-grid { display: grid; gap: 0; }
+.al-grid > div { display: grid; grid-template-columns: minmax(110px, 1fr) 1.4fr 1.4fr; gap: 12px; align-items: center; padding: 11px 0; border-top: 1px solid var(--seam); }
+.al-grid > div:first-child { border-top: 0; padding-top: 0; }
+.al-head span { font: 600 11px/1.2 var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.al-head span.al-on { color: var(--fg); }
+.al-head em { font-style: normal; letter-spacing: .06em; }
+.al-head .up em { color: var(--up); } .al-head .defensive em { color: var(--down); }
+.al-grid [role=cell] { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.al-grid small { font: 500 11px/1 var(--font-mono); }
+.al-grid .status { margin: 8px 0 0; }
+.al-cell { display: inline-flex; align-items: center; gap: 8px; font: 600 14px/1 var(--font-display); letter-spacing: .02em; }
+.al-cell i { width: 10px; height: 10px; border: 1px solid; display: inline-block; }
+.al-sq { display: inline-flex; gap: 10px; }
+.al-sq > span { display: inline-flex; gap: 3px; }
+.al-sq i { width: 8px; height: 8px; display: inline-block; border: 1px solid var(--seam-hi); }
