@@ -1,6 +1,6 @@
 # Torq (repo: derive_scan)
 
-Torq is the product name (owner, 1 October 2026). Reflex's signals on Derive (derive.xyz), plus an options layer: perps and the options volatility surface. Its own product in its own repo, separate from Reflex (`cianfru/RCCE_Scanner`). Backend: FastAPI in `backend/`. No frontend yet.
+Torq is the product name (owner, 1 October 2026). Reflex's signals on Derive (derive.xyz), plus an options layer: perps and the options volatility surface. Its own product in its own repo, separate from Reflex (`cianfru/RCCE_Scanner`). Backend: FastAPI in `backend/` (local use). Frontend: `frontend/` on Vercel (project `torq`).
 
 ## Scope: what comes from Reflex and what does not
 
@@ -16,7 +16,7 @@ Torq is the product name (owner, 1 October 2026). Reflex's signals on Derive (de
 - Recorder: GitHub Action `.github/workflows/record.yml`, started every 5 minutes by an external cron service (cron-job.org, owner's account) through the workflow-dispatch API; GitHub's own schedule never fired and stays only as a backup. Records each 15-minute slot once, committing plain files to the `data` branch; layout in README. Free on a public repo; no server. Records Derive V2 mainnet (`api.lyra.finance`) BTC and ETH; raw chains hourly. Scheduled workflows only run from the default branch.
 - Railway retired to cut cost (owner's request, 1 October 2026): it recorded from 1 October 12:00 UTC until the Action took over at 20:15 UTC; that early SQLite data was not migrated. The cron service's access token expires about 30 December 2026; the owner renews it. The FastAPI app (`backend/main.py`) stays for local use, not deployed.
 - Repo growth: ~2 MB/day of chains plus ~0.5 MB/day of CSV, about 100 MB over the 6-week study window. Past ~6 months move old chains out of git (e.g. release assets) before the repo nears 1 GB.
-- Landing page: `frontend/index.html` (Torq: dark-first, red/orange accents, Archivo display with Geist and Geist Mono from Reflex). Static, embeds a data snapshot and reads the newest `data` branch files when served where that is allowed. Not deployed yet.
+- Landing page: `frontend/index.html` (Torq: dark-first, red/orange accents, Archivo display with Geist and Geist Mono from Reflex). Static, embeds a data snapshot and reads the newest `data` branch files when served where that is allowed. Deployed on Vercel, project `torq` (root directory `frontend`, no build, production from `main`, preview builds off because the `data` branch has no frontend); the old FastAPI deployment there is gone.
 - Not built: the app frontend (plan: static site reading the `data` branch files, so users never reach Derive and nothing runs per user), V3 source (one setting, `DERIVE_SNAPSHOT_SOURCES=v3_mainnet`, once V3 mainnet is live).
 - Trading (plan Phase 2) is not in the repo. It needs the owner's explicit approval; order mechanics come from Derive's docs.
 
