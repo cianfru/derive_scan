@@ -1,6 +1,6 @@
 # Torq
 
-Repository `derive_scan`. Landing page: `frontend/index.html` (static; open it in a browser).
+Repository `derive_scan`. Landing page: `frontend/index.html`, deployed on Vercel (project `torq`) from `main`.
 
 Reflex's signals on Derive's perps, plus Derive's options volatility surface.
 
