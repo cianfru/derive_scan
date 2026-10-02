@@ -32,6 +32,7 @@ export default function Shell() {
           <nav>
             <NavLink to="/markets">Markets</NavLink>
             <NavLink to="/options">Options</NavLink>
+            <NavLink to="/traders">Traders</NavLink>
             <NavLink to="/flow">Flow</NavLink>
           </nav>
           <div className="tools">

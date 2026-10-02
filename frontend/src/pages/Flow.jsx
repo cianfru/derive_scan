@@ -1,14 +1,20 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import { usd, shortAddr, ago, price } from "../lib/format.js";
+import { usd, ago, price } from "../lib/format.js";
 import { Plate, Tabs, Loading, Failed, Info } from "../components/ui.jsx";
+import WalletTag from "../components/WalletTag.jsx";
 
-const CLASS = { top: "Top", smart: "Smart", profitable: "Profitable", directional: "Directional", income: "Income", hedger: "Hedger", occasional: "Occasional" };
+import { TYPE as CLASS } from "../lib/traders.js";
 const CLASS_INFO = "Wallet types from every trade on Derive since December 2023. Directional traders who are in profit on options that have expired are ranked: Top (best fifth), Smart (best 50), Profitable (the rest in profit). Directional: taking a view, not in profit. Income: mostly sells out-of-the-money options. Hedger: offsets its options with perps. Occasional: too few trades to tell. Market makers are left out.";
 
 function Kind({ c }) {
   return c ? <span className={c === "top" || c === "smart" ? "orange" : "dim"} style={{ fontSize: 12 }}>{CLASS[c] || c}</span> : <span className="faint">-</span>;
+}
+
+function Who({ w, ranked }) {
+  const tag = <WalletTag address={w} size={18} />;
+  return ranked ? <Link to={`/trader/${w.toLowerCase()}`} onClick={(e) => e.stopPropagation()}>{tag}</Link> : tag;
 }
 
 export default function Flow() {
@@ -38,7 +44,7 @@ export default function Flow() {
                   <td className={t.direction === "buy" ? "up" : "down"}>{t.direction === "buy" ? "Buy" : "Sell"}</td>
                   <td className="num">{usd(t.notional_usd)}</td>
                   <td className="num">{t.kind === "option" ? usd(t.premium_usd) : <span className="faint">-</span>}</td>
-                  <td className="dim">{shortAddr(t.wallet)}</td>
+                  <td><Who w={t.wallet} ranked={t.ranked} /></td>
                   <td><Kind c={t.class} /></td>
                 </tr>))}
               {!large.length && <tr><td colSpan={7} className="dim">No large trades in this window.</td></tr>}
@@ -54,7 +60,7 @@ export default function Flow() {
                 const net = w.premium_sold_usd - w.premium_bought_usd;
                 return (
                   <tr key={w.wallet} style={{ cursor: "default" }}>
-                    <td>{shortAddr(w.wallet)}</td>
+                    <td><Who w={w.wallet} ranked={w.ranked} /></td>
                     <td><Kind c={w.class} /></td>
                     <td className="num">{usd(w.perp_notional_usd)}</td>
                     <td className="num">{usd(w.option_notional_usd)}</td>
