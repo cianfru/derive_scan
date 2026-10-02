@@ -21,6 +21,44 @@ from derive.config import Settings
 from derive.filestore import FileStore
 
 
+UNIVERSE_TTL = 3600
+
+
+def load_universe(out: Path) -> dict:
+    p = out / "universe.json"
+    return json.loads(p.read_text()) if p.exists() else {}
+
+
+async def discover(settings: Settings, out: Path, now: float) -> list[str]:
+    """Coins with options on Derive (`public/get_all_currencies`), refreshed hourly."""
+    from derive.client import DeriveClient
+    from derive.config import SOURCES
+
+    uni = load_universe(out)
+    if uni.get("underlyings") and now - uni.get("at", 0) < UNIVERSE_TTL:
+        return uni["underlyings"]
+    client = DeriveClient(SOURCES[settings.sources[0]]["base"])
+    try:
+        res = await client.public("get_all_currencies", {})
+    finally:
+        await client.close()
+    unds = sorted(c["currency"] for c in res if "option" in (c.get("instrument_types") or []))
+    (out / "universe.json").write_text(json.dumps({"at": int(now), "underlyings": unds}))
+    return unds
+
+
+async def record_flow(settings: Settings, out: Path) -> dict:
+    from derive import flow
+    from derive.client import DeriveClient
+    from derive.config import SOURCES
+
+    client = DeriveClient(SOURCES[settings.sources[0]]["base"])
+    try:
+        return await flow.update(client, out, int(time.time() * 1000))
+    finally:
+        await client.close()
+
+
 def due_keys(settings: Settings, store: FileStore, slot: int) -> set[str]:
     status = store.load_status()
     keys = {f"{s}:{u}" for s in settings.sources for u in settings.underlyings}
@@ -48,7 +86,19 @@ def main() -> int:
 
     settings = Settings(data_dir=Path(args.out))
     store = FileStore(args.out)
-    slot = int(time.time()) // settings.interval_sec * settings.interval_sec
+    out, now = Path(args.out), time.time()
+    slot = int(now) // settings.interval_sec * settings.interval_sec
+    if not os.getenv("DERIVE_UNDERLYINGS"):
+        # Every coin with options. The due check reads the last list (no network).
+        known = load_universe(out).get("underlyings")
+        if args.due:
+            settings.underlyings = known or settings.underlyings
+        else:
+            try:
+                settings.underlyings = asyncio.run(discover(settings, out, now))
+            except Exception as e:
+                logging.warning("discovery failed, using the last list: %s", e)
+                settings.underlyings = known or settings.underlyings
     keys = due_keys(settings, store, slot)
 
     if args.due:
@@ -62,6 +112,10 @@ def main() -> int:
         print(f"slot {slot} already recorded")
         return 0
     status = asyncio.run(record(settings, store, slot, keys))
+    try:
+        print("flow:", asyncio.run(record_flow(settings, out)))
+    except Exception as e:  # the radar's feed must never stop the options recording
+        logging.warning("flow update failed: %s", e)
     print(json.dumps(status, indent=1))
     # Fail the run only when nothing at all was recorded, so a dead source shows in Actions.
     return 0 if any(v.get("ok") for v in status.values()) else 1

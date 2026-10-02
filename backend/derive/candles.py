@@ -5,6 +5,7 @@ Volume: the perp's traded volume in contracts (`public/get_tradingview_chart_dat
 bar with no trades. Timestamps are bar opens in milliseconds, as Reflex's engines expect.
 
 candles/{UND}/{4h|1d|1w}.csv   timestamp,open,high,low,close,volume
+candles/{UND}/{tf}.backfill.csv earlier bars from another market (derive/backfill.py), joined in front
 """
 from __future__ import annotations
 
@@ -43,15 +44,48 @@ class CandleCache:
     def path(self, und: str, tf: str) -> Path:
         return self.root / und / f"{tf}.csv"
 
+    def backfill_path(self, und: str, tf: str) -> Path:
+        return self.root / und / f"{tf}.backfill.csv"
+
+    @staticmethod
+    def _rows(p: Path) -> list[list[str]]:
+        return list(csv.reader(p.open()))[1:] if p.exists() else []
+
     def load(self, und: str, tf: str) -> dict | None:
+        """Derive's bars, preceded by any backfilled bars older than Derive's first."""
+        rows = self._rows(self.path(und, tf))
+        if not rows:
+            return None
+        first = float(rows[0][0])
+        early = [r for r in self._rows(self.backfill_path(und, tf)) if float(r[0]) < first]
+        arr = np.array(early + rows, dtype=np.float64)
+        return {f: arr[:, i] for i, f in enumerate(FIELDS)}
+
+    def counts(self, und: str, tf: str) -> tuple[int, int]:
+        """(Derive bars, backfilled bars in use)."""
+        rows = self._rows(self.path(und, tf))
+        if not rows:
+            return 0, 0
+        first = float(rows[0][0])
+        return len(rows), sum(1 for r in self._rows(self.backfill_path(und, tf)) if float(r[0]) < first)
+
+    def first_ts_ms(self, und: str, tf: str) -> int | None:
         p = self.path(und, tf)
         if not p.exists():
             return None
-        rows = list(csv.reader(p.open()))[1:]
-        if not rows:
-            return None
-        arr = np.array(rows, dtype=np.float64)
-        return {f: arr[:, i] for i, f in enumerate(FIELDS)}
+        with p.open() as f:
+            next(f, None)
+            line = next(f, None)
+        return int(float(line.split(",")[0])) if line else None
+
+    def write_backfill(self, und: str, tf: str, bars: list[list]) -> None:
+        p = self.backfill_path(und, tf)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        buf = io.StringIO()
+        w = csv.writer(buf, lineterminator="\n")
+        w.writerow(FIELDS)
+        w.writerows(bars)
+        p.write_text(buf.getvalue())
 
     def last_ts_sec(self, und: str, tf: str) -> int | None:
         p = self.path(und, tf)

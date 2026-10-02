@@ -55,6 +55,13 @@ def context_handler(request):
         {"symbol": "USDC", "circulating": {"peggedUSD": 7e10}, "circulatingPrevWeek": {"peggedUSD": 7e10}}]})
 
 
+def okx_handler(request):
+    after = int(request.url.params["after"])
+    step = {"4H": 14_400_000, "1Dutc": 86_400_000, "1Wutc": 604_800_000}[request.url.params["bar"]]
+    data = [[str(after - i * step), "1", "1.1", "0.9", "1.05", "5", "5", "5", "1"] for i in range(1, 101)]
+    return httpx.Response(200, json={"code": "0", "data": data})
+
+
 def test_last_closed_open():
     assert last_closed_open("4h", 14_400 * 10 + 5) == 14_400 * 9
     assert last_closed_open("1d", 86_400 * 3 + 1) == 86_400 * 2
@@ -88,7 +95,8 @@ def test_signal_job_end_to_end(tmp_path):
     client = DeriveClient("https://x/", transport=httpx.MockTransport(derive_handler), retries=0, backoff=0)
     assert signal_once.due_timeframes(tmp_path, NOW) == ["4h", "1d"]
     summary = asyncio.run(signal_once.run(tmp_path, NOW, ["4h", "1d"], client=client,
-                                          context_transport=httpx.MockTransport(context_handler), clock=lambda: NOW + 30))
+                                          context_transport=httpx.MockTransport(context_handler), clock=lambda: NOW + 30,
+                                          backfill_transport=httpx.MockTransport(okx_handler)))
     assert summary["4h"]["computed"] == 3 and summary["1d"]["computed"] == 3
     assert signal_once.due_timeframes(tmp_path, NOW) == []
     assert signal_once.due_timeframes(tmp_path, NOW + 14_400) == ["4h"]
@@ -97,7 +105,11 @@ def test_signal_job_end_to_end(tmp_path):
     assert latest["universe"] == ["BTC-PERP", "ETH-PERP", "NEW-PERP"]
     rows = {r["symbol"]: r for r in latest["timeframes"]["4h"]["rows"]}
     assert rows["BTC-PERP"]["data_status"] == "ready" and rows["BTC-PERP"]["volume_status"] == "ok"
-    assert rows["NEW-PERP"]["data_status"] == "not enough data" and rows["NEW-PERP"]["volume_status"] == "thin"
+    # NEW has 20 days on Derive; earlier bars come from the backfill (price only, volume 0).
+    assert rows["NEW-PERP"]["backfilled_bars"] > 0 and rows["NEW-PERP"]["data_status"] != "not enough data"
+    assert rows["NEW-PERP"]["volume_status"] == "thin" and rows["BTC-PERP"]["backfilled_bars"] == 0
+    status = json.loads((tmp_path / "signals" / "status.json").read_text())
+    assert status["backfill"]["NEW:4h"]["ok"] and "BTC:4h" not in status["backfill"]
     assert rows["BTC-PERP"]["inputs"]["global_metrics"] == "missing"     # CoinGecko refused
     assert rows["BTC-PERP"]["inputs"]["sentiment"] == "ready"
     assert rows["BTC-PERP"]["unified_signal"] is not None and rows["BTC-PERP"]["ribbon"]["state"] in ("gold", "blue", "grey")
@@ -110,7 +122,8 @@ def test_signal_job_end_to_end(tmp_path):
     # Next 4H bar: only 4h is computed; the daily block keeps its rows.
     client2 = DeriveClient("https://x/", transport=httpx.MockTransport(derive_handler), retries=0, backoff=0)
     s2 = asyncio.run(signal_once.run(tmp_path, NOW + 14_400, ["4h"], client=client2,
-                                     context_transport=httpx.MockTransport(context_handler), clock=lambda: NOW + 14_430))
+                                     context_transport=httpx.MockTransport(context_handler), clock=lambda: NOW + 14_430,
+                                     backfill_transport=httpx.MockTransport(okx_handler)))
     assert list(s2) == ["4h"]
     latest2 = json.loads((tmp_path / "signals" / "latest.json").read_text())
     assert latest2["timeframes"]["4h"]["bar_close"] == latest["timeframes"]["4h"]["bar_close"] + 14_400

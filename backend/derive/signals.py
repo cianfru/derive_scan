@@ -338,7 +338,7 @@ def public_row(r: dict) -> dict:
             "exhaustion_state", "floor_confirmed", "is_absorption", "is_climax", "rel_vol", "divergence",
             "conditions_met", "conditions_total", "entry_blocked", "regime_changes_7d", "regime_unstable",
             "beta_btc", "beta_eth", "history_bars", "data_status", "volume_coverage", "volume_status",
-            "ribbon", "positioning", "confluence", "cool_off", "sparkline", "asset_class")
+            "ribbon", "positioning", "confluence", "cool_off", "sparkline", "asset_class", "backfilled_bars")
     out = {k: copy.deepcopy(r.get(k)) for k in keys}
     out["inputs"] = {k: v.get("status") for k, v in (r.get("input_quality") or {}).items()}
     return out

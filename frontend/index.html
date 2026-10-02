@@ -166,7 +166,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
   <div>
     <div class="eyebrow">Derive perps and options</div>
     <h1>TORQ</h1>
-    <p class="lede">Reflex's signals, running on <b>every Derive perp</b>. The options surface underneath.</p>
+    <p class="lede">Regime signals on <b>every Derive perp</b>. The options market, made readable.</p>
     <div class="specs">
       <div><strong id="nPerps">15</strong><span>Perps</span></div>
       <div><strong>4H·1D</strong><span>Closes</span></div>
@@ -190,7 +190,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
 <section id="signals"><div class="wrap">
   <div class="sec-head">
     <div><div class="eyebrow">Signals</div><h2>Every perp, every close</h2>
-      <p class="sub">Reflex's engines read Derive's index after each 4H and daily close. The combined column joins both timeframes.</p></div>
+      <p class="sub">The engine reads Derive's index after each 4H and daily close. The combined column joins both timeframes.</p></div>
     <div class="tabs" role="tablist"><button role="tab" aria-selected="true" data-tf="4h" id="tab4h">4H</button><button role="tab" aria-selected="false" data-tf="1d" id="tab1d">1D</button></div>
   </div>
   <div class="board"><table>
@@ -227,8 +227,8 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
 </div></section>
 
 <section id="engine"><div class="wrap">
-  <div class="sec-head"><div><div class="eyebrow">Engine</div><h2>Reflex's code, Derive's data</h2>
-    <p class="sub">The signal code is Reflex's own, copied unchanged and pinned to one version. Torq never calls Reflex.</p></div></div>
+  <div class="sec-head"><div><div class="eyebrow">Engine</div><h2>One engine, every close</h2>
+    <p class="sub">Regime, heat, exhaustion and trend structure on every closed bar. Fetched once, served to everyone.</p></div></div>
   <div class="flow">
     <div class="step"><div class="k">Read</div><h4>Derive</h4><p>Index candles, perp volume, funding and open interest. Fetched once, served to everyone.</p></div>
     <div class="step"><div class="k">Measure</div><h4>Engines</h4><p>Regime and z-score, structural heat, exhaustion, the four-EMA ribbon.</p></div>
@@ -246,7 +246,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
 <section id="proof"><div class="wrap proof">
   <div>
     <div class="eyebrow">Proof</div><h2>Same signals, a year of bars</h2>
-    <p class="sub">Every closed bar of the past year, replayed twice through the same code: once on Derive's candles, once on the candles Reflex uses. Context held equal, so the gap is the data alone.</p>
+    <p class="sub">Every closed bar of the past year, replayed twice through the same code: once on Derive's index, once on a large external perp market. Context held equal, so the gap is the data alone.</p>
     <div class="big" style="margin-top:28px">
       <div><strong>98<em>.5</em>%</strong><span>4H final signal agreement, BTC and ETH</span></div>
       <div><strong>1<em>.000</em></strong><span>Z-score correlation</span></div>
@@ -268,7 +268,7 @@ footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px}
 
 <footer><div class="wrap">
   <span id="asof">Snapshot</span>
-  <span>Torq · built on Derive · signal code from Reflex, pinned</span>
+  <span>Torq · built on Derive</span>
 </div></footer>
 
 <script>

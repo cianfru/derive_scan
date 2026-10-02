@@ -60,3 +60,15 @@ async def test_due_only_until_recorded(tmp_path):
     eth = (tmp_path / "v2_mainnet" / "ETH" / "features" / "1970-01-12.csv").read_text().splitlines()
     assert len(eth) == 1 + len({line.split(",")[1] for line in eth[1:]})
     assert due_keys(s, store, SLOT + s.interval_sec) == {"v2_mainnet:ETH", "v2_mainnet:BTC"}
+
+
+async def test_minor_coins_keep_fewer_expiry_rows_and_chains(tmp_path):
+    s = Settings(sources=["v2_mainnet"], underlyings=["ETH"], majors=["BTC"], data_dir=tmp_path)
+    store = FileStore(tmp_path)
+    rec = _rec(s, store, httpx.MockTransport(handler))
+    await rec.run_once(SLOT + 900)            # not on the hour: features only for a minor coin
+    d = tmp_path / "v2_mainnet" / "ETH"
+    assert (d / "features" / "1970-01-12.csv").exists() and not (d / "expiries").exists()
+    assert json.loads((d / "latest.json").read_text())["expiries"]  # latest still carries the term structure
+    await rec.run_once(SLOT)                  # on the hour: expiry rows, but no chain (daily for minors)
+    assert (d / "expiries" / "1970-01-12.csv").exists() and not (d / "chains").exists()

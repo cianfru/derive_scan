@@ -86,7 +86,33 @@ def append_csv(path: Path, rows: list[list]) -> None:
         f.write(buf.getvalue())
 
 
-async def run(out: Path, now: float, due: list[str], client=None, context_transport=None, clock=time.time) -> dict:
+async def backfill_short(cache, unds: list[str], now: float, transport=None) -> dict:
+    """Fetch earlier history once for series shorter than Reflex's warm-up (derive/backfill.py)."""
+    from derive.backfill import TARGET_BARS, okx_before
+
+    log_ = (load_status(cache.root.parent).get("backfill") or {})
+    for und in unds:
+        for tf in ("4h", "1d", "1w"):
+            key = f"{und}:{tf}"
+            derive_n, early_n = cache.counts(und, tf)
+            first = cache.first_ts_ms(und, tf)
+            prev = log_.get(key) or {}
+            if not derive_n or derive_n + early_n >= TARGET_BARS[tf] or prev.get("ok"):
+                continue
+            if prev and now - prev.get("at", 0) < 86_400:   # failed recently: retry daily
+                continue
+            try:
+                bars = await okx_before(und, tf, first, TARGET_BARS[tf] - derive_n, transport=transport)
+                cache.write_backfill(und, tf, bars)
+                log_[key] = {"ok": True, "at": int(now), "bars": len(bars), "source": "okx"}
+            except Exception as e:
+                log_[key] = {"ok": False, "at": int(now), "error": str(e)[:200]}
+                logging.warning("backfill %s failed: %s", key, e)
+    return log_
+
+
+async def run(out: Path, now: float, due: list[str], client=None, context_transport=None, clock=time.time,
+              backfill_transport=None) -> dict:
     from derive import signals as sig
     from derive.candles import CandleCache, update
     from derive.client import DeriveClient
@@ -113,6 +139,7 @@ async def run(out: Path, now: float, due: list[str], client=None, context_transp
                 except Exception as e:
                     fetch_errors[f"{und}:{tf}"] = str(e)[:200]
                     logging.warning("candles %s %s failed: %s", und, tf, e)
+        backfill_log = await backfill_short(cache, unds, now, transport=backfill_transport)
         context_inputs = await fetch_context(transport=context_transport, clock=clock)
     finally:
         if own_client:
@@ -145,6 +172,7 @@ async def run(out: Path, now: float, due: list[str], client=None, context_transp
                 logging.exception("process %s %s", und, tf)
                 continue
             prev_oi[f"{und}:{tf}"] = sig.attach_positioning(r, tickers.get(f"{und}-PERP"), prev_oi.get(f"{und}:{tf}"))
+            r["backfilled_bars"] = cache.counts(und, tf)[1]
             rows.append(r)
         other_tf = "1d" if tf == "4h" else "4h"
         other_rows = {r["symbol"]: r for r in last_rows.get(other_tf, [])}
@@ -166,6 +194,7 @@ async def run(out: Path, now: float, due: list[str], client=None, context_transp
     status.setdefault("last_bar_open", {}).update({tf: s["bar_open"] for tf, s in summary.items()})
     status["computed_at"] = int(now)
     status["fetch_errors"] = fetch_errors
+    status["backfill"] = backfill_log
     _write_json(sdir / "status.json", status)
 
     prev = json.loads((sdir / "latest.json").read_text()) if (sdir / "latest.json").exists() else {}
