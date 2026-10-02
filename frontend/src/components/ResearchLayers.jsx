@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
-const WIDTH = 560;
-const HEIGHT = 500;
+const WIDTH = 540;
+const HEIGHT = 460;
 const LAYERS = [
   { id: "price", name: "Daily structure", y: -110 },
   { id: "options", name: "Options by expiry", y: 0 },
@@ -50,7 +50,6 @@ export default function ResearchLayers({ layer, onSelect }) {
   const selected = useRef(layer);
   const redraw = useRef(null);
   const scene = useRef({ time: 0, x: 0, y: 0, focus: [1, 0, 0] });
-  const [paused, setPaused] = useState(false);
   const [reduced, setReduced] = useState(false);
 
   useEffect(() => {
@@ -71,7 +70,7 @@ export default function ResearchLayers({ layer, onSelect }) {
     const surface = canvas.current;
     const ctx = surface.getContext("2d", { alpha: true });
     if (!ctx) return;
-    const moving = !paused && !reduced;
+    const moving = !reduced;
     let frame = null,
       lastFrame = 0,
       visible = true,
@@ -268,7 +267,7 @@ export default function ResearchLayers({ layer, onSelect }) {
       node.removeEventListener("pointerleave", leave);
       redraw.current = null;
     };
-  }, [paused, reduced]);
+  }, [reduced]);
 
   return (
     <div
@@ -292,18 +291,6 @@ export default function ResearchLayers({ layer, onSelect }) {
             {plane.name}
           </button>
         ))}
-      </div>
-      <div className="wave-caption">
-        <span>Illustrative research layers</span>
-        {!reduced && (
-          <button
-            className="motion-control"
-            onClick={() => setPaused((value) => !value)}
-            aria-label={paused ? "Resume layer motion" : "Pause layer motion"}
-          >
-            {paused ? "Resume motion" : "Pause motion"}
-          </button>
-        )}
       </div>
     </div>
   );

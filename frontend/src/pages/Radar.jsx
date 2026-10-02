@@ -60,6 +60,7 @@ export default function Radar() {
   if (error && !data) return <div className="wrap page"><Failed error={error} /></div>;
   if (!data) return <div className="wrap page"><Loading /></div>;
   const points = coins.map(c => radarPoint(c, horizon)).filter(Boolean);
+  const expiredQuotes = coins.filter(c => viewReading(c.align, horizon, "wallets").label === "Stale reading").length;
   const ready = coins.some(c => coverageReady(c.align?.wallet_coverage));
   const selectedPoint = selected && radarPoint(selected, horizon);
   const through = selected?.align?.wallet_coverage?.through;
@@ -71,8 +72,8 @@ export default function Radar() {
         <div className="stage-head"><h2>Positioning map</h2><span className="status">{points.length} / {coins.length} markets eligible</span></div>
         {points.length ? <RadarMap points={points} focus={selected?.und} onSelect={v => choose("focus", v)} /> : <div className="radar-empty">
           <svg viewBox="0 0 112 72" width="112" height="72" fill="none" aria-hidden="true"><path d="M8 36h96M56 4v64" stroke="var(--seam-hi)" /><path d="M8 4v64M104 4v64M8 4h96M8 68h96" stroke="var(--seam)" strokeDasharray="3 5"/><path d="M32 44h48M32 28h48" stroke="var(--orange)" strokeWidth="2"/></svg>
-          <h2>{ready ? "No markets meet the plotting checks" : "The wallet picture is still building"}</h2>
-          <p>{ready ? "The map needs a current 1D engine reading and sufficient option exposure valued with fresh quoted deltas." : "Positions will appear as wallet history catches up. You can already explore price structure and the available options evidence."}</p>
+          <h2>{ready && expiredQuotes === coins.length ? "The quote snapshot needs refreshing" : ready ? "No markets meet the plotting checks" : "The wallet picture is still building"}</h2>
+          <p>{ready && expiredQuotes === coins.length ? "Wallet history is available, but its quote valuations are over 30 minutes old. The map updates when the next valid snapshot is published." : ready ? "The map needs a current 1D engine reading and sufficient option exposure valued with fresh quoted deltas." : "Positions will appear as wallet history catches up. You can already explore price structure and the available options evidence."}</p>
           {through && <div className="history-dates"><span>Processed through<strong>{through}</strong></span><span>Required through<strong>{expected || "Latest UTC close"}</strong></span></div>}
           <Link className="text-link" to="/traders">See wallet collection status</Link>
         </div>}

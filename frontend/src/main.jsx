@@ -1,16 +1,17 @@
-import React from "react";
+import React, { lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./styles.css";
+import "./research.css";
 import Shell from "./components/Shell.jsx";
 import Landing from "./pages/Landing.jsx";
-import Radar from "./pages/Radar.jsx";
-import Markets from "./pages/Markets.jsx";
-import Coin from "./pages/Coin.jsx";
-import Options from "./pages/Options.jsx";
-import Flow from "./pages/Flow.jsx";
-import Traders from "./pages/Traders.jsx";
-import Trader from "./pages/Trader.jsx";
+const Radar = lazy(() => import("./pages/Radar.jsx"));
+const Markets = lazy(() => import("./pages/Markets.jsx"));
+const Coin = lazy(() => import("./pages/Coin.jsx"));
+const Options = lazy(() => import("./pages/Options.jsx"));
+const Flow = lazy(() => import("./pages/Flow.jsx"));
+const Traders = lazy(() => import("./pages/Traders.jsx"));
+const Trader = lazy(() => import("./pages/Trader.jsx"));
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -29,5 +30,5 @@ createRoot(document.getElementById("root")).render(
         </Route>
       </Routes>
     </BrowserRouter>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

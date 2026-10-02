@@ -1,15 +1,22 @@
 // Options shown as structure: where open interest sits, how volatility is priced across expiries and strikes.
 import { useMemo } from "react";
+import { useElementWidth } from "../lib/useElementWidth.js";
 import { price, pct, usd } from "../lib/format.js";
 
 const W = 640;
 
 /** Mirrored open-interest bars by strike: puts left, calls right, the index as a line. */
-export function OIWall({ rows, index, height = 360 }) {
+export function OIWall(props) {
+  const [ref, width] = useElementWidth(640);
+  return <div ref={ref}><OIWallChart {...props} width={width}/></div>;
+}
+function OIWallChart({ rows, index, height = 360, allStrikes = false, width = 640 }) {
+  const W = Math.max(280, width);
   const view = useMemo(() => {
     if (!rows?.length || !index) return null;
     const near = rows.filter((r) => r[0] >= index * 0.6 && r[0] <= index * 1.6 && (r[1] > 0 || r[2] > 0));
-    let list = near.length ? near : rows;
+    let list = allStrikes ? rows.filter(r=>r[1]>0 || r[2]>0) : near.length ? near : rows;
+    if (!list.length) return null;
     if (list.length > 34) { // merge into round-number buckets so the wall stays readable
       const raw = (list[list.length - 1][0] - list[0][0]) / 28, mag = 10 ** Math.floor(Math.log10(raw));
       const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw);
@@ -19,7 +26,7 @@ export function OIWall({ rows, index, height = 360 }) {
     }
     const max = Math.max(...list.map((r) => Math.max(r[1], r[2])), 1e-9);
     return { list, max };
-  }, [rows, index]);
+  }, [rows, index, allStrikes]);
   if (!view) return <p className="status">No open interest yet.</p>;
   const { list, max } = view;
   const rowH = Math.max(9, Math.min(18, (height - 30) / list.length));
@@ -39,11 +46,12 @@ export function OIWall({ rows, index, height = 360 }) {
       <text x={mid + 8} y={10}>Calls</text>
       {list.map((r, i) => (
         <g key={i}>
-          <rect x={mid - 2 - (r[2] / max) * half} y={ys[i] + 1} width={(r[2] / max) * half} height={rowH - 2} fill="var(--sig-exit)" opacity=".75" />
-          <rect x={mid + 2} y={ys[i] + 1} width={(r[1] / max) * half} height={rowH - 2} fill="var(--orange)" opacity=".9" />
+          <rect x={mid - 2 - (r[2] / max) * half} y={ys[i] + 1} width={(r[2] / max) * half} height={rowH - 2} fill="var(--sig-exit)" opacity=".75"><title>{price(r[0])} strike: {r[2].toLocaleString()} put contracts</title></rect>
+          <rect x={mid + 2} y={ys[i] + 1} width={(r[1] / max) * half} height={rowH - 2} fill="var(--orange)" opacity=".9"><title>{price(r[0])} strike: {r[1].toLocaleString()} call contracts</title></rect>
           {(list.length <= 18 || i % Math.ceil(list.length / 16) === 0) &&
             <text x={W - 4} y={ys[i] + rowH - 3} textAnchor="end">{price(r[0])}</text>}
         </g>))}
+      <text x={70} y={H-2}>{max.toLocaleString(undefined,{maximumFractionDigits:1})} contracts</text><text x={W-70} y={H-2} textAnchor="end">{max.toLocaleString(undefined,{maximumFractionDigits:1})} contracts</text>
       <line x1={mid} x2={mid} y1={12} y2={H - 14} stroke="var(--seam-hi)" />
       {iy != null && <g>
         <line x1={8} x2={W - 70} y1={iy} y2={iy} stroke="var(--fg)" strokeDasharray="4 3" />
@@ -54,7 +62,12 @@ export function OIWall({ rows, index, height = 360 }) {
 }
 
 /** Implied volatility by strike for one expiry (out-of-the-money side: puts below the forward, calls above). */
-export function Smile({ rows, index, height = 200 }) {
+export function Smile(props) {
+  const [ref, width] = useElementWidth(640);
+  return <div ref={ref}><SmileChart {...props} width={width}/></div>;
+}
+function SmileChart({ rows, index, height = 200, width = 640 }) {
+  const W = Math.max(280, width);
   const pts = (rows || []).filter((r) => r[0] >= index * 0.6 && r[0] <= index * 1.6)
     .map((r) => [r[0], r[0] < index ? r[4] : r[3]]).filter((p) => p[1] != null && p[1] > 0);
   if (pts.length < 3) return <p className="status">Not enough quotes.</p>;

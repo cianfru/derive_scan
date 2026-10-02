@@ -1,7 +1,7 @@
 export const SIGNAL_LABEL = {
-  STRONG_LONG: "Strong long", LIGHT_LONG: "Long", ACCUMULATE: "Accumulate", REVIVAL_SEED: "Revival seed",
+  STRONG_LONG: "Strong long", LIGHT_LONG: "Light long", ACCUMULATE: "Accumulate", REVIVAL_SEED: "Revival seed",
   REVIVAL_SEED_CONFIRMED: "Revival confirmed", WAIT: "Wait", TRIM: "Trim", TRIM_HARD: "Trim hard", RISK_OFF: "Risk off",
-  NO_LONG: "No long", LIGHT_SHORT: "Short",
+  NO_LONG: "No long", LIGHT_SHORT: "Light short",
 };
 export function signalTone(s) {
   if (!s) return "na";

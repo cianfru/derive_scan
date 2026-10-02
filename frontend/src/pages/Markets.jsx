@@ -9,18 +9,26 @@ import {
   title,
   utc,
   SIGNAL_RANK,
+  SIGNAL_LABEL,
   REGIME,
 } from "../lib/format.js";
 import { WINDOWS, STATUS_NAMES } from "../lib/presentation.js";
 import { openMarketRow, REGIME_HELP, READING_HELP } from "../lib/explain.js";
 import { Signal, Tabs, Loading, Failed, Info } from "../components/ui.jsx";
 import { Asset, MarketTrace, Reading } from "../components/MarketVisuals.jsx";
+import {
+  EnginePair,
+  Convergence,
+  CONVERGENCE_HELP,
+} from "../components/EngineComparison.jsx";
+import { currentEngine } from "../lib/research.js";
 import FearGreed from "../components/FearGreed.jsx";
 
 export default function Markets() {
   const { data, error } = useData("markets.json");
   const nav = useNavigate();
   const [q, setQ] = useState(""),
+    [signalFilter, setSignalFilter] = useState(null),
     [view, setView] = useState("options"),
     [horizon, setHorizon] = useState("30d"),
     [details, setDetails] = useState(false),
@@ -32,6 +40,14 @@ export default function Markets() {
     r = r.filter((c) => (view === "perps" ? !c.has_options : c.has_options));
     if (view === "entries")
       r = r.filter((c) => (SIGNAL_RANK[c.signal_1d] ?? 0) >= 3);
+    if (signalFilter)
+      r = r.filter(
+        (c) =>
+          currentEngine(c.engine_comparison?.["1d"]) &&
+          (signalFilter === "TRIM"
+            ? ["TRIM", "TRIM_HARD"].includes(c.signal_1d)
+            : c.signal_1d === signalFilter),
+      );
     return [...r].sort((a, b) => {
       const x = a[sort[0]],
         y = b[sort[0]];
@@ -42,7 +58,7 @@ export default function Markets() {
         (x > y ? 1 : x < y ? -1 : 0) * sort[1] || a.und.localeCompare(b.und)
       );
     });
-  }, [data, q, view, sort]);
+  }, [data, q, view, sort, signalFilter]);
   if (error && !data)
     return (
       <div className="wrap page">
@@ -74,9 +90,7 @@ export default function Markets() {
     </th>
   );
   const eligible = data.coins.filter((c) =>
-    c.align
-      ? c.align.readings?.["30d"]?.engine?.status === "ready"
-      : c.signal_1d,
+    currentEngine(c.engine_comparison?.["1d"]),
   );
   const groups = Object.entries(REGIME)
     .map(([k, name]) => ({
@@ -111,7 +125,11 @@ export default function Markets() {
             </Info>
           </div>
           <div className="structure-title">
-            <strong>{data.consensus_detail?.["1d"]?.status === "unavailable" ? "Unavailable" : title(data.consensus?.["1d"]) || "Unavailable"}</strong>
+            <strong>
+              {data.consensus_detail?.["1d"]?.status === "unavailable"
+                ? "Unavailable"
+                : title(data.consensus?.["1d"]) || "Unavailable"}
+            </strong>
             <span>
               {eligible.length} of {data.coins.length} daily readings available
             </span>
@@ -144,6 +162,45 @@ export default function Markets() {
           sentiment={data.context?.sentiment}
           at={data.context?.sentiment_at}
         />
+      </div>
+      <div className="signal-distribution" aria-label="Filter daily signals">
+        {[
+          "STRONG_LONG",
+          "LIGHT_LONG",
+          "ACCUMULATE",
+          "WAIT",
+          "TRIM",
+          "RISK_OFF",
+        ].map((signal) => {
+          const count = eligible.filter((c) =>
+            signal === "TRIM"
+              ? ["TRIM", "TRIM_HARD"].includes(c.signal_1d)
+              : c.signal_1d === signal,
+          ).length;
+          return (
+            <button
+              key={signal}
+              disabled={!count && signalFilter !== signal}
+              aria-pressed={signalFilter === signal}
+              onClick={() =>
+                setSignalFilter(signalFilter === signal ? null : signal)
+              }
+            >
+              <span>{SIGNAL_LABEL[signal]}</span>
+              <b>{count}</b>
+              <i
+                style={{
+                  width: `${eligible.length ? (count / eligible.length) * 100 : 0}%`,
+                }}
+              />
+            </button>
+          );
+        })}
+        <Info label="Explain daily signal counts">
+          Counts cover available daily engines across all tracked markets.
+          Select a signal to filter the table; the market-type and search
+          filters still apply. A high count does not indicate trade quality.
+        </Info>
       </div>
       <section className="market-board" aria-label="Market readings">
         <div className="board-toolbar">
@@ -211,7 +268,10 @@ export default function Markets() {
                   </Info>
                 </th>
                 <th>
-                  Daily signal / regime <Info>{READING_HELP.engine}</Info>
+                  Engine pair · 1D / 4H <Info>{CONVERGENCE_HELP}</Info>
+                </th>
+                <th>
+                  Convergence <Info>{CONVERGENCE_HELP}</Info>
                 </th>
                 {details || view === "perps" ? (
                   <>
@@ -266,18 +326,21 @@ export default function Markets() {
                     />
                   </td>
                   <td>
-                    {c.align ? (
-                      <Reading alignment={c.align} kind="engine" />
-                    ) : (
-                      <>
-                        <Signal s={c.signal_1d} />
-                        <small>
-                          {c.signal_1d
-                            ? REGIME[c.regime_1d]
-                            : STATUS_NAMES[c.engine_status_1d] || "Unavailable"}
-                        </small>
-                      </>
-                    )}
+                    <EnginePair comparison={c.engine_comparison} compact />
+                    <span className="table-evidence">
+                      Daily conditions{" "}
+                      {currentEngine(c.engine_comparison?.["1d"])
+                        ? `${c.engine_comparison["1d"].conditions_met ?? "—"}/${c.engine_comparison["1d"].conditions_total ?? "—"}`
+                        : "—"}{" "}
+                      <Info>
+                        Checks passed at the displayed daily close, with unknown
+                        evidence earning no point. Open the market for the full
+                        checklist, freshness and sources.
+                      </Info>
+                    </span>
+                  </td>
+                  <td>
+                    <Convergence comparison={c.engine_comparison} compact />
                   </td>
                   {details || view === "perps" ? (
                     <>
@@ -332,6 +395,7 @@ export default function Markets() {
               className="btn"
               onClick={() => {
                 setQ("");
+                setSignalFilter(null);
                 setView("options");
               }}
             >

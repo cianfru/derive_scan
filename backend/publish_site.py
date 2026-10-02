@@ -28,6 +28,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from derive.candles import CandleCache
+from derive.signals import engine_comparison
 from derive.quality import ANALYTICS_VERSION, engine_status, snapshot_status
 from derive.implied import implied_by_expiry, option_levels
 from derive.lean import alignment, options_lean, state_of
@@ -323,6 +324,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                               now, options_at=opts["ts"])
             align["positions_through"] = held.get("through")
             align["wallet_coverage"] = coverage
+        comparison = engine_comparison(r4, r1, now)
         pos = r4.get("positioning") or {}
         price = (opts or {}).get("features", {}).get("index_price") or (closes4[-1] if closes4 else None)
         markets.append({
@@ -330,8 +332,8 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "chg_1d": change_pct(closes1, 1), "chg_24h": change_pct(closes4, 6), "chg_7d": change_pct(closes4, 42),
             "signal_4h": r4.get("signal") if engine_status(r4, now) == "ready" else None,
             "signal_1d": r1.get("signal") if engine_status(r1, now) == "ready" else None,
-            "unified": r4.get("unified_signal") if all(engine_status(r, now) == "ready" for r in (r4, r1)) else None,
-            "daily_history": history_meta, "engine_status_1d": engine_status(r1, now),
+            "unified": comparison["unified"],
+            "engine_comparison": comparison, "daily_history": history_meta, "engine_status_1d": engine_status(r1, now),
             "z_1d": r1.get("zscore"), "heat_1d": r1.get("heat"), "regime_4h": r4.get("regime"), "regime_1d": r1.get("regime"), "z_4h": r4.get("zscore"),
             "heat_4h": r4.get("heat"), "heat_phase_4h": r4.get("heat_phase"),
             "ribbon_1d": (r1.get("ribbon") or {}).get("state"), "ribbon_4h": (r4.get("ribbon") or {}).get("state"),
@@ -344,7 +346,8 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "align": None if not align else {"version": ANALYTICS_VERSION, "readings": align["horizons"], "score": align["score"], "wallet_coverage": coverage, **{h: [row[k]["state"] for k in ("engine", "options", "wallets")]
                                                                           for h, row in align["horizons"].items()}},
             "options": None if not opts else {
-                "ts": opts["ts"], "status": opts["status"], **{k: opts["features"].get(k) for k in ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d",
+                "ts": opts["ts"], "status": opts["status"], "levels": opts["levels"],
+                "expiries": opts["expiries"], **{k: opts["features"].get(k) for k in ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d",
                                                                            "bf25_30d", "pc_oi_ratio", "option_oi_contracts")},
                 "term": [[round(e["tenor_days"], 3), e["atm_iv"]] for e in opts["expiries"] if e.get("atm_iv") is not None],
                 "iv30_hist": [[h[0], h[2]] for h in opts["iv_history"][-96 * 7:] if h[2] is not None][::4]},
@@ -355,6 +358,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
         })
         _write(site / "coins" / f"{und}.json", {
             "und": und, "symbol": sym, "generated_at": int(now), "candles": candles, "daily_history": history_meta,
+            "engine_comparison": comparison,
             "backfilled": {tf: cache.counts(und, tf)[1] for tf in CANDLES_KEEP},
             "signals": history.get(und, {}), "latest": {"4h": r4 or None, "1d": r1 or None}, "options": opts,
             "taker_flow": coin_flows, "alignment": align,
