@@ -13,7 +13,7 @@ const COLS = [
   ["align", "Alignment 7d · 30d", (c) => c.align?.score ?? -99],
   ["signal_4h", "4H", (c) => SIGNAL_RANK[c.signal_4h] ?? -1],
   ["signal_1d", "1D", (c) => SIGNAL_RANK[c.signal_1d] ?? -1],
-  ["unified", "Combined", (c) => SIGNAL_RANK[c.unified] ?? -1],
+  ["unified", "Engine 4H + 1D", (c) => SIGNAL_RANK[c.unified] ?? -1],
   ["regime_1d", "Regime 1D", (c) => c.regime_1d],
   ["heat_4h", "Heat", (c) => c.heat_4h, "num"],
   ["funding_ann", "Funding", (c) => c.funding_ann, "num"],
@@ -53,7 +53,7 @@ export default function Markets() {
           <p className="sub">Every coin with options on Derive: the engine's direction, option prices and smart wallets, side by side.</p>
         </div>
         <div className="figs" style={{ minWidth: "min(560px, 100%)" }}>
-          <div className="fig"><span>Consensus 4H</span><strong style={{ fontSize: 16 }}>{title(data.consensus?.["4h"])}</strong></div>
+          <div className="fig"><span>Consensus 4H <Info>Only ready price histories with current engine readings contribute. Eligible assets: {data.consensus_detail?.["4h"]?.counts?.total ?? "-"} / {data.consensus_detail?.["4h"]?.counts?.universe ?? "-"}.</Info></span><strong style={{ fontSize: 16 }}>{title(data.consensus?.["4h"])}</strong></div>
           <div className="fig"><span>Fear and Greed</span><strong>{ctx.sentiment?.fear_greed_value ?? "-"}</strong></div>
           <div className="fig"><span>BTC dominance</span><strong>{ctx.global_metrics?.btc_dominance?.toFixed(1) ?? "-"}%</strong></div>
           <div className="fig"><span>Updated</span><strong style={{ fontSize: 14 }}>{ago(data.generated_at)}</strong></div>
@@ -61,7 +61,7 @@ export default function Markets() {
       </div>
       <Plate
         title={view === "perps" ? "Perps without options" : "Options coins"}
-        info={<>Alignment: {ALIGN_INFO} Signals come from the engine on Derive's index price. 4H and 1D are each timeframe's signal; Combined joins both. Heat is distance from the long-term base, 0 to 100. Funding is annualised. Coins with little history on Derive show earlier bars from an external market, marked on their page.</>}
+        info={<>Alignment: {ALIGN_INFO} Signals come from the engine on Derive's index price. 4H and 1D are each timeframe's signal; Engine 4H + 1D joins the two engine timeframes only. Heat is distance from the long-term base, 0 to 100. Funding is annualised. Coins with little history on Derive show earlier bars from an external market, marked on their page.</>}
         right={<div style={{ display: "flex", gap: 20, alignItems: "center", flexWrap: "wrap" }}>
           <Tabs label="Filter" value={view} onChange={setView} items={[["options", "Options coins"], ["entries", "Entries"], ["perps", "Perps only"]]} />
           <input className="search" placeholder="Search" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search perps" />

@@ -176,7 +176,7 @@ export function PricedByDate({ implied, index }) {
 /** Taker buying vs selling of calls, puts and the perp, as mirrored bars (notional). */
 export function TakerFlow({ flow }) {
   const kinds = [["call", "Calls"], ["put", "Puts"], ["perp", "Perp"]].filter(([k]) => flow?.[k]);
-  if (!kinds.length) return <p className="status">Builds as trades are recorded.</p>;
+  if (!kinds.length) return <p className="status">No trades in the collected portion of this window.</p>;
   const max = Math.max(...kinds.map(([k]) => Math.max(flow[k].buy_notional_usd, flow[k].sell_notional_usd)), 1);
   return (
     <div style={{ display: "grid", gap: 12 }}>

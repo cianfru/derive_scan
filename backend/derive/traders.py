@@ -94,11 +94,14 @@ def mark_position(name: str, net: float, entry: float | None, strikes: dict | No
                   now: float) -> dict:
     """An open option position valued now: Black-76 at the strike's quoted volatility on the
     index (the recorder's newest chain), its delta in USD and unrealised PnL against the entry."""
-    from .history import option_delta, option_price
+    from .history import option_price
+    from .valuation import delta_at
+    from .quality import snapshot_status
     und, expiry, strike, cp = parse_option(name)
     out = {"instrument": name, "und": und, "expiry": expiry, "strike": strike, "type": cp, "net": net, "entry": entry,
-           "mark": None, "delta_usd": None, "upnl": None}
-    if not index:
+           "mark": None, "delta_usd": None, "upnl": None, "delta_source": "unavailable",
+           "valuation_at": (strikes or {}).get("ts"), "mark_method": "Black-76 on index"}
+    if not index or snapshot_status((strikes or {}).get("ts"), now) != "ready":
         return out
     t = max(expiry - now, 0) / (365 * 86400)
     iv = None
@@ -106,7 +109,9 @@ def mark_position(name: str, net: float, entry: float | None, strikes: dict | No
         if abs(float(r[0]) - strike) < 1e-9:
             iv = r[3] if cp == "C" else r[4]
     mark = option_price(index, strike, t, iv, cp) if iv else None
-    out["delta_usd"] = round(net * option_delta(index, strike, t, iv or 0.5, cp) * index, 2)
+    delta, source = delta_at(strikes, expiry, strike, cp, index, now)
+    out["delta_source"] = source
+    out["delta_usd"] = round(net * delta * index, 2) if delta is not None else None
     if mark is not None:
         out["mark"] = round(mark, 4)
         if entry is not None:

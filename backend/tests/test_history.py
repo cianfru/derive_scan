@@ -128,4 +128,4 @@ def test_traders_leaderboard_and_cohorts(tmp_path):
     assert w["open"] == [[live, 2.0, 150.0]]
     assert out["cohort_positions"]["pnl"]["Humble Earner"]["ETH"][live] == [2.0, 1, 2.0]
     pos = traders.mark_position(live, 2.0, 150.0, None, 3000.0, 1.75e9)
-    assert pos["delta_usd"] > 0 and pos["mark"] is None
+    assert pos["delta_usd"] is None and pos["mark"] is None and pos["delta_source"] == "unavailable"

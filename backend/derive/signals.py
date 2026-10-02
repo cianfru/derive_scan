@@ -33,7 +33,9 @@ from engines.heatmap_engine import compute_heatmap  # noqa: E402
 from engines.larsson_engine import compute_larsson_snapshot  # noqa: E402
 from engines.positioning_engine import compute_positioning  # noqa: E402
 from engines.rcce_engine import LEN_LONG, compute_rcce  # noqa: E402
-from signal_synthesizer import synthesize_signal  # noqa: E402
+from signal_synthesizer import synthesize_signal, enforce_signal_constraints  # noqa: E402
+
+from .quality import ANALYTICS_VERSION, TF_SECONDS, engine_status, number
 
 log = logging.getLogger(__name__)
 
@@ -87,7 +89,7 @@ def process_symbol(und: str, timeframe: str, ohlcv: dict, weekly: Optional[dict]
     eth_data = {k: v[-599:] for k, v in eth_data.items()} if eth_data is not None else None
     if len(ohlcv["close"]) == 0:
         raise ValueError("No completed candles available")
-    engine_errors = []
+    engine_errors = [] if weekly is not None else ["Weekly history missing"]
 
     rcce: dict = {}
     try:
@@ -124,7 +126,7 @@ def process_symbol(und: str, timeframe: str, ohlcv: dict, weekly: Optional[dict]
     coverage = volume_coverage(ohlcv)
     volume_ok = coverage >= VOLUME_MIN_COVERAGE
     if not volume_ok and exhaustion:
-        exhaustion = dict(exhaustion, is_climax=False, is_absorption=False, floor_confirmed=False, rel_vol=0.0)
+        exhaustion = dict(exhaustion, is_climax=False, is_absorption=False, floor_confirmed=False, rel_vol=0.0, state="UNAVAILABLE")
 
     history_bars = int(rcce.get("data_bars", len(ohlcv["close"])))
     normalization_ready = bool(rcce.get("normalization_ready", False))
@@ -197,11 +199,12 @@ def ribbon(ohlcv: dict, timeframe: str, as_of_ms: float) -> dict:
 
 
 # -- market-wide (Reflex scanner.compute_consensus, detect_divergence) ----------
-def compute_consensus(results: List[dict]) -> dict:
-    results = [r for r in results if r.get("history_bars") != 0]
+def compute_consensus(results: List[dict], as_of: float | None = None) -> dict:
+    universe = len(results)
+    results = [r for r in results if engine_status(r, as_of) == "ready"]
     total = len(results)
     if total == 0:
-        return {"consensus": "MIXED", "strength": 0.0, "counts": {}}
+        return {"consensus": "MIXED", "strength": 0.0, "counts": {"total": 0, "universe": universe}, "status": "unavailable"}
     markup_n = blowoff_n = markdown_n = accum_n = 0
     for r in results:
         regime = r.get("regime", "FLAT").upper()
@@ -213,7 +216,7 @@ def compute_consensus(results: List[dict]) -> dict:
             markdown_n += 1
         elif regime in _ACCUM_FAMILY:
             accum_n += 1
-    counts = {"markup": markup_n, "blowoff": blowoff_n, "markdown": markdown_n, "accum": accum_n, "total": total}
+    counts = {"markup": markup_n, "blowoff": blowoff_n, "markdown": markdown_n, "accum": accum_n, "total": total, "universe": universe}
     if markup_n / total > 0.55:
         consensus, strength = "RISK-ON", markup_n / total * 100.0
     elif blowoff_n / total > 0.55:
@@ -225,7 +228,7 @@ def compute_consensus(results: List[dict]) -> dict:
     else:
         consensus = "MIXED"
         strength = max(markup_n, blowoff_n, markdown_n, accum_n) / total * 100.0
-    return {"consensus": consensus, "strength": round(strength, 1), "counts": counts}
+    return {"consensus": consensus, "strength": round(strength, 1), "counts": counts, "status": "ready"}
 
 
 def detect_divergence(symbol_regime: str, btc_regime: str) -> Optional[str]:
@@ -238,47 +241,103 @@ def detect_divergence(symbol_regime: str, btc_regime: str) -> Optional[str]:
 
 
 # -- positioning (Reflex scanner._attach_positioning, Derive as the source) -----
-def attach_positioning(result: dict, ticker: Optional[dict], prev_oi: Optional[float]) -> Optional[float]:
-    """Funding and open interest from Derive's perp ticker. Returns the OI (USD) to keep."""
+def attach_positioning(result: dict, ticker: Optional[dict], previous: dict | float | None) -> dict | None:
+    """Compare contract OI and mark over the same two ticker observations.
+
+    Legacy dollar-only state cannot establish an interval; the first v2 observation seeds it.
+    The pinned engine still receives dollar OI for display, with an explicit contract-change override.
+    """
     metadata = result.setdefault("input_metadata", {})
     if not ticker:
         metadata["funding"] = {"source": None, "observed_at": None}
         result.pop("positioning", None)
-        return prev_oi
-    mark = float(ticker.get("M") or 0)
-    index = float(ticker.get("I") or 0)
-    funding_rate = float(ticker.get("f") or 0)  # hourly, as Reflex's thresholds expect
+        return previous if isinstance(previous, dict) else None
+    mark, index = number(ticker.get("M")), number(ticker.get("I"))
+    funding = number(ticker.get("f"))
     stats = ticker.get("stats") or {}
-    open_interest = float(stats.get("oi") or 0) * mark
-    volume_24h = float(stats.get("v") or 0)
-    observed = float(ticker.get("t") or 0) / 1000 or None
-    metadata["funding"] = {"source": "derive", "observed_at": observed}
-    spark = result.get("sparkline", [])
-    price_change_pct = (spark[-1] - spark[0]) / spark[0] * 100.0 if len(spark) >= 2 and spark[0] > 0 else 0.0
-    if prev_oi is None and open_interest > 0:
-        prev_oi = open_interest
-    pos = compute_positioning(funding_rate=funding_rate, open_interest=open_interest,
-                              price_change_pct=price_change_pct, prev_oi=prev_oi, mark_price=mark,
-                              oracle_price=index, volume_24h=volume_24h)
+    contracts, observed_ms = number(stats.get("oi")), number(ticker.get("t"))
+    observed = observed_ms / 1000 if observed_ms and observed_ms > 0 else None
+    metadata["funding"] = {"source": "derive", "observed_at": observed if funding is not None else None}
+    valid = mark is not None and mark > 0 and contracts is not None and contracts >= 0 and observed is not None
+    current = {"contracts": contracts, "mark": mark, "observed_at": observed} if valid else None
+    prior = previous if isinstance(previous, dict) else {}
+    elapsed = observed - prior["observed_at"] if observed and prior.get("observed_at") else None
+    step = TF_SECONDS.get(result.get("timeframe"), 14400)
+    comparable = (valid and elapsed is not None and 0 < elapsed <= step + 1800
+                  and prior.get("contracts", 0) > 0 and prior.get("mark", 0) > 0)
+    change = (contracts / prior["contracts"] - 1) * 100 if comparable else None
+    price_change = (mark / prior["mark"] - 1) * 100 if comparable else None
+    status = "ready" if comparable else "missing" if not valid else "initial" if not prior else "gap"
+    pos = compute_positioning(funding_rate=funding or 0.0, open_interest=(contracts or 0) * (mark or 0),
+                              price_change_pct=price_change or 0.0, oi_change_pct_override=change,
+                              mark_price=mark or 0.0, oracle_price=index or 0.0,
+                              volume_24h=number(stats.get("v")) or 0.0)
     result["positioning"] = {
-        "funding_regime": pos.funding_regime, "funding_rate": pos.funding_rate, "oi_trend": pos.oi_trend,
-        "oi_value": pos.oi_value, "oi_change_pct": pos.oi_change_pct, "leverage_risk": pos.leverage_risk,
-        "predicted_funding": pos.predicted_funding, "mark_price": pos.mark_price, "volume_24h": pos.volume_24h,
+        "funding_regime": pos.funding_regime if funding is not None else None, "funding_rate": funding,
+        "oi_trend": pos.oi_trend, "oi_value": pos.oi_value if valid else None,
+        "oi_contracts": contracts, "oi_change_pct": round(change, 2) if change is not None else None,
+        "price_change_pct": round(price_change, 2) if price_change is not None else None,
+        "oi_status": status, "interval_seconds": elapsed, "observed_at": observed,
+        "previous_observed_at": prior.get("observed_at"), "oi_change_basis": "contracts",
+        "leverage_risk": pos.leverage_risk, "predicted_funding": pos.predicted_funding,
+        "mark_price": pos.mark_price, "volume_24h": pos.volume_24h,
         "source": "derive", "source_map": {"funding": "derive", "oi": "derive", "volume": "derive"},
         "liquidation_24h_usd": 0.0, "long_liq_usd": 0.0, "short_liq_usd": 0.0, "liquidation_4h_usd": 0.0,
         "liquidation_1h_usd": 0.0, "long_short_ratio": 1.0, "top_trader_lsr": 1.0, "oi_market_cap_ratio": 0.0,
         "spot_volume_usd": 0.0, "spot_futures_ratio": 0.0, "spot_dominance": "NEUTRAL",
     }
-    return open_interest
+    # An out-of-order ticker must not move the saved baseline backwards.
+    return current if current and (not prior or observed > prior.get("observed_at", 0)) else prior or None
+
+
+def available_synthesis(row: dict, **context):
+    """Derive availability policy around the unchanged Reflex synthesizer.
+
+    Missing volume cannot confirm absence of a climax. Withhold new entries while this
+    evidence is unavailable; retain price-based exits and disclose the missing condition.
+    """
+    out = synthesize_signal(row, **context)
+    unknown = set()
+    if row.get("volume_status") != "ok":
+        unknown.add("no_climax")
+    if context.get("consensus", {}).get("status") != "ready":
+        unknown.add("consensus")
+    if row.get("btc_status") != "ready":
+        unknown.add("no_bear_div")
+    if row.get("data_status") != "ready":
+        unknown.update(("bullish_regime", "z_range", "heat_ok", "no_climax", "no_bear_div"))
+    if unknown:
+        earned = 0
+        for condition in out.conditions_detail:
+            if condition["name"] in unknown:
+                earned += int(condition["met"])
+                condition.update(met=False, available=False, status="unknown")
+        out.conditions_met -= earned
+        out.effective_conditions -= earned
+        out.evidence_coverage = sum(c["available"] for c in out.conditions_detail) / out.conditions_total
+        out.entry_blocked = True
+        out.strong_long_blockers.append("core evidence unavailable")
+        original = out.signal
+        out.signal = enforce_signal_constraints(out.signal, entry_blocked=True)
+        missing = ", ".join(c["label"] for c in out.conditions_detail if c["name"] in unknown)
+        out.warnings.append(f"Unavailable evidence: {missing}; new entries suppressed")
+        out.reason = (f"Unavailable evidence: {missing}; new entries suppressed" if original != out.signal
+                      else f"{out.signal}: {row.get('regime', 'Unknown')} price structure; unavailable evidence: {missing}")
+    if row.get("data_status") != "ready":
+        out.signal, out.entry_blocked = "WAIT", True
+        out.reason = "Price history is not ready; signal unavailable"
+    return out
 
 
 # -- synthesis per timeframe (Reflex scanner._synthesize_and_enrich) ------------
 def synthesize(results: List[dict], tf: str, context_inputs: dict, state, other_rows: dict,
                as_of: float) -> dict:
     """Mutates `results` into final decisions. Returns the consensus."""
-    consensus = compute_consensus(results)
-    btc_regime = next((r["regime"] for r in results if r["underlying"] == "BTC"), "FLAT")
+    consensus = compute_consensus(results, as_of)
+    btc_regime = next((r["regime"] for r in results if r["underlying"] == "BTC" and engine_status(r, as_of) == "ready"), "FLAT")
+    btc = next((r for r in results if r["underlying"] == "BTC"), None)
     for r in results:
+        r["btc_status"] = engine_status(btc, as_of)
         r["divergence"] = detect_divergence(r["regime"], btc_regime)
     gm, gm_at = context_inputs.get("global_metrics") or (None, None)
     sent, sent_at = context_inputs.get("sentiment") or (None, None)
@@ -308,17 +367,27 @@ def synthesize(results: List[dict], tf: str, context_inputs: dict, state, other_
             r["confluence"] = vars(compute_confluence(*pair))
         else:
             r.pop("confluence", None)
-        evaluate_decision(r, context, state, as_of=as_of, metadata=metadata, synthesizer=synthesize_signal)
+        evaluate_decision(r, context, state, as_of=as_of, metadata=metadata, synthesizer=available_synthesis)
+        for condition in r.get("conditions_detail", []):
+            if condition["name"] == "no_climax":
+                condition.update(source="derive_perp_volume", freshness=r.get("volume_status"))
+            elif condition["name"] == "consensus":
+                condition.update(source="eligible_engines", observed_at=as_of, freshness=consensus["status"])
+            elif condition["name"] == "no_bear_div":
+                condition.update(source="BTC_engine", observed_at=(btc or {}).get("signal_bar_close_time"), freshness=r["btc_status"])
+        r["analytics_version"] = ANALYTICS_VERSION
+        if r.get("data_status") != "ready":
+            r["signal_status"] = "unavailable"
     return consensus
 
 
-def attach_unified(rows_4h: List[dict], rows_1d: List[dict]) -> None:
+def attach_unified(rows_4h: List[dict], rows_1d: List[dict], as_of: float | None = None) -> None:
     four = {r["symbol"]: r for r in rows_4h}
     daily = {r["symbol"]: r for r in rows_1d}
     for symbol in four.keys() | daily.keys():
         pair = (four.get(symbol), daily.get(symbol))
-        signal = unified_signal(*pair)
-        complete = all(r is not None and r.get("signal_status") != "unavailable" for r in pair)
+        complete = all(engine_status(r, as_of) == "ready" for r in pair)
+        signal = unified_signal(*(r if engine_status(r, as_of) == "ready" else None for r in pair))
         for row in pair:
             if row is not None:
                 row["unified_signal"] = signal
@@ -333,12 +402,13 @@ def public_row(r: dict) -> dict:
     """The fields published for the frontend and the study (no internal decision snapshots)."""
     keys = ("symbol", "underlying", "timeframe", "signal_bar_close_time", "price", "decision_price",
             "signal", "signal_status", "signal_reason", "signal_warnings", "signal_score", "signal_confidence",
-            "unified_signal", "regime", "regime_probability", "raw_signal", "zscore", "energy", "vol_state",
+            "analytics_version", "unified_signal", "unified_complete", "regime", "regime_probability", "raw_signal", "zscore", "energy", "vol_state",
             "momentum", "heat", "heat_phase", "heat_direction", "atr_regime", "deviation_pct", "bmsb_mid",
             "exhaustion_state", "floor_confirmed", "is_absorption", "is_climax", "rel_vol", "divergence",
-            "conditions_met", "conditions_total", "entry_blocked", "regime_changes_7d", "regime_unstable",
+            "conditions_met", "conditions_total", "conditions_detail", "evidence_coverage", "weighted_total", "entry_blocked", "regime_changes_7d", "regime_unstable",
             "beta_btc", "beta_eth", "history_bars", "data_status", "volume_coverage", "volume_status",
             "ribbon", "positioning", "confluence", "cool_off", "sparkline", "asset_class", "backfilled_bars")
     out = {k: copy.deepcopy(r.get(k)) for k in keys}
+    out["input_quality"] = copy.deepcopy(r.get("input_quality") or {})
     out["inputs"] = {k: v.get("status") for k, v in (r.get("input_quality") or {}).items()}
     return out

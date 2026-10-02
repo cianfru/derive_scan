@@ -28,6 +28,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from derive.candles import CandleCache
+from derive.quality import ANALYTICS_VERSION, engine_status, snapshot_status
 from derive.implied import implied_by_expiry, option_levels
 from derive.lean import alignment, options_lean, state_of
 from derive import traders as traders_mod
@@ -93,24 +94,32 @@ def options_block(data: Path, site: Path, und: str, now: float) -> dict | None:
     doc = json.loads(latest.read_text())
     strikes_p = site / "strikes" / f"{und}.json"
     strikes = json.loads(strikes_p.read_text()) if strikes_p.exists() else None
-    return {"ts": doc["ts"], "features": doc["features"], "expiries": doc["expiries"],
+    quality = snapshot_status(doc["ts"], now)
+    usable_strikes = strikes if snapshot_status((strikes or {}).get("ts"), now) == "ready" and (strikes or {}).get("ts") == doc["ts"] else None
+    return {"status": quality, "chain_status": snapshot_status((strikes or {}).get("ts"), now),
+            "chain_at": (strikes or {}).get("ts"), "ts": doc["ts"], "features": doc["features"], "expiries": doc["expiries"],
             "strikes": strikes, "iv_history": iv_history(data, und, now),
-            "implied": implied_by_expiry(strikes, doc["expiries"], doc["ts"]),
-            "levels": option_levels(strikes, doc["features"].get("index_price"), doc["ts"])}
+            "implied": implied_by_expiry(usable_strikes, doc["expiries"], doc["ts"]) if quality == "ready" else [],
+            "levels": option_levels(usable_strikes, doc["features"].get("index_price"), doc["ts"]) if quality == "ready" else None}
 
 
 def taker_sides(data: Path, now: float) -> dict:
-    """{UND: {"24h"|"7d": {kind: {buy_notional_usd, sell_notional_usd, buy_premium_usd, sell_premium_usd}}}}"""
-    out: dict = defaultdict(lambda: {"24h": defaultdict(lambda: defaultdict(float)), "7d": defaultdict(lambda: defaultdict(float))})
+    """Trade-time windows with separately measured collection coverage."""
+    from derive.flow import window_coverage
+    coverage = {w: window_coverage(data, now, n) for w, n in (("24h", 86400), ("7d", 7 * 86400))}
+    out: dict = defaultdict(lambda: {w: defaultdict(lambda: defaultdict(float)) for w in coverage})
     for day in _days(8, now):
-        for r in _read_csv(data / "flow" / "sides" / f"{day}.csv"):
-            age = now - int(r["run_ts"])
-            for window, limit in (("24h", 86_400), ("7d", 7 * 86_400)):
-                if age <= limit:
+        for r in _read_csv(data / "flow" / "sides_v2" / f"{day}.csv"):
+            bucket = int(r["bucket_ts"])
+            for window, c in coverage.items():
+                if c["start"] <= bucket < c["end"]:
                     a = out[r["underlying"]][window][r["kind"]]
                     for k in ("buy_notional_usd", "sell_notional_usd", "buy_premium_usd", "sell_premium_usd"):
                         a[k] += float(r[k] or 0)
-    return {u: {w: {k: dict(v) for k, v in kinds.items()} for w, kinds in d.items()} for u, d in out.items()}
+    result = {u: {w: {**{k: dict(v) for k, v in kinds.items()}, "coverage": coverage[w]}
+                  for w, kinds in d.items()} for u, d in out.items()}
+    result["_coverage"] = coverage
+    return result
 
 
 def change_pct(closes: list[float], bars: int) -> float | None:
@@ -133,19 +142,21 @@ def tier_positions(data: Path) -> dict:
 
 def flow_block(data: Path, now: float) -> dict:
     """Large taker trades and the most active wallets, market makers left out."""
-    since_ms = (now - 86_400) * 1000
+    from derive.flow import window_coverage
+    coverage = window_coverage(data, now, 86400)
+    since_ms = coverage["start"] * 1000
     classes = wallet_classes(data)
     large = []
     for day in _days(2, now):
         for r in _read_csv(data / "flow" / "large" / f"{day}.csv"):
-            if int(r["ts"]) >= since_ms and classes.get(r["wallet"]) != "market_maker":
+            if since_ms <= int(r["ts"]) < coverage["end"] * 1000 and classes.get(r["wallet"]) != "market_maker":
                 large.append({**r, "class": classes.get(r["wallet"])})
     large.sort(key=lambda r: float(r["notional_usd"]), reverse=True)
     large = sorted(large[:FLOW_LARGE], key=lambda r: int(r["ts"]), reverse=True)
     wallets: dict = defaultdict(lambda: defaultdict(float))
     for day in _days(2, now):
-        for r in _read_csv(data / "flow" / "wallets" / f"{day}.csv"):
-            if int(r["run_ts"]) * 1000 < since_ms or classes.get(r["wallet"]) == "market_maker":
+        for r in _read_csv(data / "flow" / "wallets_v2" / f"{day}.csv"):
+            if not coverage["start"] <= int(r["bucket_ts"]) < coverage["end"] or classes.get(r["wallet"]) == "market_maker":
                 continue
             w = wallets[r["wallet"]]
             for k in ("legs", "perp_notional_usd", "option_notional_usd", "premium_bought_usd", "premium_sold_usd",
@@ -153,7 +164,7 @@ def flow_block(data: Path, now: float) -> dict:
                 w[k] += float(r[k] or 0)
     top = sorted(wallets.items(), key=lambda kv: kv[1]["perp_notional_usd"] + kv[1]["option_notional_usd"],
                  reverse=True)[:FLOW_WALLETS]
-    return {"since": int(since_ms // 1000),
+    return {"since": int(since_ms // 1000), "coverage": coverage,
             "classes_ready": bool(classes),
             "large": [{k: (_num(v) if k not in ("instrument", "kind", "underlying", "direction", "wallet", "class") else v)
                        for k, v in r.items()} for r in large],
@@ -177,8 +188,10 @@ def _book(open_rows: list, chains: dict, now: float) -> list[dict]:
 def _lean(book: list[dict]) -> dict:
     net = sum(p["delta_usd"] or 0 for p in book)
     gross = sum(abs(p["delta_usd"] or 0) for p in book)
-    score = round(net / gross, 3) if gross and all(p["delta_usd"] is not None for p in book) else None
-    return {"net_delta_usd": round(net, 2), "gross_delta_usd": round(gross, 2), "score": score, "state": state_of(score)}
+    score = round(net / gross, 3) if gross and all(p["delta_usd"] is not None and p["delta_source"] == "quoted" for p in book) else None
+    return {"net_delta_usd": round(net, 2) if all(p["delta_usd"] is not None for p in book) else None,
+            "gross_delta_usd": round(gross, 2) if all(p["delta_usd"] is not None for p in book) else None,
+            "score": score, "state": state_of(score)}
 
 
 def history_coverage(doc: dict, now: float) -> dict:
@@ -200,15 +213,16 @@ def cohort_lean(insts: dict, chains: dict, now: float) -> dict:
             continue
         und = name.split("-")[0]
         strikes, index, _ = chains.get(und, (None, None, None))
-        delta = traders_mod.mark_position(name, 1, None, strikes, index, now)["delta_usd"]
+        valued = traders_mod.mark_position(name, 1, None, strikes, index, now)
+        delta = valued["delta_usd"]
         positions += cell[1]
-        if delta is None or len(cell) < 3:
+        if delta is None or valued["delta_source"] != "quoted" or len(cell) < 3:
             complete = False
             continue
         net += cell[0] * delta
         gross += cell[2] * abs(delta)
     score = round(net / gross, 3) if complete and gross else None
-    return {"net_delta_usd": round(net, 2), "gross_delta_usd": round(gross, 2) if complete else None,
+    return {"net_delta_usd": round(net, 2) if complete else None, "gross_delta_usd": round(gross, 2) if complete else None,
             "score": score, "state": state_of(score), "positions": positions}
 
 
@@ -285,13 +299,14 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                                                 for i in range(max(0, len(c["close"]) - keep), len(c["close"]))]
         closes4 = [b[4] for b in candles["4h"]]
         opts = options_block(data, site, und, now)
+        coin_flows = flows.get(und) or {w: {"coverage": c} for w, c in flows["_coverage"].items()}
         align = None
         if opts:
             chains[und] = (opts["strikes"], opts["features"].get("index_price"), opts["ts"])
-            opts["lean"] = options_lean(opts["features"], opts["iv_history"], (flows.get(und) or {}).get("7d"))
-            align = alignment(r4.get("signal"), r1.get("signal"), opts["features"], opts["iv_history"], flows.get(und),
+            opts["lean"] = options_lean(opts["features"], opts["iv_history"], coin_flows.get("7d"), observed_at=opts["ts"], now=now)
+            align = alignment(r4, r1, opts["features"], opts["iv_history"], coin_flows,
                               (held.get("positions") or {}).get(und) if coverage["ready"] else None, opts["strikes"], opts["features"].get("index_price"),
-                              opts["ts"])
+                              now, options_at=opts["ts"])
             align["positions_through"] = held.get("through")
             align["wallet_coverage"] = coverage
         pos = r4.get("positioning") or {}
@@ -299,20 +314,22 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
         markets.append({
             "und": und, "symbol": sym, "price": price,
             "chg_24h": change_pct(closes4, 6), "chg_7d": change_pct(closes4, 42),
-            "signal_4h": r4.get("signal"), "signal_1d": r1.get("signal"), "unified": r4.get("unified_signal"),
+            "signal_4h": r4.get("signal") if engine_status(r4, now) == "ready" else None,
+            "signal_1d": r1.get("signal") if engine_status(r1, now) == "ready" else None,
+            "unified": r4.get("unified_signal") if all(engine_status(r, now) == "ready" for r in (r4, r1)) else None,
             "regime_4h": r4.get("regime"), "regime_1d": r1.get("regime"), "z_4h": r4.get("zscore"),
             "heat_4h": r4.get("heat"), "heat_phase_4h": r4.get("heat_phase"),
             "ribbon_1d": (r1.get("ribbon") or {}).get("state"), "ribbon_4h": (r4.get("ribbon") or {}).get("state"),
             "data_4h": r4.get("data_status"), "data_1d": r1.get("data_status"), "volume_status": r4.get("volume_status"),
-            "funding_ann": pos.get("funding_rate", 0) * 24 * 365 if pos else None,
+            "funding_ann": pos["funding_rate"] * 24 * 365 if pos.get("funding_rate") is not None else None,
             "oi_usd": pos.get("oi_value"), "has_options": opts is not None,
             "atm_iv_30d": (opts or {}).get("features", {}).get("atm_iv_30d"),
             "rr25_30d": (opts or {}).get("features", {}).get("rr25_30d"),
             "lean": ((opts or {}).get("lean") or {}).get("state"),
-            "align": None if not align else {"score": align["score"], "wallet_coverage": coverage, **{h: [row[k]["state"] for k in ("engine", "options", "wallets")]
+            "align": None if not align else {"version": ANALYTICS_VERSION, "readings": align["horizons"], "score": align["score"], "wallet_coverage": coverage, **{h: [row[k]["state"] for k in ("engine", "options", "wallets")]
                                                                           for h, row in align["horizons"].items()}},
             "options": None if not opts else {
-                "ts": opts["ts"], **{k: opts["features"].get(k) for k in ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d",
+                "ts": opts["ts"], "status": opts["status"], **{k: opts["features"].get(k) for k in ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d",
                                                                            "bf25_30d", "pc_oi_ratio", "option_oi_contracts")},
                 "term": [[round(e["tenor_days"], 3), e["atm_iv"]] for e in opts["expiries"] if e.get("atm_iv") is not None],
                 "iv30_hist": [[h[0], h[2]] for h in opts["iv_history"][-96 * 7:] if h[2] is not None][::4]},
@@ -322,10 +339,11 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "und": und, "symbol": sym, "generated_at": int(now), "candles": candles,
             "backfilled": {tf: cache.counts(und, tf)[1] for tf in CANDLES_KEEP},
             "signals": history.get(und, {}), "latest": {"4h": r4 or None, "1d": r1 or None}, "options": opts,
-            "taker_flow": flows.get(und), "alignment": align,
+            "taker_flow": coin_flows, "alignment": align,
         })
-    meta = {"generated_at": int(now), "bars": {tf: (sig["timeframes"].get(tf) or {}).get("bar_close") for tf in ("4h", "1d")},
+    meta = {"analytics_version": ANALYTICS_VERSION, "generated_at": int(now), "bars": {tf: (sig["timeframes"].get(tf) or {}).get("bar_close") for tf in ("4h", "1d")},
             "consensus": {tf: ((sig["timeframes"].get(tf) or {}).get("consensus") or {}).get("consensus") for tf in ("4h", "1d")},
+            "consensus_detail": {tf: (sig["timeframes"].get(tf) or {}).get("consensus") for tf in ("4h", "1d")},
             "context": sig.get("context", {})}
     _write(site / "markets.json", {**meta, "coins": markets})
     flow = flow_block(data, now)

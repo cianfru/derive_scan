@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { usd, ago, price } from "../lib/format.js";
 import { Plate, Tabs, Loading, Failed, Info } from "../components/ui.jsx";
+import { FlowCoverage } from "../components/AnalyticalDetails.jsx";
 import WalletTag from "../components/WalletTag.jsx";
 
 import { TYPE as CLASS } from "../lib/traders.js";
@@ -31,6 +32,7 @@ export default function Flow() {
         <h1>Flow</h1>
         <p className="sub">The largest trades on Derive in the last 24 hours, and the wallets behind the most volume.{data.classes_ready ? " Market makers left out." : ""}</p>
       </div>
+      <FlowCoverage coverage={data.coverage} />
       <div style={{ display: "grid", gap: 16 }}>
         <Plate title="Large trades" info="Trades that crossed the spread at $25K or more on perps, $100K notional or $2K premium on options. RFQ marks block trades negotiated off the book."
           right={<Tabs label="Kind" value={kind} onChange={(k) => { setKind(k); setAll(false); }} items={[["option", "Options"], ["perp", "Perps"], ["all", "All"]]} />} bodyClass="table-wrap">
@@ -47,7 +49,7 @@ export default function Flow() {
                   <td><Who w={t.wallet} ranked={t.ranked} /></td>
                   <td><Kind c={t.class} /></td>
                 </tr>))}
-              {!large.length && <tr><td colSpan={7} className="dim">No large trades in this window.</td></tr>}
+              {!large.length && <tr><td colSpan={7} className="dim">No large trades in the collected portion of this window.</td></tr>}
             </tbody>
           </table>
           {matching.length > large.length && <button className="btn" style={{ marginTop: 12 }} onClick={() => setAll(true)}>Show all {matching.length}</button>}

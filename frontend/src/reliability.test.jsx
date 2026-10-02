@@ -56,16 +56,18 @@ it("explains incomplete coverage instead of claiming flat or neutral", async () 
 });
 
 it("keeps engine and options visible while withholding incomplete wallet readings", () => {
-  const row = { engine: { state: "up", signal: "LIGHT_LONG" }, options: { state: "defensive" }, wallets: { state: "up" } };
-  render(<AlignmentGrid alignment={{ horizons: { "7d": row, "30d": row }, positions_through: "2025-06-13",
+  const now = Date.now() / 1000;
+  const row = { engine: { state: "up", signal: "LIGHT_LONG", status: "ready", observed_at: now, timeframe: "4h" }, options: { state: "defensive", status: "ready", observed_at: now }, wallets: { state: "up" } };
+  render(<AlignmentGrid alignment={{ version: 2, horizons: { "7d": row, "30d": row }, positions_through: "2025-06-13",
     wallet_coverage: { ready: false, status: "backfilling" } }} />);
   expect(screen.getAllByText("History incomplete")).toHaveLength(2);
   expect(screen.getAllByText("Defensive")).toHaveLength(2);
 });
 
 it("labels compact alignment readings with their actual meanings", () => {
-  render(<AlignSquares a={{ "7d": ["up", "neutral", null], "30d": ["defensive", null, null] }} />);
-  expect(screen.getByLabelText(/Next 7 days: Engine: Up, Option prices: Neutral, Smart wallets: history incomplete/)).toBeTruthy();
+  const now = Date.now() / 1000;
+  render(<AlignSquares a={{ version: 2, readings: { "7d": { engine: { state: "up", status: "ready", timeframe: "4h", observed_at: now }, options: { state: "neutral", status: "ready", observed_at: now } } } }} />);
+  expect(screen.getByLabelText(/Shorter view: Engine: Up, Option prices: Neutral, Smart wallets: history incomplete/)).toBeTruthy();
 });
 
 it("never shows the previous wallet while a new wallet request loads or fails", async () => {
