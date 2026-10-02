@@ -32,6 +32,19 @@ Every Derive perp is listed. `data_status` says how far Reflex's engine can read
 | `flow/large/YYYY-MM-DD.csv` | taker trades at or above $25k perp notional, $100k option notional or $2k option premium, with wallet |
 | `flow/wallets/YYYY-MM-DD.csv` | one row per wallet per 15-minute run: trades, perp and option notional, premium bought and sold, realised PnL, fees |
 
+| `flow/sides/YYYY-MM-DD.csv` | per run, coin and kind (call, put, perp): taker buying and selling, market makers left out once classed |
+
+## Options traders' history (`data` branch)
+
+Every option and perp trade on Derive V2 since December 2023, one finished UTC day at a time (`history_once.py`, part 1 of `docs/options-traders-study.md`). Raw legs are not kept; they can be read again from Derive.
+
+| Path | Content |
+|---|---|
+| `history/days/YYYY-MM-DD.csv.gz` | per wallet and instrument for the day: contracts and value bought and sold, maker and taker legs, delta added in USD (Black-76 at each trade's implied volatility), implied volatility, out-of-the-money premium sold, realised PnL, fees |
+| `history/settlements/{UND}.json` | option settlement price per expiry |
+| `history/wallets.json` | each wallet's class from all days so far: market maker, income, hedger, directional, skilled, occasional |
+| `history/state.json` | last day done |
+
 ## Options files (`data` branch)
 
 Every coin with options on Derive (`universe.json`). BTC and ETH in full detail; the others with expiry rows hourly and raw chains daily.
@@ -77,6 +90,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 python record_once.py --out ../store   # record the current options slot into files, as the Action does
 python signal_once.py --out ../store   # compute any due 4H/1D signals, as the Action does
+python history_once.py --out ../store  # extend the options traders' history (150 s budget), as the Action does
 python research/parity_report.py OUT.md   # one-off: Derive candles vs Reflex's candles, same code
 python main.py                         # local API with its own recorder, http://localhost:8000
 ```

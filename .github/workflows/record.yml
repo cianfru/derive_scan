@@ -1,6 +1,6 @@
-# Records Derive's options surface and trade flow every 15 minutes and computes the signals on
-# Derive's perps after each 4H and daily close, into the `data` branch; then rebuilds the app's
-# data files on the `site-data` branch.
+# Records Derive's options surface and trade flow every 15 minutes, computes the signals on
+# Derive's perps after each 4H and daily close and extends the options traders' history, into the
+# `data` branch; then rebuilds the app's data files on the `site-data` branch.
 # Started every 5 minutes by an external cron service through workflow_dispatch; GitHub's own
 # schedule below is a backup (minutes 2, 7, ..., 57). Each 15-minute slot and each closed bar
 # is processed once, so repeated starts do no harm.
@@ -65,6 +65,12 @@ jobs:
         if: always() && steps.due.outputs.signals_due == 'true'
         working-directory: backend
         run: python signal_once.py --out ../store
+
+      # Options traders' history: rebuilds past days within a time budget, then one new day a day.
+      - name: History
+        if: always() && steps.due.outputs.due == 'true'
+        working-directory: backend
+        run: python history_once.py --out ../store --budget 150
 
       - name: Build app data
         if: always() && (steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true')

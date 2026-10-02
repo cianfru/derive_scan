@@ -28,6 +28,55 @@ function Readout({ row }) {
   );
 }
 
+const HORIZON_DAYS = { "4h": 21, "1d": 120 };
+const LEAN = { defensive: ["Defensive", "down"], neutral: ["Neutral", ""], up: ["Leaning up", "up"] };
+const LEAN_PARTS = [["skew", "Skew vs its range"], ["flow", "Taker premium, 7d"], ["put_call", "Put/call OI, 7d change"], ["term", "Short vs 30d volatility"]];
+const LEAN_INFO = "How options positioning reads now, beside the engine's signal and separate from it. Four readings, each from defensive to leaning up: skew against its own recent range, which side takers paid premium for over 7 days (market makers left out), whether puts or calls were added to open interest, and whether short-dated volatility sits above 30-day. Context, not a signal.";
+
+function Lean({ lean }) {
+  const [label, cls] = LEAN[lean?.state] || ["Building", "faint"];
+  return <strong className={cls} style={{ fontSize: 15 }}>{label}</strong>;
+}
+
+function LeanParts({ lean }) {
+  return (
+    <div className="figs">
+      <div className="fig"><span>Options lean <Info>{LEAN_INFO}</Info></span><Lean lean={lean} /></div>
+      {LEAN_PARTS.map(([k, label]) => {
+        const v = lean?.parts?.[k];
+        return (
+          <div className="fig" key={k}><span>{label}</span>
+            <span className="meter" style={{ textTransform: "none" }}><i className="center">{v != null && <b style={{ left: `${50 + Math.min(0, v) * 50}%`, width: `${Math.abs(v) * 50}%`, background: v < 0 ? "var(--down)" : "var(--up)" }} />}</i>
+              <strong style={{ fontSize: 13 }} className={v == null ? "faint" : ""}>{v == null ? "Building" : v > 0.2 ? "Up" : v < -0.2 ? "Defensive" : "Neutral"}</strong></span></div>);
+      })}
+    </div>
+  );
+}
+
+function ChartLegend({ opts, tf, last }) {
+  const cone = (opts?.implied || []).filter((e) => e.days <= HORIZON_DAYS[tf]);
+  const lv = opts?.levels;
+  if (!cone.length && !lv) return null;
+  const end = cone[cone.length - 1];
+  const rel = (v) => `${v >= last ? "+" : ""}${((v / last - 1) * 100).toFixed(1)}%`;
+  return (
+    <div className="chart-legend">
+      {end && <>
+        <span>Priced range to {new Date(end.expiry * 1000).toISOString().slice(5, 10)}</span>
+        <span><i style={{ background: "var(--up)" }} /><b className="up">{rel(end.q[3])}</b></span>
+        <span><i style={{ background: "var(--down)" }} /><b className="down">{rel(end.q[1])}</b></span>
+        <Info>Option prices across all strikes imply a spread of outcomes for each expiry. The shaded areas hold the middle half of them: a quarter above the green edge, a quarter below the red one. A green area larger than the red one means calls are paying for more upside than puts for downside, and the reverse. Market pricing, not a view; options tend to over-price large moves.</Info>
+      </>}
+      {lv && <>
+        <span><i className="dots" style={{ color: "var(--up)" }} />Call wall {lv.call_wall?.toLocaleString() ?? "-"}</span>
+        <span><i className="dots" style={{ color: "var(--down)" }} />Put wall {lv.put_wall?.toLocaleString() ?? "-"}</span>
+        <span><i className="dots" style={{ color: "var(--muted)" }} />Max pain {lv.max_pain?.toLocaleString() ?? "-"}</span>
+        <Info>Open interest on expiries in the next {lv.days} days. Call wall: the strike above the index with the most calls open; put wall: the strike below with the most puts. Max pain: the price at which option holders together would be paid least at expiry. These are positions, often watched as levels near expiry.</Info>
+      </>}
+    </div>
+  );
+}
+
 function OptionsPanel({ opts, und, flow }) {
   const [win, setWin] = useState("24h");
   const exps = opts.strikes?.expiries || {};
@@ -50,6 +99,7 @@ function OptionsPanel({ opts, und, flow }) {
         <div><h2>{und} options</h2><p className="sub">Where open interest sits and what traders pay for protection.</p></div>
         <span className="status">Updated {utc(opts.ts)}</span>
       </div>
+      <LeanParts lean={opts.lean} />
       <div className="figs">
         <div className="fig"><span>ATM 7d</span><strong>{pct(f.atm_iv_7d)}</strong></div>
         <div className="fig"><span>ATM 30d</span><strong>{pct(f.atm_iv_30d)}</strong></div>
@@ -118,6 +168,7 @@ export default function Coin() {
         </div>
         <div style={{ display: "flex", gap: 22, alignItems: "center", flexWrap: "wrap" }}>
           <span className="label">Combined <Signal s={data.latest?.["4h"]?.unified_signal} /></span>
+          {data.options && <span className="label">Options <Lean lean={data.options.lean} /></span>}
           <Tabs label="Timeframe" value={tf} onChange={setTf} items={[["4h", "4H"], ["1d", "1D"]]} />
         </div>
       </div>
@@ -125,14 +176,8 @@ export default function Coin() {
       <Plate title={`${und} · ${tf.toUpperCase()}`} info={<>Derive's index price with traded volume. Orange line: fast average; grey: slow. Markers show where the signal changed. {data.backfilled?.[tf] ? `The first ${data.backfilled[tf]} bars come from an external market, before Derive listed ${und}.` : ""}</>}
         right={<span className="status">{row?.signal_bar_close_time ? `Bar closed ${utc(row.signal_bar_close_time)}` : ""}</span>}>
         <CandleChart candles={candles} signals={data.signals?.[tf]} tf={tf} theme={theme} backfilled={data.backfilled?.[tf] || 0}
-          implied={data.options?.implied} />
-        {data.options?.implied?.length > 0 && (
-          <div className="chart-legend">
-            <span><i style={{ background: "var(--orange)" }} />Middle half of priced outcomes</span>
-            <span><i style={{ background: "var(--orange-lo)" }} />Eight in ten</span>
-            <span><i style={{ background: "var(--fg)" }} />Middle</span>
-            <Info>What option prices imply for each upcoming expiry, read from prices across all strikes. It shows where traders are paying for the price to be, not a view. Options tend to over-price large moves.</Info>
-          </div>)}
+          implied={data.options?.implied} levels={data.options?.levels} />
+        <ChartLegend opts={data.options} tf={tf} last={last?.[4]} />
       </Plate>
       {pos && (
         <div className="figs">

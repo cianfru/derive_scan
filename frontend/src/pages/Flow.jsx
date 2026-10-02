@@ -2,7 +2,14 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { usd, shortAddr, ago, price } from "../lib/format.js";
-import { Plate, Tabs, Loading, Failed } from "../components/ui.jsx";
+import { Plate, Tabs, Loading, Failed, Info } from "../components/ui.jsx";
+
+const CLASS = { skilled: "Skilled", directional: "Directional", income: "Income", hedger: "Hedger", occasional: "Occasional" };
+const CLASS_INFO = "Wallet types from every trade on Derive since December 2023. Skilled: directional traders with the best results on options that have expired. Directional: regular traders taking a view. Income: mostly sells out-of-the-money options. Hedger: offsets its options with perps. Occasional: too few trades to tell. Market makers are left out.";
+
+function Kind({ c }) {
+  return c ? <span className={c === "skilled" ? "orange" : "dim"} style={{ fontSize: 12 }}>{CLASS[c] || c}</span> : <span className="faint">-</span>;
+}
 
 export default function Flow() {
   const { data, error } = useData("flow.json", 2 * 60_000);
@@ -16,13 +23,13 @@ export default function Flow() {
     <div className="wrap page">
       <div>
         <h1>Flow</h1>
-        <p className="sub">The largest trades on Derive in the last 24 hours, and the wallets behind the most volume. Every trade is public on Derive.</p>
+        <p className="sub">The largest trades on Derive in the last 24 hours, and the wallets behind the most volume.{data.classes_ready ? " Market makers left out." : ""}</p>
       </div>
       <div style={{ display: "grid", gap: 16 }}>
         <Plate title="Large trades" info="Trades that crossed the spread at $25K or more on perps, $100K notional or $2K premium on options. RFQ marks block trades negotiated off the book."
           right={<Tabs label="Kind" value={kind} onChange={(k) => { setKind(k); setAll(false); }} items={[["option", "Options"], ["perp", "Perps"], ["all", "All"]]} />} bodyClass="table-wrap">
-          <table className="grid" style={{ minWidth: 640 }}>
-            <thead><tr><th>Time</th><th>Instrument</th><th>Side</th><th className="num">Notional</th><th className="num">Premium</th><th>Wallet</th></tr></thead>
+          <table className="grid" style={{ minWidth: 720 }}>
+            <thead><tr><th>Time</th><th>Instrument</th><th>Side</th><th className="num">Notional</th><th className="num">Premium</th><th>Wallet</th><th>Type <Info>{CLASS_INFO}</Info></th></tr></thead>
             <tbody>
               {large.map((t, i) => (
                 <tr key={i} style={{ cursor: "default" }}>
@@ -32,21 +39,23 @@ export default function Flow() {
                   <td className="num">{usd(t.notional_usd)}</td>
                   <td className="num">{t.kind === "option" ? usd(t.premium_usd) : <span className="faint">-</span>}</td>
                   <td className="dim">{shortAddr(t.wallet)}</td>
+                  <td><Kind c={t.class} /></td>
                 </tr>))}
-              {!large.length && <tr><td colSpan={6} className="dim">No large trades in this window.</td></tr>}
+              {!large.length && <tr><td colSpan={7} className="dim">No large trades in this window.</td></tr>}
             </tbody>
           </table>
           {matching.length > large.length && <button className="btn" style={{ marginTop: 12 }} onClick={() => setAll(true)}>Show all {matching.length}</button>}
         </Plate>
         <Plate title="Most active wallets, 24h" info="Volume and realised profit and loss per wallet from Derive's public trades. Premium is what the wallet paid for options (bought) and received (sold)." bodyClass="table-wrap">
-          <table className="grid" style={{ minWidth: 560 }}>
-            <thead><tr><th>Wallet</th><th className="num">Perp volume</th><th className="num">Options notional</th><th className="num">Premium net</th><th className="num">Realised PnL</th></tr></thead>
+          <table className="grid" style={{ minWidth: 640 }}>
+            <thead><tr><th>Wallet</th><th>Type <Info>{CLASS_INFO}</Info></th><th className="num">Perp volume</th><th className="num">Options notional</th><th className="num">Premium net</th><th className="num">Realised PnL</th></tr></thead>
             <tbody>
               {data.wallets.map((w) => {
                 const net = w.premium_sold_usd - w.premium_bought_usd;
                 return (
                   <tr key={w.wallet} style={{ cursor: "default" }}>
                     <td>{shortAddr(w.wallet)}</td>
+                    <td><Kind c={w.class} /></td>
                     <td className="num">{usd(w.perp_notional_usd)}</td>
                     <td className="num">{usd(w.option_notional_usd)}</td>
                     <td className={`num ${net > 0 ? "up" : net < 0 ? "down" : ""}`}>{w.premium_bought_usd || w.premium_sold_usd ? usd(net) : <span className="faint">-</span>}</td>

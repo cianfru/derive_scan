@@ -11,7 +11,9 @@ flow/sides/YYYY-MM-DD.csv    per run, per coin and kind (call, put, perp): what 
                              the aggressive side of the market
 flow/state.json              newest trade time read, and trade keys at that time
 
-Only the taker leg of a trade enters the large list (the side that crossed the spread).
+Only the taker leg of a trade enters the large list (the side that crossed the spread). Wallets
+classed as market makers (history/wallets.json, from the rebuilt history) are left out of the
+taker sides: their trades show inventory management, not a view.
 """
 from __future__ import annotations
 
@@ -77,11 +79,18 @@ def option_kind(name: str) -> str:
     return "call" if name.endswith("-C") else "put" if name.endswith("-P") else "perp"
 
 
-def sides(trades: list[dict], run_ts: int) -> list[list]:
-    """Taker buying and selling per coin and kind."""
+def market_makers(root: Path) -> set[str]:
+    p = root / "history" / "wallets.json"
+    if not p.exists():
+        return set()
+    return {w for w, v in json.loads(p.read_text()).get("wallets", {}).items() if v.get("class") == "market_maker"}
+
+
+def sides(trades: list[dict], run_ts: int, exclude: set[str] = frozenset()) -> list[list]:
+    """Taker buying and selling per coin and kind, without the excluded wallets."""
     agg: dict = defaultdict(lambda: defaultdict(float))
     for t in trades:
-        if t.get("liquidity_role") != "taker":
+        if t.get("liquidity_role") != "taker" or t.get("wallet") in exclude:
             continue
         name = t.get("instrument_name", "")
         if kind_of(name) == "other":
@@ -138,6 +147,7 @@ async def fetch_since(client: DeriveClient, since_ms: int, until_ms: int) -> lis
 
 
 async def update(client: DeriveClient, root: Path | str, now_ms: int) -> dict:
+    exclude = market_makers(Path(root))
     root = Path(root) / "flow"
     state_p = root / "state.json"
     state = json.loads(state_p.read_text()) if state_p.exists() else {}
@@ -149,7 +159,7 @@ async def update(client: DeriveClient, root: Path | str, now_ms: int) -> dict:
         for day in sorted({_day(r[0]) for r in large}):
             _append(root / "large" / f"{day}.csv", LARGE_FIELDS, [r for r in large if _day(r[0]) == day])
         _append(root / "wallets" / f"{_day(now_ms)}.csv", WALLET_FIELDS, wallets)
-        _append(root / "sides" / f"{_day(now_ms)}.csv", SIDE_FIELDS, sides(trades, now_ms // 1000))
+        _append(root / "sides" / f"{_day(now_ms)}.csv", SIDE_FIELDS, sides(trades, now_ms // 1000, exclude))
         last = max(int(t["timestamp"]) for t in trades)
         state = {"last_ms": last, "keys_at_last": sorted(leg_key(t) for t in trades if int(t["timestamp"]) == last)}
         root.mkdir(parents=True, exist_ok=True)
