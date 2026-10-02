@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { createChart, CandlestickSeries, HistogramSeries, LineSeries, createSeriesMarkers, ColorType, CrosshairMode } from "lightweight-charts";
+import { createChart, CandlestickSeries, HistogramSeries, LineSeries, BaselineSeries, createSeriesMarkers, ColorType, CrosshairMode, LineStyle } from "lightweight-charts";
 import { cssVar, SIGNAL_LABEL, signalTone } from "../lib/format.js";
 
 const TF_SEC = { "4h": 14400, "1d": 86400 };
@@ -19,9 +19,13 @@ const TONE_VAR = { strong: "--sig-strong", long: "--sig-long", acc: "--sig-acc",
 
 const HORIZON_DAYS = { "4h": 21, "1d": 120 };
 
+const pctFrom = (v, base) => `${v >= base ? "+" : ""}${((v / base - 1) * 100).toFixed(1)}%`;
+
 /** Candles with volume, the ribbon (fast and slow EMAs), a marker wherever the signal changed and,
- * when options exist, the price ranges option prices imply for each upcoming expiry. */
-export default function CandleChart({ candles, signals, tf, theme, backfilled = 0, implied = null }) {
+ * when options exist: the middle half of the outcomes option prices imply for each upcoming
+ * expiry (upper edge in the up colour, lower edge in the down colour, so any lean shows), and
+ * the levels where open interest sits (call and put walls, max pain). */
+export default function CandleChart({ candles, signals, tf, theme, backfilled = 0, implied = null, levels = null }) {
   const box = useRef(null);
   useEffect(() => {
     if (!box.current || !candles?.length) return;
@@ -55,10 +59,26 @@ export default function CandleChart({ candles, signals, tf, theme, backfilled = 
     });
     if (cone.length) {
       const snap = (t) => lastT + Math.max(1, Math.round((t - lastT) / step)) * step;
-      const band = [[0, c("--orange-lo"), 1, 2], [1, c("--orange"), 2, 0], [2, c("--fg"), 1, 1], [3, c("--orange"), 2, 0], [4, c("--orange-lo"), 1, 2]];
-      band.forEach(([qi, color, width, style]) => {
-        const s = chart.addSeries(LineSeries, { color, lineWidth: width, lineStyle: style, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
-        s.setData([{ time: lastT, value: lastC }, ...cone.map((e) => ({ time: snap(e.expiry), value: e.q[qi] }))]);
+      const path = (qi) => [{ time: lastT, value: lastC }, ...cone.map((e) => ({ time: snap(e.expiry), value: e.q[qi] }))];
+      const none = "rgba(0,0,0,0)";
+      // Each edge is filled from today's price, so the upside and downside areas compare at a glance.
+      [[3, up], [1, down]].forEach(([qi, color]) => {
+        const s = chart.addSeries(BaselineSeries, { baseValue: { type: "price", price: lastC }, lineWidth: 2,
+          topLineColor: qi === 3 ? color : none, bottomLineColor: qi === 1 ? color : none,
+          topFillColor1: qi === 3 ? color + "40" : none, topFillColor2: qi === 3 ? color + "08" : none,
+          bottomFillColor1: qi === 1 ? color + "08" : none, bottomFillColor2: qi === 1 ? color + "40" : none,
+          priceLineVisible: false, crosshairMarkerVisible: false, lastValueVisible: true, title: "" });
+        const d = path(qi);
+        s.setData(d);
+        s.applyOptions({ title: pctFrom(d[d.length - 1].value, lastC) });
+      });
+      const mid = chart.addSeries(LineSeries, { color: c("--fg"), lineWidth: 1, lineStyle: LineStyle.Dashed, lastValueVisible: false,
+        priceLineVisible: false, crosshairMarkerVisible: false });
+      mid.setData(path(2));
+    }
+    if (levels) {
+      [["call_wall", "Call wall", up], ["put_wall", "Put wall", down], ["max_pain", "Max pain", c("--muted")]].forEach(([k, label, color]) => {
+        if (levels[k]) candle.createPriceLine({ price: levels[k], color, lineWidth: 1, lineStyle: LineStyle.SparseDotted, axisLabelVisible: true, title: label });
       });
     }
     // A marker on each bar where the published signal changed.
@@ -78,6 +98,6 @@ export default function CandleChart({ candles, signals, tf, theme, backfilled = 
     const ahead = bars.length - candles.length;
     chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles.length - (tf === "4h" ? 180 : 160)), to: candles.length + Math.max(3, ahead + 2) });
     return () => chart.remove();
-  }, [candles, signals, tf, theme, backfilled, implied]);
+  }, [candles, signals, tf, theme, backfilled, implied, levels]);
   return <div ref={box} className="chart-box" />;
 }

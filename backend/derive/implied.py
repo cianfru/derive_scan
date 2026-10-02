@@ -112,3 +112,37 @@ def implied_by_expiry(strikes: dict | None, expiries: list[dict], ts: int, max_d
             q, method = lognormal_quantiles(f, t, atm), "atm"
         out.append({"expiry": int(key), "days": round(days, 2), "forward": f, "q": [round(v, 8) for v in q], "method": method})
     return out
+
+
+def option_levels(strikes: dict | None, index: float | None, ts: int, max_days: float = 30) -> dict | None:
+    """Where open interest sits across expiries up to max_days out (positions, not a forecast).
+
+    call_wall: the strike at or above the index with the most call contracts open; put_wall: the
+    strike at or below with the most puts; max_pain: the expiry price at which option holders
+    together would be paid least (sum of intrinsic value over all open contracts).
+    """
+    if not strikes or not index:
+        return None
+    calls: dict[float, float] = {}
+    puts: dict[float, float] = {}
+    for key, rows in (strikes.get("expiries") or {}).items():
+        days = (int(key) - ts) / 86400
+        if days < 0 or days > max_days:
+            continue
+        for r in rows:
+            k = float(r[0])
+            calls[k] = calls.get(k, 0.0) + float(r[1] or 0)
+            puts[k] = puts.get(k, 0.0) + float(r[2] or 0)
+    ks = sorted(set(calls) | set(puts))
+    if not ks or not (sum(calls.values()) + sum(puts.values())):
+        return None
+    above = [k for k in ks if k >= index and calls.get(k)]
+    below = [k for k in ks if k <= index and puts.get(k)]
+    pain = min(ks, key=lambda s: sum(c * max(s - k, 0) for k, c in calls.items()) +
+               sum(p * max(k - s, 0) for k, p in puts.items()))
+    return {"days": max_days,
+            "call_wall": max(above, key=lambda k: calls[k]) if above else None,
+            "call_wall_oi": round(max(calls[k] for k in above), 4) if above else None,
+            "put_wall": max(below, key=lambda k: puts[k]) if below else None,
+            "put_wall_oi": round(max(puts[k] for k in below), 4) if below else None,
+            "max_pain": pain}

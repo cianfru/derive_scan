@@ -9,8 +9,10 @@ keeps no history. Files:
   markets.json        every perp: price, change, signals, regime, heat, z, ribbon, funding, OI,
                       data status, options summary, sparkline; market-wide context
   coins/{UND}.json    candles (4H, 1D) with signal history, latest rows, options detail
-                      (term structure, per-strike open interest and IV, 14-day IV history)
-  flow.json           last 24 hours: large trades, most active wallets
+                      (term structure, per-strike open interest and IV, 14-day IV history,
+                      implied ranges, open-interest levels, options lean)
+  flow.json           last 24 hours: large trades, most active wallets (market makers left out once
+                      the rebuilt history has classed them), with each wallet's class
   strikes/{UND}.json  written by record_once.py (per-strike view of the newest chain)
 """
 from __future__ import annotations
@@ -24,7 +26,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from derive.candles import CandleCache
-from derive.implied import implied_by_expiry
+from derive.implied import implied_by_expiry, option_levels
+from derive.lean import options_lean
 
 SOURCE = "v2_mainnet"
 CANDLES_KEEP = {"4h": 500, "1d": 400}
@@ -88,7 +91,8 @@ def options_block(data: Path, site: Path, und: str, now: float) -> dict | None:
     strikes = json.loads(strikes_p.read_text()) if strikes_p.exists() else None
     return {"ts": doc["ts"], "features": doc["features"], "expiries": doc["expiries"],
             "strikes": strikes, "iv_history": iv_history(data, und, now),
-            "implied": implied_by_expiry(strikes, doc["expiries"], doc["ts"])}
+            "implied": implied_by_expiry(strikes, doc["expiries"], doc["ts"]),
+            "levels": option_levels(strikes, doc["features"].get("index_price"), doc["ts"])}
 
 
 def taker_sides(data: Path, now: float) -> dict:
@@ -111,19 +115,27 @@ def change_pct(closes: list[float], bars: int) -> float | None:
     return (closes[-1] / closes[-1 - bars] - 1) * 100
 
 
+def wallet_classes(data: Path) -> dict[str, str]:
+    """{wallet: class} from the rebuilt history (derive/history.py); empty until it exists."""
+    p = data / "history" / "wallets.json"
+    return {w: v["class"] for w, v in json.loads(p.read_text()).get("wallets", {}).items()} if p.exists() else {}
+
+
 def flow_block(data: Path, now: float) -> dict:
+    """Large taker trades and the most active wallets, market makers left out."""
     since_ms = (now - 86_400) * 1000
+    classes = wallet_classes(data)
     large = []
     for day in _days(2, now):
         for r in _read_csv(data / "flow" / "large" / f"{day}.csv"):
-            if int(r["ts"]) >= since_ms:
-                large.append(r)
+            if int(r["ts"]) >= since_ms and classes.get(r["wallet"]) != "market_maker":
+                large.append({**r, "class": classes.get(r["wallet"])})
     large.sort(key=lambda r: float(r["notional_usd"]), reverse=True)
     large = sorted(large[:FLOW_LARGE], key=lambda r: int(r["ts"]), reverse=True)
     wallets: dict = defaultdict(lambda: defaultdict(float))
     for day in _days(2, now):
         for r in _read_csv(data / "flow" / "wallets" / f"{day}.csv"):
-            if int(r["run_ts"]) * 1000 < since_ms:
+            if int(r["run_ts"]) * 1000 < since_ms or classes.get(r["wallet"]) == "market_maker":
                 continue
             w = wallets[r["wallet"]]
             for k in ("legs", "perp_notional_usd", "option_notional_usd", "premium_bought_usd", "premium_sold_usd",
@@ -132,9 +144,10 @@ def flow_block(data: Path, now: float) -> dict:
     top = sorted(wallets.items(), key=lambda kv: kv[1]["perp_notional_usd"] + kv[1]["option_notional_usd"],
                  reverse=True)[:FLOW_WALLETS]
     return {"since": int(since_ms // 1000),
-            "large": [{k: (_num(v) if k not in ("instrument", "kind", "underlying", "direction", "wallet") else v)
+            "classes_ready": bool(classes),
+            "large": [{k: (_num(v) if k not in ("instrument", "kind", "underlying", "direction", "wallet", "class") else v)
                        for k, v in r.items()} for r in large],
-            "wallets": [{"wallet": a, **{k: round(v, 2) for k, v in w.items()}} for a, w in top]}
+            "wallets": [{"wallet": a, "class": classes.get(a), **{k: round(v, 2) for k, v in w.items()}} for a, w in top]}
 
 
 def build(data: Path, site: Path, now: float | None = None) -> dict:
@@ -157,6 +170,8 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                                                 for i in range(max(0, len(c["close"]) - keep), len(c["close"]))]
         closes4 = [b[4] for b in candles["4h"]]
         opts = options_block(data, site, und, now)
+        if opts:
+            opts["lean"] = options_lean(opts["features"], opts["iv_history"], (flows.get(und) or {}).get("7d"))
         pos = r4.get("positioning") or {}
         price = (opts or {}).get("features", {}).get("index_price") or (closes4[-1] if closes4 else None)
         markets.append({
@@ -171,6 +186,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "oi_usd": pos.get("oi_value"), "has_options": opts is not None,
             "atm_iv_30d": (opts or {}).get("features", {}).get("atm_iv_30d"),
             "rr25_30d": (opts or {}).get("features", {}).get("rr25_30d"),
+            "lean": ((opts or {}).get("lean") or {}).get("state"),
             "options": None if not opts else {
                 "ts": opts["ts"], **{k: opts["features"].get(k) for k in ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d",
                                                                            "bf25_30d", "pc_oi_ratio", "option_oi_contracts")},

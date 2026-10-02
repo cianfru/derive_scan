@@ -1,6 +1,6 @@
 # Options traders on Derive: history rebuild and declared study
 
-Status: DRAFT for the owner's approval (2 October 2026). Under the declared-study protocol nothing in "Rules" may change once approved, and no result is computed before approval. The data rebuild (part 1) may start before approval: it computes no results.
+Status: APPROVED by the owner on 2 October 2026, before any result was computed. Under the declared-study protocol nothing in "Rules" changes from here. The owner's emphasis: skilled traders are the ones who profit from directional positioning; market makers are noise and are never shown in the app.
 
 ## Question
 
@@ -19,6 +19,12 @@ Steps:
 4. Per wallet, per underlying, per day: net option delta (contracts x delta x index), net perp position, premium paid and received, realised PnL.
 
 Storage: daily per-wallet aggregates only (compressed), not raw legs, so the repository stays small. Raw legs can be refetched from Derive.
+
+Built 2 October 2026: `backend/derive/history.py`, run by `history_once.py` in the recorder's Action (a time budget per run until it has caught up, then one new day a day). Derive's public trades start mid-December 2023, so the rebuild starts there. Operational details, fixed with the rules and before any result:
+- A wallet's position in an instrument is the running sum of its daily buys minus sells; an option held to expiry settles at Derive's settlement price (`public/get_option_settlement_prices`). Option PnL per instrument = premium received - premium paid + contracts held at expiry x settlement value.
+- "Both sides of the same instrument within 24 hours" is read per UTC day.
+- "Mostly out of the money" for income sellers: at least half of the premium sold was out of the money at the trade.
+- Hedgers are read per day and underlying: on more than half of the days a wallet traded options, its perp trades that day offset at least half of the option delta it added.
 
 ## Part 2: rules (fixed before any result)
 
@@ -61,4 +67,7 @@ Otherwise the result is "context, not a signal", and positioning is shown withou
 
 - Priced outcomes (built 2 October 2026): the price ranges option prices imply per expiry, drawn on the coin chart; labelled as market pricing, never as a forecast.
 - Who is buying (built 2 October 2026): taker buying and selling of calls, puts and the perp, 24 hours and 7 days.
-- After part 1: positioning by wallet class (skilled directional, income sellers, hedgers) per coin, as context.
+- Option levels (built 2 October 2026): call wall, put wall and max pain over the next 30 days, on the coin chart.
+- Options lean (built 2 October 2026): skew against its own range, taker premium (market makers left out), put/call change, short-dated stress; beside the engine's signal, never part of it.
+- Market makers left out of Flow and of taker sides as soon as the rebuilt history classes them; every other wallet shows its type.
+- Next: positioning by wallet class (skilled directional, income sellers, hedgers) per coin, as context.

@@ -45,3 +45,12 @@ def test_update_reads_only_new_trades(tmp_path):
     assert asyncio.run(flow.update(client, tmp_path, 12_000))["legs"] == 1
     rows = list(csv.DictReader(open(next((tmp_path / "flow" / "wallets").glob("*.csv")))))
     assert len(rows) == 3 + 1   # three wallets in the first run, one in the third
+
+
+def test_market_makers_left_out_of_taker_sides(tmp_path):
+    (tmp_path / "history").mkdir()
+    (tmp_path / "history" / "wallets.json").write_text(json.dumps({"wallets": {"0xA": {"class": "market_maker"}}}))
+    mms = flow.market_makers(tmp_path)
+    assert mms == {"0xA"}
+    kinds = {r[2] for r in flow.sides(TRADES, 5, mms)}
+    assert kinds == {"perp"} and all(r[1] == "BTC" for r in flow.sides(TRADES, 5, mms))

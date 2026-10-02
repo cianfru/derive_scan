@@ -157,7 +157,7 @@ h3 { font-size: 15px; letter-spacing: .06em; text-transform: uppercase; }
 .sig.strong { color: var(--sig-strong); } .sig.long { color: var(--sig-long); } .sig.acc { color: var(--sig-acc); }
 .sig.wait { color: var(--sig-wait); } .sig.exit { color: var(--sig-exit); } .sig.na { color: var(--faint); }
 
-.up { color: var(--up); } .down { color: var(--down); } .dim { color: var(--muted); } .faint { color: var(--faint); }
+.up { color: var(--up); } .down { color: var(--down); } .dim { color: var(--muted); } .faint { color: var(--faint); } .orange { color: var(--orange); }
 .status { font: 500 11px/1.2 var(--font-mono); color: var(--muted); }
 .status.warn { color: var(--sig-acc); }
 
@@ -286,3 +286,4 @@ svg.viz .gridline { stroke: var(--seam); stroke-width: 1; }
 .chart-legend { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; margin-top: 10px; font: 500 11px/1 var(--font-mono); color: var(--muted); }
 .chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .chart-legend i { width: 14px; height: 3px; display: inline-block; }
+.chart-legend i.dots { background: none; height: 0; border-top: 2px dotted currentColor; }
