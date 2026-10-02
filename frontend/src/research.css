@@ -102,6 +102,9 @@ h2 {
 [id] {
   scroll-margin-top: 100px;
 }
+.torq-landing {
+  overflow-x: clip;
+}
 .torq-hero {
   grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.35fr);
   min-height: 750px;
@@ -135,18 +138,11 @@ h2 {
   gap: 24px;
 }
 .research-object {
-  width: 112%;
-  margin-left: -6%;
+  width: 120%;
+  margin-left: -10%;
 }
 .wave-stage {
-  aspect-ratio: 540 / 460;
-}
-.wave-layer-label {
-  background: color-mix(in srgb, var(--bg) 75%, transparent);
-  padding: 5px 9px;
-  backdrop-filter: blur(8px);
-  border-bottom-color: var(--seam);
-  font: 500 11px var(--font-mono);
+  aspect-ratio: 620 / 460;
 }
 .bitcoin-examples {
   padding-block: 40px 50px;
@@ -1075,9 +1071,6 @@ h2 {
   .torq-hero h1 {
     font-size: 65px;
   }
-  .research-object {
-    width: 112%;
-  }
   .research-example {
     padding-inline: 18px;
   }
@@ -1244,9 +1237,6 @@ h2 {
   .research-object {
     width: 116%;
     margin: -2px -8% -15px;
-  }
-  .wave-layer-label {
-    font-size: 9px;
   }
   .bitcoin-examples {
     padding-block: 22px 30px;

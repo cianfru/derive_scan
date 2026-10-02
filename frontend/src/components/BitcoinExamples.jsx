@@ -31,7 +31,7 @@ export default function BitcoinExamples({ onSelect }) {
       <div className="section-heading">
         <div>
           <span className="section-code">ONE MARKET / THREE PERSPECTIVES</span>
-          <h2>See the evidence on Bitcoin.</h2>
+          <h2>See the evidence.</h2>
         </div>
         <div className="example-asset">
           <Asset und="BTC" />

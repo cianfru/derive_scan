@@ -38,7 +38,7 @@ export default function Landing() {
             </Link>
           </div>
         </div>
-        <ResearchLayers layer={layer} onSelect={setLayer} />
+        <ResearchLayers layer={layer} />
       </section>
       <BitcoinExamples onSelect={setLayer} />
       <section className="wrap research-promise">

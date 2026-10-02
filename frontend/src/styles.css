@@ -211,13 +211,6 @@ svg.viz { width: 100%; height: auto; display: block; overflow: visible; }svg.viz
 
 @media(max-width:600px) { .trader-summary .fig:last-child { grid-column: 1/-1; } }
 
-/* One coherent point-cloud scene, with controls outside the moving geometry. */
+/* One decorative point-cloud scene. */
 .wave-stage { position: relative; aspect-ratio: 560 / 500; isolation: isolate; }
 .wave-stage canvas { display: block; width: 100%; height: 100%; }
-.wave-layer-label { position: absolute; z-index: 1; border: 0; border-bottom: 1px solid var(--seam-hi); padding: 5px 0; background: var(--bg); color: var(--muted); font: 500 12px/1.4 var(--font-display); white-space: nowrap; transition: color .3s, border-color .3s; }
-.wave-layer-label[aria-pressed=true] { color: var(--orange); border-color: var(--orange); }
-.wave-layer-label:hover { color: var(--fg); }
-.wave-caption { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 0 24px; color: var(--faint); font-size: 11px; }
-.motion-control { padding: 8px 0; background: none; border: 0; color: var(--muted); font: inherit; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--seam-hi); }
-.motion-control:hover { color: var(--fg); }
-@media(max-width:600px) { .wave-layer-label { font-size: 10px; }.wave-caption { margin-inline: 10px; font-size: 10px; } }

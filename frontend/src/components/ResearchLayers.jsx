@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 
-const WIDTH = 540;
+const WIDTH = 620;
 const HEIGHT = 460;
+const SPAN_X = 235;
+const SPAN_Z = 125;
 const LAYERS = [
-  { id: "price", name: "Daily structure", y: -110 },
-  { id: "options", name: "Options by expiry", y: 0 },
-  { id: "wallets", name: "Wallet exposure", y: 110 },
+  { id: "price", y: -110 },
+  { id: "options", y: 0 },
+  { id: "wallets", y: 110 },
 ];
 function mixColor(from, to, amount) {
   const channels = [1, 3, 5].map((offset) =>
@@ -43,10 +45,9 @@ function heightAt(layer, u, v, time) {
   return 37 * peak - 31 * trough + 4 * Math.sin(u * 4 + v * 4 - time * 0.5);
 }
 
-export default function ResearchLayers({ layer, onSelect }) {
+export default function ResearchLayers({ layer }) {
   const root = useRef(null);
   const canvas = useRef(null);
-  const labels = useRef({});
   const selected = useRef(layer);
   const redraw = useRef(null);
   const scene = useRef({ time: 0, x: 0, y: 0, focus: [1, 0, 0] });
@@ -146,9 +147,9 @@ export default function ResearchLayers({ layer, onSelect }) {
         for (const { u, v } of DOTS) {
           const height = heightAt(plane.id, u, v, time);
           const point = project(
-            u * 174,
+            u * SPAN_X,
             base + sway - height,
-            v * 110,
+            v * SPAN_Z,
             yaw,
             pitch,
           );
@@ -164,18 +165,12 @@ export default function ResearchLayers({ layer, onSelect }) {
         edgePaths.push({
           focus,
           corners: [
-            [-174, -110],
-            [174, -110],
-            [174, 110],
-            [-174, 110],
+            [-SPAN_X, -SPAN_Z],
+            [SPAN_X, -SPAN_Z],
+            [SPAN_X, SPAN_Z],
+            [-SPAN_X, SPAN_Z],
           ].map(([x, z]) => project(x, base + sway, z, yaw, pitch)),
         });
-        const anchor = project(105, base + 23, 130, yaw, pitch);
-        const label = labels.current[plane.id];
-        if (label) {
-          label.style.left = `${(Math.min(WIDTH - 142, anchor.x - 28) / WIDTH) * 100}%`;
-          label.style.top = `${(anchor.y / HEIGHT) * 100}%`;
-        }
       });
 
       ctx.setTransform(size, 0, 0, size, 0, 0);
@@ -273,24 +268,10 @@ export default function ResearchLayers({ layer, onSelect }) {
     <div
       ref={root}
       className="research-object research-waves"
-      role="group"
-      aria-label="Illustrative 3D research layers"
+      aria-hidden="true"
     >
       <div className="wave-stage">
         <canvas ref={canvas} width={WIDTH} height={HEIGHT} aria-hidden="true" />
-        {LAYERS.map((plane) => (
-          <button
-            key={plane.id}
-            ref={(node) => {
-              labels.current[plane.id] = node;
-            }}
-            className="wave-layer-label"
-            aria-pressed={layer === plane.id}
-            onClick={() => onSelect(plane.id)}
-          >
-            {plane.name}
-          </button>
-        ))}
       </div>
     </div>
   );

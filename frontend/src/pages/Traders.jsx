@@ -44,7 +44,7 @@ export default function Traders() {
             {shown.map((t) => (
               <tr key={t.address} onClick={() => nav(`/trader/${t.address.toLowerCase()}`)} tabIndex={0}
                 onKeyDown={(e) => e.key === "Enter" && nav(`/trader/${t.address.toLowerCase()}`)}>
-                <td><span className={`rank ${t.rank <= 3 ? "top3" : ""}`}>{t.rank}</span><WalletTag address={t.address} size={22} /></td>
+                <td><span className={`rank ${t.rank <= 3 ? "top3" : ""}`}>{t.rank}</span><WalletTag address={t.address} size={28} /></td>
                 <td className={t.tier === "top" || t.tier === "smart" ? "orange" : "dim"}>{TYPE[typeOf(t)]}</td>
                 <td className={`num ${t.option_pnl > 0 ? "up" : t.option_pnl < 0 ? "down" : ""}`}>{usd(t.option_pnl)}</td>
                 <td className="num">{pct(t.win_rate, 0)}</td>
