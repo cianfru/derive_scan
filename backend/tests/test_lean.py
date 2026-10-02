@@ -45,8 +45,9 @@ def test_alignment_by_horizon():
     out = alignment(engine("LIGHT_LONG", "4h"), engine("RISK_OFF", "1d"), feats, [],
                     {k: covered(v) for k, v in flows.items()}, positions, strikes, 85000, now, options_at=now)
     h7, h30 = out["horizons"]["7d"], out["horizons"]["30d"]
-    assert h7["engine"]["state"] == "up" and h7["options"]["state"] == "up" and h7["wallets"]["state"] == "up"
-    assert h7["aligned"] == "up"
+    assert h7["engine"]["state"] == "defensive" and h7["options"]["state"] == "up" and h7["wallets"]["state"] == "up"
+    assert h7["aligned"] is None
+    assert h7["engine"]["timeframe"] == h30["engine"]["timeframe"] == "1d"
     # 30 days: the 7-day calls count too; puts held are short delta, so wallets lean defensive
     assert h30["engine"]["state"] == "defensive" and h30["wallets"]["state"] == "defensive"
-    assert out["score"] >= 3
+    assert out["score"] == 0

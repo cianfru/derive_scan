@@ -27,7 +27,7 @@ const pctFrom = (v, base) => `${v >= base ? "+" : ""}${((v / base - 1) * 100).to
  * when options exist: the middle half of the outcomes option prices imply for each upcoming
  * expiry (upper edge in the up colour, lower edge in the down colour, so any lean shows), and
  * the levels where open interest sits (call and put walls, max pain). */
-export default function CandleChart({ candles, signals, tf, theme, backfilled = 0, implied = null, levels = null, optionsAt = null, optionsIndex = null }) {
+export default function CandleChart({ candles, signals, tf, theme, implied = null, levels = null, optionsAt = null, optionsIndex = null }) {
   const box = useRef(null);
   useEffect(() => {
     if (!box.current || !candles?.length) return;
@@ -53,7 +53,7 @@ export default function CandleChart({ candles, signals, tf, theme, backfilled = 
     candle.setData(bars);
     const vol = chart.addSeries(HistogramSeries, { priceScaleId: "", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
     vol.priceScale().applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
-    vol.setData(candles.map(([t, o, , , cl, v], i) => ({ time: t, value: v, color: (cl >= o ? up : down) + (i < backfilled ? "00" : "55") })));
+    vol.setData(candles.map(([t, o, , , cl, v]) => ({ time: t, value: v, color: (cl >= o ? up : down) + "55" })));
     const closes = candles.map((k) => k[4]);
     RIBBON.forEach((n, j) => {
       const e = ema(closes, n);
@@ -95,6 +95,6 @@ export default function CandleChart({ candles, signals, tf, theme, backfilled = 
     const ahead = bars.length - candles.length;
     chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles.length - (tf === "4h" ? 180 : 160)), to: candles.length + Math.max(3, ahead + 2) });
     return () => chart.remove();
-  }, [candles, signals, tf, theme, backfilled, implied, levels, optionsAt, optionsIndex]);
+  }, [candles, signals, tf, theme, implied, levels, optionsAt, optionsIndex]);
   return <div ref={box} className="chart-box" />;
 }

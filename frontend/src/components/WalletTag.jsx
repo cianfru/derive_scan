@@ -1,29 +1,14 @@
-// Adapted from Reflex (cianfru/RCCE_Scanner, commit 9977a83): import paths only.
-import { useId } from "react";
-import { AVATAR_VIEW, avatarShapes, avatarSpec } from "../lib/walletAvatar.js";
+import { AVATAR_VIEW, AVATAR_OUTLINE, avatarShapes, avatarSpec } from "../lib/walletAvatar.js";
 import { codename, shortAddr } from "../lib/walletName.js";
 
-// The wallet's face, drawn from its address.
 export function WalletAvatar({ address, size = 20 }) {
-  const clip = useId();
   const s = avatarSpec(address);
-  const sh = avatarShapes(s);
-  const V = AVATAR_VIEW;
-  const stroke = { fill: "none", stroke: s.ink, strokeWidth: 2, strokeLinecap: "round" };
-  const mark = (e, i) => {
-    const { tag, fill, ...a } = e;
-    const paint = tag === "circle" || fill ? { fill: s.ink } : stroke;
-    if (tag === "circle") return <circle key={i} {...a} {...paint} />;
-    if (tag === "line") return <line key={i} {...a} {...paint} />;
-    return <path key={i} {...a} {...paint} />;
-  };
   return (
-    <svg className="wtag-av" width={size} height={size} viewBox={`0 0 ${V} ${V}`} aria-hidden="true" focusable="false">
-      <defs><clipPath id={clip}><circle cx={V / 2} cy={V / 2} r={V / 2} /></clipPath></defs>
-      <g clipPath={`url(#${clip})`}>
-        <rect width={V} height={V} fill={s.bg} />
-        <rect {...sh.body} fill={s.body} />
-        <g transform={sh.faceTransform}>{sh.eyes.map(mark)}{mark(sh.mouth, "m")}</g>
+    <svg className="wtag-av" width={size} height={size} viewBox={`0 0 ${AVATAR_VIEW} ${AVATAR_VIEW}`} aria-hidden="true" focusable="false">
+      <path d={AVATAR_OUTLINE} fill="#171f20" />
+      <path d={AVATAR_OUTLINE} fill={s.body} fillOpacity=".08" stroke={s.body} strokeOpacity=".35" />
+      <g transform={`rotate(${s.rotate} 18 18) translate(3 3) scale(.833333)`}>
+        {avatarShapes(s).map((shape, i) => <path key={i} {...shape} />)}
       </g>
     </svg>
   );

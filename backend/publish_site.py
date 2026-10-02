@@ -28,6 +28,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from derive.candles import CandleCache
+from derive.signals import engine_comparison
 from derive.quality import ANALYTICS_VERSION, engine_status, snapshot_status
 from derive.implied import implied_by_expiry, option_levels
 from derive.lean import alignment, options_lean, state_of
@@ -140,7 +141,7 @@ def tier_positions(data: Path) -> dict:
     return json.loads(p.read_text()) if p.exists() else {}
 
 
-def flow_block(data: Path, now: float) -> dict:
+def flow_block(data: Path, now: float, sides: dict | None = None) -> dict:
     """Large taker trades and the most active wallets, market makers left out."""
     from derive.flow import window_coverage
     coverage = window_coverage(data, now, 86400)
@@ -164,14 +165,13 @@ def flow_block(data: Path, now: float) -> dict:
                 w[k] += float(r[k] or 0)
     top = sorted(wallets.items(), key=lambda kv: kv[1]["perp_notional_usd"] + kv[1]["option_notional_usd"],
                  reverse=True)[:FLOW_WALLETS]
-    return {"since": int(since_ms // 1000), "coverage": coverage,
+    sides = taker_sides(data, now) if sides is None else sides
+    return {"by_coin": {u: d.get("24h", {}) for u, d in sides.items() if u != "_coverage"},
+            "since": int(since_ms // 1000), "coverage": coverage,
             "classes_ready": bool(classes),
             "large": [{k: (_num(v) if k not in ("instrument", "kind", "underlying", "direction", "wallet", "class") else v)
                        for k, v in r.items()} for r in large],
             "wallets": [{"wallet": a, "class": classes.get(a), **{k: round(v, 2) for k, v in w.items()}} for a, w in top]}
-
-
-COHORT_COINS = ("BTC", "ETH")
 
 
 def _book(open_rows: list, chains: dict, now: float) -> list[dict]:
@@ -204,12 +204,13 @@ def history_coverage(doc: dict, now: float) -> dict:
     return {"ready": ready, "status": status, "through": through, "expected_through": expected}
 
 
-def cohort_lean(insts: dict, chains: dict, now: float) -> dict:
+def cohort_lean(insts: dict, chains: dict, now: float, max_days=None, min_days=0) -> dict:
     net = gross = 0.0
     positions = 0
     complete = True
     for name, cell in insts.items():
-        if parse_option(name)[1] <= now:
+        expiry = parse_option(name)[1]
+        if expiry <= now + min_days * 86400 or (max_days is not None and expiry > now + max_days * 86400):
             continue
         und = name.split("-")[0]
         strikes, index, _ = chains.get(und, (None, None, None))
@@ -223,7 +224,7 @@ def cohort_lean(insts: dict, chains: dict, now: float) -> dict:
         gross += cell[2] * abs(delta)
     score = round(net / gross, 3) if complete and gross else None
     return {"net_delta_usd": round(net, 2) if complete else None, "gross_delta_usd": round(gross, 2) if complete else None,
-            "score": score, "state": state_of(score), "positions": positions}
+            "score": score, "state": state_of(score), "positions": positions, "quotes_complete": complete}
 
 
 def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) -> None:
@@ -267,11 +268,13 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
         cohorts[dim] = []
         for name in names:
             per = doc["cohort_positions"].get(dim, {}).get(name, {})
-            coins = {}
-            for und in list(COHORT_COINS) + ["Other"]:
-                insts = per.get(und, {}) if und != "Other" else {i: c for u, d in per.items() if u not in COHORT_COINS for i, c in d.items()}
-                coins[und] = cohort_lean(insts, chains, now)
-            cohorts[dim].append({"name": name, "wallets": doc["cohort_counts"].get(dim, {}).get(name, 0), "coins": coins})
+            combined = {i: c for insts in per.values() for i, c in insts.items()}
+            windows = {}
+            for window, end, start in (("all", None, 0), ("7d", 7, 0), ("30d", 30, 0), ("beyond30d", None, 30)):
+                coins = {und: cohort_lean(insts, chains, now, end, start) for und, insts in per.items()}
+                windows[window] = {"coins": coins, "total": cohort_lean(combined, chains, now, end, start)}
+            cohorts[dim].append({"name": name, "wallets": doc["cohort_counts"].get(dim, {}).get(name, 0),
+                                 "coins": windows["all"]["coins"], "windows": windows})
     _write(site / "traders.json", {"generated_at": int(now), **coverage,
                                    "ranked_total": doc.get("ranked_total"), "traders": rows, "cohorts": cohorts})
 
@@ -282,6 +285,8 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     sig = json.loads(sig_p.read_text()) if sig_p.exists() else {"timeframes": {}, "universe": [], "context": {}}
     rows = {tf: {r["symbol"]: r for r in (sig["timeframes"].get(tf) or {}).get("rows", [])} for tf in ("4h", "1d")}
     cache = CandleCache(data)
+    status_path = data / "signals" / "status.json"
+    backfill_log = json.loads(status_path.read_text()).get("backfill", {}) if status_path.exists() else {}
     history = signal_history(data, now)
     flows = taker_sides(data, now)
     held = tier_positions(data)
@@ -291,6 +296,15 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     for sym in sig.get("universe", []):
         und = sym.split("-")[0]
         r4, r1 = rows["4h"].get(sym) or {}, rows["1d"].get(sym) or {}
+        daily_native, daily_early = cache.counts(und, "1d")
+        evaluated = r1.get("history_bars")
+        history_meta = {"available_bars": daily_native + daily_early, "evaluated_bars": evaluated,
+                        "price_only_bars": daily_early, "normalization_bars": 499,
+                        "sources": backfill_log.get(f"{und}:1d", {}).get("sources") or
+                                   ([backfill_log[f"{und}:1d"]["source"]] if backfill_log.get(f"{und}:1d", {}).get("source") else []),
+                        "refresh_pending": isinstance(evaluated, (int, float)) and evaluated < min(599, daily_native + daily_early)}
+        if history_meta["refresh_pending"] and r1.get("data_status") != "ready":
+            r1 = {**r1, "data_status": "history_updated"}
         candles = {}
         for tf, keep in CANDLES_KEEP.items():
             c = cache.load(und, tf)
@@ -298,6 +312,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                                                 ("open", "high", "low", "close", "volume"))]
                                                 for i in range(max(0, len(c["close"]) - keep), len(c["close"]))]
         closes4 = [b[4] for b in candles["4h"]]
+        closes1 = [b[4] for b in candles["1d"]]
         opts = options_block(data, site, und, now)
         coin_flows = flows.get(und) or {w: {"coverage": c} for w, c in flows["_coverage"].items()}
         align = None
@@ -309,15 +324,17 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                               now, options_at=opts["ts"])
             align["positions_through"] = held.get("through")
             align["wallet_coverage"] = coverage
+        comparison = engine_comparison(r4, r1, now)
         pos = r4.get("positioning") or {}
         price = (opts or {}).get("features", {}).get("index_price") or (closes4[-1] if closes4 else None)
         markets.append({
             "und": und, "symbol": sym, "price": price,
-            "chg_24h": change_pct(closes4, 6), "chg_7d": change_pct(closes4, 42),
+            "chg_1d": change_pct(closes1, 1), "chg_24h": change_pct(closes4, 6), "chg_7d": change_pct(closes4, 42),
             "signal_4h": r4.get("signal") if engine_status(r4, now) == "ready" else None,
             "signal_1d": r1.get("signal") if engine_status(r1, now) == "ready" else None,
-            "unified": r4.get("unified_signal") if all(engine_status(r, now) == "ready" for r in (r4, r1)) else None,
-            "regime_4h": r4.get("regime"), "regime_1d": r1.get("regime"), "z_4h": r4.get("zscore"),
+            "unified": comparison["unified"],
+            "engine_comparison": comparison, "daily_history": history_meta, "engine_status_1d": engine_status(r1, now),
+            "z_1d": r1.get("zscore"), "heat_1d": r1.get("heat"), "regime_4h": r4.get("regime"), "regime_1d": r1.get("regime"), "z_4h": r4.get("zscore"),
             "heat_4h": r4.get("heat"), "heat_phase_4h": r4.get("heat_phase"),
             "ribbon_1d": (r1.get("ribbon") or {}).get("state"), "ribbon_4h": (r4.get("ribbon") or {}).get("state"),
             "data_4h": r4.get("data_status"), "data_1d": r1.get("data_status"), "volume_status": r4.get("volume_status"),
@@ -329,15 +346,19 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "align": None if not align else {"version": ANALYTICS_VERSION, "readings": align["horizons"], "score": align["score"], "wallet_coverage": coverage, **{h: [row[k]["state"] for k in ("engine", "options", "wallets")]
                                                                           for h, row in align["horizons"].items()}},
             "options": None if not opts else {
-                "ts": opts["ts"], "status": opts["status"], **{k: opts["features"].get(k) for k in ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d",
+                "ts": opts["ts"], "status": opts["status"], "levels": opts["levels"],
+                "expiries": opts["expiries"], **{k: opts["features"].get(k) for k in ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d",
                                                                            "bf25_30d", "pc_oi_ratio", "option_oi_contracts")},
                 "term": [[round(e["tenor_days"], 3), e["atm_iv"]] for e in opts["expiries"] if e.get("atm_iv") is not None],
                 "iv30_hist": [[h[0], h[2]] for h in opts["iv_history"][-96 * 7:] if h[2] is not None][::4]},
+            "spark_1d": closes1[-60:],
+            "spark_times_1d": [b[0] + 86400 for b in candles["1d"][-60:]],
             "spark": closes4[-42:],
             "spark_times": [b[0] + 14400 for b in candles["4h"][-42:]],
         })
         _write(site / "coins" / f"{und}.json", {
-            "und": und, "symbol": sym, "generated_at": int(now), "candles": candles,
+            "und": und, "symbol": sym, "generated_at": int(now), "candles": candles, "daily_history": history_meta,
+            "engine_comparison": comparison,
             "backfilled": {tf: cache.counts(und, tf)[1] for tf in CANDLES_KEEP},
             "signals": history.get(und, {}), "latest": {"4h": r4 or None, "1d": r1 or None}, "options": opts,
             "taker_flow": coin_flows, "alignment": align,
@@ -347,7 +368,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "consensus_detail": {tf: (sig["timeframes"].get(tf) or {}).get("consensus") for tf in ("4h", "1d")},
             "context": sig.get("context", {})}
     _write(site / "markets.json", {**meta, "coins": markets})
-    flow = flow_block(data, now)
+    flow = flow_block(data, now, flows)
     tp = data / "history" / "traders.json"
     ranked = {t["address"].lower() for t in json.loads(tp.read_text())["traders"]} if tp.exists() else set()
     for r in flow["large"] + flow["wallets"]:

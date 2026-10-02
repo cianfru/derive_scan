@@ -1,14 +1,7 @@
-// Copied unchanged from Reflex (cianfru/RCCE_Scanner, commit 9977a83) so a wallet has the same name on both products.
-// A wallet's avatar: a small abstract face drawn from the address, in the spirit of the
-// "beam" avatars. A tilted body shape in one palette colour over a second colour, two eyes
-// and a mouth whose shape, spread and angle come from the address hash. Pure data and an SVG
-// string, no requests. The body colour is the wallet's colour (its chart markers use it too).
-
+// Address-seeded Torq emblems. The existing palette and seed preserve wallet colors;
+// only the decorative avatar changes. No remote images or wallet data are involved.
 import { draw, walletSeed } from "./walletName.js";
 
-// Mid-bright hues that read on the dark green-black theme and on white, kept off pure red and
-// green so a wallet never looks like profit or loss. light: a deeper copy for marks drawn
-// straight on a light background (chart markers).
 export const AVATAR_PALETTE = [
   { c: "#5eead4", light: "#0f766e" }, // teal
   { c: "#38bdf8", light: "#0369a1" }, // sky
@@ -21,97 +14,53 @@ export const AVATAR_PALETTE = [
   { c: "#e7c9a0", light: "#8a6a2f" }, // sand
   { c: "#94a3b8", light: "#475569" }, // slate
 ];
-const INK_DARK = "#0b1411";
-const INK_LIGHT = "#f4faf7";
 export const AVATAR_VIEW = 36;
+export const AVATAR_OUTLINE = "M7 1H29L35 7V29L29 35H7L1 29V7Z";
 
-const range = (v, lo, hi) => lo + (v % (hi - lo + 1));
-function luminance(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => {
-    const s = v / 255;
-    return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * ch[0] + 0.7152 * ch[1] + 0.0722 * ch[2];
-}
+// Solid silhouettes stay readable at table size. The second face adds a cut-metal facet.
+const EMBLEMS = [
+  ["M8 9H15L24 18L15 27H8L17 18Z", "M19 9H26L35 18L26 27H19L28 18Z"],
+  ["M18 6L30 18L18 30L6 18ZM18 12L12 18L18 24L24 18Z", "M18 6L30 18L24 18L18 12Z"],
+  ["M7 8H13V28H7ZM17 8H23V28H17Z", "M27 8H31V28H27Z"],
+  ["M7 7H17V17H7ZM19 19H29V29H19Z", "M20 7H29V16H20ZM7 20H16V29H7Z"],
+  ["M18 6L23 15L18 18L13 15ZM18 30L13 21L18 18L23 21Z", "M6 18L15 13L18 18L15 23ZM30 18L21 23L18 18L21 13Z"],
+  ["M7 7H29V13H13V29H7Z", "M17 17H29V29H23V23H17Z"],
+  ["M7 7H18L29 18V29L18 18H7Z", "M20 7H29V16ZM7 20H16V29H7Z"],
+  ["M8 6H14V22H26V28H8Z", "M18 8H28V18H22V14H18Z"],
+];
 
-// Everything the avatar needs, all from the address.
 export function avatarSpec(address) {
   const seed = walletSeed(address);
-  const r = k => draw(seed, 0x2545f491 * (k + 1));
-  const P = AVATAR_PALETTE.length;
-  const bodyI = r(0) % P;
-  const bgI = (bodyI + 1 + (r(1) % (P - 1))) % P;       // never the body colour
-  const body = AVATAR_PALETTE[bodyI].c;
-  const bg = AVATAR_PALETTE[bgI].c;
-  const ink = luminance(body) > 0.3 ? INK_DARK : INK_LIGHT;
-  const t = r(2), f = r(3), m = r(4);
-  // Shift the body off centre so a crescent of the background shows (at least 6 units).
-  let tx = range(t >>> 1, -10, 10), ty = range(t >>> 6, -10, 10);
-  if (Math.abs(tx) + Math.abs(ty) < 6) { tx = tx < 0 ? -6 : 6; ty = ty < 0 ? -3 : 3; }
+  const color = AVATAR_PALETTE[draw(seed, 0x2545f491) % AVATAR_PALETTE.length];
   return {
-    bg, body, ink,
-    bodyLight: AVATAR_PALETTE[bodyI].light,
-    round: (t & 1) === 1,                               // circle or rounded square
-    tx, ty,
-    rotate: range(t >>> 11, 0, 359),
-    scale: 1 + range(t >>> 20, 0, 2) / 10,
-    faceX: Math.round(tx / 3) + range(f, -1, 1), faceY: Math.round(ty / 3) + range(f >>> 2, -1, 1),
-    faceRotate: range(f >>> 6, -12, 12),
-    eyeSpread: range(f >>> 11, 5, 7),
-    eyes: ["dot", "dot", "line", "wide"][(f >>> 14) & 3],
-    mouth: ["smile", "open", "flat", "smile", "small"][m % 5],
-    mouthWidth: range(m >>> 4, 7, 10),
+    body: color.c,
+    bodyLight: color.light,
+    motif: draw(seed, 0x4a8be922) % EMBLEMS.length,
+    rotate: (draw(seed, 0x6fd1ddb3) % 4) * 90,
   };
 }
 
-// The marks for one spec (shared by the SVG string and the React avatar).
-export function avatarShapes(s) {
-  const V = AVATAR_VIEW, h = V / 2;
-  const cx = h + s.faceX, cy = h + s.faceY;
-  const ey = cy - 3;
-  const eyes = s.eyes === "line"
-    ? [-1, 1].map(d => ({ tag: "line", x1: cx + d * s.eyeSpread - 2, x2: cx + d * s.eyeSpread + 2, y1: ey, y2: ey }))
-    : [-1, 1].map(d => ({ tag: "circle", cx: cx + d * s.eyeSpread, cy: ey, r: s.eyes === "wide" ? 2.6 : 2 }));
-  const w = s.mouthWidth, my = cy + 4.5;
-  const mouth = s.mouth === "open"
-    ? { tag: "path", d: `M${cx - w / 2} ${my} a${w / 2} ${w / 2.4} 0 0 0 ${w} 0 Z`, fill: true }
-    : s.mouth === "flat"
-    ? { tag: "line", x1: cx - w / 2, x2: cx + w / 2, y1: my + 1, y2: my + 1 }
-    : s.mouth === "small"
-    ? { tag: "circle", cx, cy: my + 1.5, r: 1.8 }
-    : { tag: "path", d: `M${cx - w / 2} ${my} q${w / 2} ${w / 2.2} ${w} 0` };
-  return {
-    body: { x: 0, y: 0, width: V, height: V, rx: s.round ? V : 6,
-      transform: `translate(${s.tx} ${s.ty}) rotate(${s.rotate} ${h} ${h}) translate(${h} ${h}) scale(${s.scale}) translate(${-h} ${-h})` },
-    faceTransform: `rotate(${s.faceRotate} ${cx} ${cy})`,
-    eyes, mouth,
-  };
+export function avatarShapes(spec) {
+  return EMBLEMS[spec.motif].map((d, i) => ({
+    d,
+    fill: spec.body,
+    fillRule: "evenodd",
+    opacity: i === 0 ? 1 : 0.48,
+  }));
 }
 
-const n = v => (Number.isInteger(v) ? String(v) : v.toFixed(2));
-function markup(el, ink) {
-  const { tag, fill, ...a } = el;
-  const attrs = Object.entries(a).map(([k, v]) => `${k}="${typeof v === "number" ? n(v) : v}"`).join(" ");
-  const paint = tag === "circle" || fill ? `fill="${ink}"` : `fill="none" stroke="${ink}" stroke-width="2" stroke-linecap="round"`;
-  return `<${tag} ${attrs} ${paint}/>`;
-}
-
-// A standalone SVG string (for places outside React).
+// Matching SVG for non-React consumers, without document-wide clip IDs.
 export function avatarSvg(address, size = 28) {
   const s = avatarSpec(address);
-  const sh = avatarShapes(s);
-  const V = AVATAR_VIEW;
-  const b = sh.body;
-  const id = `wa${walletSeed(address).toString(36)}`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${V} ${V}">`
-    + `<defs><clipPath id="${id}"><circle cx="${V / 2}" cy="${V / 2}" r="${V / 2}"/></clipPath></defs>`
-    + `<g clip-path="url(#${id})"><rect width="${V}" height="${V}" fill="${s.bg}"/>`
-    + `<rect x="0" y="0" width="${V}" height="${V}" rx="${b.rx}" transform="${b.transform}" fill="${s.body}"/>`
-    + `<g transform="${sh.faceTransform}">${sh.eyes.map(e => markup(e, s.ink)).join("")}${markup(sh.mouth, s.ink)}</g></g></svg>`;
+  const paths = avatarShapes(s).map(({ d, fill, opacity }) =>
+    `<path d="${d}" fill="${fill}" fill-rule="evenodd" opacity="${opacity}"/>`,
+  ).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 36 36">`
+    + `<path d="${AVATAR_OUTLINE}" fill="#171f20"/>`
+    + `<path d="${AVATAR_OUTLINE}" fill="${s.body}" fill-opacity=".08" stroke="${s.body}" stroke-opacity=".35"/>`
+    + `<g transform="rotate(${s.rotate} 18 18) translate(3 3) scale(.833333)">${paths}</g></svg>`;
 }
 
-// The wallet's colour for marks drawn on the page itself (chart markers).
 export const walletColor = (address, light = false) => {
   const s = avatarSpec(address);
   return light ? s.bodyLight : s.body;

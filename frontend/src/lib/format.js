@@ -1,7 +1,7 @@
 export const SIGNAL_LABEL = {
-  STRONG_LONG: "Strong long", LIGHT_LONG: "Long", ACCUMULATE: "Accumulate", REVIVAL_SEED: "Revival",
-  REVIVAL_SEED_CONFIRMED: "Revival", WAIT: "Wait", TRIM: "Trim", TRIM_HARD: "Trim hard", RISK_OFF: "Risk off",
-  NO_LONG: "No long", LIGHT_SHORT: "Short",
+  STRONG_LONG: "Strong long", LIGHT_LONG: "Light long", ACCUMULATE: "Accumulate", REVIVAL_SEED: "Revival seed",
+  REVIVAL_SEED_CONFIRMED: "Revival confirmed", WAIT: "Wait", TRIM: "Trim", TRIM_HARD: "Trim hard", RISK_OFF: "Risk off",
+  NO_LONG: "No long", LIGHT_SHORT: "Light short",
 };
 export function signalTone(s) {
   if (!s) return "na";
@@ -43,4 +43,4 @@ export function ago(t) {
 }
 export const shortAddr = (a) => (a && a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a || "-");
 export const cssVar = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
-export const DATA_LABEL = { ready: "Ready", "warming up": "Warming up", "not enough data": "Not enough data" };
+export const DATA_LABEL = { history_updated: "History recovered", ready: "Ready", "warming up": "Warming up", "not enough data": "Not enough data" };

@@ -88,7 +88,7 @@ def append_csv(path: Path, rows: list[list]) -> None:
 
 async def backfill_short(cache, unds: list[str], now: float, transport=None) -> dict:
     """Fetch earlier history once for series shorter than Reflex's warm-up (derive/backfill.py)."""
-    from derive.backfill import TARGET_BARS, okx_before
+    from derive.backfill import TARGET_BARS, BACKFILL_VERSION, okx_before, supplemental_before
 
     log_ = (load_status(cache.root.parent).get("backfill") or {})
     for und in unds:
@@ -97,17 +97,37 @@ async def backfill_short(cache, unds: list[str], now: float, transport=None) -> 
             derive_n, early_n = cache.counts(und, tf)
             first = cache.first_ts_ms(und, tf)
             prev = log_.get(key) or {}
-            if not derive_n or derive_n + early_n >= TARGET_BARS[tf] or prev.get("ok"):
+            if not derive_n or derive_n + early_n >= TARGET_BARS[tf] or (prev.get("ok") and prev.get("version") == BACKFILL_VERSION):
                 continue
-            if prev and now - prev.get("at", 0) < 86_400:   # failed recently: retry daily
+            if prev.get("version") == BACKFILL_VERSION and now - prev.get("at", 0) < 86_400:   # failed recently: retry daily
                 continue
+            # Preserve previously recovered history if either provider is unavailable.
+            cached = cache.load(und, tf)
+            rows = {int(cached["timestamp"][i]): [int(cached["timestamp"][i]), *[float(cached[k][i]) for k in
+                    ("open", "high", "low", "close")], "0.0"] for i in range(early_n)}
+            sources = list(prev.get("sources") or ([prev["source"]] if prev.get("source") else []))
+            errors = []
             try:
                 bars = await okx_before(und, tf, first, TARGET_BARS[tf] - derive_n, transport=transport)
-                cache.write_backfill(und, tf, bars)
-                log_[key] = {"ok": True, "at": int(now), "bars": len(bars), "source": "okx"}
+                rows.update({r[0]: r for r in bars})
+                if bars and "okx" not in sources:
+                    sources.append("okx")
             except Exception as e:
-                log_[key] = {"ok": False, "at": int(now), "error": str(e)[:200]}
-                logging.warning("backfill %s failed: %s", key, e)
+                errors.append(f"OKX: {str(e)[:140]}")
+            if len(rows) + derive_n < TARGET_BARS[tf]:
+                try:
+                    extra, source = await supplemental_before(und, tf, min(rows, default=first),
+                        TARGET_BARS[tf] - derive_n - len(rows), transport=transport)
+                    rows.update({r[0]: r for r in extra})
+                    if extra and source not in sources:
+                        sources.append(source)
+                except Exception as e:
+                    errors.append(f"Supplement: {str(e)[:140]}")
+            bars = sorted(rows.values())[-(TARGET_BARS[tf] - derive_n):]
+            if bars:
+                cache.write_backfill(und, tf, bars)
+            log_[key] = {"ok": not errors, "version": BACKFILL_VERSION, "at": int(now), "bars": len(bars),
+                         "sources": sources, "errors": errors, "status": "extended" if bars else "no_earlier_history"}
     return log_
 
 

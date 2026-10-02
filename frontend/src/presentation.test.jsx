@@ -9,7 +9,8 @@ import { RadarMap } from "./pages/Radar.jsx";
 afterEach(cleanup);
 const now = 1790944200;
 function coin(overrides = {}) {
-  return { und: "BTC", z_4h: 1.2, align: { version: 2, wallet_coverage: { ready: true, status: "ready" }, readings: {
+  return { und: "BTC", z_4h: -2.4, z_1d: 1.2, align: { version: 2, wallet_coverage: { ready: true, status: "ready" }, readings: {
+    "30d": { engine: { status: "ready", state: "up", signal: "LIGHT_LONG", timeframe: "1d", observed_at: now } },
     "7d": { engine: { status: "ready", state: "up", timeframe: "4h", observed_at: now }, wallets: { status: "ready", state: "up", valuation_at: now, score: .6, gross_delta_usd: 50000, gross_complete: true, positions: 4, estimated_positions: 0, missing_positions: 0, ...overrides } }
   } } };
 }
@@ -34,10 +35,9 @@ describe("radar eligibility", () => {
     expect(radarPoint(coin(), "7d", now + 1801)).toBeNull();
     for (const bad of [{ estimated_positions: 1 }, { missing_positions: 1 }, { gross_complete: false }, { score: 1.01 }, { gross_delta_usd: 0 }]) expect(radarPoint(coin(bad), "7d", now)).toBeNull();
   });
-  it("requires the 4H horizontal source even for a 30-day wallet window", () => {
-    const c = coin(); c.align.readings["30d"] = c.align.readings["7d"];
-    c.align.readings["7d"] = { engine: { status: "thin_volume" } };
-    expect(radarPoint(c, "30d", now)).toBeNull();
+  it("requires the daily horizontal source even for a 7-day wallet window", () => {
+    const c = coin(); c.align.readings["30d"] = { engine: { status: "thin_volume" } };
+    expect(radarPoint(c, "7d", now)).toBeNull();
   });
   it("lets keyboard users select a plotted market", async () => {
     let selected;

@@ -1,79 +1,143 @@
-import { Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import { pct, price, utc } from "../lib/format.js";
-import { Plate, Loading, Failed, Info } from "../components/ui.jsx";
-
-function MiniTerm({ term }) {
-  const rows = (term || []).filter(([d, iv]) => Number.isFinite(d) && d >= 0 && Number.isFinite(iv)).sort((a, b) => a[0] - b[0]);
-  if (rows.length < 2) return <div className="term-empty status">Too few expiries for a curve</div>;
-  const W = 340, H = 136, left = 38, right = 10, top = 18, bottom = 28;
-  const lastDay = rows[rows.length - 1][0], ivs = rows.map(t => t[1]), lo = Math.min(...ivs), hi = Math.max(...ivs);
-  const pad = Math.max(.01, (hi - lo) * .2);
-  const x = d => left + (d - rows[0][0]) / (lastDay - rows[0][0] || 1) * (W - left - right);
-  const y = iv => top + (hi + pad - iv) / (hi - lo + 2 * pad) * (H - top - bottom);
-  const path = rows.map(([d, iv], i) => `${i ? "L" : "M"}${x(d)},${y(iv)}`).join(" ");
-  return <figure className="term-preview"><figcaption>Volatility by expiry <Info label="About the volatility curve">Each point is an expiry's annualised at-the-money implied volatility. Days to expiry use a linear scale. The vertical scale fits this market's observed volatility range.</Info></figcaption><svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Annualised implied volatility ranges from ${pct(lo)} to ${pct(hi)} across expiries from ${rows[0][0].toFixed(0)} to ${lastDay.toFixed(0)} days`}>
-    {[lo, hi].filter((v, i, a) => a.indexOf(v) === i).map(v => <g key={v}><line x1={left} x2={W-right} y1={y(v)} y2={y(v)} className="trace-grid"/><text x={left-8} y={y(v)+4} textAnchor="end">{pct(v,0)}</text></g>)}
-    <path d={path} fill="none" stroke="var(--orange)" strokeWidth="1.7" strokeLinejoin="round"/>
-    {rows.map(([d, iv],i) => <circle key={i} cx={x(d)} cy={y(iv)} r="2.3" fill="var(--plate)" stroke="var(--orange)"><title>{d.toFixed(1)} days: {pct(iv)}</title></circle>)}
-    <text x={left} y={H-4}>{rows[0][0].toFixed(0)}d</text><text x={W-right} y={H-4} textAnchor="end">{lastDay.toFixed(0)} days</text>
-  </svg></figure>;
-}
-
-function SkewBar({ rr }) {
-  if (rr == null) return <span className="faint">-</span>;
-  const w = Math.min(50, Math.abs(rr) * 100 * 6);
-  return (
-    <span className="meter" style={{ gridTemplateColumns: "80px auto" }}>
-      <i className="center"><b style={{ left: rr < 0 ? `${50 - w}%` : "50%", width: `${w}%`, background: rr < 0 ? "var(--sig-exit)" : "var(--orange)" }} /></i>
-      <span className="mono">{rr > 0 ? "+" : ""}{(rr * 100).toFixed(2)}</span>
-    </span>
-  );
-}
+import { price, utc } from "../lib/format.js";
+import { Asset } from "../components/MarketVisuals.jsx";
+import {
+  MoveBand,
+  SkewInstrument,
+  VolatilityTenors,
+} from "../components/OptionsInstruments.jsx";
+import { Loading, Failed, Info } from "../components/ui.jsx";
+import { openMarketRow } from "../lib/explain.js";
 
 export default function Options() {
+  const nav = useNavigate();
   const { data, error } = useData("markets.json");
-  if (error && !data) return <div className="wrap page"><Failed error={error} /></div>;
-  if (!data) return <div className="wrap page"><Loading /></div>;
-  const coins = data.coins.filter((c) => c.options).sort((a, b) => (b.options.option_oi_contracts * (b.price || 0)) - (a.options.option_oi_contracts * (a.price || 0)));
-  return (
-    <div className="wrap page">
-      <div>
-        <h1>Options</h1>
-        <p className="sub">Every coin with options on Derive: how much volatility is priced, how the curve is shaped, and which side pays for protection.</p>
+  if (!data)
+    return (
+      <div className="wrap page">
+        {error ? <Failed error={error} /> : <Loading />}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 300px), 1fr))", gap: 16 }}>
+    );
+  const coins = data.coins
+    .filter((c) => c.options)
+    .sort(
+      (a, b) =>
+        b.options.option_oi_contracts * (b.price || 0) -
+        a.options.option_oi_contracts * (a.price || 0),
+    );
+  const open = (e, und) =>
+    openMarketRow(e, (path) => nav(`${path}#options-detail`), und);
+  return (
+    <div className="wrap page options-page">
+      <div className="page-heading">
+        <div>
+          <span className="section-code">THE PRICE OF RISK</span>
+          <h1>Options</h1>
+          <p className="sub">
+            Read the movement priced in. Compare protection. Locate the open
+            positions.
+          </p>
+        </div>
+        <div className="close-stamp">
+          <span>{coins.length} Derive surfaces</span>
+          <b>{utc(data.generated_at)}</b>
+        </div>
+      </div>
+      <div className="options-reading-guide">
+        <span>
+          <b>01</b> Movement <small>30-day ATM scale</small>
+        </span>
+        <span>
+          <b>02</b> Protection <small>Call versus put IV</small>
+        </span>
+        <span>
+          <b>03</b> Positioning <small>Open contracts by strike</small>
+        </span>
+        <Info label="How to use the options workspace">
+          Each card separates the amount of movement priced into options, the
+          relative cost of protection and the distribution of open interest.
+          These are different measurements. Open a market to choose an exact
+          expiry and inspect its strikes, model ranges and collected trade flow.
+        </Info>
+      </div>
+      <div className="options-dossiers">
         {coins.map((c) => {
-          const o = c.options;
-          const t = (o.term || []).filter((x) => x[0] >= 1);
-          const slope = t.length >= 2 ? t[t.length - 1][1] - t[0][1] : null;
+          const o = c.options,
+            lv = o.levels,
+            historical =
+              o.status !== "ready" || Date.now() / 1000 - o.ts > 1800;
           return (
-            <section key={c.und} className="plate option-card">
-              <div className="plate-h">
-                <Link className="option-market-link" to={`/coin/${c.und}`}>{c.und}<span aria-hidden="true">↗</span></Link>
-                <span className="mono dim" style={{ fontSize: 13 }}>${price(c.price)}</span>
-              </div>
-              <div className="plate-b" style={{ display: "grid", gap: 12 }}>
-                <p className="option-snapshot status">Snapshot {utc(o.ts)}{Date.now() / 1000 - o.ts > 1800 ? " · historical" : ""}</p>
-                <MiniTerm term={o.term} />
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-                  <div className="fig" style={{ padding: 0, background: "none" }}><span>IV 30d</span><strong style={{ fontSize: 17 }}>{pct(o.atm_iv_30d)}</strong></div>
-                  <div className="fig" style={{ padding: 0, background: "none" }}><span>Curve</span>
-                    <strong style={{ fontSize: 13 }} className={slope < 0 ? "down" : ""}>{slope == null ? "-" : slope < 0 ? "Inverted" : "Upward"}</strong></div>
-                  <div className="fig" style={{ padding: 0, background: "none" }}><span>Put / call</span><strong style={{ fontSize: 17 }}>{o.pc_oi_ratio?.toFixed(2) ?? "-"}</strong></div>
+            <article
+              key={c.und}
+              className="option-dossier"
+              tabIndex={0}
+              aria-label={`Open ${c.und} options`}
+              onClick={(e) => open(e, c.und)}
+              onKeyDown={(e) => open(e, c.und)}
+            >
+              <header>
+                <Link
+                  className="option-market-link"
+                  to={`/coin/${c.und}#options-detail`}
+                >
+                  <Asset und={c.und} />
+                </Link>
+                <div className="dossier-index">
+                  <strong>${price(c.price)}</strong>
+                  <span>Index</span>
                 </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span className="label">Skew 30d <Info>Call minus put implied volatility at 25 delta, in volatility points. Negative means puts are priced richer.</Info></span><SkewBar rr={o.rr25_30d} />
+                <span className="dossier-arrow" aria-hidden="true">
+                  ↗
+                </span>
+              </header>
+              <div className="dossier-body">
+                <MoveBand index={c.price} iv={o.atm_iv_30d} />
+                <div className="dossier-secondary">
+                  <SkewInstrument rr={o.rr25_30d} />
+                  <VolatilityTenors features={o} />
                 </div>
               </div>
-            </section>);
+              <div className="dossier-positioning">
+                <span className="label">
+                  OI concentrations · next {lv?.days || 30} days{" "}
+                  <Info>
+                    Call concentration is the strike above the index with the
+                    most calls open; put concentration is the strike below it
+                    with the most puts. The displayed window pools expiries and
+                    may be dominated by different dates. These are open
+                    positions, not support or resistance. Inspect one expiry for
+                    a precise view.
+                  </Info>
+                </span>
+                <div>
+                  <span>
+                    Puts <b>{lv?.put_wall ? `$${price(lv.put_wall)}` : "—"}</b>
+                  </span>
+                  <span>
+                    Calls{" "}
+                    <b>{lv?.call_wall ? `$${price(lv.call_wall)}` : "—"}</b>
+                  </span>
+                  <span>
+                    Put / call OI{" "}
+                    <Info>
+                      Put contracts divided by call contracts across all live
+                      expiries. This does not identify buyers or sellers.
+                    </Info>
+                    <b>{o.pc_oi_ratio?.toFixed(2) ?? "—"}</b>
+                  </span>
+                </div>
+              </div>
+              <footer>
+                <span>
+                  {historical ? "Historical snapshot" : "Quoted"} · {utc(o.ts)}
+                </span>
+                <span>Inspect expiries & strikes ↗</span>
+              </footer>
+            </article>
+          );
         })}
       </div>
-      <p className="status" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        Curve compares the longest expiry with the nearest; inverted means short-dated options cost more, usually under stress.
-        <Info>Skew is the 25-delta risk reversal at 30 days: below zero, puts are priced richer than calls. Put / call is open interest. On some coins most open interest comes from call-selling vaults, so read it as structure rather than sentiment.</Info>
-      </p>
-      {coins[0] && <p className="status">Updated {utc(coins[0].options.ts)}</p>}
     </div>
   );
 }

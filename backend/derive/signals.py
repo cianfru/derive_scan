@@ -394,6 +394,25 @@ def attach_unified(rows_4h: List[dict], rows_1d: List[dict], as_of: float | None
                 row["unified_complete"] = complete
 
 
+def engine_comparison(row_4h: dict | None, row_1d: dict | None, now: float) -> dict:
+    """Compare the final stored decisions, not synthesis-time cached confluence.
+
+    This publication view neither evaluates a new bar nor mutates recorder state.
+    """
+    pair = (row_4h, row_1d)
+    complete = all(engine_status(r, now) == "ready" for r in pair)
+    out = {}
+    for tf, row in zip(("4h", "1d"), pair):
+        r = row or {}
+        out[tf] = {"timeframe": tf, "status": engine_status(row, now),
+                   "observed_at": r.get("signal_bar_close_time"),
+                   **{k: r.get(k) for k in ("signal", "regime", "heat", "zscore", "volume_status",
+                                            "conditions_met", "conditions_total", "entry_blocked")}}
+    out["confluence"] = vars(compute_confluence(*pair)) if complete else None
+    out["unified"] = unified_signal(*pair) if complete else None
+    return out
+
+
 def fresh_state():
     return new_state()
 
