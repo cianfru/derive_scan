@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Tabs } from "../components/ui.jsx";
+import ResearchLayers from "../components/ResearchLayers.jsx";
 const LAYERS = {
   price: {
     title: "Structure before signal.",
@@ -49,83 +50,7 @@ export default function Landing() {
             </Link>
           </div>
         </div>
-        <div
-          className={`research-object layer-${layer}`}
-          aria-label="The three layers of Torq research"
-        >
-          <svg
-            viewBox="0 0 560 470"
-            role="img"
-            aria-label="Schematic of three distinct research layers: daily price structure, options by expiry, wallet exposure"
-          >
-            <defs>
-              <pattern
-                id="research-grid"
-                width="26"
-                height="26"
-                patternUnits="userSpaceOnUse"
-              >
-                <path
-                  d="M26 0H0V26"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth=".5"
-                />
-              </pattern>
-            </defs>
-            <g className="object-guides">
-              <path d="M45 342 287 452 524 322 M46 116 46 343 M524 96V322 M286 3V453" />
-            </g>
-            <g className="object-plane wallets">
-              <path d="M46 300 278 207 524 286 287 398Z" />
-              <path
-                className="plane-grid"
-                d="M46 300 278 207 524 286 287 398Z"
-                fill="url(#research-grid)"
-              />
-              <path
-                className="plane-ink"
-                d="m137 306 35-14 45 16-34 15Z m91-37 35-14 86 29-36 17Z m91-36 35-14 59 20-36 16Z"
-              />
-              <text x="306" y="376" transform="rotate(-25 306 376)">
-                Wallet exposure
-              </text>
-            </g>
-            <g className="object-plane options">
-              <path d="M46 210 278 117 524 196 287 308Z" />
-              <path
-                className="plane-grid"
-                d="M46 210 278 117 524 196 287 308Z"
-                fill="url(#research-grid)"
-              />
-              <path
-                className="plane-line"
-                d="m124 210 44-2 44-28 52-12 46 8 45 10 77-13 m-275 54 55 1 52-9 60-34 46 20 64 5"
-              />
-              <text x="306" y="285" transform="rotate(-25 306 285)">
-                Options by expiry
-              </text>
-            </g>
-            <g className="object-plane price">
-              <path d="M46 120 278 27 524 106 287 218Z" />
-              <path
-                className="plane-grid"
-                d="M46 120 278 27 524 106 287 218Z"
-                fill="url(#research-grid)"
-              />
-              <path
-                className="plane-line"
-                d="m125 123 22-19 20 11 26-25 19 14 24-35 28 23 23-14 25 5 22-21 33 14 28-24 41 4"
-              />
-              <text x="306" y="195" transform="rotate(-25 306 195)">
-                Daily structure
-              </text>
-            </g>
-          </svg>
-          <span className="object-caption">
-            Three analytical layers, kept distinct
-          </span>
-        </div>
+        <ResearchLayers layer={layer} onSelect={setLayer} />
       </section>
       <section className="wrap research-intro">
         <div className="research-tabs">

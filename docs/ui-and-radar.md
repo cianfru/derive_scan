@@ -1,6 +1,6 @@
 # Torq interface and radar
 
-Torq restores its angular identity: Chakra Petch headings, Barlow text, IBM Plex Mono numbers, chamfered controls, graphite surfaces and Derive orange `#ff5e00`. Mint and muted coral describe positive and negative readings. The landing page illustrates the three analytical layers without exposing a live subset of the market universe. It does not fetch market data.
+Torq restores its angular identity: Chakra Petch headings, Barlow text, IBM Plex Mono numbers, chamfered controls, graphite surfaces and Derive orange `#ff5e00`. Mint and muted coral describe positive and negative readings. The landing page illustrates the three analytical layers with projected 3D dot surfaces: travelling price ridges, a curved options surface and positioning peaks/troughs. Pointer movement gently changes perspective; choosing a layer changes its emphasis and separation. The illustration is explicitly labelled, with no live market subset or data fetches. Motion has a pause control, follows reduced-motion preferences, and stops drawing offscreen or in a hidden tab.
 
 ## Reading the interface
 
