@@ -35,7 +35,7 @@ export default function Trader() {
         <div className="fig"><span>Perp PnL</span><strong className={data.perp_pnl > 0 ? "up" : data.perp_pnl < 0 ? "down" : ""}>{usd(data.perp_pnl)}</strong></div>
         <div className="fig"><span>Active</span><strong style={{ fontSize: 13 }}>{data.first} to {data.last}</strong></div>
       </div>
-      <Plate title="Open options" info="Positions reconstructed through the displayed UTC close, valued on the newest options chain. Later trades are not included, and expired instruments are omitted. Entry is the average cost of the remaining position where daily records determine it. When buys and sells lose their order in a daily aggregate, entry and unrealised PnL are unavailable until a later close or reversal establishes a known basis. Delta is dollar exposure to the coin; positive gains when the price rises."
+      <Plate title="Open options" info="Positions reconstructed through the displayed UTC close, valued on fresh options quotes. Marks use a Black-76 model on the index; quoted delta is used where available, otherwise a labelled estimate from the strike IV. No default volatility is assumed. Later trades are not included, and expired instruments are omitted. Entry is the average cost of the remaining position where daily records determine it. When buys and sells lose their order in a daily aggregate, entry and unrealised PnL are unavailable until a later close or reversal establishes a known basis. Delta is dollar exposure to the coin; positive gains when the price rises."
         right={book.length ? <LeanBar lean={data.lean} /> : null} bodyClass="table-wrap">
         {book.length ? (
           <table className="grid" style={{ minWidth: 720 }}>
@@ -48,7 +48,7 @@ export default function Trader() {
                   <td className="num">{Math.abs(p.net).toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
                   <td className="num">{p.entry == null ? <span className="faint">Unavailable</span> : price(p.entry)}</td>
                   <td className="num">{price(p.mark)}</td>
-                  <td className={`num ${p.delta_usd > 0 ? "up" : p.delta_usd < 0 ? "down" : ""}`}>{usd(p.delta_usd)}</td>
+                  <td className={`num ${p.delta_usd > 0 ? "up" : p.delta_usd < 0 ? "down" : ""}`}>{usd(p.delta_usd)} {p.delta_source !== "quoted" && <Info label="About delta estimate">{p.delta_source === "model_iv" ? "Estimated from the strike IV on the index. Excluded from directional labels." : "No fresh quoted delta or strike IV is available."}</Info>}</td>
                   <td className={`num ${p.upnl > 0 ? "up" : p.upnl < 0 ? "down" : ""}`}>{p.upnl == null ? <span className="faint">Unavailable</span> : usd(p.upnl)}</td>
                 </tr>))}
             </tbody>

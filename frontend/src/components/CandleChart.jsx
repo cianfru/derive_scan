@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
-import { createChart, CandlestickSeries, HistogramSeries, LineSeries, BaselineSeries, createSeriesMarkers, ColorType, CrosshairMode, LineStyle } from "lightweight-charts";
+import { createChart, CandlestickSeries, HistogramSeries, LineSeries, createSeriesMarkers, ColorType, CrosshairMode, LineStyle } from "lightweight-charts";
 import { cssVar, SIGNAL_LABEL, signalTone } from "../lib/format.js";
+
+import { conePath } from "../lib/analytics.js";
 
 const TF_SEC = { "4h": 14400, "1d": 86400 };
 const RIBBON = [32, 58];
@@ -25,7 +27,7 @@ const pctFrom = (v, base) => `${v >= base ? "+" : ""}${((v / base - 1) * 100).to
  * when options exist: the middle half of the outcomes option prices imply for each upcoming
  * expiry (upper edge in the up colour, lower edge in the down colour, so any lean shows), and
  * the levels where open interest sits (call and put walls, max pain). */
-export default function CandleChart({ candles, signals, tf, theme, backfilled = 0, implied = null, levels = null }) {
+export default function CandleChart({ candles, signals, tf, theme, backfilled = 0, implied = null, levels = null, optionsAt = null, optionsIndex = null }) {
   const box = useRef(null);
   useEffect(() => {
     if (!box.current || !candles?.length) return;
@@ -42,9 +44,10 @@ export default function CandleChart({ candles, signals, tf, theme, backfilled = 
     const candle = chart.addSeries(CandlestickSeries, { upColor: up, downColor: down, borderVisible: false, wickUpColor: up, wickDownColor: down });
     const bars = candles.map(([t, o, h, l, cl]) => ({ time: t, open: o, high: h, low: l, close: cl }));
     const step = TF_SEC[tf], lastT = candles[candles.length - 1][0], lastC = candles[candles.length - 1][4];
-    const cone = (implied || []).filter((e) => e.days <= HORIZON_DAYS[tf]);
+    const rangePath = (qi) => conePath(implied, optionsAt, optionsIndex, HORIZON_DAYS[tf], qi);
+    const cone = rangePath(2).slice(1);
     if (cone.length) { // empty future bars so dates in the future sit at their true distance
-      const end = cone[cone.length - 1].expiry;
+      const end = cone[cone.length - 1].time;
       for (let t = lastT + step; t <= end + step; t += step) bars.push({ time: t });
     }
     candle.setData(bars);
@@ -58,26 +61,20 @@ export default function CandleChart({ candles, signals, tf, theme, backfilled = 
       s.setData(candles.map((k, i) => (e[i] == null ? null : { time: k[0], value: e[i] })).filter(Boolean));
     });
     if (cone.length) {
-      const snap = (t) => lastT + Math.max(1, Math.round((t - lastT) / step)) * step;
-      const path = (qi) => [{ time: lastT, value: lastC }, ...cone.map((e) => ({ time: snap(e.expiry), value: e.q[qi] }))];
-      const none = "rgba(0,0,0,0)";
-      // Each edge is filled from today's price, so the upside and downside areas compare at a glance.
+      // Both edges remain visible even if the whole band lies above or below the index.
       [[3, up], [1, down]].forEach(([qi, color]) => {
-        const s = chart.addSeries(BaselineSeries, { baseValue: { type: "price", price: lastC }, lineWidth: 2,
-          topLineColor: qi === 3 ? color : none, bottomLineColor: qi === 1 ? color : none,
-          topFillColor1: qi === 3 ? color + "40" : none, topFillColor2: qi === 3 ? color + "08" : none,
-          bottomFillColor1: qi === 1 ? color + "08" : none, bottomFillColor2: qi === 1 ? color + "40" : none,
-          priceLineVisible: false, crosshairMarkerVisible: false, lastValueVisible: true, title: "" });
-        const d = path(qi);
-        s.setData(d);
-        s.applyOptions({ title: pctFrom(d[d.length - 1].value, lastC) });
+        const s = chart.addSeries(LineSeries, { color, lineWidth: 2, priceLineVisible: false,
+          crosshairMarkerVisible: false, lastValueVisible: true });
+        const points = rangePath(qi);
+        s.setData(points);
+        s.applyOptions({ title: pctFrom(points[points.length - 1].value, optionsIndex) });
       });
       const mid = chart.addSeries(LineSeries, { color: c("--fg"), lineWidth: 1, lineStyle: LineStyle.Dashed, lastValueVisible: false,
         priceLineVisible: false, crosshairMarkerVisible: false });
-      mid.setData(path(2));
+      mid.setData(rangePath(2));
     }
     if (levels) {
-      [["call_wall", "Call wall", up], ["put_wall", "Put wall", down], ["max_pain", "Max pain", c("--muted")]].forEach(([k, label, color]) => {
+      [["call_wall", "Call wall", up], ["put_wall", "Put wall", down], ["max_pain", `Min payout ${levels.max_pain_expiry ? new Date(levels.max_pain_expiry * 1000).toISOString().slice(5, 10) : ""}`, c("--muted")]].forEach(([k, label, color]) => {
         if (levels[k]) candle.createPriceLine({ price: levels[k], color, lineWidth: 1, lineStyle: LineStyle.SparseDotted, axisLabelVisible: true, title: label });
       });
     }
@@ -98,6 +95,6 @@ export default function CandleChart({ candles, signals, tf, theme, backfilled = 
     const ahead = bars.length - candles.length;
     chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles.length - (tf === "4h" ? 180 : 160)), to: candles.length + Math.max(3, ahead + 2) });
     return () => chart.remove();
-  }, [candles, signals, tf, theme, backfilled, implied, levels]);
+  }, [candles, signals, tf, theme, backfilled, implied, levels, optionsAt, optionsIndex]);
   return <div ref={box} className="chart-box" />;
 }

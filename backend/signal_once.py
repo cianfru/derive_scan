@@ -66,7 +66,7 @@ def _csv_row(r: dict) -> list:
 
 
 KEEP_KEYS = ("symbol", "underlying", "timeframe", "signal", "signal_status", "regime", "heat", "zscore",
-             "confidence", "entry_blocked", "signal_bar_close_time")
+             "confidence", "entry_blocked", "signal_bar_close_time", "data_status", "volume_status")
 
 
 def slim(r: dict) -> dict:
@@ -185,7 +185,7 @@ async def run(out: Path, now: float, due: list[str], client=None, context_transp
     # Unified 4H x 1D signal: the computed rows meet the other timeframe's newest rows.
     four = computed.get("4h") or last_rows.get("4h", [])
     daily = computed.get("1d") or last_rows.get("1d", [])
-    sig.attach_unified(four, daily)
+    sig.attach_unified(four, daily, as_of)
     for tf, rows in computed.items():
         day = datetime.fromtimestamp(summary[tf]["bar_close"], timezone.utc).strftime("%Y-%m-%d")
         append_csv(sdir / tf / f"{day}.csv", [_csv_row(r) for r in rows])

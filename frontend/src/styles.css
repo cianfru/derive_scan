@@ -323,3 +323,8 @@ svg.viz .gridline { stroke: var(--seam); stroke-width: 1; }
 .lean-bar i { position: relative; width: 70px; height: 6px; background: var(--plate-3); display: inline-block; }
 .lean-bar i b { position: absolute; top: 0; bottom: 0; }
 .lean-bar i::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--seam-hi); }
+
+.condition-details { margin-top: 16px; font-size: 13px; }
+.condition-details summary { cursor: pointer; color: var(--fg-2); padding: 8px 0; }
+.condition-details summary:focus-visible { outline: 2px solid var(--orange); outline-offset: 4px; }
+.condition-details td small { display: block; margin-top: 3px; color: var(--muted); }

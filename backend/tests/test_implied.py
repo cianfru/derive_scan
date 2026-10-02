@@ -13,10 +13,12 @@ def test_flat_smile_matches_lognormal():
     assert q == sorted(q) and q[0] < F < q[4]
 
 
-def test_put_skew_widens_the_downside():
+def test_piecewise_iv_skew_with_invalid_price_convexity_is_rejected():
     rows = [[k, 0, 0, 0.5, 0.5 + max(0, (100 - k) / 100)] for k in range(50, 201, 5)]
     q, ln = smile_quantiles(rows, F, T), lognormal_quantiles(F, T, 0.5)
-    assert F - q[0] > F - ln[0]
+    # Linear IV interpolation can create negative density at slope changes.
+    # The old cumulative-maximum repair concealed it.
+    assert q is None
 
 
 def test_thin_quotes_fall_back_to_atm():

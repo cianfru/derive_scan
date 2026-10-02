@@ -4,12 +4,13 @@ Every run reads the trades since the last run (`public/get_trade_history`; each 
 once per side, with the side's wallet) and appends:
 
 flow/large/YYYY-MM-DD.csv    taker legs at or above the size thresholds, one row each
-flow/wallets/YYYY-MM-DD.csv  one row per wallet per run: legs, perp and option notional,
+flow/wallets_v2/YYYY-MM-DD.csv  per trade-time bucket and wallet: legs, perp and option notional,
                              option premium bought and sold, realised PnL, fees
-flow/sides/YYYY-MM-DD.csv    per run, per coin and kind (call, put, perp): what takers bought and sold
+flow/sides_v2/YYYY-MM-DD.csv    per trade-time bucket, coin and kind (call, put, perp): what takers bought and sold
                              (notional and option premium); takers crossed the spread, so this is
                              the aggressive side of the market
-flow/state.json              newest trade time read, and trade keys at that time
+flow/coverage_v2/YYYY-MM-DD.csv successful query intervals, including empty intervals
+flow/state.json              newest trade time read, trade keys and coverage watermark
 
 Only the taker leg of a trade enters the large list (the side that crossed the spread). Wallets
 classed as market makers (history/wallets.json, from the rebuilt history) are left out of the
@@ -29,6 +30,8 @@ from .client import DeriveClient
 
 log = logging.getLogger(__name__)
 
+BUCKET_SECONDS = 900
+COVERAGE_FIELDS = ("from_ms", "through_ms")
 PAGE = 1000
 FIRST_LOOKBACK_MS = 3_600_000
 LARGE_PERP_USD = 25_000          # perp notional
@@ -150,26 +153,77 @@ async def fetch_since(client: DeriveClient, since_ms: int, until_ms: int) -> lis
         page += 1
 
 
+def event_buckets(trades: list[dict]):
+    buckets: dict[int, list] = defaultdict(list)
+    for trade in trades:
+        bucket = int(trade["timestamp"]) // (BUCKET_SECONDS * 1000) * BUCKET_SECONDS
+        buckets[bucket].append(trade)
+    return sorted(buckets.items())
+
+
 async def update(client: DeriveClient, root: Path | str, now_ms: int) -> dict:
     exclude = market_makers(Path(root))
     root = Path(root) / "flow"
     state_p = root / "state.json"
     state = json.loads(state_p.read_text()) if state_p.exists() else {}
     since = state.get("last_ms", now_ms - FIRST_LOOKBACK_MS)
+    if since > now_ms:
+        raise ValueError("Flow watermark is in the future")
     seen = set(state.get("keys_at_last", []))
-    # Deduplicate within the response too, preserving all keys at an unchanged watermark.
-    trades = list({leg_key(t): t for t in await fetch_since(client, since, now_ms) if leg_key(t) not in seen}.values())
+    response = await fetch_since(client, since, now_ms)
+    trades = list({leg_key(t): t for t in response if leg_key(t) not in seen
+                   and since <= int(t["timestamp"]) <= now_ms}.values())
+    # New versioned directories leave legacy collection-time aggregates untouched.
+    # Every bucket is keyed by trade time, including catch-up after downtime.
+    large, _ = summarise(trades, now_ms // 1000)
+    for day in sorted({_day(r[0]) for r in large}):
+        _append(root / "large" / f"{day}.csv", LARGE_FIELDS, [r for r in large if _day(r[0]) == day])
+    for bucket, legs in event_buckets(trades):
+        _, wallets = summarise(legs, bucket)
+        day = _day(bucket * 1000)
+        _append(root / "wallets_v2" / f"{day}.csv", ("bucket_ts", *WALLET_FIELDS[1:]), wallets)
+        _append(root / "sides_v2" / f"{day}.csv", ("bucket_ts", *SIDE_FIELDS[1:]), sides(legs, bucket, exclude))
     if trades:
-        large, wallets = summarise(trades, now_ms // 1000)
-        for day in sorted({_day(r[0]) for r in large}):
-            _append(root / "large" / f"{day}.csv", LARGE_FIELDS, [r for r in large if _day(r[0]) == day])
-        _append(root / "wallets" / f"{_day(now_ms)}.csv", WALLET_FIELDS, wallets)
-        _append(root / "sides" / f"{_day(now_ms)}.csv", SIDE_FIELDS, sides(trades, now_ms // 1000, exclude))
         last = max(int(t["timestamp"]) for t in trades)
         keys = {leg_key(t) for t in trades if int(t["timestamp"]) == last}
         if last == since:
             keys |= seen
-        state = {"last_ms": last, "keys_at_last": sorted(keys)}
-        root.mkdir(parents=True, exist_ok=True)
-        state_p.write_text(json.dumps(state))
+        state.update(last_ms=last, keys_at_last=sorted(keys))
+    else:
+        state.setdefault("last_ms", since)
+        state.setdefault("keys_at_last", [])
+    # Empty, successfully queried intervals count as collection coverage. A failed fetch
+    # never reaches this point. On migration exclude the already-consumed watermark ms.
+    start = state.get("v2_checked_through", since + int(bool(seen)))
+    if now_ms > start:
+        _append(root / "coverage_v2" / f"{_day(now_ms)}.csv", COVERAGE_FIELDS, [[start, now_ms]])
+    state["v2_checked_through"] = now_ms
+    state["schema_version"] = 2
+    root.mkdir(parents=True, exist_ok=True)
+    state_p.write_text(json.dumps(state))
     return {"legs": len(trades)}
+
+
+def window_coverage(root: Path, now: float, seconds: int) -> dict:
+    """Complete 15-minute buckets ending at or before publication, including empty buckets."""
+    end = int(now) // BUCKET_SECONDS * BUCKET_SECONDS
+    start = end - seconds
+    intervals = []
+    directory = root / "flow" / "coverage_v2"
+    for path in sorted(directory.glob("*.csv")):
+        # Keep the publisher's scan bounded; catch-up intervals can begin before the file day.
+        if path.stem < _day(start * 1000):
+            continue
+        for row in csv.DictReader(path.open()):
+            a, b = max(start * 1000, int(row["from_ms"])), min(end * 1000, int(row["through_ms"]))
+            if b > a:
+                intervals.append((a, b))
+    covered, right = 0, start * 1000
+    for a, b in sorted(intervals):
+        covered += max(0, b - max(a, right))
+        right = max(right, b)
+    ready = covered >= seconds * 1000
+    return {"ready": ready, "status": "ready" if ready else "partial" if covered else "unavailable",
+            "start": start, "end": end, "covered_seconds": covered / 1000,
+            "required_seconds": seconds, "bucket_seconds": BUCKET_SECONDS,
+            "fraction": round(covered / (seconds * 1000), 4)}

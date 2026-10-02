@@ -56,7 +56,10 @@ def test_engines_consensus_and_decisions_match_reflex():
         for r in rows:  # engine output as Reflex has it before synthesis (divergence included)
             engine_rows[r["underlying"]] = dict(r, divergence=sig.detect_divergence(r["regime"], btc_regime))
         consensus = sig.synthesize(rows, tf, ctx, state, {}, as_of)
-        _same(consensus, exp["consensus"], f"{tf}.consensus")
+        # Added quality fields do not alter the pinned baseline when all rows are eligible.
+        baseline_consensus = {k: consensus[k] for k in exp["consensus"]}
+        baseline_consensus["counts"] = {k: consensus["counts"][k] for k in exp["consensus"]["counts"]}
+        _same(baseline_consensus, exp["consensus"], f"{tf}.consensus")
         for r in rows:
             u = r["underlying"]
             mine = sig.public_row(r)  # decision fields below come from the evaluated row itself

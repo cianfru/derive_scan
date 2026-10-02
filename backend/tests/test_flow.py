@@ -43,7 +43,7 @@ def test_update_reads_only_new_trades(tmp_path):
     assert asyncio.run(flow.update(client, tmp_path, 11_000))["legs"] == 0     # same trades, not counted twice
     feed.append(_t("d", 10_500, "ETH-PERP", "buy", 1, 2700, "0xD"))
     assert asyncio.run(flow.update(client, tmp_path, 12_000))["legs"] == 1
-    rows = list(csv.DictReader(open(next((tmp_path / "flow" / "wallets").glob("*.csv")))))
+    rows = list(csv.DictReader(open(next((tmp_path / "flow" / "wallets_v2").glob("*.csv")))))
     assert len(rows) == 3 + 1   # three wallets in the first run, one in the third
 
 
@@ -80,5 +80,5 @@ def test_late_trade_at_same_watermark_is_counted_once(tmp_path):
         finally:
             await client.close()
     asyncio.run(go())
-    rows = list(csv.DictReader(next((tmp_path / "flow" / "wallets").glob("*.csv")).open()))
+    rows = list(csv.DictReader(next((tmp_path / "flow" / "wallets_v2").glob("*.csv")).open()))
     assert sum(int(r["legs"]) for r in rows) == 2

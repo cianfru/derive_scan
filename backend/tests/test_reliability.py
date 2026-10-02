@@ -46,7 +46,7 @@ def test_multiple_fills_crossing_flat_have_unknown_remaining_cost():
 
 def test_unknown_entry_does_not_produce_unrealised_pnl():
     exp = history.parse_option(OPTION)[1]
-    chain = {"expiries": {str(exp): [[100000, 0, 0, .5, .5, .5]]}}
+    chain = {"ts": NOW, "expiries": {str(exp): [[100000, 0, 0, .5, .5, .5]]}}
     marked = traders.mark_position(OPTION, 1, None, chain, 100000, NOW)
     assert marked["mark"] is not None and marked["upnl"] is None
 
@@ -55,7 +55,7 @@ def test_opposing_wallets_preserve_gross_exposure():
     held = {(a, OPTION): n for a, n in [("a", 100), ("b", -99), ("c", 1)]}
     positions = history.tier_positions(held, {a: {"tier": "smart"} for a in ("a", "b", "c")})["BTC"]
     exp = history.parse_option(OPTION)[1]
-    chain = {"expiries": {str(exp): [[100000, 0, 0, .5, .5, .5]]}}
+    chain = {"ts": NOW, "expiries": {str(exp): [[100000, 0, 0, .5, .5, .5]]}}
     reading = wallets_reading(positions, chain, 100000, NOW, 7)
     assert reading["score"] == .01 and reading["state"] == "neutral"
     assert reading["gross_delta_usd"] == 10_000_000
