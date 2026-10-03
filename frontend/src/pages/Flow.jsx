@@ -46,7 +46,7 @@ export default function Flow() {
               {large.map((t, i) => (
                 <tr key={i} style={{ cursor: "default" }}>
                   <td className="dim">{ago(t.ts / 1000)}</td>
-                  <td><Link to={`/coin/${t.underlying}#${t.kind === "option" ? "options" : "regime"}`} style={{ fontWeight: 600 }}>{t.kind === "option" ? `${t.underlying} $${price(Number(t.instrument.split("-")[2]))} ${t.instrument.endsWith("-C") ? "call" : "put"}` : `${t.underlying} perpetual`}</Link>{t.kind === "option" && <small className="dim">Expiry {t.instrument.split("-")[1]?.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3")}</small>}{t.rfq ? <span className="status" style={{ marginLeft: 8 }}>RFQ</span> : null}</td>
+                  <td><Link to={`/coin/${t.underlying}#${t.kind === "option" ? "options" : "regime"}`} style={{ fontWeight: 600 }}>{t.kind === "option" ? `${t.underlying} $${price(Number(t.instrument.split("-")[2].replace("_", ".")))} ${t.instrument.endsWith("-C") ? "call" : "put"}` : `${t.underlying} perpetual`}</Link>{t.kind === "option" && <small className="dim">Expiry {t.instrument.split("-")[1]?.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3")}</small>}{t.rfq ? <span className="status" style={{ marginLeft: 8 }}>RFQ</span> : null}</td>
                   <td className={t.direction === "buy" ? "up" : "down"}>{t.direction === "buy" ? "Buy" : "Sell"}</td>
                   <td className="num">{usd(t.notional_usd)}</td>
                   <td className="num">{t.kind === "option" ? usd(t.premium_usd) : <span className="faint">-</span>}</td>

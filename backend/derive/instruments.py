@@ -28,7 +28,9 @@ def parse_option_name(name: str) -> OptionName | None:
     if len(date) != 8 or not date.isdigit() or kind not in ("C", "P"):
         return None
     try:
-        k = float(strike)
+        # Derive writes fractional strikes with an underscore ("1_35" is 1.35); Python's float()
+        # would silently read "1_35" as 135, so the underscore is turned into a decimal point.
+        k = float(strike.replace("_", "."))
     except ValueError:
         return None
     if k <= 0:

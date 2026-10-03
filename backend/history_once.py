@@ -21,12 +21,32 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 
+# One-time repairs: days written before a parsing fix are read again from Derive. Days holding
+# fractional strikes ("XRP-...-1_35-P") were stored with strike 135 instead of 1.35, which made
+# their delta, implied volatility and out-of-the-money figures wrong (contracts and premiums were right).
+REPAIR = "fractional_strikes"
+SCHEMA_VERSION = 3
+
+
 def is_due(out: Path, now: float) -> bool:
-    """A finished day not yet read (no network; standard library only)."""
+    """A finished day not yet read, or a repair not finished (no network; standard library only)."""
     p = out / "history" / "state.json"
-    done = json.loads(p.read_text()).get("done_through") if p.exists() else None
+    state = json.loads(p.read_text()) if p.exists() else {}
+    done = state.get("done_through")
     last = (datetime.fromtimestamp(now - 3600, timezone.utc) - timedelta(days=1)).date()
-    return done is None or date.fromisoformat(done) < last
+    return done is None or date.fromisoformat(done) < last or (bool(done) and state.get("repaired") != REPAIR)
+
+
+def repair_days(out: Path) -> list[str]:
+    """Days whose files hold an instrument with a fractional strike."""
+    import gzip
+    days = []
+    for p in sorted((out / "history" / "days").glob("*.csv.gz")):
+        with gzip.open(p, "rt") as fh:
+            fh.readline()
+            if any("_" in line.split(",", 2)[1] for line in fh):
+                days.append(p.name[:10])
+    return days
 
 
 async def run(out: Path, budget: float, now: float | None = None, client=None) -> dict:
@@ -50,13 +70,27 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
             history.save_state(out, state)
             added.append(day.isoformat())
             day = history.next_day(state)
+        repaired_now = False
+        if state.get("done_through") and state.get("repaired") != REPAIR:
+            if "repair_pending" not in state:
+                state["repair_pending"] = repair_days(out)
+            while state["repair_pending"] and time.monotonic() - t0 < budget:
+                fix = date.fromisoformat(state["repair_pending"][0])
+                history.write_day(out, fix, history.day_rows(await history.fetch_day(client, fix)))
+                state["repair_pending"].pop(0)
+                history.save_state(out, state)
+            if not state["repair_pending"]:
+                state["repaired"] = REPAIR
+                state.pop("repair_pending")
+                history.save_state(out, state)
+                repaired_now = True
         snapshots = [out / "history" / f"{name}.json" for name in ("wallets", "positions", "traders")]
         needs_rebuild = False
         for p in snapshots:
             doc = json.loads(p.read_text()) if p.exists() else {}
-            if doc.get("schema_version") != 2 or doc.get("through") != state.get("done_through"):
+            if doc.get("schema_version") != SCHEMA_VERSION or doc.get("through") != state.get("done_through"):
                 needs_rebuild = True
-        if state.get("done_through") and (added or needs_rebuild):
+        if state.get("done_through") and (added or needs_rebuild or repaired_now):
             uni = out / "universe.json"
             unds = json.loads(uni.read_text()).get("underlyings", []) if uni.exists() else ["BTC", "ETH"]
             settlements = await history.update_settlements(client, out, unds)
@@ -64,7 +98,7 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
             as_of = min(now, datetime.fromisoformat(state["done_through"]).replace(tzinfo=timezone.utc).timestamp() + 86400)
             scan = history.scan_days(out, as_of)
             classes = history.classify(out, settlements, as_of, held, scan=scan)
-            meta = {"as_of": int(as_of), "through": state["done_through"], "schema_version": 2}
+            meta = {"as_of": int(as_of), "through": state["done_through"], "schema_version": SCHEMA_VERSION}
             (out / "history" / "wallets.json").write_text(json.dumps({**meta, "wallets": classes}, separators=(",", ":")))
             (out / "history" / "positions.json").write_text(json.dumps(
                 {**meta, "positions": history.tier_positions(held, classes)}, separators=(",", ":")))
@@ -73,7 +107,10 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
     finally:
         if own:
             await client.close()
-    return {"added": len(added), "through": state.get("done_through")}
+    out_doc = {"added": len(added), "through": state.get("done_through")}
+    if state.get("repair_pending"):
+        out_doc["repair_pending"] = len(state["repair_pending"])
+    return out_doc
 
 
 def main() -> None:
