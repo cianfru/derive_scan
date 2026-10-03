@@ -177,6 +177,15 @@ def history_doc(root: Path, und: str, e: str, coin: dict, sett: dict, now: float
                 col["i"].append(i)
                 for k, src in (("fair", "fair"), ("yb", "yes_buy"), ("ys", "yes_sell"), ("nb", "no_buy"), ("ns", "no_sell")):
                     col[k].append(Q._f(row[src]))
+    # Hours in time order (a rebuilt history and live rows can interleave).
+    order = sorted(range(len(ts)), key=lambda i: ts[i])
+    if order != list(range(len(ts))):
+        pos = {old: new for new, old in enumerate(order)}
+        ts, index = [ts[i] for i in order], [index[i] for i in order]
+        for col in rows.values():
+            idx = sorted(range(len(col["i"])), key=lambda j: pos[col["i"][j]])
+            for k in col:
+                col[k] = [pos[col["i"][j]] if k == "i" else col[k][j] for j in idx]
     # Expired dates keep four points a day.
     if ts and Q.expiry_ts(e) <= now - 86400:
         keep = {i for i, t in enumerate(ts) if t % 21600 == 0} | {len(ts) - 1}
@@ -239,7 +248,7 @@ def write_site(site: Path, root: Path, boards: dict, state: dict, now: float, pr
                                            "coins": sorted(coins, key=lambda c: (c["thin"], Q.QUESTION_GATES["majors"].index(c["und"]) if not c["thin"] else 0, -c["questions"]))}))
 
 
-def kept_chains(root: Path, source: str, und: str, since: float) -> list[tuple[int, Path]]:
+def kept_chains(root: Path, source: str, und: str, since: float, until: float = float("inf")) -> list[tuple[int, Path]]:
     out = []
     for p in sorted((root / source / und / "chains").glob("*/*.json.gz")):
         try:
@@ -247,7 +256,7 @@ def kept_chains(root: Path, source: str, und: str, since: float) -> list[tuple[i
             t = int(datetime.fromisoformat(f"{day}T{p.name[:2]}:00:00+00:00").timestamp())
         except ValueError:
             continue
-        if t >= since:
+        if since <= t <= until:
             out.append((t, p))
     return out
 
@@ -261,7 +270,7 @@ def rebuild(root: Path, source: str, unds: list[str], now: float, specs: dict) -
     state = new_state()
     for und in unds:
         coin = state["coins"].setdefault(und, {"dates": {}, "spec": specs.get(und) or dict(Q.DEFAULT_SPEC)})
-        for t, p in kept_chains(root, source, und, now - REBUILD_HOURS * 3600):
+        for t, p in kept_chains(root, source, und, now - REBUILD_HOURS * 3600, now - 1):
             try:
                 chain = json.load(gzip.open(p, "rt"))
             except (OSError, ValueError):

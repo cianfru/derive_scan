@@ -51,6 +51,7 @@ def test_btc_above_86000_worked_example(chain14):
     assert cents_up(y["buy"]) - cents_down(y["sell"]) == 4 and round(y["buy"] - y["sell"], 4) == 0.0318
     assert round(y["size"]) == 26496 and round(n["size"]) == 720
     assert y["legs"] == [["BTC-20261009-83000-C", "buy", 2431.0], ["BTC-20261009-89000-C", "sell", 162.0]]
+    assert y["close"] == [["BTC-20261009-89000-C", "buy", 190.0], ["BTC-20261009-83000-C", "sell", 2268.0]]
     t = Q.ticket(y, 6000, idx, BTC_SPEC, dollars=100)
     assert t["contracts"] == 0.04407 and f"{t['premium']:.2f}" == "99.99" and f"{t['fees']:.2f}" == "3.01"
     assert f"{t['payout']:.2f}" == "264.42" and f"{t['at_k']:.2f}" == "132.21" and t["net"] == 2269
@@ -309,3 +310,15 @@ def test_publish_site_removes_questions_while_off(tmp_path, chain14, monkeypatch
     monkeypatch.setenv("QUESTIONS_PUBLISH", "off")
     assert publish_site.question_coins(site, T14 + 600) is None
     assert not (site / "questions").exists()
+
+
+def test_history_is_in_time_order(tmp_path, snaps):
+    root, site = tmp_path / "data", tmp_path / "site"
+    root.mkdir()
+    site.mkdir()
+    for ts in (T14, T14 - 3600):  # an earlier hour appended after a later one
+        qj.run(root, "v2_mainnet", {"BTC": snaps[ts]["BTC"]}, SPECS, ts, site=site, publish=True, now=T14 + 60)
+    h = json.loads((site / "questions" / "history" / "BTC-20261009.json").read_text())
+    assert h["ts"] == sorted(h["ts"]) and len(h["ts"]) == 2
+    for col in h["rows"].values():
+        assert col["i"] == sorted(col["i"])

@@ -192,8 +192,10 @@ def _construct(legs: list[tuple[str, dict, str]], w: float, credit: bool) -> dic
         sell = 1 + got / w if credit else got / w
         sell = sell if 0 <= sell <= 1 else None
     size = min((q["A"] if s == "buy" else q["B"]) for _, q, s in legs) * w
+    # Selling back: the short leg is bought back first, then the bought leg sold.
+    close = [[n, "sell" if s == "buy" else "buy", p] for (n, _, s), p in zip(legs, rev)][::-1] if sell is not None else None
     return {"buy": buy, "sell": sell, "size": size, "form": "credit" if credit else "debit",
-            "legs": [[n, s, p] for (n, _, s), p in zip(legs, px)]}
+            "legs": [[n, s, p] for (n, _, s), p in zip(legs, px)], "close": close}
 
 
 def price_level(ex: dict, lo: float, hi: float, index: float, spec: dict, payout: float | None = None) -> dict | None:
@@ -432,7 +434,7 @@ def _side_out(side: dict | None, und: str) -> dict | None:
     return {"state": side_state(side, und), "buy": round(side["buy"], 4),
             "sell": None if side["sell"] is None else round(side["sell"], 4),
             "size": round(side["size"], 2), "form": side["form"],
-            "legs": [[n, s, p] for n, s, p in side["legs"]]}
+            "legs": [[n, s, p] for n, s, p in side["legs"]], "close": side.get("close")}
 
 
 def _date_board(und: str, e: str, ex: dict, ds: dict, priced: dict, index: float, ts: int, spec: dict) -> dict:
