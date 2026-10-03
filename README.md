@@ -32,7 +32,6 @@ Every Derive perp is listed. `data_status` says how far Reflex's engine can read
 |---|---|
 | `flow/large/YYYY-MM-DD.csv` | taker trades at or above $25k perp notional, $100k option notional or $2k option premium, with wallet |
 | `flow/wallets_v2/YYYY-MM-DD.csv` | one row per wallet and trade-time bucket: trades, perp and option notional, premium bought and sold, realised PnL, fees |
-
 | `flow/sides_v2/YYYY-MM-DD.csv` | per trade-time bucket, coin and kind (call, put, perp): taker buying and selling, market makers left out once classed |
 | `flow/coverage_v2/YYYY-MM-DD.csv`, `flow/recovery.json` | successfully queried intervals, query provenance and progress recovering missing recent history |
 
@@ -45,7 +44,7 @@ Built by `backend/publish_site.py` from the `data` branch after every recording 
 | Path | Content |
 |---|---|
 | `markets.json` | every perp: price, changes, signals, regime, heat, z-score, ribbon, funding, OI, data status, options summary, alignment, sparklines; market-wide context and consensus per timeframe; `breadth_1d`: the daily regime mix, `{cols, rows: [[close, perps per regime...]]}` with columns MARKUP, BLOWOFF, REACC, ACCUM, CAP, MARKDOWN, FLAT, over the 120-day engine history |
-| `coins/{UND}.json` | candles (4H, 1D) with signal history and the newest rows; `ribbon["1d"]`: one character per daily candle (`g` gold, `b` blue, `n` grey, `-` warm-up or no reading); `engine_context`: consensus per timeframe, BTC's regime, Fear & Greed, stablecoin 7-day change, with observation times; `history.engine` (recorded and reconstructed price metrics) and `history.coverage` (engine, option recording and wallet history; option rows are not published); options detail; alignment by horizon; taker flow |
+| `coins/{UND}.json` | candles (4H, 1D) with signal history and the newest rows; `ribbon["1d"]`: one character per daily candle (`g` gold, `b` blue, `n` grey, `-` warm-up or no reading); `engine_context`: consensus per timeframe, BTC's regime, Fear & Greed, stablecoin 7-day change, with observation times; `history.engine` (recorded and reconstructed price metrics) and `history.coverage` (engine, option recording and wallet history; option rows are not published); options detail, with `options.iv_history`: 14 days of 15-minute readings `[ts, atm_iv_7d, atm_iv_30d, atm_iv_90d, rr25_30d, bf25_30d, pc_oi_ratio, rr25_7d]` at 6 decimals (so a coin file stops growing after 14 days of recording); alignment by horizon; taker flow |
 | `wallets/{UND}.json` | the ranked traders holding the coin's options and how each cohort is positioned on it |
 | `traders.json`, `traders/{address}.json` | options traders' leaderboard and cohorts (market makers left out); one file per ranked trader |
 | `flow.json` | last 24 hours: large trades and the most active wallets |

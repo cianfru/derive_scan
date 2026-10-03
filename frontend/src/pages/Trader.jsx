@@ -55,10 +55,10 @@ function OpenOptions({ book }) {
                 <td className="b-exp mono faint">{short(p.expiry)}</td>
                 <td className="b-side dim">{p.net > 0 ? "Long" : "Short"}</td>
                 <td className="num b-qty">{qty(p.net)}</td>
-                <td className="num b-entry" data-k="Entry">{p.entry == null ? <span className="faint">–</span> : price(p.entry)}</td>
+                <td className="num b-entry" data-k="Entry">{p.entry == null ? <span className="faint">—</span> : price(p.entry)}</td>
                 <td className="num b-mark" data-k="Mark">{price(p.mark)}</td>
-                <td className="num b-delta" data-k="Delta">{p.delta_usd == null ? <span className="faint">–</span> : <>{usd(p.delta_usd)}{p.delta_source !== "quoted" && <span className="faint est"> est</span>}</>}</td>
-                <td className={`num hero b-upnl ${tone(p.upnl)}`}>{p.upnl == null ? <span className="faint">–</span> : usd(p.upnl)}</td>
+                <td className="num b-delta" data-k="Delta">{p.delta_usd == null ? <span className="faint">—</span> : <>{usd(p.delta_usd)}{p.delta_source !== "quoted" && <span className="faint est"> est</span>}</>}</td>
+                <td className={`num hero b-upnl ${tone(p.upnl)}`}>{p.upnl == null ? <span className="faint">—</span> : usd(p.upnl)}</td>
               </tr>
             );
           })}

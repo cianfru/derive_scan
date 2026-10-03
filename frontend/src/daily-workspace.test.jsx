@@ -133,12 +133,13 @@ it("summarizes the recorded premium categories and selects a market for the tape
   await userEvent.setup().click(screen.getByRole("button", { name: /HYPE/ }));
   expect(choose).toHaveBeenCalledWith("HYPE");
 });
-it("uses the same Fear and Greed value for the band, needle and description", () => {
+it("uses the same Fear and Greed value for the dial, needle and band name", () => {
   render(
     <FearGreed sentiment={{ fear_greed_value: 72 }} at={Date.now() / 1000} />,
   );
   expect(
     screen.getByRole("img", { name: "72 out of 100, Greed" }),
   ).toBeTruthy();
-  expect(screen.getByText("Greed gate active")).toBeTruthy();
+  expect(screen.getByText("72")).toBeTruthy();
+  expect(screen.getByText("Greed")).toBeTruthy();
 });

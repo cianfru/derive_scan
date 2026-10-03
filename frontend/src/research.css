@@ -316,7 +316,7 @@ body {
 .agreement-track i {
   height: 100%;
   display: block;
-  background: var(--orange);
+  background: var(--fg-2);
 }
 .combined-signal {
   display: flex;
@@ -367,13 +367,7 @@ body {
   height: 12px;
   font-size: 8px;
 }
-.engine-evidence-workspace {
-  display: grid;
-  grid-template-columns: 1fr 1.05fr;
-  gap: 20px;
-}
-.engine-comparison,
-.condition-scorecard {
+.engine-comparison {
   min-width: 0;
   border: 1px solid var(--seam);
   background: linear-gradient(135deg, var(--plate-2), var(--plate) 42%);
@@ -397,66 +391,6 @@ body {
   padding-top: 19px;
   border-top: 1px solid var(--seam);
   margin-top: 15px;
-}
-.conditions-visible {
-  padding: 17px 26px 22px;
-}
-.condition-score {
-  display: flex;
-  gap: 18px;
-  align-items: center;
-  margin-bottom: 18px;
-}
-.condition-score > strong {
-  font: 600 35px var(--font-display);
-}
-.condition-score strong small {
-  font-size: 17px;
-  color: var(--muted);
-  font-weight: 400;
-}
-.condition-score > span {
-  font-size: 12px;
-}
-.condition-score > span > small {
-  display: block;
-  color: var(--muted);
-  font-size: 10px;
-  margin-top: 4px;
-}
-.condition-tiles {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.condition-tiles > div {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--bg);
-  border: 1px solid var(--seam);
-  padding: 9px 8px;
-  font-size: 11px;
-}
-.condition-tiles .info {
-  margin-left: auto;
-  width: 12px;
-  height: 12px;
-  font-size: 8px;
-}
-.condition-result {
-  color: var(--muted);
-  font: 500 13px var(--font-mono);
-}
-.condition-tiles [data-result="pass"] .condition-result {
-  color: var(--up);
-}
-.condition-tiles [data-result="fail"] .condition-result {
-  color: var(--down);
-}
-.conditions-visible > .status {
-  font-size: 10px;
-  margin: 14px 0 0;
 }
 /* Options instruments (coin page). */
 .move-instrument {
@@ -800,12 +734,6 @@ body {
   .engine-pair-row {
     gap: 6px;
   }
-  .condition-tiles {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-      .engine-evidence-workspace {
-    grid-template-columns: 1fr 1fr;
-  }
   .options-dashboard {
     grid-template-columns: 1.2fr 1fr;
   }
@@ -861,12 +789,6 @@ body {
   }
   .research-example > .status {
     margin-top: 0;
-  }
-  .condition-tiles {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .engine-evidence-workspace {
-    grid-template-columns: 1fr;
   }
   .engine-comparison-body {
     display: grid;
@@ -934,12 +856,6 @@ body {
   }
   .evidence-heading h2 {
     font-size: 22px;
-  }
-  .conditions-visible {
-    padding-inline: 20px;
-  }
-  .condition-tiles {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .options-dashboard {
     grid-template-columns: 1fr;
@@ -1037,23 +953,6 @@ body {
 .evidence-heading .tabs button {
   font-size: 12px;
   padding-block: 7px;
-}
-.recorded-engine-facts {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-  padding-block: 2px 12px;
-}
-.recorded-engine-facts > div {
-  display: grid;
-  gap: 7px;
-}
-.recorded-engine-facts span {
-  font-size: 11px;
-  color: var(--muted);
-}
-.recorded-engine-facts b {
-  font: 500 19px var(--font-display);
 }
 @media (min-width: 601px) {
   .expiry-rail {

@@ -48,7 +48,7 @@ HEDGE_DAYS_SHARE = 0.50
 MIN_LEGS = 20
 MIN_ACTIVE_DAYS = 90
 TOP_FRACTION = 0.20   # tier "top": the study's main set
-SMART_COUNT = 50      # tier "smart": the 50 best profitable directional wallets
+SMART_COUNT = 50      # tier "smart": the 50 best profitable directional wallets not already "top" (none while top has 50 or more)
 TIERS = ("top", "smart", "profitable")
 
 
@@ -311,7 +311,8 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float,
     Directional: the rest with at least 20 option legs over at least 90 days. Skilled: directional
     wallets get a tier by option PnL (instruments already expired: premium received minus paid
     plus contracts held at expiry x settlement value), among those with positive PnL: "top" for
-    the top fifth of all directional wallets, "smart" for the best 50, "profitable" for the rest.
+    the top fifth of all directional wallets, "smart" for the rest of the best 50, "profitable"
+    for the rest.
     held, when given, receives {(wallet, instrument): net contracts} for instruments not yet expired.
     """
     if scan is None or scan.get("cutoff") != as_of:

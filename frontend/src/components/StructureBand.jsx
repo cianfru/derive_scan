@@ -122,7 +122,7 @@ export default function StructureBand({ data, scoped, scopeLabel, signalFilter, 
       </div>
 
       <div className="sb-cell sb-fg">
-        <FearGreed compact sentiment={data.context?.sentiment} at={data.context?.sentiment_at} />
+        <FearGreed sentiment={data.context?.sentiment} at={data.context?.sentiment_at} />
       </div>
     </section>
   );

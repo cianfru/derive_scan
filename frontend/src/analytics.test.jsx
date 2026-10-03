@@ -3,7 +3,7 @@ import { afterEach, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { conePath, readingState } from "./lib/analytics.js";
-import { Conditions, FlowCoverage, ModelDetails } from "./components/AnalyticalDetails.jsx";
+import { FlowCoverage, ModelDetails } from "./components/AnalyticalDetails.jsx";
 import AlignmentGrid from "./components/Alignment.jsx";
 
 afterEach(cleanup);
@@ -27,15 +27,6 @@ it("does not relabel missing or stale engine evidence as neutral", () => {
   expect(screen.queryByText("Neutral")).toBeNull();
   expect(screen.queryByText("Next 7 days")).toBeNull();
   expect(screen.getByText("7d tenor / 24h flow")).toBeTruthy();
-});
-
-it("lets the reader inspect unknown evidence and its explanation", async () => {
-  render(<Conditions row={{ conditions_detail: [{ name: "no_climax", label: "No Climax", available: false,
-    met: false, desc: "Insufficient traded volume", source: "derive_perp_volume", freshness: "thin" }] }} />);
-  await userEvent.setup().click(screen.getByText("Inspect conditions · 0 / 1 available"));
-  expect(screen.getByText("Unknown")).toBeTruthy();
-  await userEvent.setup().click(screen.getByRole("button", { name: "About No Climax" }));
-  expect(screen.getByRole("dialog").textContent).toContain("Insufficient traded volume");
 });
 
 it("shows collection coverage separately from recorded activity", () => {

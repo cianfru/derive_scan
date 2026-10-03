@@ -20,7 +20,7 @@
 .history-plot text { font: 400 var(--t-key) var(--font-mono); fill: var(--muted); }
 .history-grid { stroke: var(--seam); stroke-width: 1; }
 .history-zero { stroke: var(--seam-hi); stroke-dasharray: 3 4; }
-.history-line { fill: none; stroke: var(--orange); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.history-line { fill: none; stroke: var(--fg); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .history-line.reconstructed { stroke: var(--muted); stroke-dasharray: 5 4; }
 .history-crosshair { stroke: var(--faint); stroke-dasharray: 3 4; pointer-events: none; }
 .history-selected { fill: var(--plate); stroke: var(--orange); stroke-width: 2; pointer-events: none; }

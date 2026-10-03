@@ -13,6 +13,6 @@ export default function HistoryStatus({ data }) {
     <Info label="About wallet history coverage">Wallet classes and rankings follow the approved study rules. History is processed one completed UTC day at a time. Rankings and positioning are withheld until coverage is current; missing history does not mean a wallet is flat. The history collection continues automatically.</Info>
     <p className="dim">{data?.through ? `History processed through ${data.through} UTC close.` : "The first history snapshot is being prepared."}
       {data?.expected_through && ` Required through ${data.expected_through} UTC close.`}</p>
-    <p className="status">{updating ? "Existing daily records are being recalculated. No history is being reset." : "Rankings and wallet positioning will appear when the daily history has caught up."}</p>
+    <p className="status">{updating ? "Existing daily records are being recalculated. No history is being reset." : "Rankings and wallet positioning appear once the daily history has caught up."}</p>
   </div></div>;
 }

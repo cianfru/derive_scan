@@ -2,6 +2,7 @@
 import { useMemo } from "react";
 import { useElementWidth } from "../lib/useElementWidth.js";
 import { price, pct, usd, strike } from "../lib/format.js";
+import { Empty } from "./ui.jsx";
 
 
 /** Mirrored open-interest bars by strike: puts left, calls right, the index as a line. */
@@ -148,14 +149,14 @@ function MiniSeriesChart({ points, height = 120, format = (v) => pct(v, 1), colo
 
 /** Index plus and minus one standard deviation over 30 days, from 30-day ATM implied volatility. */
 export function PricedRange({ index, iv30 }) {
-  if (!index || !iv30) return <p className="status">-</p>;
+  if (!index || !iv30) return <p className="status"><Empty /></p>;
   const sd = index * iv30 * Math.sqrt(30 / 365), lo = index - sd, hi = index + sd, span = sd * 3;
   const pos = (v) => ((v - (index - span / 2)) / span) * 100;
   return (
     <div>
       <div style={{ position: "relative", height: 34, margin: "8px 0 6px" }}>
         <div style={{ position: "absolute", top: 10, height: 14, left: `${pos(lo)}%`, width: `${pos(hi) - pos(lo)}%`,
-          background: "linear-gradient(90deg, color-mix(in srgb, var(--orange) 25%, transparent), color-mix(in srgb, var(--orange) 70%, transparent), color-mix(in srgb, var(--orange) 25%, transparent))",
+          background: "linear-gradient(90deg, color-mix(in srgb, var(--fg-2) 25%, transparent), color-mix(in srgb, var(--fg-2) 70%, transparent), color-mix(in srgb, var(--fg-2) 25%, transparent))",
           clipPath: "polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px)" }} />
         <div style={{ position: "absolute", top: 2, height: 30, width: 2, left: `calc(${pos(index)}% - 1px)`, background: "var(--fg)" }} />
       </div>

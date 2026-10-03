@@ -28,8 +28,8 @@ export function MoveBand({ index, iv, days = 30, compact = false, bare = false, 
         <Info label={`Explain ${days}-day priced movement`}>
           Index × annualised ATM implied volatility × √({days}/365). This
           arithmetic one-standard-deviation scale describes the size of movement
-          priced into options. It is symmetric, ignores strike skew and is not a
-          price forecast. The centre is the quoted index, not a model median.
+          priced into options. It is symmetric, ignores strike skew and is what
+          option prices imply, not our view. The centre is the quoted index, not a model median.
         </Info>
       </span>}
       <div className="move-reading">

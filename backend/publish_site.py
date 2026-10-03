@@ -731,6 +731,9 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                               now, options_at=opts["ts"])
             align["positions_through"] = held.get("through")
             align["wallet_coverage"] = coverage
+            # Readings above use full precision; the published rows keep 6 decimals (14 days of
+            # 15-minute rows would otherwise add about 200 KB to the coin file).
+            opts["iv_history"] = [[r[0], *(None if v is None else round(v, 6) for v in r[1:])] for r in opts["iv_history"]]
         comparison = engine_comparison(r4, r1, now)
         pos = r4.get("positioning") or {}
         price = (opts or {}).get("features", {}).get("index_price") or (closes4[-1] if closes4 else None)
@@ -757,8 +760,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                 "ts": opts["ts"], "status": opts["status"], "levels": opts["levels"],
                 "expiries": opts["expiries"], **{k: opts["features"].get(k) for k in ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d",
                                                                            "bf25_30d", "pc_oi_ratio", "option_oi_contracts")},
-                "term": [[round(e["tenor_days"], 3), e["atm_iv"]] for e in opts["expiries"] if e.get("atm_iv") is not None],
-                "iv30_hist": [[h[0], h[2]] for h in opts["iv_history"][-96 * 7:] if h[2] is not None][::4]},
+                "term": [[round(e["tenor_days"], 3), e["atm_iv"]] for e in opts["expiries"] if e.get("atm_iv") is not None]},
             "spark_1d": closes1[-60:],
             "spark_times_1d": [b[0] + 86400 for b in candles["1d"][-60:]],
             "spark": closes4[-42:],
