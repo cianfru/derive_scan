@@ -1,6 +1,6 @@
-# Torq
+# Cowboy
 
-Repository `derive_scan`. App and landing page: `frontend/` (React + Vite), deployed on Vercel (project `torq`) from `main`; it reads the `site-data` branch built by `backend/publish_site.py`.
+Trader intelligence on Derive. Repository `derive_scan` (internal name, kept). App and landing page: `frontend/` (React + Vite), deployed on Vercel (project `torq`, internal name kept) from `main`; it reads the `site-data` branch built by `backend/publish_site.py`.
 
 ```
 cd frontend && npm install && npm run dev      # app against the live site-data branch
