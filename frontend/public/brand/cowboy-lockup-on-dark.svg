@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1450" height="440" viewBox="0 0 1450 440" role="img" aria-labelledby="title">
+<title id="title">Cowboy neon logo</title>
+<defs>
+ <filter id="halo" x="-40%" y="-70%" width="180%" height="240%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="10"/></filter>
+ <filter id="glow" x="-20%" y="-40%" width="140%" height="180%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="3.5"/></filter>
+ <g id="art" fill="none" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(10 15)"><path d="M 166,233 C 171,192 183,140 201,98 C 211,72 228,67 243,84 C 269,116 266,141 307,152 C 328,158 356,155 372,171 C 388,188 384,233 387,256 M 222,72 C 250,62 276,93 313,91 M 287,108 C 315,98 345,69 365,92 C 383,115 381,170 400,241 C 407,268 390,280 361,284 C 301,294 227,280 177,265"/>
+<path d="M 170,235 L 119,234 M 408,258 C 452,240 479,239 487,273 C 504,334 456,372 409,358 C 310,332 230,287 149,247 C 104,225 70,208 48,227 C 22,248 53,294 92,316 C 151,351 259,364 324,360"/></g><g transform="translate(560 130)"><path d="M 121,46 C 88,10 18,20 18,82 C 18,146 88,154 121,121"/>
+<path d="M 212,24 C 171,24 145,48 145,84 C 145,122 172,146 212,146 C 252,146 279,122 279,84 C 279,48 252,24 212,24 Z"/>
+<path d="M 298,26 L 329,145 L 369,57 L 410,145 L 443,26"/>
+<path d="M 470,145 L 470,26 L 514,26 C 559,26 561,80 516,84 L 470,84 M 516,84 C 569,84 569,145 515,145 L 470,145"/>
+<path d="M 646,24 C 605,24 579,48 579,84 C 579,122 606,146 646,146 C 686,146 713,122 713,84 C 713,48 686,24 646,24 Z"/>
+<path d="M 733,26 L 774,85 L 816,26 M 774,85 L 774,145"/></g></g>
+</defs>
+<!-- True vector paths; transparent canvas. Remove the first two uses for a flat outline. -->
+<use href="#art" stroke="#ff5900" stroke-width="20" opacity=".42" filter="url(#halo)"/>
+<use href="#art" stroke="#ff6500" stroke-width="12" opacity=".85" filter="url(#glow)"/>
+<use href="#art" stroke="#ff740f" stroke-width="10"/>
+<use href="#art" stroke="#ffb54c" stroke-width="6"/>
+<use href="#art" stroke="#fff3ca" stroke-width="2.5"/>
+</svg>

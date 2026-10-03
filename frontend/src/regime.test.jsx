@@ -28,7 +28,7 @@ const CC = fixture({ underlying: "CC", signal: "WAIT", regime: "MARKUP", zscore:
 const CTX = { consensus: { "1d": { consensus: "RISK-ON", status: "ready" } }, btc_regime: { "1d": "MARKUP", "4h": "REACC" }, fear_greed: 67, stablecoin_7d_pct: -0.37 };
 
 describe("checks", () => {
-  it("returns the nine checks in the engine's order with Torq's names and values", () => {
+  it("returns the nine checks in the engine's order with the app's names and values", () => {
     const list = regime.checks(BTC, CTX);
     expect(list.map((c) => c.name)).toEqual(NAMES);
     expect(list.map((c) => c.label)).toEqual(["Regime", "Market", "Z-score", "BTC", "Heat", "Climax", "Funding", "Fear & Greed", "Stablecoins"]);

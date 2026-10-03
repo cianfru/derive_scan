@@ -3,9 +3,11 @@ import ResearchLayers from "../components/ResearchLayers.jsx";
 import { LayerIcon } from "../components/Chain.jsx";
 import WalletTag from "../components/WalletTag.jsx";
 import { Info } from "../components/ui.jsx";
+import { HatMark, NeonSign } from "../components/Brand.jsx";
 
-// The landing page shows what Torq does and never what it currently reads: no prices, no coins,
-// no counts, no results. Every figure is an illustration, labelled as one.
+// The landing page shows what Cowboy does and never what it currently reads: no prices, no coins,
+// no counts, no results. Every figure is an illustration, labelled as one. The sign carries the
+// character (neon, flicker, light spill); everything below it is as calm as the app.
 
 const Tag = () => <span className="lp-illus" aria-hidden="true">Illustration</span>;
 
@@ -164,35 +166,35 @@ const LAYERS = [
   {
     kind: "engine", n: "01", name: "Regime", Figure: RegimeFigure,
     head: "Our own engine names the regime.",
-    body: "Every coin is placed in one of six regimes, from Accumulation through Markup to Markdown, by how far price sits from its own trend, how fast it is moving and how volatile it is. Then nine checks score the case for a long entry.",
+    body: "Every coin is placed in one of six regimes, from Accumulation to Markdown, after each 4-hour and daily close. Nine checks then score the case for a long entry. One candle does not flip the label.",
     proof: [
       ["Every close", "Recomputed minutes after each 4-hour and daily close, on Derive's perps."],
       ["Six regimes", "A new regime has to lead across closes before the label changes. One candle does not flip it."],
       ["Nine checks", "Regime, market, z-score, BTC, heat, climax, funding, Fear & Greed and stablecoin supply."],
     ],
-    info: "The engine reads each perp's own price history: how far price sits from its long-term trend line (the z-score, in standard deviations), its momentum and its volatility. Funding and open interest come from Derive; Fear & Greed, stablecoin supply and BTC dominance are market-wide. Signals run from Strong long to Risk off; the nine checks score the long entries.",
+    info: "The engine reads each perp's own price history: how far price sits from its long-run trend, how fast it is moving and how volatile it is. Funding and open interest come from Derive; Fear & Greed, stablecoin supply and BTC dominance are market-wide. A new regime has to hold across closes before the label changes.",
   },
   {
     kind: "wallets", n: "02", name: "Wallets", Figure: WalletsFigure,
-    head: "Every trade rebuilt. Only the best traders kept.",
-    body: "We rebuilt every options trade on Derive since December 2023, wallet by wallet, and scored each trader on the options that have settled. Market makers, income sellers and hedgers are set aside. What remains are directional traders ranked by results, and you see what the best of them hold.",
+    head: "Every trader rebuilt. The best kept.",
+    body: "Every options trade on Derive since December 2023, rebuilt wallet by wallet and scored on settled results. Market makers, income sellers and hedgers are set aside. You see what the top directional traders hold.",
     proof: [
       ["Since Dec 2023", "Every options trade on Derive, rebuilt per wallet and extended every day."],
       ["Market makers out", "Classed by fixed rules from their own trades, and never shown."],
       ["Settled results", "Premium paid and received plus what each option paid at expiry. Open trades count once they settle."],
     ],
-    info: "Wallet classes follow rules fixed before any result: market makers (mostly maker fills, or both sides of the same option on the same day), income sellers (mostly selling out-of-the-money options) and hedgers (options offset with perps) are set aside. Directional traders need at least 20 option trades over at least 90 days. Each wallet appears under a made-up codename and emblem.",
+    info: "Wallet classes follow rules fixed before any result. Market makers, income sellers and hedgers are set aside and never shown. Directional traders need at least 20 option trades over at least 90 days and are ranked on premium paid and received plus what each option paid at expiry. Each wallet appears under a made-up codename and brand.",
   },
   {
     kind: "options", n: "03", name: "Options", Figure: OptionsFigure,
-    head: "Where the market is positioned, in plain sight.",
-    body: "Every 15 minutes we read the full option chain of every coin with options on Derive and turn it into a few pictures: the range option prices imply for each expiry, where open interest is stacked, whether puts or calls cost more, and who is paying up. Always market pricing, never our view.",
+    head: "Options positioning, made plain.",
+    body: "Every 15 minutes, each coin's option chain becomes a few pictures: the price range options imply, where open interest is stacked, and what traders pay for protection. Clear enough to act on, even if you have never traded an option. Always market pricing, never our view.",
     proof: [
       ["Every 15 minutes", "Every coin's option chain read, and its shape recorded: volatility, skew, open interest."],
       ["The whole smile", "Priced ranges read from every quoted strike, not from one volatility number."],
       ["Takers only", "Premium paid and received by takers, with market makers left out."],
     ],
-    info: "Priced ranges come from option prices across strikes for each expiry (where too few strikes are quoted, the at-the-money volatility stands in). They describe what the market is paying for, not our view. Call wall, put wall and max pain are read from open interest over the next 30 days.",
+    info: "Priced ranges come from option prices across every quoted strike for each expiry. Call wall, put wall and max pain are read from open interest over the next 30 days. Taker flow leaves market makers out. All of it describes what the market is paying for, not our view.",
   },
 ];
 
@@ -200,7 +202,7 @@ function Layer({ kind, n, name, head, body, proof, info, Figure }, i) {
   return (
     <section key={kind} className={`wrap lp-layer${i % 2 ? " flip" : ""}`} aria-labelledby={`lp-${kind}`}>
       <div className="lp-copy">
-        <p className="lp-eyebrow"><LayerIcon kind={kind} size={16} /><span>{n}</span>{name}</p>
+        <p className="lp-eyebrow"><span>{n}</span>{name}</p>
         <h2 id={`lp-${kind}`}>{head}</h2>
         <p className="lp-body">{body}<Info label={`More about ${name}`}>{info}</Info></p>
         <ul className="lp-proof">
@@ -216,64 +218,77 @@ const FACTS = [
   ["4H · 1D", "engine run at every close"],
   ["Dec 2023", "every options trade since, rebuilt"],
   ["15 min", "every option chain read"],
-  ["0", "market makers in the rankings"],
+  ["0", "market makers shown"],
 ];
 
 const FAQ = [
-  ["What is Torq?", "Independent research on Derive: a price engine, a rebuilt history of every options trader, and the options market itself, read side by side for every coin with options on Derive."],
-  ["Where does the data come from?", "Derive's public data: index prices, perps, option quotes and public trades. Market-wide context (Fear & Greed, stablecoin supply, BTC dominance) comes from public sources."],
+  ["What is Cowboy?", "Independent trader intelligence on Derive: a regime engine, a rebuilt record of every options trader, and the options market itself, read side by side for every coin with options on Derive."],
+  ["Do I need to trade options?", "No. Every options view is drawn as a picture with a plain label, and each term has an (i) beside it."],
+  ["Where does the data come from?", "Derive's public data: index prices, perps, option quotes and public trades. Fear & Greed, stablecoin supply and BTC dominance come from public sources."],
   ["How often does it update?", "Option chains and trade flow every 15 minutes. The engine after every 4-hour and daily close. Trader history once a day."],
-  ["Is this advice?", "No. Torq shows what prices, traders and option markets read. Market data and positioning for research, not investment advice."],
+  ["Does Cowboy trade for me?", "No. Cowboy reads the market; any trade is yours to place on Derive."],
+  ["Is this advice?", "No. Market data and positioning for research, not investment advice."],
 ];
 
 export default function Landing() {
   return (
-    <div className="landing torq-landing">
-      <section className="wrap torq-hero">
-        <div className="torq-hero-copy">
-          <p className="hero-purpose">Independent research for Derive traders</p>
-          <h1>Read the market. <em>See the positioning.</em></h1>
-          <p className="hero-description">
-            Our engine names the regime. Derive's most profitable options traders show where they stand. Option prices show how the market is positioned. Side by side, for every coin with options on Derive.
-          </p>
-          <div className="hero-cta">
-            <Link className="btn primary" to="/markets">Open the markets <span aria-hidden="true">↗</span></Link>
-            <Link className="text-link" to="/traders">Meet the traders</Link>
+    <div className="landing cowboy-landing">
+      <section className="hero-stage" aria-labelledby="lp-hero">
+        <div className="hero-inner">
+          <p className="hero-eyebrow">Trader intelligence on Derive</p>
+          <div className="sign-wrap"><NeonSign /></div>
+          <div className="hero-row">
+            <h1 id="lp-hero">Know where the herd stands.</h1>
+            <div className="hero-side">
+              <p className="hero-description">Cowboy names each coin's regime, follows Derive's best options traders and turns option prices into pictures anyone can read.</p>
+              <div className="hero-cta">
+                <Link className="btn primary lg" to="/markets">Open the markets</Link>
+                <a className="btn lg" href="#how">See how it works</a>
+              </div>
+            </div>
           </div>
+          <div className="lp-facts" aria-label="What Cowboy records">{FACTS.map(([v, l]) => <div key={l}><b>{v}</b><span>{l}</span></div>)}</div>
         </div>
-        <ResearchLayers />
       </section>
 
-      <section className="wrap" aria-label="What Torq records">
-        <div className="lp-facts">{FACTS.map(([v, l]) => <div key={l}><b>{v}</b><span>{l}</span></div>)}</div>
+      <section id="how" className="wrap lp-how" aria-labelledby="lp-how">
+        <div className="lp-how-head">
+          <p className="lp-eyebrow">How it works</p>
+          <h2 id="lp-how">One coin. Three layers, always in this order.</h2>
+        </div>
+        <div className="lp-how-stage"><span className="lp-illus" aria-hidden="true">Illustration</span><ResearchLayers /></div>
       </section>
 
       {LAYERS.map((l, i) => Layer(l, i))}
 
       <section className="wrap lp-layer lp-together" aria-labelledby="lp-together">
         <div className="lp-copy">
-          <p className="lp-eyebrow"><span>+</span>Together</p>
-          <h2 id="lp-together">Three independent reads. One row per coin.</h2>
-          <p className="lp-body">Price, positioning and option prices come from different places and can disagree, so Torq never blends them into one score. Each layer gives its own reading, up, balanced or defensive, over 7 and 30 days, and the board lines them up. When all three agree, the row is framed.</p>
+          <p className="lp-eyebrow">Together</p>
+          <h2 id="lp-together">Three reads. One row per coin.</h2>
+          <p className="lp-body">One read on its own can mislead. Price, wallets and option prices come from different places, so Cowboy keeps them apart and lines them up per coin over 7 and 30 days. You see at a glance when all three tell the same story, and when they do not.</p>
           <ul className="lp-proof">
             <li><b>Independent</b><span>Price history, wallet history, option prices: three sources, three readings.</span></li>
-            <li><b>Never blended</b><span>No layer is averaged into another. The board only counts how many agree.</span></li>
-            <li><b>Rules first</b><span>Whether top wallets lead price is tested in a study whose rules were fixed before any result. Until it reports, wallet positions are context.</span></li>
+            <li><b>Never blended</b><span>No read is averaged into another. When all three agree, the row is framed.</span></li>
+            <li><b>Rules first</b><span>Whether wallets lead price is under study, with rules fixed before any result. Until it reports, positions are context.</span></li>
           </ul>
         </div>
         <TogetherFigure />
       </section>
 
-      <section className="wrap lp-faq" aria-label="Questions">
-        {FAQ.map(([q, a]) => (
-          <details key={q}><summary>{q}<span aria-hidden="true">+</span></summary><p>{a}</p></details>))}
+      <section className="wrap lp-faq" aria-labelledby="lp-faq">
+        <h2 id="lp-faq">Questions</h2>
+        <div className="lp-faq-list">
+          {FAQ.map(([q, a]) => (
+            <details key={q}><summary>{q}<span aria-hidden="true">+</span></summary><p>{a}</p></details>))}
+        </div>
       </section>
 
       <section className="wrap landing-close">
-        <h2>Three reads. Every coin with options.</h2>
+        <HatMark size={52} className="close-hat" />
+        <h2>The whole range, in three reads.</h2>
         <div className="hero-cta">
-          <Link className="btn primary" to="/markets">Open the markets <span aria-hidden="true">↗</span></Link>
-          <Link className="text-link" to="/traders">Meet the traders</Link>
+          <Link className="btn primary lg" to="/markets">Open the markets</Link>
+          <Link className="btn lg" to="/traders">Meet the traders</Link>
         </div>
       </section>
     </div>
