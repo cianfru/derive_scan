@@ -22,6 +22,9 @@ keeps no history. Files:
   flow.json           last 24 hours: large trades, most active wallets (market makers left out once
                       the rebuilt history has classed them), with each wallet's class
   strikes/{UND}.json  written by record_once.py (per-strike view of the newest chain)
+  surface/{UND}.json  daily option readings rebuilt from traded options (ATM 7/30/90 days, 25-delta
+                      risk reversal 7/30 days), gated, with the recorded daily medians beside them;
+                      only for coins whose history/surface CSV exists (has_surface in markets.json)
 """
 from __future__ import annotations
 
@@ -31,8 +34,11 @@ import json
 import math
 import time
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from statistics import median
+
+import numpy as np
 
 from derive.candles import CandleCache
 from derive.signals import engine_comparison, ribbon_trail
@@ -319,6 +325,107 @@ def taker_sides(data: Path, now: float) -> dict:
     return result
 
 
+SURFACE_FILE_VERSION = 1
+SURFACE_METRICS = ("atm7", "atm30", "atm90", "rr7", "rr30")
+SURFACE_COVERAGE = (180, 0.70)       # trailing days, share of them with a reading
+SURFACE_RELIABILITY = 0.85           # corrected split-half rank correlation
+SURFACE_SEAM = (14, {"atm7": 0.03, "atm30": 0.03, "atm90": 0.03, "rr7": 0.02, "rr30": 0.02})  # overlap days, |median diff|
+SURFACE_RANGE = (365, 60)            # past-year window, values needed
+
+
+def _sig(v, digits=5):
+    return None if v is None else float(f"{v:.{digits}g}")
+
+
+def _r4(v):
+    return None if v is None else round(v, 4)
+
+
+def surface_block(data: Path, und: str, now: float) -> dict | None:
+    """site-data surface/{UND}.json (version 1), from history/surface/{UND}.csv (derive/surface_history.py).
+
+    traded: the daily readings rebuilt from traded options as a 5-day median (centred where later
+    days exist, at least 3 values; null is a gap), from the first day the trailing 30 days (counted
+    from the first day a fit was possible) have a 30-day ATM reading on at least half the days.
+    Only readings that pass the gates are included. The gates are recomputed every run, so a coin
+    qualifies by itself: a reading on at least 70% of the trailing 180 days, corrected split-half
+    reliability >= 0.85 and, once recorded and traded readings overlap on 14 days or more,
+    |median(recorded - traded)| <= 3 vol points for ATM and 2 for RR. No level offset is applied.
+    recorded: for the same readings, daily medians of the recorded 15-minute snapshots (full days
+    only) from offset `from`, never joined to traded. range_1y: the traded series over the past
+    year (p10, p50, p90, last, pct = percentile rank of the last value, 0-100). overlap: raw daily
+    traded readings against the recorded daily medians. day0: unix seconds of the UTC day of value 0.
+    """
+    from derive import surface_history as sh
+
+    rows = sh.read_rows(data / "history" / "surface" / f"{und}.csv")
+    if not rows:
+        return None
+    state_p = data / "history" / "state.json"
+    through = (json.loads(state_p.read_text()) if state_p.exists() else {}).get("surface_through") or ""
+    by = {r["day"]: r for r in rows}
+    # The series begins on the first day a fit was possible (options traded and an index known).
+    first = next((r["day"] for r in rows if r["carry"] is not None), rows[0]["day"])
+    d0, end = date.fromisoformat(first), date.fromisoformat(max(rows[-1]["day"], through))
+    days = [(d0 + timedelta(i)).isoformat() for i in range((end - d0).days + 1)]
+
+    def col(key):
+        return [by[d][key] if d in by else None for d in days]
+
+    raw = {m: col(m) for m in SURFACE_METRICS}
+    rec = {m: col(f"rec_{m}") for m in SURFACE_METRICS}
+    traded = {m: sh.smooth(v) for m, v in raw.items()}
+    i0 = sh.start_day(traded["atm30"])
+    quality, overlap = {}, {}
+    span_days, need = SURFACE_COVERAGE
+    for m in SURFACE_METRICS:
+        coverage = sum(v is not None for v in traded[m][-span_days:]) / span_days
+        rel = sh.reliability(col(f"{m}_a"), col(f"{m}_b"), i0) if i0 is not None else None
+        diffs = [r - t for r, t in zip(rec[m], raw[m]) if r is not None and t is not None]
+        overlap[m] = {"days": len(diffs), "median_diff": round(median(diffs), 4) if diffs else None}
+        seam_ok = len(diffs) < SURFACE_SEAM[0] or abs(overlap[m]["median_diff"]) <= SURFACE_SEAM[1][m]
+        quality[m] = {"coverage": round(coverage, 3), "reliability": rel,
+                      "shown": i0 is not None and coverage >= need and (rel or 0) >= SURFACE_RELIABILITY and seam_ok}
+    shown = [m for m in SURFACE_METRICS if quality[m]["shown"]]
+    doc = {"und": und, "version": SURFACE_FILE_VERSION, "generated_at": int(now), "status": "ready" if shown else "sparse",
+           "first_trade_day": next((r["day"] for r in rows if r["points"]), None),
+           "day0": None, "days": 0, "index": [], "traded": {}, "recorded": None,
+           "quality": quality, "range_1y": {}, "overlap": overlap}
+    if not shown:
+        return doc
+    span = days[i0:]
+    doc.update(day0=int(datetime.fromisoformat(span[0]).replace(tzinfo=timezone.utc).timestamp()), days=len(span),
+               index=[_sig(v) for v in col("index")[i0:]],
+               traded={m: [_r4(v) for v in traded[m][i0:]] for m in shown})
+    full = [(n or 0) >= sh.FULL_DAY_SNAPSHOTS for n in col("rec_n")[i0:]]
+    r0 = full.index(True) if any(full) else None
+    if r0 is not None:
+        doc["recorded"] = {"from": r0, **{m: [_r4(v) for v in rec[m][i0 + r0:]] for m in shown}}
+    window, enough = SURFACE_RANGE
+    for m in shown:
+        series = [v for v in traded[m][i0:][-window:] if v is not None]
+        last = next((v for v in reversed(traded[m][i0:]) if v is not None), None)
+        if len(series) >= enough and last is not None:
+            p10, p50, p90 = (float(x) for x in np.percentile(series, [10, 50, 90]))
+            doc["range_1y"][m] = {"p10": _r4(p10), "p50": _r4(p50), "p90": _r4(p90), "last": _r4(last),
+                                  "pct": round(100 * sum(v < last for v in series) / len(series), 1)}
+    return doc
+
+
+def surface_files(data: Path, site: Path, now: float) -> dict[str, dict]:
+    """Writes site/surface/{UND}.json for every coin with a surface CSV; drops files of coins without one."""
+    out = {}
+    for p in sorted((data / "history" / "surface").glob("*.csv")):
+        doc = surface_block(data, p.stem, now)
+        if doc:
+            out[p.stem] = doc
+            _write(site / "surface" / f"{p.stem}.json", doc)
+    for old in (site / "surface").glob("*.json"):
+        if old.stem not in out:
+            old.unlink()
+    return out
+
+
 def change_pct(closes: list[float], bars: int) -> float | None:
     if len(closes) <= bars or not closes[-1 - bars]:
         return None
@@ -525,6 +632,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "consensus_detail": {tf: (sig["timeframes"].get(tf) or {}).get("consensus") for tf in ("4h", "1d")},
             "context": sig.get("context", {})}
     context = engine_context(sig, rows, meta)
+    surfaces = surface_files(data, site, now)
     breadth: dict = defaultdict(Counter)
     for sym in sig.get("universe", []):
         und = sym.split("-")[0]
@@ -561,6 +669,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
         comparison = engine_comparison(r4, r1, now)
         pos = r4.get("positioning") or {}
         price = (opts or {}).get("features", {}).get("index_price") or (closes4[-1] if closes4 else None)
+        has_surface = bool((surfaces.get(und) or {}).get("traded"))
         markets.append({
             "und": und, "symbol": sym, "price": price,
             "chg_1d": change_pct(closes1, 1), "chg_24h": change_pct(closes4, 6), "chg_7d": change_pct(closes4, 42),
@@ -573,7 +682,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "ribbon_1d": (r1.get("ribbon") or {}).get("state"), "ribbon_4h": (r4.get("ribbon") or {}).get("state"),
             "data_4h": r4.get("data_status"), "data_1d": r1.get("data_status"), "volume_status": r4.get("volume_status"),
             "funding_ann": pos["funding_rate"] * 24 * 365 if pos.get("funding_rate") is not None else None,
-            "oi_usd": pos.get("oi_value"), "has_options": opts is not None,
+            "oi_usd": pos.get("oi_value"), "has_options": opts is not None, "has_surface": has_surface,
             "atm_iv_30d": (opts or {}).get("features", {}).get("atm_iv_30d"),
             "rr25_30d": (opts or {}).get("features", {}).get("rr25_30d"),
             "lean": ((opts or {}).get("lean") or {}).get("state"),
@@ -599,7 +708,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "history": tracking,
             "backfilled": {tf: cache.counts(und, tf)[1] for tf in CANDLES_KEEP},
             "signals": history.get(und, {}), "latest": {"4h": r4 or None, "1d": r1 or None}, "options": opts,
-            "taker_flow": coin_flows, "alignment": align,
+            "has_surface": has_surface, "taker_flow": coin_flows, "alignment": align,
         })
     meta["breadth_1d"] = breadth_table(breadth)
     _write(site / "markets.json", {**meta, "coins": markets})

@@ -9,7 +9,7 @@ cd frontend && npm install && npm run dev      # app against the live site-data 
 Reflex's signals on Derive's perps, plus Derive's options volatility surface.
 
 - Signals: Reflex's signal code (engines, synthesizer, decision pipeline, agent filters), copied unchanged into `backend/reflex` at a pinned Reflex commit, run on Derive's candles for every Derive perp after each 4H and daily close. Design: `docs/signal-port.md`. Check against Reflex: `docs/parity-report.md`.
-- Options: Derive does not serve past volatility surfaces, so the recorder builds the history every 15 minutes.
+- Options: Derive does not serve past volatility surfaces, so the recorder builds the history every 15 minutes. Daily readings before recording began are rebuilt from traded options, a separate measurement that is labelled as such and never joined to the recorded quotes.
 
 Both run in one GitHub Action (`.github/workflows/record.yml`) that commits plain files to the `data` branch: no server, no cost on a public repo. The FastAPI app in `backend/` serves the options data from SQLite and is kept for local use; it is not deployed.
 
@@ -50,12 +50,15 @@ Built by `backend/publish_site.py` from the `data` branch after every recording 
 | `traders.json`, `traders/{address}.json` | options traders' leaderboard and cohorts (market makers left out); one file per ranked trader |
 | `flow.json` | last 24 hours: large trades and the most active wallets |
 | `strikes/{UND}.json` | per-strike view of the newest chain (written by `record_once.py`) |
+| `surface/{UND}.json` | daily option readings rebuilt from traded options, version 1: `{und, version, generated_at, status: ready\|sparse, first_trade_day, day0, days, index[], traded{atm7, atm30, atm90, rr7, rr30}, recorded{from, ...}, quality{metric: {coverage, reliability, shown}}, range_1y{metric: {p10, p50, p90, last, pct}}, overlap{metric: {days, median_diff}}}`. Value `i` of each array is the UTC day `day0 + i * 86400`; null is a gap. `traded` holds a 5-day median and only the readings that pass the gates (below); `recorded` holds, for the same readings, the daily medians of the recorded 15-minute snapshots (days with at least 72 of 96) from offset `from`, as a separate series; `pct` is the newest value's percentile rank (0-100) within the past year of `traded`. Written for every coin with a `history/surface` file; `markets.json` and `coins/{UND}.json` carry `has_surface` (true when at least one reading is shown); a coin without it needs no request |
 
 ## Tracking values over time
 
 Coin pages include **Market history**: dated engine metrics, funding and open interest. Inspect exact samples by pointer, touch or keyboard; select daily or four-hour readings. Missing intervals remain gaps. Details: `docs/history-tracking.md`.
 
-Historical price metrics cover up to 120 daily closes and 30 days of four-hour closes. They use the same engines on completed cached candles, with warmup and source provenance retained. Reconstructed metrics use dashed lines; final trading decisions are shown only where originally recorded. Option measurements stay in the `data` branch's feature files; the coin file carries their recording coverage and 14 days of IV history for the options panel. Derive provides no past surfaces, so missing snapshots and dates before recording began cannot be recovered from the trade history or price candles. Wallet trade reconstruction and option-surface recording have separate coverage dates.
+Historical price metrics cover up to 120 daily closes and 30 days of four-hour closes. They use the same engines on completed cached candles, with warmup and source provenance retained. Reconstructed metrics use dashed lines; final trading decisions are shown only where originally recorded. Option measurements stay in the `data` branch's feature files; the coin file carries their recording coverage and 14 days of IV history for the options panel. Derive provides no past surfaces, so missing snapshots and the surfaces of dates before recording began cannot be recovered. Daily readings rebuilt from the options traded on those dates (`surface/{UND}.json`) are a separate measurement: labelled as rebuilt from traded options, published as their own series beside the recorded quotes and never used to fill a recorded gap. Wallet trade reconstruction and option-surface recording have separate coverage dates.
+
+Readings rebuilt from traded options are published per reading only while it passes three gates, recomputed on every run: a reading on at least 70% of the trailing 180 days, a corrected split-half reliability of at least 0.85 (the same fit on two halves of the instruments), and, once recorded and traded readings overlap on 14 days or more, a median difference of at most 3 volatility points (ATM) or 2 (risk reversal). No level offset is applied. On 3 October 2026 BTC (from 21 September 2024) and ETH (from 3 February 2024) passed for all five readings, HYPE (from 7 February 2026) for ATM 7, 30 and 90 days and the 30-day risk reversal; the other coins trade too few options. Method and validation: `docs/history-tracking.md`.
 
 ## Options traders' history (`data` branch)
 
@@ -68,7 +71,8 @@ Every option and perp trade on Derive V2 since December 2023, one finished UTC d
 | `history/wallets.json` | each wallet's class from all days so far (market maker, income, hedger, directional, occasional) and, for profitable directional wallets, its tier (top, smart, profitable) |
 | `history/positions.json` | open option contracts per instrument held by each tier's wallets |
 | `history/traders.json` | leaderboard (best 200 by options PnL, market makers left out), each one's open options and last 45 days, cohorts by results and by size with their open options |
-| `history/state.json` | last day done |
+| `history/surface/{UND}.csv` | one row per finished UTC day for each coin with options (traded or recorded that day), appended once and never rewritten (`derive/surface_history.py`): `day, index, index_src, carry_day, carry_pairs, carry, points, contracts, atm7, atm30, atm90, rr7, rr30, n7, n30, n90`, the same five readings from two halves of the instruments (`*_a`, `*_b`, by crc32 of the instrument name), and `rec_atm7 ... rec_rr30, rec_n`: the median of that day's recorded snapshots, null unless at least 72 of 96 were recorded |
+| `history/state.json` | last day done; `surface` (definition version of `history/surface`), `surface_through` (newest day in it) and, while a new version is rebuilt into `history/surface_rebuild/`, `surface_pending` |
 
 ## Options files (`data` branch)
 
