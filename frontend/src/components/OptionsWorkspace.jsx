@@ -34,7 +34,7 @@ function ExpiryDesk({ opts }) {
     else node.scrollTop += button.top - box.top - (box.height - button.height) / 2;
   }, [key]);
   const index = opts.features?.index_price;
-  if (!exps.length) return <p className="status">No strikes for this market yet.</p>;
+  if (!exps.length) return <p className="status desk-empty">No strikes for this market yet.</p>;
   return (
     <div className="expiry-workspace">
       <aside ref={rail} className="expiry-rail" aria-label="Expiries">

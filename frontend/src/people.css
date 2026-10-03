@@ -1,19 +1,19 @@
 /* Traders, trader profile and Flow: one plate treatment, dense rows, numbers in mono. */
 
 /* Shared: lead plate rule, flush table bodies, tier tag, show-all button, breadcrumb. */
-.lead-plate { border-top: 2px solid var(--orange); }
+
 .plate-b.flush { padding: 0 0 4px; }
 .plate-b.flush > table.grid th:first-child, .plate-b.flush > table.grid td:first-child,
 .lb table.grid th:first-child, .lb table.grid td:first-child { padding-left: 20px; }
 .plate-b.flush > table.grid th:last-child, .plate-b.flush > table.grid td:last-child,
 .lb table.grid th:last-child, .lb table.grid td:last-child { padding-right: 20px; }
 .plate-b.flush > .status.pad { padding: 16px 20px; margin: 0; }
-.tier-tag { font: 600 var(--t-key)/1 var(--font-body); font-style: normal; letter-spacing: .08em; text-transform: uppercase; color: var(--orange); }
+.tier-tag { font: 600 var(--t-key)/1 var(--font-body); font-style: normal; color: var(--accent-text); }
 .lb-more { margin: 12px 20px 12px; padding: 8px 16px; }
 .people-page { gap: 24px; }
 .crumbs { display: flex; align-items: center; gap: 8px; font: 500 var(--t-label)/1.4 var(--font-body); color: var(--faint); margin-bottom: -8px; }
 .crumbs a { color: var(--muted); border-bottom: 1px solid var(--seam-hi); }
-.crumbs a:hover { color: var(--fg); border-bottom-color: var(--orange); }
+.crumbs a:hover { color: var(--fg); border-bottom-color: var(--accent-text); }
 .crumbs span:last-child { color: var(--fg-2); }
 table.grid tr[tabindex]:hover .wtag-name { text-decoration: underline; text-decoration-color: var(--seam-hi); text-underline-offset: 3px; }
 
@@ -79,7 +79,7 @@ td.lb-who { padding-block: 10px; }
 .cohort-title span { font: 400 var(--t-label)/1.4 var(--font-body); color: var(--muted); }
 .cohort-detail > .tabs { margin-top: 8px; border-bottom: 1px solid var(--seam); }
 .cohort-totals { display: flex; gap: 12px 40px; flex-wrap: wrap; padding-block: 16px; }
-.cohort-totals > span { display: grid; gap: 6px; font: 600 var(--t-key)/1.2 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.cohort-totals > span { display: grid; gap: 6px; font: 600 var(--t-key)/1.2 var(--font-body); color: var(--faint); }
 .cohort-totals b { font: 500 var(--t-h2)/1.2 var(--font-mono); letter-spacing: -.01em; text-transform: none; color: var(--fg); font-variant-numeric: tabular-nums; }
 .cohort-totals b.up { color: var(--up); } .cohort-totals b.down { color: var(--down); }
 .dagger { font: 400 var(--t-key)/0 var(--font-body); color: var(--faint); margin-left: 3px; vertical-align: super; }
@@ -142,14 +142,14 @@ table.grid.exposure-grid { min-width: 560px; }
 /* ---------- Flow and trader tables ---------- */
 table.grid.flow-table { min-width: 0; }
 .flow-table .ft-inst a { font-size: var(--t-cell); }
-.flow-table .ft-inst a:hover { color: var(--orange); }
-.ft-rfq { margin-left: 8px; font: 600 var(--t-key)/1 var(--font-body); letter-spacing: .08em; }
+.flow-table .ft-inst a:hover { color: var(--accent-text); }
+.ft-rfq { margin-left: 8px; font: 600 var(--t-key)/1 var(--font-body); }
 .flow-table .ft-side, .trade-table .t-side { color: var(--muted); }
 .flow-table .wtag-name { font-size: var(--t-cell); }
 .flow-table a:hover .wtag-name { text-decoration: underline; text-decoration-color: var(--seam-hi); text-underline-offset: 3px; }
 .trade-table, .book-table { min-width: 0 !important; }
 .trade-table td.t-opt { font-size: var(--t-cell); color: var(--fg-2); }
-.trade-table tr.day-row td { padding: 14px 20px 6px; font: 600 var(--t-key)/1.3 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); border-bottom: 1px solid var(--seam); }
+.trade-table tr.day-row td { padding: 14px 20px 6px; font: 600 var(--t-key)/1.3 var(--font-body); color: var(--faint); border-bottom: 1px solid var(--seam); }
 .trade-table tbody tr.day-row:hover, .book-table tr.coin-row:hover { background: none; }
 
 /* ---------- Trader identity ---------- */
@@ -163,11 +163,11 @@ table.grid.flow-table { min-width: 0; }
 .tid-meta { gap: 2px 0; }
 .tid-meta > span { white-space: nowrap; }
 .tid-meta > span + span::before { content: "·"; margin: 0 8px; color: var(--faint); }
-.tid-copy { border: 0; padding: 0; background: none; font: 500 var(--t-label)/1.4 var(--font-body); color: var(--orange); border-bottom: 1px solid currentColor; }
+.tid-copy { border: 0; padding: 0; background: none; font: 500 var(--t-label)/1.4 var(--font-body); color: var(--accent-text); border-bottom: 1px solid currentColor; }
 .tid-copy:hover { color: var(--orange-hi); }
 .tkpis { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 12px 24px; border-top: 1px solid var(--seam); padding-top: 16px; }
 .tkpis > div { display: grid; gap: 6px; align-content: start; min-width: 0; }
-.tkpis span { display: inline-flex; align-items: center; font: 600 var(--t-key)/1.2 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); white-space: nowrap; }
+.tkpis span { display: inline-flex; align-items: center; font: 600 var(--t-key)/1.2 var(--font-body); color: var(--faint); white-space: nowrap; }
 .tkpis b { font: 500 var(--t-h2)/1.15 var(--font-mono); letter-spacing: -.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tkpis b.big { font-size: var(--t-kpi-big); font-weight: 600; letter-spacing: -.02em; }
 
@@ -210,7 +210,7 @@ table.grid.flow-table { min-width: 0; }
   .book-table td.b-entry { grid-area: entry; text-align: right; }
   .book-table td.b-mark { grid-area: mark; }
   .book-table td.b-delta { grid-area: delta; text-align: right; }
-  .book-table td[data-k]::before { content: attr(data-k); margin-right: 6px; font: 600 var(--t-key)/1 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+  .book-table td[data-k]::before { content: attr(data-k); margin-right: 6px; font: 600 var(--t-key)/1 var(--font-body); color: var(--faint); }
 
   /* Trades: one line, side + contracts + option, price right. */
   .trade-table thead { display: none; }
@@ -239,7 +239,7 @@ table.grid.flow-table { min-width: 0; }
   .flow-table td.fw-pnl { grid-area: pnl; text-align: right; font-size: 15px; }
   .flow-table tr.fw-row > td.fw-pnl, .flow-table tr.fw-row > td.fw-net { text-align: right; }
   .flow-table td.fw-perp { grid-area: perp; } .flow-table td.fw-opt { grid-area: opt; } .flow-table td.fw-net { grid-area: net; text-align: right; }
-  .flow-table tr.fw-row td[data-k]::before { content: attr(data-k); display: block; font: 600 var(--t-key)/1.3 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+  .flow-table tr.fw-row td[data-k]::before { content: attr(data-k); display: block; font: 600 var(--t-key)/1.3 var(--font-body); color: var(--faint); }
   .flow-table tbody tr:last-child { border-bottom: 0; }
 
   .flow-brief-head { padding: 14px 16px; }
