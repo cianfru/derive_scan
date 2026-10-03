@@ -140,7 +140,15 @@ def balance_step(out: Path, state: dict, *, added: bool, surface_ready: bool, no
             or state.get("repaired") != REPAIR or done < history.last_complete_day(now).isoformat() \
             or left < BALANCE_MIN_BUDGET:
         return None
-    n = balance_history.backfill(out, BALANCE_CLOSES)
+    if state.get("balance_failed") == BALANCE_VERSION and now - state.get("balance_failed_at", 0) < 86400:
+        return None  # a failed backfill is retried once a day, not on every run
+    try:
+        n = balance_history.backfill(out, BALANCE_CLOSES)
+    except Exception as exc:  # the backfill must never fail the history step
+        print(f"balance backfill failed: {exc!r}")
+        state["balance_failed"], state["balance_failed_at"] = BALANCE_VERSION, now
+        history.save_state(out, state)
+        return None
     state["balance"] = BALANCE_VERSION
     history.save_state(out, state)
     return n

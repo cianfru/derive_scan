@@ -25,7 +25,8 @@ history/balance.json
   through       YYYY-MM-DD, the day of the newest close
   closes        {close_ts: {UND: {"7d": [score, net, gross, positions, flags], "30d": [...]}}}
                 close_ts is the daily bar's close (00:00 UTC after the day). score is null below the
-                live gates (gross >= $10k, >= 3 positions) or when a delta was missing or estimated;
+                live gates (gross >= $10k, >= 3 positions) or when a delta was missing (a modelled
+                close keeps its score and sets bit 1);
                 net and gross (USD delta) are null when a quote is missing. flags: bit 0 roll,
                 bit 1 modelled. A coin or horizon without a Smart position is left out.
   expiry_gross  {close_ts: {UND: {expiry_ts: gross}}} for the two newest closes (the next roll)
