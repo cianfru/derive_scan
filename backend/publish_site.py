@@ -22,6 +22,10 @@ keeps no history. Files:
   flow.json           last 24 hours: large trades, most active wallets (market makers left out once
                       the rebuilt history has classed them), with each wallet's class
   strikes/{UND}.json  written by record_once.py (per-strike view of the newest chain)
+  questions/          written by record_once.py only while QUESTIONS_PUBLISH is on (index.json,
+                      {UND}.json boards, history/{UND}-{YYYYMMDD}.json); marked paused here when
+                      its prices are over 90 minutes old, removed here when publishing is off;
+                      markets.json and coins/{UND}.json then carry `questions` per coin
   surface/{UND}.json  daily option readings rebuilt from traded options (ATM 7/30/90 days, 25-delta
                       risk reversal 7/30 days), gated, with the recorded daily medians beside them;
                       only for coins whose history/surface CSV exists (has_surface in markets.json)
@@ -697,6 +701,8 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "context": sig.get("context", {})}
     context = engine_context(sig, rows, meta)
     surfaces = surface_files(data, site, now)
+    q_coins = question_coins(site, now)
+    q_flag = {} if q_coins is None else None  # with Questions off, no field is added at all
     breadth: dict = defaultdict(Counter)
     engine_1d: dict = {}
     for sym in sig.get("universe", []):
@@ -765,6 +771,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "spark_times_1d": [b[0] + 86400 for b in candles["1d"][-60:]],
             "spark": closes4[-42:],
             "spark_times": [b[0] + 14400 for b in candles["4h"][-42:]],
+            **(q_flag if q_flag is not None else {"questions": und in q_coins}),
         })
         tracking = metric_history(data, cache, und, now, metrics.get(und, {}))
         count_breadth(breadth, tracking["engine"]["1d"])
@@ -777,6 +784,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "backfilled": {tf: cache.counts(und, tf)[1] for tf in CANDLES_KEEP},
             "signals": history.get(und, {}), "latest": {"4h": r4 or None, "1d": r1 or None}, "options": opts,
             "has_surface": has_surface, "taker_flow": coin_flows, "alignment": align,
+            **(q_flag if q_flag is not None else {"questions": und in q_coins}),
         })
     meta["breadth_1d"] = breadth_table(breadth)
     _write(site / "markets.json", {**meta, "coins": markets})
@@ -793,6 +801,21 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     _write(site / "flow.json", {"generated_at": int(now), **flow})
     traders_block(data, site, chains, flow, now)
     return {"coins": len(markets)}
+
+
+def question_coins(site: Path, now: float) -> set | None:
+    """Coins with live questions (questions/index.json, written by record_once.py), or None when
+    Questions publishing is off; then any questions/ left from an earlier run is removed."""
+    from derive import question_job as qj
+    if not qj.publishing():
+        qj.remove_site(site)
+        return None
+    qj.mark_paused(site, now)
+    try:
+        idx = json.loads((site / "questions" / "index.json").read_text())
+    except (OSError, ValueError):
+        return set()
+    return {c["und"] for c in idx.get("coins") or []} if not idx.get("paused") else set()
 
 
 def main() -> None:

@@ -29,6 +29,10 @@ jobs:
   record:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      # Questions: the data branch always keeps their state and hourly history; the app files
+      # (site-data questions/) are published only when this is "on". Off until the owner switches it on.
+      QUESTIONS_PUBLISH: "off"
     steps:
       - uses: actions/checkout@v4
 
