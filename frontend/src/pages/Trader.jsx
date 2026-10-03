@@ -1,81 +1,169 @@
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import { usd, pct, price, ago, utc } from "../lib/format.js";
-import { TYPE, TYPE_INFO, typeOf } from "../lib/traders.js";
+import { usd, pct, price, ago, utc, optionLabel, strike } from "../lib/format.js";
+import { TYPE_INFO } from "../lib/traders.js";
+import { codename, shortAddr } from "../lib/walletName.js";
 import { Plate, Loading, Failed, Info } from "../components/ui.jsx";
-import WalletTag from "../components/WalletTag.jsx";
+import { WalletEmblem } from "../components/WalletTag.jsx";
 import LeanBar from "../components/LeanBar.jsx";
+import { Asset } from "../components/MarketVisuals.jsx";
 import HistoryStatus, { coverageReady } from "../components/HistoryStatus.jsx";
 
-const day = (t) => new Date(t * 1000).toISOString().slice(0, 10);
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const short = (t) => { const d = new Date(t * 1000); return `${MONTHS[d.getUTCMonth()]} ${String(d.getUTCDate()).padStart(2, "0")}`; };
+const dayLabel = (iso) => short(Date.parse(`${iso}T00:00:00Z`) / 1000);
+const qty = (v) => Math.abs(v).toLocaleString("en-US", { maximumFractionDigits: 3 });
+const tone = (v) => (v > 0 ? "up" : v < 0 ? "down" : "");
+const tiered = (t) => t.tier === "top" || t.tier === "smart";
+const CAP = 20;
+
+const KPI_HELP = "Gross options PnL: expired options, premium received minus premium paid plus settlement value, before fees; it sets the rank. Win rate: share of expired option instruments with positive gross PnL; it counts outcomes, not their size. Expired options: distinct expired instruments with reconstructed results. Premium traded: option premium bought plus sold, before netting; it sets the size cohort. Perp PnL: reported realised perpetual PnL, separate from the ranking. " + TYPE_INFO;
+const BOOK_HELP = "Positions reconstructed through the displayed UTC close, valued on fresh options quotes. Marks use a Black-76 model on the index; quoted delta is used where available, otherwise an estimate from the strike IV, marked est. No default volatility is assumed. Later trades are not included, and expired instruments are omitted. Entry is the average cost of the remaining position where daily records determine it; when buys and sells lose their order in a daily aggregate, entry and unrealised PnL show a dash until a later close or reversal establishes a known basis. Delta is dollar exposure to the coin; positive gains when the price rises. Coins are ordered by gross delta.";
+
+function leanOf(rows) {
+  const q = rows.filter((p) => p.delta_usd != null);
+  const net = q.reduce((s, p) => s + p.delta_usd, 0), gross = q.reduce((s, p) => s + Math.abs(p.delta_usd), 0);
+  return { net_delta_usd: net, gross_delta_usd: gross, score: gross > 0 ? net / gross : null };
+}
+
+function OpenOptions({ book }) {
+  const by = {};
+  for (const p of book) (by[p.und] ||= []).push(p);
+  const groups = Object.entries(by).map(([und, rows]) => ({
+    und, lean: leanOf(rows),
+    rows: [...rows].sort((a, b) => a.expiry - b.expiry || a.strike - b.strike),
+  })).sort((a, b) => b.lean.gross_delta_usd - a.lean.gross_delta_usd);
+  return (
+    <table className="grid book-table">
+      <thead><tr><th>Option</th><th>Expiry</th><th>Side</th><th className="num">Contracts</th><th className="num">Entry</th><th className="num">Mark</th><th className="num">Delta</th><th className="num">Unrealised</th></tr></thead>
+      {groups.map((g) => (
+        <tbody key={g.und}>
+          <tr className="coin-row">
+            <td colSpan={8}>
+              <span className="coin-row-in">
+                <Link to={`/coin/${g.und}#wallets`} className="asset-link"><Asset und={g.und} compact /></Link>
+                <LeanBar lean={g.lean} width={56} />
+              </span>
+            </td>
+          </tr>
+          {g.rows.map((p) => {
+            const o = optionLabel(p.instrument);
+            return (
+              <tr key={p.instrument} className="book-row">
+                <td className="b-opt mono">{o.strike != null ? `${strike(o.strike, "")} ${o.type}` : p.instrument}</td>
+                <td className="b-exp mono faint">{short(p.expiry)}</td>
+                <td className="b-side dim">{p.net > 0 ? "Long" : "Short"}</td>
+                <td className="num b-qty">{qty(p.net)}</td>
+                <td className="num b-entry" data-k="Entry">{p.entry == null ? <span className="faint">–</span> : price(p.entry)}</td>
+                <td className="num b-mark" data-k="Mark">{price(p.mark)}</td>
+                <td className="num b-delta" data-k="Delta">{p.delta_usd == null ? <span className="faint">–</span> : <>{usd(p.delta_usd)}{p.delta_source !== "quoted" && <span className="faint est"> est</span>}</>}</td>
+                <td className={`num hero b-upnl ${tone(p.upnl)}`}>{p.upnl == null ? <span className="faint">–</span> : usd(p.upnl)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      ))}
+    </table>
+  );
+}
+
+function Recent({ recent }) {
+  const [all, setAll] = useState(false);
+  const rows = [];
+  for (const [d, inst, buy, sell, bv, sv] of recent) {
+    if (buy) rows.push({ d, inst, side: "Buy", n: buy, px: bv / buy });
+    if (sell) rows.push({ d, inst, side: "Sell", n: sell, px: sv / sell });
+  }
+  const shown = all ? rows : rows.slice(0, CAP);
+  let last = null;
+  return (
+    <>
+      <table className="grid trade-table">
+        <thead><tr><th>Side</th><th className="num">Contracts</th><th>Option</th><th className="num">Average price</th></tr></thead>
+        <tbody>
+          {shown.flatMap((r, i) => {
+            const out = [];
+            if (r.d !== last) { last = r.d; out.push(<tr key={`d${i}`} className="day-row"><td colSpan={4}>{dayLabel(r.d)}</td></tr>); }
+            out.push(
+              <tr key={i} className="trade-row">
+                <td className="t-side">{r.side}</td>
+                <td className="num t-qty">{qty(r.n)}</td>
+                <td className="mono t-opt">{optionLabel(r.inst).display}</td>
+                <td className="num t-px">{price(r.px)}</td>
+              </tr>);
+            return out;
+          })}
+        </tbody>
+      </table>
+      {rows.length > shown.length && <button className="btn lb-more" onClick={() => setAll(true)}>Show all {rows.length}</button>}
+    </>
+  );
+}
 
 export default function Trader() {
   const { address } = useParams();
   const { data, error } = useData(`traders/${address.toLowerCase()}.json`, 5 * 60_000);
-  if (error && !data) return <div className="wrap page"><Link to="/traders" className="status">Traders /</Link><Failed error={error} /></div>;
+  const [copied, setCopied] = useState(false);
+  const crumb = (name) => <nav className="crumbs" aria-label="Breadcrumb"><Link to="/traders">Traders</Link><span>/</span><span>{name}</span></nav>;
+  if (error && !data) return <div className="wrap page">{crumb(codename(address))}<Failed error={error} /></div>;
   if (!data) return <div className="wrap page"><Loading /></div>;
-  if (!coverageReady(data)) return <div className="wrap page"><Link to="/traders">Traders /</Link><HistoryStatus data={data} /></div>;
+  if (!coverageReady(data)) return <div className="wrap page">{crumb(codename(address))}<HistoryStatus data={data} /></div>;
   const book = data.book || [];
+  const name = codename(data.address);
+  const copy = () => { navigator.clipboard?.writeText(data.address).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }, () => {}); };
+  const large = (data.large_24h || []).slice(0, CAP);
   return (
-    <div className="wrap page">
-      <div>
-        <Link to="/traders" className="status">Traders /</Link>
-        <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap", marginTop: 6 }}>
-          <WalletTag address={data.address} size={44} className="wtag-head" />
-          <span className="status">Rank {data.rank} · <span className={data.tier === "top" || data.tier === "smart" ? "orange" : ""}>{TYPE[typeOf(data)]}</span>
-            {data.pnl_cohort ? ` · ${data.pnl_cohort}` : ""}{data.size_cohort ? ` · ${data.size_cohort}` : ""} <Info>{TYPE_INFO}</Info></span>
+    <div className="wrap page people-page trader-page">
+      {crumb(name)}
+      <section className="plate trader-id">
+        <div className="tid">
+          <WalletEmblem address={data.address} size={44} />
+          <div className="tid-t">
+            <h1>{name}{tiered(data) && <em className="tier-tag">{data.tier}</em>}</h1>
+            <p className="tid-sub">
+              <span className="mono" title={data.address}>{shortAddr(data.address)}</span>
+              <button className="tid-copy" onClick={copy}>{copied ? "Copied" : "Copy"}</button>
+            </p>
+            <p className="tid-sub tid-meta">
+              <span>Rank {data.rank}</span>
+              {data.pnl_cohort && <span>{data.pnl_cohort}</span>}
+              {data.size_cohort && <span>{data.size_cohort}</span>}
+              <span>since {data.first}</span>
+              {data.last && <span>last trade {data.last}</span>}
+              <span>perp PnL <b className={`mono ${tone(data.perp_pnl)}`}>{usd(data.perp_pnl)}</b></span>
+            </p>
+          </div>
         </div>
-      </div>
-      <div className="figs">
-        <div className="fig"><span>Gross options PnL <Info label="About gross options PnL">Expired options: premium received minus premium paid plus settlement value. Fees are excluded, matching the documented ranking rules.</Info></span>
-          <strong className={data.option_pnl > 0 ? "up" : data.option_pnl < 0 ? "down" : ""}>{usd(data.option_pnl)}</strong></div>
-        <div className="fig"><span>Win rate <Info>Share of expired option instruments with positive gross PnL. It counts outcomes, not the size of wins and losses, and is not an estimate of future success.</Info></span><strong>{pct(data.win_rate, 0)}</strong></div>
-        <div className="fig"><span>Expired options <Info>Distinct expired option instruments with reconstructed results in the collected history.</Info></span><strong>{data.expired}</strong></div>
-        <div className="fig"><span>Premium traded <Info>Total option premium bought plus sold over the collected history, before netting. This determines the size cohort.</Info></span><strong>{usd(data.premium_traded)}</strong></div>
-        <div className="fig"><span>Perp PnL <Info>Reported realised perpetual PnL in the collected trade history. It is separate from the expired-options PnL used for this ranking.</Info></span><strong className={data.perp_pnl > 0 ? "up" : data.perp_pnl < 0 ? "down" : ""}>{usd(data.perp_pnl)}</strong></div>
-        <div className="fig"><span>Active</span><strong style={{ fontSize: 13 }}>{data.first} to {data.last}</strong></div>
-      </div>
-      <Plate title="Open options" info="Positions reconstructed through the displayed UTC close, valued on fresh options quotes. Marks use a Black-76 model on the index; quoted delta is used where available, otherwise a labelled estimate from the strike IV. No default volatility is assumed. Later trades are not included, and expired instruments are omitted. Entry is the average cost of the remaining position where daily records determine it. When buys and sells lose their order in a daily aggregate, entry and unrealised PnL are unavailable until a later close or reversal establishes a known basis. Delta is dollar exposure to the coin; positive gains when the price rises."
-        right={book.length ? <LeanBar lean={data.lean} /> : null} bodyClass="table-wrap">
-        {book.length ? (
-          <table className="grid" style={{ minWidth: 720 }}>
-            <thead><tr><th>Option</th><th>Side</th><th className="num">Contracts</th><th className="num">Entry</th><th className="num">Mark</th><th className="num">Delta</th><th className="num">Unrealised</th></tr></thead>
-            <tbody>
-              {book.map((p) => (
-                <tr key={p.instrument} style={{ cursor: "default" }}>
-                  <td><Link to={`/coin/${p.und}#wallets`} style={{ fontWeight: 600 }}>{p.und}</Link> <span className="mono">{p.strike.toLocaleString()} {p.type === "C" ? "call" : "put"}</span> <span className="dim mono">{day(p.expiry)}</span></td>
-                  <td className={p.net > 0 ? "up" : "down"}>{p.net > 0 ? "Long" : "Short"}</td>
-                  <td className="num">{Math.abs(p.net).toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
-                  <td className="num">{p.entry == null ? <span className="faint">Unavailable</span> : price(p.entry)}</td>
-                  <td className="num">{price(p.mark)}</td>
-                  <td className={`num ${p.delta_usd > 0 ? "up" : p.delta_usd < 0 ? "down" : ""}`}>{usd(p.delta_usd)} {p.delta_source !== "quoted" && <Info label="About delta estimate">{p.delta_source === "model_iv" ? "Estimated from the strike IV on the index. Excluded from directional labels." : "No fresh quoted delta or strike IV is available."}</Info>}</td>
-                  <td className={`num ${p.upnl > 0 ? "up" : p.upnl < 0 ? "down" : ""}`}>{p.upnl == null ? <span className="faint">Unavailable</span> : usd(p.upnl)}</td>
-                </tr>))}
-            </tbody>
-          </table>) : <p className="status">No open options.</p>}
+        <div className="tkpis">
+          <div><span>Gross options PnL <Info label="About these figures">{KPI_HELP}</Info></span><b className={`big ${tone(data.option_pnl)}`}>{usd(data.option_pnl)}</b></div>
+          <div><span>Win rate</span><b>{pct(data.win_rate, 0)}</b></div>
+          <div><span>Expired options</span><b>{data.expired?.toLocaleString("en-US") ?? "—"}</b></div>
+          <div><span>Premium traded</span><b>{usd(data.premium_traded)}</b></div>
+        </div>
+      </section>
+      <Plate title="Open options" info={BOOK_HELP} right={data.lean?.score != null ? <LeanBar lean={data.lean} /> : null} bodyClass="flush">
+        {book.length ? <OpenOptions book={book} /> : <p className="status pad">—</p>}
       </Plate>
-      {data.large_24h?.length > 0 && (
-        <Plate title="Large trades, 24h" bodyClass="table-wrap">
-          <table className="grid" style={{ minWidth: 560 }}>
-            <thead><tr><th>Time</th><th>Instrument</th><th>Side</th><th className="num">Price</th><th className="num">Notional</th></tr></thead>
-            <tbody>{data.large_24h.map((t, i) => (
-              <tr key={i} style={{ cursor: "default" }}><td className="dim">{ago(t.ts / 1000)}</td><td>{t.instrument}</td>
-                <td className={t.direction === "buy" ? "up" : "down"}>{t.direction === "buy" ? "Buy" : "Sell"}</td>
-                <td className="num">{price(t.price)}</td><td className="num">{usd(t.notional_usd)}</td></tr>))}</tbody>
+      {large.length > 0 && (
+        <Plate title="Large trades, 24h" bodyClass="flush">
+          <table className="grid trade-table">
+            <thead><tr><th>Time</th><th>Side</th><th className="num">Contracts</th><th>Option</th><th className="num">Price</th><th className="num">Notional</th></tr></thead>
+            <tbody>{large.map((t, i) => (
+              <tr key={i} className="trade-row">
+                <td className="t-time dim">{ago(t.ts / 1000)}</td>
+                <td className="t-side">{t.direction === "buy" ? "Buy" : "Sell"}</td>
+                <td className="num t-qty">{t.amount != null ? qty(t.amount) : "—"}</td>
+                <td className="mono t-opt">{optionLabel(t.instrument).display}</td>
+                <td className="num t-px">{price(t.price)}</td>
+                <td className="num t-notional">{usd(t.notional_usd)}</td>
+              </tr>))}</tbody>
           </table>
         </Plate>)}
-      <Plate title="Recent activity" info="Options bought and sold per day over the last 45 rebuilt days, with the average price." bodyClass="table-wrap">
-        {data.recent?.length ? (
-          <table className="grid" style={{ minWidth: 560 }}>
-            <thead><tr><th>Day</th><th>Option</th><th className="num">Bought</th><th className="num">Sold</th><th className="num">Average price</th></tr></thead>
-            <tbody>{data.recent.map(([d, inst, buy, sell, bv, sv], i) => (
-              <tr key={i} style={{ cursor: "default" }}><td className="dim">{d}</td><td className="mono">{inst}</td>
-                <td className="num up">{buy ? buy.toLocaleString(undefined, { maximumFractionDigits: 3 }) : ""}</td>
-                <td className="num down">{sell ? sell.toLocaleString(undefined, { maximumFractionDigits: 3 }) : ""}</td>
-                <td className="num">{price((bv + sv) / (buy + sell))}</td></tr>))}</tbody>
-          </table>) : <p className="status">No trades in the last 45 days.</p>}
+      <Plate title="Recent activity" info="Options bought and sold per day over the last 45 rebuilt days, with the average price." bodyClass="flush">
+        {data.recent?.length ? <Recent recent={data.recent} /> : <p className="status pad">—</p>}
       </Plate>
-      <p className="status">History to {data.through} UTC. Book valued {utc(data.generated_at)}{Date.now()/1000-data.generated_at>1800 ? " / historical snapshot" : ""}</p>
+      <p className="status">History to {data.through} UTC · book valued {utc(data.generated_at)}{Date.now() / 1000 - data.generated_at > 1800 ? " · historical snapshot" : ""}</p>
     </div>
   );
 }

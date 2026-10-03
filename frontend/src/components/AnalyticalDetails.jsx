@@ -1,5 +1,5 @@
 import { Info } from "./ui.jsx";
-import { title, utc } from "../lib/format.js";
+import { title, utc, dayTime } from "../lib/format.js";
 
 export const QUALITY_LABEL = {
   ready: "Ready",
@@ -20,21 +20,20 @@ export const QUALITY_LABEL = {
   insufficient_exposure: "Insufficient exposure",
 };
 
-export function FlowCoverage({ coverage }) {
+export function FlowCoverage({ coverage, as: Tag = "p" }) {
   if (!coverage)
-    return <p className="status warn">Collection coverage unavailable</p>;
+    return <Tag className="status warn">Collection coverage unavailable</Tag>;
   return (
-    <p className={`status ${coverage.ready ? "" : "warn"}`}>
-      {coverage.ready
-        ? "Complete collection"
-        : `Partial collection · ${(coverage.fraction * 100).toFixed(1)}% of window`}
-      {coverage.end ? ` · through ${utc(coverage.end)}` : ""}
+    <Tag className={`status flow-coverage ${coverage.ready ? "" : "warn"}`}>
+      {coverage.ready ? "" : `Partial collection · ${(coverage.fraction * 100).toFixed(1)}% of window · `}
+      {coverage.end ? `through ${dayTime(coverage.end)}` : ""}
       <Info label="About flow coverage">
         Trades are grouped by their execution time into complete 15-minute
-        buckets. Empty intervals count only after a successful collection.
-        Partial windows are shown for context and do not enter the options tone.
+        buckets, refreshed every 15 minutes. Empty intervals count only after a
+        successful collection. Partial windows are shown for context and do not
+        enter the options tone.
       </Info>
-    </p>
+    </Tag>
   );
 }
 

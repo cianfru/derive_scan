@@ -48,10 +48,11 @@ export function radarLabels(points, bounds) {
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
   return points.map(p => {
     const half = p.name.length * 3.6 + 3;
-    const candidates = [[0, -p.r - 12], [0, p.r + 20], [-p.r - half - 10, 4], [p.r + half + 10, 4],
-      [-32, -p.r - 26], [32, p.r + 34], [-50, 25], [50, -25]];
+    // Right of the dot first; candidate order breaks ties.
+    const candidates = [[p.r + half + 6, 4], [-p.r - half - 6, 4], [0, -p.r - 10], [0, p.r + 18],
+      [p.r + half + 10, -18], [p.r + half + 10, 26], [-32, -p.r - 26], [32, p.r + 34]];
     let best;
-    for (const [dx, dy] of candidates) {
+    for (const [i, [dx, dy]] of candidates.entries()) {
       const x = clamp(p.x + dx, bounds.left + half, bounds.right - half);
       const y = clamp(p.y + dy, bounds.top + 14, bounds.bottom - 4);
       const rect = { left: x - half, right: x + half, top: y - 12, bottom: y + 3 };
@@ -60,7 +61,7 @@ export function radarLabels(points, bounds) {
         const nx = clamp(c.x, rect.left, rect.right), ny = clamp(c.y, rect.top, rect.bottom);
         return Math.hypot(c.x - nx, c.y - ny) < c.r + 3;
       }).length;
-      const score = overlaps * 1000 + circles * 100 + Math.hypot(dx, dy) / 100;
+      const score = overlaps * 1000 + circles * 100 + i;
       if (!best || score < best.score) best = { x, y, rect, score, name: p.name };
     }
     placed.push(best.rect);

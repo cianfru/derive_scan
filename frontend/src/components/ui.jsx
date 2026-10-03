@@ -81,6 +81,11 @@ export function PageHead({ title, info, meta, tabs }) {
   );
 }
 
+/** A 12px right arrow drawn inline, so it never falls back to a system glyph. */
+export function Arrow({ className = "" }) {
+  return <svg className={`arrow-icon ${className}`} width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M1.5 6h8.5M6.5 2.5 10 6l-3.5 3.5" /></svg>;
+}
+
 /** A missing value: a faint em dash at normal size. */
 export function Empty({ label = "Unavailable" }) {
   return <span className="empty-dash" aria-label={label}>—</span>;

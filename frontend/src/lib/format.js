@@ -81,3 +81,11 @@ export function dayTime(t) {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.toISOString().slice(11, 16)} UTC`;
 }
 export const clock = (t) => (ok(t) ? `${new Date(t * 1000).toISOString().slice(11, 16)} UTC` : DASH);
+/** Three significant figures, grouped: 7,835.6 -> 7,840 · 347.51 -> 348 · 14.64 -> 14.6 · 0.04751 -> 0.0475 */
+export function sig3(v) {
+  if (!ok(v)) return DASH;
+  if (v === 0) return "0";
+  const d = Math.max(0, 2 - Math.floor(Math.log10(Math.abs(v))));
+  const r = Number(v.toPrecision(3));
+  return fmt(r, 0, d);
+}

@@ -105,11 +105,11 @@ it("opens Money Printer exposure and changes the expiry window without changing 
       />
     </MemoryRouter>,
   );
-  expect(screen.getAllByText("Long delta")).toHaveLength(2);
+  expect(screen.getAllByText("Long delta")).toHaveLength(1);
   await userEvent
     .setup()
     .click(screen.getByRole("tab", { name: "Beyond 30d" }));
-  expect(screen.getAllByText("Short delta")).toHaveLength(2);
+  expect(screen.getAllByText("Short delta")).toHaveLength(1);
   expect(screen.getByRole("link", { name: "HYPE" }).getAttribute("href")).toBe(
     "/coin/HYPE#wallets",
   );
@@ -128,9 +128,8 @@ it("summarizes the recorded premium categories and selects a market for the tape
       onSelect={choose}
     />,
   );
-  expect(
-    screen.getByRole("heading", { name: "HYPE leads premium activity" }),
-  ).toBeTruthy();
+  expect(screen.getByText("$150")).toBeTruthy();
+  expect(screen.getByText("2 markets · 24h")).toBeTruthy();
   await userEvent.setup().click(screen.getByRole("button", { name: /HYPE/ }));
   expect(choose).toHaveBeenCalledWith("HYPE");
 });

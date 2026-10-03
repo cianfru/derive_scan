@@ -110,7 +110,7 @@ export default function Markets() {
             </span>
             {view !== "perps" && (
               <button className="text-control" aria-pressed={details} onClick={() => setDetails((v) => !v)}>
-                {details ? "Overview" : "More measurements"}
+                {details ? "Overview" : <><span className="t-long">More measurements</span><span className="t-short">More</span></>}
               </button>)}
             <label className="search-box">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>

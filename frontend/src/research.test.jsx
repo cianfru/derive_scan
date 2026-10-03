@@ -89,6 +89,6 @@ it("changing expiry updates the forward, concentration and range together", asyn
   await userEvent.setup().click(screen.getByRole("button", { name: /11-27/ }));
   expect(screen.getByText("$103.00")).toBeTruthy();
   expect(screen.getByText("$70.00 — $140.00")).toBeTruthy();
-  expect(screen.getAllByText("$110.00").length).toBeGreaterThan(0);
+  expect(screen.getAllByText("$110").length).toBeGreaterThan(0);
   expect(screen.queryByText("$85.00 — $115.00")).toBeNull();
 });

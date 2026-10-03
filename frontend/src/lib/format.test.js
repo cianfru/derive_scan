@@ -1,7 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { price, strike, usd, pct, chg, z, optionLabel, DASH } from "./format.js";
+import { price, strike, usd, pct, chg, z, optionLabel, sig3, DASH } from "./format.js";
 
 describe("format", () => {
+  it("sig3: three significant figures, grouped", () => {
+    expect(sig3(7835.6)).toBe("7,840");
+    expect(sig3(347.51)).toBe("348");
+    expect(sig3(14.64)).toBe("14.6");
+    expect(sig3(0.04751)).toBe("0.0475");
+    expect(sig3(null)).toBe(DASH);
+  });
   it("price: decimals by magnitude, grouping, dash for missing", () => {
     expect(price(84566.5)).toBe("84,567");
     expect(price(2681.2)).toBe("2,681.2");
