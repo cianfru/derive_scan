@@ -20,6 +20,7 @@ Both run in one GitHub Action (`.github/workflows/record.yml`) that commits plai
 | `signals/latest.json` | newest rows for every perp on 4H and 1D: signal, unified 4H x 1D signal, regime, z-score, heat, exhaustion, ribbon, positioning, inputs status, data status; market-wide context |
 | `signals/{4h,1d}/YYYY-MM-DD.csv` | one row per perp per closed bar |
 | `signals/status.json`, `signals/state.pkl` | last computed bar per timeframe; decision and agent-filter state carried between bars |
+| `metric_history/{UND}/{4h,1d}.json` | cached historical price metrics, reconstructed from completed candles; original recorded decisions take precedence |
 | `candles/{UND}/{4h,1d,1w}.csv` | closed bars: Derive index OHLC, perp volume in contracts (0 when nothing traded) |
 | `candles/{UND}/{tf}.backfill.csv` | earlier bars from OKX spot, before Derive's first bar (price only); rows report `backfilled_bars` |
 
@@ -30,9 +31,18 @@ Every Derive perp is listed. `data_status` says how far Reflex's engine can read
 | Path | Content |
 |---|---|
 | `flow/large/YYYY-MM-DD.csv` | taker trades at or above $25k perp notional, $100k option notional or $2k option premium, with wallet |
-| `flow/wallets/YYYY-MM-DD.csv` | one row per wallet per 15-minute run: trades, perp and option notional, premium bought and sold, realised PnL, fees |
+| `flow/wallets_v2/YYYY-MM-DD.csv` | one row per wallet and trade-time bucket: trades, perp and option notional, premium bought and sold, realised PnL, fees |
 
-| `flow/sides/YYYY-MM-DD.csv` | per run, coin and kind (call, put, perp): taker buying and selling, market makers left out once classed |
+| `flow/sides_v2/YYYY-MM-DD.csv` | per trade-time bucket, coin and kind (call, put, perp): taker buying and selling, market makers left out once classed |
+| `flow/coverage_v2/YYYY-MM-DD.csv`, `flow/recovery.json` | successfully queried intervals, query provenance and progress recovering missing recent history |
+
+Flow runs independently of options snapshots. A failed read remains due even when the current options slot succeeded. Missing complete 15-minute buckets in the trailing seven days are replayed from public trades, newest first, under a time budget. Full-bucket replacement and a write-ahead transaction make retries safe; coverage advances only after all pages and files are complete.
+
+## Tracking values over time
+
+Coin pages include **Market history**: dated engine metrics, funding, open interest, fixed-tenor IV, skew, butterfly and put/call ratios. Inspect exact samples by pointer, touch or keyboard; select daily/four-hour engine readings, daily option summaries or individual snapshots. Missing intervals remain gaps. Details: `docs/history-tracking.md`.
+
+Historical price metrics cover up to 120 daily closes and 30 days of four-hour closes. They use the same engines on completed cached candles, with warmup and source provenance retained. Reconstructed metrics use dashed lines; final trading decisions are shown only where originally recorded. Recorded options measurements cover the latest 90 days as the archive grows. Derive provides no past surfaces, so missing snapshots and dates before recording began cannot be recovered from the trade history or price candles. Wallet trade reconstruction and option-surface recording have separate coverage dates.
 
 ## Options traders' history (`data` branch)
 
@@ -92,6 +102,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 python record_once.py --out ../store   # record the current options slot into files, as the Action does
 python signal_once.py --out ../store   # compute any due 4H/1D signals, as the Action does
+python flow_once.py --out ../store     # collect flow and recover missing recent buckets independently
 python history_once.py --out ../store  # extend the options traders' history (150 s budget), as the Action does
 python research/parity_report.py OUT.md   # one-off: Derive candles vs Reflex's candles, same code
 python main.py                         # local API with its own recorder, http://localhost:8000

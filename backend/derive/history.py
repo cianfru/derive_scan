@@ -66,7 +66,7 @@ def parse_option(name: str) -> tuple[str, int, float, str] | None:
         return None
     try:
         d = datetime.strptime(p[1], "%Y%m%d").replace(hour=EXPIRY_HOUR, tzinfo=timezone.utc)
-        return p[0], int(d.timestamp()), float(p[2]), p[3]
+        return p[0], int(d.timestamp()), float(p[2].replace("_", ".")), p[3]  # "1_35" is 1.35, not 135
     except ValueError:
         return None
 

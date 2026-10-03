@@ -109,9 +109,10 @@ def test_snapshot_upgrade_preserves_accumulation_and_uses_history_cutoff(tmp_pat
     monkeypatch.setattr(history, "update_settlements", settlements)
     result = asyncio.run(history_once.run(tmp_path, budget=0, now=NOW, client=object()))
     assert result == {"added": 0, "through": "2024-06-01"}
-    assert all(p.read_bytes() == content for p, content in stored.items())
+    # Day files stay untouched (nothing to repair); only the state records the finished repair.
+    assert all(p.read_bytes() == content for p, content in stored.items() if p.name != "state.json")
     doc = json.loads((tmp_path / "history" / "wallets.json").read_text())
-    assert doc["schema_version"] == 2
+    assert doc["schema_version"] == history_once.SCHEMA_VERSION
     assert doc["as_of"] == datetime(2024, 6, 2, tzinfo=timezone.utc).timestamp()
     assert doc["wallets"]["alice"]["expired"] == 0
     assert doc["wallets"]["alice"]["option_pnl"] == 0

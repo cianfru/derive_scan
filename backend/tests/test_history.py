@@ -129,3 +129,43 @@ def test_traders_leaderboard_and_cohorts(tmp_path):
     assert out["cohort_positions"]["pnl"]["Humble Earner"]["ETH"][live] == [2.0, 1, 2.0]
     pos = traders.mark_position(live, 2.0, 150.0, None, 3000.0, 1.75e9)
     assert pos["delta_usd"] is None and pos["mark"] is None and pos["delta_source"] == "unavailable"
+
+
+def test_fractional_strikes_parse_as_decimals():
+    from derive.instruments import parse_option_name
+    assert history.parse_option("XRP-20260828-1_35-P")[2] == 1.35
+    assert parse_option_name("HYPE-20260814-57_5-C").strike == 57.5
+
+
+def test_history_repair_rereads_days_with_fractional_strikes(tmp_path):
+    legs = {"2024-06-02": [_t("XRP-20240628-1_35-P", "buy", 10, 0.08, "0xA", index="1.3",
+                              ts=int(datetime(2024, 6, 2, 12, tzinfo=timezone.utc).timestamp() * 1000))]}
+    calls = []
+
+    def handler(request):
+        p = json.loads(request.content)
+        if request.url.path.endswith("get_option_settlement_prices"):
+            return httpx.Response(200, json={"result": {"expiries": []}})
+        day = datetime.fromtimestamp(p["from_timestamp"] / 1000, timezone.utc).date().isoformat()
+        calls.append(day)
+        got = legs.get(day, []) if p["instrument_type"] == "option" else []
+        return httpx.Response(200, json={"result": {"trades": got, "pagination": {"num_pages": 1, "count": len(got)}}})
+
+    _write(tmp_path, date(2024, 6, 1), [{"wallet": "0xB", "instrument": "BTC-PERP", "buy_contracts": 1}])
+    _write(tmp_path, date(2024, 6, 2), [{"wallet": "0xA", "instrument": "XRP-20240628-1_35-P", "buy_contracts": 10,
+                                         "buy_value_usd": 0.5, "taker_legs": 1, "delta_usd": -999999}])
+    history.save_state(tmp_path, {"done_through": "2024-06-02"})
+
+    async def go():
+        client = DeriveClient("https://x", transport=httpx.MockTransport(handler))
+        out = await history_once.run(tmp_path, budget=60, now=datetime(2024, 6, 3, 2, tzinfo=timezone.utc).timestamp(),
+                                     client=client)
+        await client.close()
+        return out
+
+    asyncio.run(go())
+    assert set(calls) == {"2024-06-02"}  # only the day with a fractional strike is read again
+    row = {r["instrument"]: r for r in history.read_day(tmp_path / "history" / "days" / "2024-06-02.csv.gz")}["XRP-20240628-1_35-P"]
+    assert -13 < float(row["delta_usd"]) < 0 and float(row["iv"]) > 0
+    state = history.load_state(tmp_path)
+    assert state["repaired"] == history_once.REPAIR and history_once.is_due(tmp_path, datetime(2024, 6, 3, 2, tzinfo=timezone.utc).timestamp()) is False
