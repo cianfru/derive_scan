@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="220" viewBox="0 0 880 220" role="img" aria-labelledby="title">
+<title id="title">Cowboy wordmark, light background</title>
+<defs>
+ <g id="art" fill="none" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(22 25)"><path d="M 121,46 C 88,10 18,20 18,82 C 18,146 88,154 121,121"/>
+<path d="M 212,24 C 171,24 145,48 145,84 C 145,122 172,146 212,146 C 252,146 279,122 279,84 C 279,48 252,24 212,24 Z"/>
+<path d="M 298,26 L 329,145 L 369,57 L 410,145 L 443,26"/>
+<path d="M 470,145 L 470,26 L 514,26 C 559,26 561,80 516,84 L 470,84 M 516,84 C 569,84 569,145 515,145 L 470,145"/>
+<path d="M 646,24 C 605,24 579,48 579,84 C 579,122 606,146 646,146 C 686,146 713,122 713,84 C 713,48 686,24 646,24 Z"/>
+<path d="M 733,26 L 774,85 L 816,26 M 774,85 L 774,145"/></g></g>
+</defs>
+<use href="#art" stroke="#b84300" stroke-width="10"/>
+<use href="#art" stroke="#ff8a3d" stroke-width="4"/>
+</svg>

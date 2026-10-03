@@ -33,7 +33,7 @@ export const REGIME_INFO =
   "The regime places price against its own long-term trend line. The engine scores six regimes from the z-score, " +
   "volatility and the 30-bar price change, and changes the label only after a new leader has led for several bars (usually 5).";
 
-/** One line per signal, for the (i). Torq's inputs: no taker-flow or wallet inputs enter this engine. */
+/** One line per signal, for the (i). Cowboy's inputs: no taker-flow or wallet inputs enter this engine. */
 export const SIGNAL_LINE = {
   STRONG_LONG: "The engine's top long setup: at least 8 of 9 checks (weighted), in Accumulation, Capitulation, or Markup with the z-score between 0 and 1, and none of its limits hit (heat, crowded funding, BTC divergence, 3+ regime changes in 7 days, missing data).",
   LIGHT_LONG: "A long setup with fewer confirmations: Markup with at least 4 of 9 checks and a z-score up to 2 (scaled for volatility), or a Strong long held back by one of its limits.",
@@ -84,7 +84,7 @@ const fmtPct = (v, d = 1) => (num(v) ? `${Math.abs(v).toFixed(d)}%` : DASH);
 const CONSENSUS = { "RISK-ON": "Risk-on", "RISK-OFF": "Risk-off", ACCUMULATION: "Accumulation", EUPHORIA: "Euphoria", MIXED: "Mixed" };
 const warming = (row) => !!row?.data_status && row.data_status !== "ready";
 
-/** The nine checks, in the engine's order, with Torq's names, the measured value and the rule. */
+/** The nine checks, in the engine's order, with the app's names, the measured value and the rule. */
 export function checks(row, ctx, tf = "1d") {
   const detail = Object.fromEntries((row?.conditions_detail || []).map((c) => [c.name, c]));
   const cons = ctx?.consensus?.[tf];

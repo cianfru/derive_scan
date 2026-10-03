@@ -1,4 +1,4 @@
-// Torq reads only the published app data (site-data branch): one file per screen, cached in memory.
+// Cowboy reads only the published app data (site-data branch): one file per screen, cached in memory.
 import { useEffect, useState } from "react";
 
 export const DATA_URL = import.meta.env.VITE_DATA_URL || "https://raw.githubusercontent.com/cianfru/derive_scan/site-data/";

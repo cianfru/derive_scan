@@ -1,0 +1,236 @@
+/* The landing sign (components/Brand.jsx NeonSign). Copied verbatim from the brand spec's flicker.css: opacity-only
+   keyframes generated from a millisecond timing table; retune the table and regenerate, never hand-edit. */
+.neon-sign { position: relative; isolation: isolate; }
+.neon-sign > svg { position: relative; display: block; width: 100%; height: auto; overflow: visible; }
+.neon-sign > .neon-lit { position: absolute; inset: 0; height: 100%; }
+.neon-spill {
+  position: absolute; inset: -35% -10%; z-index: 0; pointer-events: none;
+  background: radial-gradient(50% 50% at 50% 52%, rgb(255 94 0 / .17), rgb(255 94 0 / .07) 45%, rgb(255 94 0 / 0) 72%);
+}
+
+/* Switch-on: the hat strikes first (three flashes), the letters follow ~300 ms later, the B stutters. */
+.neon-sign .nt-crown { animation: n-ign-crown 2s linear both; }
+.neon-sign .nt-brim { animation: n-ign-brim 2s linear both, n-idle-brim 23.9s linear 2.4s infinite; }
+.neon-sign .nt-c { animation: n-ign-c 2s linear both; }
+.neon-sign .nt-o1 { animation: n-ign-o1 2s linear both; }
+.neon-sign .nt-w { animation: n-ign-w 2s linear both; }
+.neon-sign .nt-b { animation: n-ign-b 2s linear both, n-idle-b 19.7s linear 2.4s infinite; }
+.neon-sign .nt-o2 { animation: n-ign-o2 2s linear both, n-idle-o2 37.1s linear 2.4s infinite; }
+.neon-sign .nt-y { animation: n-ign-y 2s linear both; }
+.neon-sign .neon-lit { animation: n-idle-sign 31.3s linear 2.4s infinite; }
+.neon-sign .neon-spill { animation: n-ign-spill 2s linear both, n-idle-spill 31.3s linear 2.4s infinite; }
+
+/* Steady sign: reduced motion, or the .no-flicker switch on the wrapper. The sign is simply on. */
+.neon-sign.is-paused .neon-lit, .neon-sign.is-paused .neon-spill,
+.neon-sign.is-paused [class^="nt-"], .neon-sign.is-paused [class*=" nt-"] { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  .neon-sign .neon-lit, .neon-sign .neon-spill, .neon-sign [class^="nt-"], .neon-sign [class*=" nt-"] { animation: none !important; }
+}
+.neon-sign.no-flicker .neon-lit, .neon-sign.no-flicker .neon-spill,
+.neon-sign.no-flicker [class^="nt-"], .neon-sign.no-flicker [class*=" nt-"] { animation: none !important; }
+
+/* ---- keyframes: switch-on (2 s, shared clock) ---- */
+@keyframes n-ign-crown {
+  0% { opacity: 0; }
+  6% { opacity: 0; }
+  6.8% { opacity: 1; }
+  8.5% { opacity: 1; }
+  9.3% { opacity: 0; }
+  13% { opacity: 0; }
+  13.8% { opacity: 0.85; }
+  16% { opacity: 0.85; }
+  16.8% { opacity: 0; }
+  22.5% { opacity: 0; }
+  23.3% { opacity: 0.7; }
+  27% { opacity: 1; }
+}
+@keyframes n-ign-brim {
+  0% { opacity: 0; }
+  7.5% { opacity: 0; }
+  8.3% { opacity: 1; }
+  9.5% { opacity: 1; }
+  10.3% { opacity: 0; }
+  14.5% { opacity: 0; }
+  15.3% { opacity: 0.9; }
+  16.5% { opacity: 0.9; }
+  17.3% { opacity: 0; }
+  23.5% { opacity: 0; }
+  24.3% { opacity: 0.75; }
+  28.5% { opacity: 1; }
+}
+@keyframes n-ign-c {
+  0% { opacity: 0; }
+  45% { opacity: 0; }
+  45.8% { opacity: 1; }
+  47% { opacity: 1; }
+  47.8% { opacity: 0; }
+  50.5% { opacity: 0; }
+  51.3% { opacity: 0.8; }
+  54.5% { opacity: 1; }
+}
+@keyframes n-ign-o1 {
+  0% { opacity: 0; }
+  46.5% { opacity: 0; }
+  47.3% { opacity: 0.9; }
+  50% { opacity: 1; }
+}
+@keyframes n-ign-w {
+  0% { opacity: 0; }
+  44% { opacity: 0; }
+  44.8% { opacity: 1; }
+  45.75% { opacity: 1; }
+  46.55% { opacity: 0; }
+  49.5% { opacity: 0; }
+  50.3% { opacity: 1; }
+}
+@keyframes n-ign-b {
+  0% { opacity: 0; }
+  47.5% { opacity: 0; }
+  48.3% { opacity: 1; }
+  49.25% { opacity: 1; }
+  50.05% { opacity: 0; }
+  53% { opacity: 0; }
+  53.8% { opacity: 0.9; }
+  54.75% { opacity: 0.9; }
+  55.55% { opacity: 0; }
+  61.75% { opacity: 0; }
+  62.55% { opacity: 0.6; }
+  65.5% { opacity: 0.6; }
+  66.3% { opacity: 0; }
+  70% { opacity: 0; }
+  70.8% { opacity: 1; }
+  81% { opacity: 1; }
+  81.8% { opacity: 0.4; }
+  83% { opacity: 0.4; }
+  83.8% { opacity: 1; }
+}
+@keyframes n-ign-o2 {
+  0% { opacity: 0; }
+  48% { opacity: 0; }
+  48.8% { opacity: 1; }
+  50% { opacity: 1; }
+  50.8% { opacity: 0; }
+  52.5% { opacity: 0; }
+  53.3% { opacity: 1; }
+}
+@keyframes n-ign-y {
+  0% { opacity: 0; }
+  45.25% { opacity: 0; }
+  46.05% { opacity: 0.85; }
+  49% { opacity: 1; }
+}
+@keyframes n-ign-spill {
+  0% { opacity: 0; }
+  6% { opacity: 0; }
+  6.8% { opacity: 0.3; }
+  8.5% { opacity: 0.3; }
+  9.3% { opacity: 0.06; }
+  13% { opacity: 0.06; }
+  13.8% { opacity: 0.26; }
+  16% { opacity: 0.26; }
+  16.8% { opacity: 0.06; }
+  22.5% { opacity: 0.06; }
+  23.3% { opacity: 0.3; }
+  28% { opacity: 0.45; }
+  44% { opacity: 0.45; }
+  44.8% { opacity: 0.7; }
+  50% { opacity: 0.8; }
+  55% { opacity: 0.9; }
+  70% { opacity: 0.95; }
+  83% { opacity: 1; }
+}
+
+/* ---- keyframes: idle ---- */
+/* whole sign: a deep dip with a re-strike, and later a soft sag; 31.3 s cycle */
+@keyframes n-idle-sign {
+  0% { opacity: 1; }
+  27.476% { opacity: 1; }
+  27.527% { opacity: 0.3; }
+  27.652% { opacity: 0.3; }
+  27.703% { opacity: 0.85; }
+  27.796% { opacity: 0.85; }
+  27.847% { opacity: 0.45; }
+  27.955% { opacity: 0.45; }
+  28.006% { opacity: 1; }
+  62.62% { opacity: 1; }
+  62.696% { opacity: 0.62; }
+  62.907% { opacity: 0.62; }
+  63.035% { opacity: 1; }
+  100% { opacity: 1; }
+}
+/* the wall light, in step with the sign; 31.3 s cycle */
+@keyframes n-idle-spill {
+  0% { opacity: 1; }
+  27.476% { opacity: 1; }
+  27.527% { opacity: 0.65; }
+  27.652% { opacity: 0.65; }
+  27.703% { opacity: 0.925; }
+  27.796% { opacity: 0.925; }
+  27.847% { opacity: 0.725; }
+  27.955% { opacity: 0.725; }
+  28.006% { opacity: 1; }
+  62.62% { opacity: 1; }
+  62.696% { opacity: 0.848; }
+  62.907% { opacity: 0.848; }
+  63.035% { opacity: 1; }
+  100% { opacity: 1; }
+}
+/* the B: out, two quick blinks, back; 19.7 s cycle */
+@keyframes n-idle-b {
+  0% { opacity: 1; }
+  15.736% { opacity: 1; }
+  15.817% { opacity: 0; }
+  16.345% { opacity: 0; }
+  16.426% { opacity: 1; }
+  16.629% { opacity: 1; }
+  16.711% { opacity: 0; }
+  16.853% { opacity: 0; }
+  16.934% { opacity: 1; }
+  17.137% { opacity: 1; }
+  17.218% { opacity: 0; }
+  17.513% { opacity: 0; }
+  17.594% { opacity: 1; }
+  100% { opacity: 1; }
+}
+/* brim tube buzz: three tiny dips; 23.9 s cycle */
+@keyframes n-idle-brim {
+  0% { opacity: 1; }
+  56.904% { opacity: 1; }
+  56.954% { opacity: 0.55; }
+  57.079% { opacity: 0.55; }
+  57.13% { opacity: 1; }
+  57.297% { opacity: 1; }
+  57.347% { opacity: 0.62; }
+  57.473% { opacity: 0.62; }
+  57.523% { opacity: 1; }
+  57.69% { opacity: 1; }
+  57.741% { opacity: 0.5; }
+  57.908% { opacity: 0.5; }
+  57.958% { opacity: 1; }
+  100% { opacity: 1; }
+}
+/* the second O: out, two quick blinks, back; 37.1 s cycle */
+@keyframes n-idle-o2 {
+  0% { opacity: 1; }
+  78.437% { opacity: 1; }
+  78.48% { opacity: 0; }
+  78.76% { opacity: 0; }
+  78.803% { opacity: 1; }
+  78.911% { opacity: 1; }
+  78.954% { opacity: 0; }
+  79.03% { opacity: 0; }
+  79.073% { opacity: 1; }
+  79.181% { opacity: 1; }
+  79.224% { opacity: 0; }
+  79.38% { opacity: 0; }
+  79.423% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+/* The small lit lockup (header, footer): two layers, no blur; strokes in screen pixels. */
+.lockup { display: block; height: 28px; width: auto; overflow: visible; }
+.lockup g { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.lockup path { vector-effect: non-scaling-stroke; }
+.lockup .lk-tube { stroke: var(--logo-tube); stroke-width: 2.4px; }
+.lockup .lk-core { stroke: var(--logo-core); stroke-width: 1px; }

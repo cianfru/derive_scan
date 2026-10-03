@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { NavLink, Link, Outlet, useLocation } from "react-router-dom";
 import { Loading } from "./ui.jsx";
 import ErrorBoundary from "./ErrorBoundary.jsx";
+import { Lockup } from "./Brand.jsx";
 
 function useTheme() {
   const [theme, setTheme] = useState(
@@ -12,28 +13,13 @@ function useTheme() {
     const next = effective === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
     try {
-      localStorage.setItem("torq-theme", next);
+      localStorage.setItem("cowboy-theme", next);
     } catch {
       /* storage may be blocked */
     }
     setTheme(next);
   };
   return [effective, toggle];
-}
-
-export function Logo({ theme, height = 24 }) {
-  const src =
-    theme === "light"
-      ? "/brand/torq-logo-on-light.webp"
-      : "/brand/torq-logo-on-dark.webp";
-  return (
-    <img
-      src={src}
-      alt="Torq"
-      height={height}
-      style={{ height, width: "auto" }}
-    />
-  );
 }
 
 export default function Shell() {
@@ -55,14 +41,13 @@ export default function Shell() {
   }, []);
   return (
     <>
-      <div className="industrial-ground" aria-hidden="true" />
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
       <header className="hdr" ref={header}>
         <div className="wrap">
-          <Link to="/" className="logo" aria-label="Torq home">
-            <Logo theme={theme} />
+          <Link to="/" className="logo" aria-label="Cowboy home">
+            <Lockup />
           </Link>
           <nav aria-label="Main navigation">
             <NavLink to="/markets">Markets</NavLink>
@@ -120,9 +105,9 @@ export default function Shell() {
       </main>
       <footer className="foot">
         <div className="wrap">
-          <Logo theme={theme} height={18} />
+          <Link to="/" className="foot-brand" aria-label="Cowboy home"><Lockup /></Link>
           <span className="foot-note">
-            <span>Independent analytics for Derive. Snapshots every 15 minutes.</span>
+            <span>Cowboy is independent and built on Derive's public data. Not affiliated with Derive.</span>
             <span>Market data and positioning for research. Not investment advice.</span>
           </span>
           <a href="https://www.derive.xyz/" target="_blank" rel="noreferrer">
