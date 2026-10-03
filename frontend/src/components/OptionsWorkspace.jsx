@@ -207,7 +207,7 @@ function ExpiryDesk({ opts }) {
     </div>
   );
 }
-export default function OptionsWorkspace({ opts, und, flow }) {
+export default function OptionsWorkspace({ opts, und, flow, embedded = false }) {
   const [view, setView] = useState("expiry");
   const [window, setWindow] = useState("24h");
   const f = opts.features || {},
@@ -216,6 +216,7 @@ export default function OptionsWorkspace({ opts, und, flow }) {
     opts.status !== "ready" || Date.now() / 1000 - opts.ts > 1800;
   return (
     <section id="options-detail" className="options-workspace">
+      {embedded ? <p className="status">{historical ? "Historical pricing" : "Option snapshot"} · {utc(opts.ts)}</p> : (
       <div className="section-heading">
         <div>
           <span className="section-code">02 / OPTIONS MARKET</span>
@@ -228,7 +229,7 @@ export default function OptionsWorkspace({ opts, und, flow }) {
           <span>{historical ? "Historical pricing" : "Option snapshot"}</span>
           <b>{utc(opts.ts)}</b>
         </div>
-      </div>
+      </div>)}
       <div className="options-dashboard">
         <MoveBand index={f.index_price} iv={f.atm_iv_30d} />
         <SkewInstrument rr={f.rr25_30d} />

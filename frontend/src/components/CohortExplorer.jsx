@@ -162,7 +162,7 @@ export default function CohortExplorer({ cohorts, through, valuedAt }) {
                     {coins.map(([und, b]) => (
                       <tr key={und}>
                         <td>
-                          <Link className="asset-link" to={`/coin/${und}`}>
+                          <Link className="asset-link" to={`/coin/${und}#wallets`}>
                             <Asset und={und} compact />
                           </Link>
                         </td>

@@ -1,182 +1,18 @@
 import { useEffect } from "react";
-import {
-  Link,
-  useOutletContext,
-  useParams,
-  useLocation,
-} from "react-router-dom";
+import { Link, useOutletContext, useParams, useLocation } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import {
-  price,
-  chg,
-  pct,
-  usd,
-  title,
-  utc,
-  REGIME,
-  DATA_LABEL,
-} from "../lib/format.js";
-import { Signal, Plate, Loading, Failed, Info } from "../components/ui.jsx";
+import { price, chg, pct, usd, title, utc, REGIME } from "../lib/format.js";
+import { Plate, Loading, Failed, Info } from "../components/ui.jsx";
 import CandleChart from "../components/CandleChart.jsx";
-import AlignmentGrid, { ALIGN_INFO } from "../components/Alignment.jsx";
-
 import { Asset, Reading } from "../components/MarketVisuals.jsx";
-import EngineComparison, {
-  EngineEvidence,
-} from "../components/EngineComparison.jsx";
+import EngineComparison, { EngineEvidence } from "../components/EngineComparison.jsx";
 import OptionsWorkspace from "../components/OptionsWorkspace.jsx";
+import Chain, { LayerIcon, HORIZON_LABEL, chainReadings } from "../components/Chain.jsx";
+import CoinWallets from "../components/CoinWallets.jsx";
 import { currentEngine } from "../lib/research.js";
-import { SIGNAL_HELP, REGIME_HELP } from "../lib/explain.js";
-import { QUALITY_LABEL } from "../components/AnalyticalDetails.jsx";
-
-function Readout({ row, alignment }) {
-  if (!row) return <p className="status">No signal yet.</p>;
-  const z = Math.max(-3, Math.min(3, row.zscore || 0));
-  return (
-    <div className="figs">
-      <div className="fig">
-        <span>Signal</span>
-        {alignment ? (
-          <Reading alignment={alignment} kind="engine" />
-        ) : row.signal_status === "ready" && row.data_status === "ready" ? (
-          <Signal s={row.signal} />
-        ) : (
-          <strong style={{ fontSize: 13 }}>Unavailable</strong>
-        )}
-      </div>
-      <div className="fig">
-        <span>
-          Daily regime{" "}
-          <Info label="Explain this regime">{REGIME_HELP[row.regime]}</Info>
-        </span>
-        <strong style={{ fontSize: 15 }}>
-          {REGIME[row.regime] || title(row.regime)}
-        </strong>
-      </div>
-      <div className="fig">
-        <span>
-          Z-score{" "}
-          <Info>
-            How far price sits from its trend, in standard deviations. Above 2.5
-            is stretched.
-          </Info>
-        </span>
-        <span className="meter" style={{ textTransform: "none" }}>
-          <i className="center">
-            <b
-              style={{
-                left: `${50 + (Math.min(0, z) / 3) * 50}%`,
-                width: `${(Math.abs(z) / 3) * 50}%`,
-                background: "var(--sig-strong)",
-              }}
-            />
-          </i>
-          <strong style={{ fontSize: 15 }}>
-            {row.zscore?.toFixed(2) ?? "-"}
-          </strong>
-        </span>
-      </div>
-      <div className="fig">
-        <span>
-          Heat{" "}
-          <Info>
-            Distance from the long-term base, 0 to 100. High heat means
-            extended.
-          </Info>
-        </span>
-        <span className="meter" style={{ textTransform: "none" }}>
-          <i>
-            <b style={{ left: 0, width: `${Math.min(100, row.heat || 0)}%` }} />
-          </i>
-          <strong style={{ fontSize: 15 }}>{row.heat ?? "-"}</strong>
-        </span>
-      </div>
-      <div className="fig">
-        <span>
-          Exhaustion{" "}
-          <Info>
-            Examines stretch, relative volume and signs of selling absorption or
-            a climax. It is one input to the engine, not a standalone reversal
-            call.
-          </Info>
-        </span>
-        <strong style={{ fontSize: 15 }}>{title(row.exhaustion_state)}</strong>
-      </div>
-      <div className="fig">
-        <span>
-          Ribbon{" "}
-          <Info>
-            Trend structure from four moving averages. Gold: stacked up. Blue:
-            stacked down. Grey: no clear order.
-          </Info>
-        </span>
-        <strong
-          style={{
-            fontSize: 15,
-            color:
-              row.ribbon?.state === "gold"
-                ? "var(--orange)"
-                : row.ribbon?.state === "blue"
-                  ? "var(--sig-exit)"
-                  : "var(--muted)",
-          }}
-        >
-          {title(row.ribbon?.state)}
-        </strong>
-      </div>
-      <div className="fig">
-        <span>
-          Conditions{" "}
-          <Info>
-            Passed checks out of all checks. Unknown evidence earns no point.
-            Inspect each result and its source under Why this signal.
-          </Info>
-        </span>
-        <strong style={{ fontSize: 15 }}>
-          {row.conditions_met ?? "-"} / {row.conditions_total ?? "-"}
-        </strong>
-      </div>
-      <div className="fig">
-        <span>
-          Data quality{" "}
-          <Info>
-            Ready requires sufficient price history and completed engine
-            calculations. Daily volume availability is checked separately.
-            Expand Daily price history below the chart for counts and sources.
-          </Info>
-        </span>
-        <strong
-          style={{
-            fontSize: 13,
-            color: row.data_status === "ready" ? "var(--fg)" : "var(--sig-acc)",
-          }}
-        >
-          {DATA_LABEL[row.data_status] || "-"}
-        </strong>
-      </div>
-    </div>
-  );
-}
+import { SIGNAL_HELP } from "../lib/explain.js";
 
 const HORIZON_DAYS = { "4h": 21, "1d": 120 };
-const LEAN = {
-  defensive: ["Defensive tone", "down"],
-  neutral: ["Balanced tone", ""],
-  up: ["Upward tone", "up"],
-};
-
-function Lean({ lean }) {
-  const [label, cls] = (lean?.version === 2 && LEAN[lean.state]) || [
-    QUALITY_LABEL[lean?.status] || "Unavailable",
-    "faint",
-  ];
-  return (
-    <strong className={cls} style={{ fontSize: 15 }}>
-      {label}
-    </strong>
-  );
-}
-
 function ChartLegend({ opts, tf, last }) {
   const cone = (opts?.implied || []).filter((e) => e.days <= HORIZON_DAYS[tf]);
   const lv = opts?.levels;
@@ -246,6 +82,69 @@ function ChartLegend({ opts, tf, last }) {
   );
 }
 
+
+function Step({ id, n, kind, title, sub, reading, children }) {
+  return (
+    <section id={id} className="step">
+      <div className="step-head">
+        <span className="num">0{n}</span>
+        <span className="ico"><LayerIcon kind={kind} size={22} /></span>
+        <div><h2>{title}</h2>{sub && <p>{sub}</p>}</div>
+        {reading && <span className="reading">{reading}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function JourneyStrip({ alignment }) {
+  if (!alignment) return null;
+  return (
+    <div className="journey-strip">
+      <div className="rows">
+        {["7d", "30d"].map((h) => {
+          const r = chainReadings(alignment, h);
+          const agreed = r[0].state && r[0].state !== "neutral" && r.every((x) => x.state === r[0].state);
+          return (
+            <div key={h} className={`journey-row${agreed ? " agreed" : ""}`}>
+              <span>{HORIZON_LABEL[h]}{agreed ? " · aligned" : ""}</span>
+              <Chain alignment={alignment} horizon={h} />
+            </div>);
+        })}
+      </div>
+    </div>
+  );
+}
+
+function RegimeFigs({ row, row4 }) {
+  if (!row) return null;
+  const z = row.zscore;
+  return (
+    <div className="regime-figs">
+      <div><span>Daily regime</span><strong>{REGIME[row.regime] || title(row.regime)}</strong></div>
+      <div><span>4H</span><strong>{REGIME[row4?.regime] || title(row4?.regime)}</strong></div>
+      <div><span>Z-score</span><strong className="mono">{z == null ? "-" : z.toFixed(2)}</strong></div>
+      <div><span>Heat</span><strong className="mono">{row.heat ?? "-"}</strong></div>
+      <div><span>Ribbon</span><strong style={{ color: row.ribbon?.state === "gold" ? "var(--orange)" : row.ribbon?.state === "blue" ? "var(--sig-exit)" : undefined }}>{title(row.ribbon?.state)}</strong></div>
+      <div><span>Conditions</span><strong className="mono">{row.conditions_met ?? "-"} / {row.conditions_total ?? "-"}</strong></div>
+    </div>
+  );
+}
+
+function PerpFigs({ pos }) {
+  if (!pos) return null;
+  return (
+    <div className="regime-figs">
+      <div><span>Funding, annual</span><strong className={pos.funding_rate < 0 ? "down" : ""}>{pct(pos.funding_rate == null ? null : pos.funding_rate * 24 * 365)}</strong></div>
+      <div><span>Funding regime</span><strong>{title(pos.funding_regime?.replace("_", " "))}</strong></div>
+      <div><span>Perp OI</span><strong>{usd(pos.oi_value)}</strong></div>
+      <div><span>OI change</span><strong>{pos.oi_status === "ready" ? chg(pos.oi_change_pct) : "-"}</strong></div>
+      <div><span>Perp volume 24h</span><strong>{usd(pos.volume_24h)}</strong></div>
+      <div><span>Exhaustion</span><strong>{title(pos.exhaustion_state)}</strong></div>
+    </div>
+  );
+}
+
 export default function Coin() {
   const { und } = useParams();
   const { theme } = useOutletContext();
@@ -254,272 +153,68 @@ export default function Coin() {
   const { hash } = useLocation();
   useEffect(() => {
     if (!data || !hash) return;
-    const frame = requestAnimationFrame(() =>
-      document
-        .getElementById(hash.slice(1))
-        ?.scrollIntoView({ block: "start", behavior: "instant" }),
-    );
+    const frame = requestAnimationFrame(() => document.getElementById(hash.slice(1))?.scrollIntoView({ block: "start", behavior: "instant" }));
     return () => cancelAnimationFrame(frame);
   }, [hash, !!data]);
-  if (error && !data)
-    return (
-      <div className="wrap page">
-        <Failed error={error} />
-      </div>
-    );
-  if (!data)
-    return (
-      <div className="wrap page">
-        <Loading />
-      </div>
-    );
+  if (error && !data) return <div className="wrap page"><Failed error={error} /></div>;
+  if (!data) return <div className="wrap page"><Loading /></div>;
   const candles = data.candles[tf] || [];
   const last = candles[candles.length - 1];
   const prevDay = candles[candles.length - 2];
   const dayChg = last && prevDay ? (last[4] / prevDay[4] - 1) * 100 : null;
   const row = data.latest?.[tf];
+  const row4 = data.latest?.["4h"];
   const pos = data.latest?.["1d"]?.positioning;
+  const engineReady = currentEngine(data.engine_comparison?.["1d"]);
   return (
     <div className="wrap page coin-page">
-      <div
-        className="coin-heading"
-        style={{
-          display: "flex",
-          alignItems: "end",
-          justifyContent: "space-between",
-          gap: 16,
-          flexWrap: "wrap",
-        }}
-      >
+      <div className="coin-top">
         <div>
-          <Link to="/markets" className="status">
-            Markets /
-          </Link>
-          <h1
-            style={{
-              display: "flex",
-              alignItems: "baseline",
-              gap: 20,
-              flexWrap: "wrap",
-            }}
-          >
-            <Asset und={und} />
-            <span className="mono" style={{ fontSize: 24, fontWeight: 500 }}>
-              {price(last?.[4])}
-            </span>
-            <span
-              className={`mono ${dayChg > 0 ? "up" : dayChg < 0 ? "down" : ""}`}
-              style={{ fontSize: 15 }}
-            >
-              {chg(dayChg)} 1D
-            </span>
-          </h1>
-          <p className="status" style={{ margin: "6px 0 0" }}>
-            Last daily close in USD. Change compares the two latest completed
-            UTC days.
-          </p>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            gap: 22,
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <span className="label">
-            Daily engine{" "}
-            {data.alignment ? (
-              <Reading alignment={data.alignment} kind="engine" />
-            ) : (
-              <Signal
-                s={
-                  row?.signal_status === "ready" && row?.data_status === "ready"
-                    ? row.signal
-                    : null
-                }
-              />
-            )}
-          </span>
-          {data.options && (
-            <span className="label">
-              Options <Lean lean={data.options.lean} />
-            </span>
-          )}
+          <Link to="/markets" className="status">Markets /</Link>
+          <h1><Asset und={und} />
+            <span className="mono" style={{ fontSize: 24, fontWeight: 500 }}>{price(last?.[4])}</span>
+            <span className={`mono ${dayChg > 0 ? "up" : dayChg < 0 ? "down" : ""}`} style={{ fontSize: 15 }}>{chg(dayChg)} 1D</span></h1>
         </div>
       </div>
-      <nav className="section-nav" aria-label="Market sections">
-        {data.alignment && <a href="#alignment">Three perspectives</a>}
-        <a href="#price-chart">Price chart</a>
-        <a href="#engine-comparison">Engine comparison</a>
-        {data.options && <a href="#options-detail">Options detail</a>}
-      </nav>
-      <div id="engine-comparison" className="engine-evidence-workspace">
-        <EngineComparison comparison={data.engine_comparison} />
-        <EngineEvidence latest={data.latest} />
-      </div>
-      <Plate
-        className="price-stage"
-        id="price-chart"
-        title={`${und} / Daily price & options ranges`}
-        info={
-          <>
-            Derive's index price with traded volume. Orange line: fast average;
-            grey: slow. Markers show where the signal changed.{" "}
-            {data.backfilled?.[tf]
-              ? `${data.backfilled[tf]} earlier bars are stored from external spot markets. The chart shows the latest available 400 daily bars; external volume is never used.`
-              : ""}
-          </>
-        }
-        right={
-          <span className="status">
-            {row?.signal_bar_close_time
-              ? `Bar closed ${utc(row.signal_bar_close_time)}`
-              : ""}
-          </span>
-        }
-      >
-        <CandleChart
-          candles={candles}
-          signals={data.signals?.[tf]}
-          tf={tf}
-          theme={theme}
-          implied={data.options?.implied}
-          levels={data.options?.levels}
-          optionsAt={data.options?.ts}
-          optionsIndex={data.options?.features?.index_price}
-        />
-        <ChartLegend opts={data.options} tf={tf} last={last?.[4]} />
-        <details className="history-explanation">
-          <summary>
-            Daily price history ·{" "}
-            {data.daily_history?.available_bars ?? candles.length} stored bars
-            {data.daily_history?.refresh_pending
-              ? " / reading update pending"
-              : ""}
-          </summary>
-          <p>
-            The engine needs 200 bars to begin regime calculations and 499 for
-            full normalisation.{" "}
-            {data.daily_history?.evaluated_bars ?? "Unknown"} bars were
-            evaluated at the displayed close.{" "}
-            {data.daily_history?.price_only_bars || 0} earlier price-only bars
-            come from{" "}
-            {data.daily_history?.sources?.join(", ") || "external spot markets"}
-            ; volume remains Derive-only.{" "}
-            {data.daily_history?.refresh_pending
-              ? "Additional history has been recovered since that reading. It enters the engine on the next daily close; the old signal is not reissued as a new event."
-              : "Newly listed tokens may still have less history than the engine requires."}
-          </p>
+      <JourneyStrip alignment={data.alignment} />
+
+      <Step id="regime" n={1} kind="engine" title="Regime" sub="The engine's read of the daily price structure."
+        reading={data.alignment ? <Reading alignment={data.alignment} kind="engine" /> : null}>
+        {engineReady && <RegimeFigs row={row} row4={row4} />}
+        <Plate className="price-stage" id="price-chart" title={`${und} · daily`}
+          info={<>Derive's index price with traded volume. Orange line: fast average; grey: slow. Markers show where the daily signal changed. Ahead of the last bar: the middle half of outcomes option prices imply (green upper edge, red lower edge) and where open interest sits.{data.backfilled?.[tf] ? ` ${data.backfilled[tf]} earlier bars come from external spot markets (price only).` : ""}</>}
+          right={<span className="status">{row?.signal_bar_close_time ? `Closed ${utc(row.signal_bar_close_time)}` : ""}</span>}>
+          <CandleChart candles={candles} signals={data.signals?.[tf]} tf={tf} theme={theme} implied={data.options?.implied}
+            levels={data.options?.levels} optionsAt={data.options?.ts} optionsIndex={data.options?.features?.index_price} />
+          <ChartLegend opts={data.options} tf={tf} last={last?.[4]} />
+        </Plate>
+        <details className="engine-detail">
+          <summary>Engine detail</summary>
+          <div>
+            {row?.signal && row?.data_status === "ready" && <p className="signal-explanation">{SIGNAL_HELP[row.signal]}</p>}
+            <div className="engine-evidence-workspace">
+              <EngineComparison comparison={data.engine_comparison} />
+              <EngineEvidence latest={data.latest} />
+            </div>
+            <PerpFigs pos={pos && { ...pos, exhaustion_state: row?.exhaustion_state }} />
+            {row?.signal_reason && <p className="status">{row.signal_reason}</p>}
+            {data.daily_history && <p className="status">{data.daily_history.available_bars ?? candles.length} daily bars stored; {data.daily_history.evaluated_bars ?? "-"} evaluated at the last close; {data.daily_history.price_only_bars || 0} earlier price-only bars from {data.daily_history.sources?.join(", ") || "external spot markets"}.</p>}
+          </div>
         </details>
-      </Plate>
-      {currentEngine(data.engine_comparison?.["1d"]) && (
-        <Readout row={row} alignment={data.alignment} />
-      )}
-      {data.alignment && (
-        <Plate id="alignment" title="Three perspectives" info={ALIGN_INFO}>
-          <AlignmentGrid alignment={data.alignment} />
-        </Plate>
-      )}
-      {pos && (
-        <div className="figs">
-          <div className="fig">
-            <span>
-              Funding, annual{" "}
-              <Info>
-                The observed hourly perpetual funding rate multiplied by 24 ×
-                365. This is an annualised snapshot, not a fixed yield.
-              </Info>
-            </span>
-            <strong className={pos.funding_rate < 0 ? "down" : ""}>
-              {pct(
-                pos.funding_rate == null ? null : pos.funding_rate * 24 * 365,
-              )}
-            </strong>
-          </div>
-          <div className="fig">
-            <span>
-              Funding regime{" "}
-              <Info>
-                Describes the current perpetual funding conditions. Positive
-                funding generally means longs pay shorts; it does not identify a
-                future price direction.
-              </Info>
-            </span>
-            <strong style={{ fontSize: 14 }}>
-              {title(pos.funding_regime?.replace("_", " "))}
-            </strong>
-          </div>
-          <div className="fig">
-            <span>
-              Perp open interest{" "}
-              <Info>
-                Outstanding perpetual contracts marked in dollars at the ticker
-                observation.
-              </Info>
-            </span>
-            <strong>{usd(pos.oi_value)}</strong>
-          </div>
-          <div className="fig">
-            <span>
-              OI contract change{" "}
-              <Info>
-                Contract count and mark-price changes use the same two ticker
-                observations. Dollar OI also moves with price. These
-                measurements do not identify which side opened contracts or
-                establish liquidations.
-              </Info>
-            </span>
-            <strong style={{ fontSize: 14 }}>
-              {pos.oi_status === "ready"
-                ? chg(pos.oi_change_pct)
-                : "Unavailable"}
-            </strong>
-            <small className="dim">
-              {pos.oi_status === "ready"
-                ? `Price ${chg(pos.price_change_pct)} · ${(pos.interval_seconds / 3600).toFixed(1)}h interval`
-                : "Needs two comparable observations"}
-            </small>
-          </div>
-          <div className="fig">
-            <span>
-              Perp volume 24h{" "}
-              <Info>
-                Derive-reported perpetual traded notional over the ticker’s last
-                24 hours.
-              </Info>
-            </span>
-            <strong>{usd(pos.volume_24h)}</strong>
-          </div>
-        </div>
-      )}
-      {data.latest?.[tf]?.signal_reason && (
-        <Plate
-          id="signal-evidence"
-          title="Why this signal"
-          info="The engine's own summary of the conditions it checked on the last closed bar."
-        >
-          <p className="signal-explanation">
-            {row?.data_status === "ready"
-              ? SIGNAL_HELP[row.signal]
-              : "The daily reading is withheld until its history and quality checks pass. Expand the history note for the available sample and source."}
-          </p>
-          <details className="condition-details">
-            <summary>Engine diagnostic text</summary>
-            <p className="status">{data.latest[tf].signal_reason}</p>
-          </details>
-        </Plate>
-      )}
+      </Step>
+
       {data.options ? (
-        <OptionsWorkspace
-          key={und}
-          opts={data.options}
-          und={und}
-          flow={data.taker_flow}
-        />
-      ) : (
-        <p className="status">{und} has no options on Derive.</p>
-      )}
+        <>
+          <Step id="wallets" n={2} kind="wallets" title="Wallets" sub="What Derive's ranked options traders hold on this coin."
+            reading={data.alignment ? <Reading alignment={data.alignment} horizon="30d" kind="wallets" /> : null}>
+            <CoinWallets und={und} alignment={data.alignment} />
+          </Step>
+          <Step id="options" n={3} kind="options" title="Options" sub="What option prices say: the range priced in, protection, where open interest sits."
+            reading={data.alignment ? <Reading alignment={data.alignment} horizon="30d" kind="options" /> : null}>
+            <OptionsWorkspace key={und} opts={data.options} und={und} flow={data.taker_flow} embedded />
+          </Step>
+        </>
+      ) : <p className="status">{und} has no options on Derive, so there is no wallet or options step.</p>}
     </div>
   );
 }

@@ -27,7 +27,7 @@ export default function Options() {
         a.options.option_oi_contracts * (a.price || 0),
     );
   const open = (e, und) =>
-    openMarketRow(e, (path) => nav(`${path}#options-detail`), und);
+    openMarketRow(e, (path) => nav(`${path}#options`), und);
   return (
     <div className="wrap page options-page">
       <div className="page-heading">
@@ -79,7 +79,7 @@ export default function Options() {
               <header>
                 <Link
                   className="option-market-link"
-                  to={`/coin/${c.und}#options-detail`}
+                  to={`/coin/${c.und}#options`}
                 >
                   <Asset und={c.und} />
                 </Link>

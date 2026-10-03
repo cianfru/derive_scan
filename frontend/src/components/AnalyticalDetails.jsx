@@ -5,6 +5,7 @@ export const QUALITY_LABEL = {
   ready: "Ready",
   history_updated: "History recovered",
   partial_flow: "Partial flow",
+  skew_only: "From skew",
   insufficient_data: "Insufficient data",
   unknown: "Unavailable",
   missing: "Unavailable",
