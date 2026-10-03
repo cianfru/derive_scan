@@ -341,47 +341,54 @@ svg.viz text { font: 400 var(--t-key) var(--font-mono); }
   .desk-panels .plate-b { padding: 12px 0; }
 }
 
-/* Markets: the board leads; the daily structure sits beside it on wide screens. */
-.markets-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; align-items: start; }
-.markets-layout > .market-structure { grid-column: 2; grid-row: 1; position: sticky; top: calc(var(--header-h) + 16px); }
-.markets-layout > .market-board { grid-column: 1; grid-row: 1; }
-.plate.market-structure, .plate.market-board { background: linear-gradient(145deg, color-mix(in srgb, var(--plate-2) 30%, var(--plate)), var(--plate) 45%); box-shadow: inset 0 1px 0 #ffffff0b; }
-.structure-body { padding: 16px 20px; display: grid; gap: 12px; }
-.structure-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.structure-title strong { font: 600 var(--t-kpi)/1.1 var(--font-display); letter-spacing: -.01em; }
-.structure-title span { font: 400 var(--t-label) var(--font-mono); color: var(--muted); }
-.regime-distribution { display: flex; gap: 2px; height: 6px; }
-.regime-segment { min-width: 2px; background: var(--seam-hi); }
-.regime-MARKUP { background: var(--up); } .regime-REACC { background: #819b77; } .regime-ACCUM { background: #c4b17b; }
-.regime-CAP, .regime-MARKDOWN { background: var(--down); } .regime-BLOWOFF { background: var(--sig-strong); } .regime-FLAT { background: var(--muted); }
-.regime-key { display: flex; flex-wrap: wrap; gap: 6px 16px; }
-.regime-key > span { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: var(--t-label); }
-.regime-key i { width: 7px; height: 7px; }
-.regime-key b { color: var(--fg); font: 400 var(--t-label) var(--font-mono); }
-.signal-ladder { display: grid; border-top: 1px solid var(--seam); padding-top: 8px; }
-.ladder-row { --tick: var(--faint); display: grid; grid-template-columns: minmax(0, 1fr) 72px 28px; align-items: center; gap: 12px; height: 28px; padding: 0 0 0 10px;
-  margin-inline: -10px 0; border: 0; background: none; text-align: left; color: var(--fg); position: relative; }
-.ladder-row.strong { --tick: var(--sig-strong); } .ladder-row.long { --tick: var(--sig-long); } .ladder-row.acc { --tick: var(--sig-acc); }
-.ladder-row.wait { --tick: var(--sig-wait); } .ladder-row.exit { --tick: var(--sig-trim); }
-button.ladder-row:hover { background: color-mix(in srgb, var(--fg) 4%, transparent); }
-button.ladder-row[aria-pressed="true"] { box-shadow: inset 2px 0 var(--orange); background: color-mix(in srgb, var(--fg) 4%, transparent); }
-.ladder-label { font: 500 var(--t-cell)/1 var(--font-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ladder-bar { height: 3px; background: var(--plate-3); }
-.ladder-bar i { display: block; height: 100%; background: var(--tick); }
-.ladder-row b { font: 500 var(--t-num) var(--font-mono); text-align: right; }
-.ladder-zero .ladder-label, .ladder-zero b { color: var(--faint); font-weight: 400; }
-.ladder-zero .ladder-bar { background: none; }
-/* Fear & Greed: a small instrument at the foot of the structure plate. */
-.sentiment-instrument { border-top: 1px solid var(--seam); padding: 12px 20px 16px; display: grid; gap: 4px; }
-.sentiment-instrument .instrument-label { font: 600 var(--t-key)/1.4 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); white-space: nowrap; display: flex; align-items: center; gap: 4px; }
-.sentiment-body { display: flex; align-items: center; gap: 16px; }
-.sentiment-body svg { width: 112px; flex: none; }
-.sentiment-body text { fill: var(--muted); font: 11px var(--font-mono); }
-.sentiment-body > div { display: grid; gap: 2px; }
-.sentiment-body strong { font: 600 var(--t-kpi)/1.1 var(--font-mono); letter-spacing: -.02em; }
-.sentiment-body strong small { font: 400 var(--t-key) var(--font-mono); color: var(--muted); padding-left: 3px; }
-.sentiment-body b { font: 600 var(--t-cell) var(--font-display); }
-.sentiment-body span { font-size: var(--t-label); color: var(--muted); line-height: 1.35; }
+/* Markets: the daily structure is one slim band above the board, which spans the full width. */
+.markets-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.plate.structure-band, .plate.market-board { background: linear-gradient(145deg, color-mix(in srgb, var(--plate-2) 30%, var(--plate)), var(--plate) 45%); box-shadow: inset 0 1px 0 #ffffff0b; }
+.structure-band { display: grid; grid-template-columns: minmax(150px, auto) minmax(240px, 1.15fr) minmax(0, 1.6fr) auto;
+  grid-template-areas: "cons mix sig fg"; align-items: stretch; }
+.sb-cell { min-width: 0; padding: 14px 20px; display: grid; align-content: center; gap: 6px; }
+.sb-cell + .sb-cell { border-left: 1px solid var(--seam); }
+.sb-consensus { grid-area: cons; box-shadow: inset 2px 0 var(--orange); }
+.sb-mix { grid-area: mix; }
+.sb-signals { grid-area: sig; }
+.sb-fg { grid-area: fg; justify-content: center; }
+.sb-eyebrow, .fg-label { display: inline-flex; align-items: center; gap: 2px; font: 600 var(--t-key)/1.4 var(--font-body); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); white-space: nowrap; }
+.sb-headline { font: 600 var(--t-kpi)/1.05 var(--font-display); letter-spacing: -.01em; }
+.sb-sub { font: 400 var(--t-label)/1.3 var(--font-body); color: var(--muted); white-space: nowrap; }
+.sb-sub b { font: 500 var(--t-label) var(--font-mono); color: var(--fg-2); }
+/* Regime mix: today's key, then one column per past daily close stacked by regime (Markup at the foot), today last. */
+.sb-key { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: var(--t-label); color: var(--muted); }
+.sb-key > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sb-key i { width: 7px; height: 7px; display: inline-block; }
+.sb-key b { font: 500 var(--t-label) var(--font-mono); color: var(--fg); }
+.regime-strip { display: block; width: 100%; height: 30px; }
+.regime-strip rect { opacity: .62; }
+.regime-strip rect.today { opacity: 1; }
+.rs-line { stroke: var(--bg); stroke-dasharray: 3 2; stroke-width: 1.5; }
+.sb-axis { display: flex; justify-content: space-between; font: 400 10px/1 var(--font-mono); color: var(--faint); }
+/* Signal counts: underlined-text filters with the signal tick, and a share bar under them. No pills. */
+.sb-filters { display: flex; flex-wrap: wrap; gap: 4px 22px; }
+.sb-filter { --tick: var(--faint); display: inline-flex; align-items: center; gap: 8px; padding: 4px 0 5px; border: 0; border-bottom: 2px solid transparent; background: none;
+  font: 500 var(--t-cell)/1.3 var(--font-body); color: var(--fg-2); white-space: nowrap; cursor: pointer; }
+.sb-filter::before { content: ""; width: 3px; height: 12px; background: var(--tick); }
+.sb-filter b { font: 500 var(--t-num) var(--font-mono); color: var(--fg); }
+.sb-filter:hover { color: var(--fg); border-bottom-color: var(--seam-hi); }
+.sb-filter[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--orange); }
+.sb-filter.strong, .sb-share .strong { --tick: var(--sig-strong); } .sb-filter.long, .sb-share .long { --tick: var(--sig-long); }
+.sb-filter.acc, .sb-share .acc { --tick: var(--sig-acc); } .sb-filter.wait, .sb-share .wait { --tick: var(--sig-wait); }
+.sb-filter.exit, .sb-share .exit { --tick: var(--sig-trim); }
+.sb-share { display: flex; gap: 2px; height: 3px; max-width: 360px; }
+.sb-share i { display: block; background: var(--tick, var(--faint)); min-width: 3px; }
+/* Fear & Greed, compact: a 64px dial, the number and its band. */
+.fg-compact { display: flex; align-items: center; gap: 14px; }
+.fg-dial { width: 64px; height: auto; flex: none; }
+.fg-dial path { stroke: var(--seam-hi); } .fg-dial path.on { stroke: var(--orange); }
+.fg-dial .needle { fill: var(--fg); } .fg-dial .hub { fill: var(--orange); }
+.fg-read { display: grid; gap: 2px; }
+.fg-value { display: inline-flex; align-items: baseline; gap: 8px; }
+.fg-value strong { font: 600 var(--t-kpi)/1 var(--font-mono); letter-spacing: -.02em; }
+.fg-value em { font: 600 var(--t-cell) var(--font-display); font-style: normal; color: var(--fg-2); }
+.fg-compact.stale .fg-value strong { color: var(--muted); }
 
 /* The board */
 .plate.market-board { overflow: clip; }
@@ -420,28 +427,26 @@ table.grid.market-grid:not(.overview) { min-width: 980px; table-layout: auto; }
 .regime-cell small { color: var(--muted); font: 400 var(--t-label)/1.35 var(--font-body); margin: 0 0 0 11px !important; }
 .market-board .empty-state { padding: 40px 20px; display: grid; justify-items: center; gap: 12px; }
 @media (max-width: 1180px) {
-  .markets-layout { grid-template-columns: minmax(0, 1fr); }
-  .markets-layout > .market-structure { grid-column: 1; grid-row: auto; position: static; display: grid; grid-template-columns: minmax(0, 1fr) 260px; }
-  .markets-layout > .market-structure > .panel-head { grid-column: 1 / -1; }
-  .markets-layout > .market-board { grid-row: auto; }
-  .market-structure .sentiment-instrument { border-top: 0; border-left: 1px solid var(--seam); padding-top: 16px; }
+  .structure-band { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "cons mix fg" "sig sig sig"; }
+  .sb-signals { border-left: 0 !important; border-top: 1px solid var(--seam); grid-auto-flow: column; justify-content: start; align-items: center; gap: 16px; padding-block: 8px; }
+  .sb-share { display: none; }
 }
 @media (max-width: 900px) { .market-grid .hide-md { display: none; } }
 @media (max-width: 600px) {
   .page.markets-page { gap: 16px; }
-  .markets-layout { gap: 16px; }
-  .markets-layout > .market-structure { grid-template-columns: minmax(0, 1fr); }
-  .structure-body { padding: 12px 16px; gap: 10px; }
-  .signal-ladder { grid-template-columns: 1fr 1fr; column-gap: 20px; }
-  .ladder-row { grid-template-columns: minmax(0, 1fr) 24px; }
-  .ladder-bar { display: none; }
-  .market-structure .sentiment-instrument { border-left: 0; border-top: 1px solid var(--seam); padding: 6px 16px 8px; grid-template-columns: auto 1fr; align-items: center; column-gap: 16px; }
-  .sentiment-instrument .info { display: none; }
-  .sentiment-body svg { width: 60px; }
-  .regime-key { display: none; }
-  .sentiment-body strong { font-size: var(--t-h2); }
-  .sentiment-body span { display: none; }
-  .sentiment-body > div { grid-auto-flow: column; align-items: baseline; gap: 10px; }
+  .markets-layout { gap: 12px; }
+  .plate.structure-band { margin-inline: -20px; border-inline: 0; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "cons fg" "mix mix" "sig sig"; }
+  .sb-cell { padding: 10px 16px; }
+  .sb-fg { border-left: 0 !important; padding-left: 0; }
+  .fg-compact { gap: 8px; }
+  .fg-dial { width: 44px; }
+  .fg-value strong, .sb-headline { font-size: var(--t-h2); }
+  .sb-mix { border-left: 0 !important; border-top: 1px solid var(--seam); padding-block: 8px; gap: 4px; }
+  .sb-key { display: none; }
+  .regime-strip { height: 18px; }
+  .sb-signals { display: block; padding-block: 6px 8px; }
+  .sb-signals > .sb-eyebrow { display: none; }
+  .sb-filters { gap: 2px 18px; }
   .plate.market-board { margin-inline: -20px; border-inline: 0; overflow: visible; }
   .board-toolbar { padding: 4px 16px 0; gap: 4px 16px; }
   .board-toolbar .tabs { gap: 14px; }
