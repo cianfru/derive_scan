@@ -5,8 +5,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Shell from "./components/Shell.jsx";
 import Landing from "./pages/Landing.jsx";
 
-// The landing shows what Torq does, never what it currently reads, and never what comes next.
-const BANNED = /\b(will|expect\w*|likely|predict\w*|target\w*|probabilit\w*|odds|forecast\w*|reflex|larsson|edge|alpha|proven)\b/i;
+// The landing shows what Cowboy does, never what it currently reads, and never what comes next.
+const BANNED = /\b(will|expect\w*|likely|predict\w*|target\w*|probabilit\w*|odds|forecast\w*|reflex|larsson|torq|edge|alpha|proven)\b/i;
 
 let fetchSpy;
 beforeEach(() => {
@@ -22,7 +22,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 function show() {
   return render(<MemoryRouter><Routes><Route element={<Shell />}><Route index element={<Landing />} /></Route></Routes></MemoryRouter>);
 }
-const landing = (container) => container.querySelector(".torq-landing");
+const landing = (container) => container.querySelector(".cowboy-landing");
 
 // Every word a visitor can reach: the page, every opened question, every (i) and every accessible name.
 function allText(container) {
@@ -36,13 +36,25 @@ describe("landing", () => {
   it("has no forecast, edge or provenance words anywhere, including the (i) and the questions", () => {
     const { container } = show();
     expect(container.querySelectorAll("button.info").length).toBe(3);
-    expect(container.querySelectorAll("details").length).toBe(4);
+    expect(container.querySelectorAll("details").length).toBe(6);
     const text = allText(container);
     expect(document.querySelectorAll(".pop").length).toBe(3);
     expect(text).toContain("Our own engine names the regime.");
     expect(container.querySelector(".foot").textContent).toContain("Market data and positioning for research. Not investment advice.");
     expect(text.match(BANNED)).toBeNull();
     expect(text).not.toMatch(/proprietary/i);
+    expect(text).toContain("Know where the herd stands.");
+    expect(container.querySelector(".foot").textContent).toContain("Cowboy is independent and built on Derive");
+  });
+
+  it("lights the owner's sign: unlit glass under five lit layers, every tube flickering on its own", () => {
+    const { container } = show();
+    const sign = container.querySelector(".neon-sign");
+    expect(sign.getAttribute("role")).toBe("img");
+    expect(sign.getAttribute("aria-label")).toBe("Cowboy");
+    expect(sign.querySelectorAll("svg.neon-glass use").length).toBe(16);
+    expect(sign.querySelectorAll("svg.neon-lit use").length).toBe(40);
+    for (const t of ["crown", "brim", "c", "o1", "w", "b", "o2", "y"]) expect(sign.querySelectorAll(`.nt-${t}`).length).toBe(5);
   });
 
   it("shows no money amounts or percentages and reads no data", () => {
@@ -73,6 +85,6 @@ describe("landing", () => {
     expect(text).not.toMatch(/\b(ETH|SOL|HYPE|XRP|ADA|ZEC|XAUT|LIT|PUMP|VVV|AAVE|SNX|CC|BNB|DOGE|LINK|Bitcoin|Ethereum|Solana)\b/);
     expect(text.replace(/\bBTC dominance\b|, BTC, /g, "")).not.toMatch(/\bBTC\b/);
     const hrefs = [...page.querySelectorAll("a")].map((a) => a.getAttribute("href"));
-    expect(new Set(hrefs)).toEqual(new Set(["/markets", "/traders"]));
+    expect(new Set(hrefs)).toEqual(new Set(["/markets", "/traders", "#how"]));
   });
 });
