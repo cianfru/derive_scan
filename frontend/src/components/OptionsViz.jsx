@@ -1,9 +1,8 @@
 // Options shown as structure: where open interest sits, how volatility is priced across expiries and strikes.
 import { useMemo } from "react";
 import { useElementWidth } from "../lib/useElementWidth.js";
-import { price, pct, usd } from "../lib/format.js";
+import { price, pct, usd, strike } from "../lib/format.js";
 
-const W = 640;
 
 /** Mirrored open-interest bars by strike: puts left, calls right, the index as a line. */
 export function OIWall(props) {
@@ -29,6 +28,7 @@ function OIWallChart({ rows, index, height = 360, allStrikes = false, width = 64
   }, [rows, index, allStrikes]);
   if (!view) return <p className="status">No open interest yet.</p>;
   const { list, max } = view;
+  const maxLabel = max.toLocaleString("en-US", { maximumFractionDigits: max >= 100 ? 0 : 1 });
   const rowH = Math.max(9, Math.min(18, (height - 30) / list.length));
   const H = rowH * list.length + 30, mid = W / 2, half = W / 2 - 70;
   const ys = list.map((_, i) => 14 + (list.length - 1 - i) * rowH);
@@ -46,16 +46,18 @@ function OIWallChart({ rows, index, height = 360, allStrikes = false, width = 64
       <text x={mid + 8} y={10}>Calls</text>
       {list.map((r, i) => (
         <g key={i}>
-          <rect x={mid - 2 - (r[2] / max) * half} y={ys[i] + 1} width={(r[2] / max) * half} height={rowH - 2} fill="var(--sig-exit)" opacity=".75"><title>{price(r[0])} strike: {r[2].toLocaleString()} put contracts</title></rect>
-          <rect x={mid + 2} y={ys[i] + 1} width={(r[1] / max) * half} height={rowH - 2} fill="var(--orange)" opacity=".9"><title>{price(r[0])} strike: {r[1].toLocaleString()} call contracts</title></rect>
+          <rect x={mid - 2 - (r[2] / max) * half} y={ys[i] + 1} width={(r[2] / max) * half} height={rowH - 2} fill="var(--put)"><title>{strike(r[0])} strike: {r[2].toLocaleString()} put contracts</title></rect>
+          <rect x={mid + 2} y={ys[i] + 1} width={(r[1] / max) * half} height={rowH - 2} fill="var(--call)"><title>{strike(r[0])} strike: {r[1].toLocaleString()} call contracts</title></rect>
           {(list.length <= 18 || i % Math.ceil(list.length / 16) === 0) &&
-            <text x={W - 4} y={ys[i] + rowH - 3} textAnchor="end">{price(r[0])}</text>}
+            <text x={W - 4} y={ys[i] + rowH - 3} textAnchor="end">{strike(r[0], "")}</text>}
         </g>))}
-      <text x={70} y={H-2}>{max.toLocaleString(undefined,{maximumFractionDigits:1})} contracts</text><text x={W-70} y={H-2} textAnchor="end">{max.toLocaleString(undefined,{maximumFractionDigits:1})} contracts</text>
+      <text x={mid - half - 2} y={H - 2}>{maxLabel}</text>
+      <text x={mid} y={H - 2} textAnchor="middle">contracts</text>
+      <text x={mid + half + 2} y={H - 2} textAnchor="end">{maxLabel}</text>
       <line x1={mid} x2={mid} y1={12} y2={H - 14} stroke="var(--seam-hi)" />
       {iy != null && <g>
         <line x1={8} x2={W - 70} y1={iy} y2={iy} stroke="var(--fg)" strokeDasharray="4 3" />
-        <text x={10} y={iy - 4} style={{ fill: "var(--fg)" }}>Index {price(index)}</text>
+        <text x={10} y={iy - 4} style={{ fill: "var(--fg)" }}>{price(index)}</text>
       </g>}
     </svg>
   );
@@ -81,16 +83,20 @@ function SmileChart({ rows, index, height = 200, width = 640 }) {
     <svg className="viz" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Implied volatility by strike">
       {ticks.map((t, i) => <g key={i}><line className="gridline" x1={L} x2={W - R} y1={Y(t)} y2={Y(t)} /><text x={L - 6} y={Y(t) + 3} textAnchor="end">{pct(t, 0)}</text></g>)}
       <line x1={X(index)} x2={X(index)} y1={T} y2={H - B} stroke="var(--fg)" strokeDasharray="4 3" />
-      <path d={d} fill="none" stroke="var(--orange)" strokeWidth="2" />
-      {pts.map((p, i) => <circle key={i} cx={X(p[0])} cy={Y(p[1])} r="2.5" fill="var(--bg)" stroke={p[0] < index ? "var(--sig-exit)" : "var(--orange)"} strokeWidth="1.5"><title>{price(p[0])}: {pct(p[1])}</title></circle>)}
-      <text x={L} y={H - 6}>{price(x0)}</text><text x={W - R} y={H - 6} textAnchor="end">{price(x1)}</text>
+      <path d={d} fill="none" stroke="var(--fg-2)" strokeWidth="1.5" />
+      {pts.map((p, i) => <circle key={i} cx={X(p[0])} cy={Y(p[1])} r="2.5" fill="var(--plate)" stroke={p[0] < index ? "var(--put)" : "var(--call)"} strokeWidth="1.5"><title>{strike(p[0])}: {pct(p[1])}</title></circle>)}
+      <text x={L} y={H - 6}>{strike(x0, "")}</text><text x={W - R} y={H - 6} textAnchor="end">{strike(x1, "")}</text>
       <text x={X(index)} y={H - 6} textAnchor="middle" style={{ fill: "var(--fg)" }}>{price(index)}</text>
     </svg>
   );
 }
 
 /** ATM implied volatility across expiries. */
-export function TermStructure({ expiries, height = 220 }) {
+export function TermStructure(props) {
+  const [ref, width] = useElementWidth(640);
+  return <div ref={ref}><TermStructureChart {...props} W={Math.max(280, width)} /></div>;
+}
+function TermStructureChart({ expiries, height = 220, W }) {
   const ex = (expiries || []).filter((e) => e.atm_iv != null && e.tenor_days > 0.4);
   if (ex.length < 2) return <p className="status">Not enough expiries.</p>;
   const H = height, L = 44, R = 14, T = 12, B = 28;
@@ -103,21 +109,23 @@ export function TermStructure({ expiries, height = 220 }) {
   for (let v = y0; v <= y1 + 1e-9; v += 0.05) grid.push(v);
   return (
     <svg className="viz" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="At-the-money implied volatility by days to expiry">
-      <defs><linearGradient id="tsg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="var(--orange)" stopOpacity=".28" /><stop offset="1" stopColor="var(--orange)" stopOpacity="0" /></linearGradient></defs>
       {grid.map((v, i) => <g key={i}><line className="gridline" x1={L} x2={W - R} y1={Y(v)} y2={Y(v)} /><text x={L - 6} y={Y(v) + 3} textAnchor="end">{Math.round(v * 100)}%</text></g>)}
       {[1, 7, 30, 90, 180, 365].filter((d) => d <= tmax * 1.05).map((d) => <text key={d} x={X(d)} y={H - 8} textAnchor="middle">{d}d</text>)}
-      <path d={`${line}L${pts[pts.length - 1][0]},${H - B}L${pts[0][0]},${H - B}Z`} fill="url(#tsg)" />
-      <path d={line} fill="none" stroke="var(--orange)" strokeWidth="2.2" />
-      {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="3" fill="var(--bg)" stroke="var(--orange-hi)" strokeWidth="1.8"><title>{ex[i].tenor_days.toFixed(1)} days: {pct(ex[i].atm_iv)}</title></circle>)}
+      <path d={line} fill="none" stroke="var(--fg-2)" strokeWidth="1.5" />
+      {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="3" fill="var(--plate)" stroke="var(--fg)" strokeWidth="1.5"><title>{ex[i].tenor_days.toFixed(1)} days: {pct(ex[i].atm_iv)}</title></circle>)}
     </svg>
   );
 }
 
 /** A small time series (e.g. 30-day ATM IV over the last two weeks). */
-export function MiniSeries({ points, height = 110, format = (v) => pct(v, 1), color = "var(--orange)", zero = false }) {
+export function MiniSeries(props) {
+  const [ref, width] = useElementWidth(420);
+  return <div ref={ref}><MiniSeriesChart {...props} W={Math.max(260, width)} /></div>;
+}
+function MiniSeriesChart({ points, height = 120, format = (v) => pct(v, 1), color = "var(--fg-2)", zero = false, W }) {
   const p = (points || []).filter((q) => q[1] != null);
   if (p.length < 2) return <p className="status">Builds as data is recorded.</p>;
-  const W = 420, H = height, L = 44, R = 8, T = 8, B = 18;
+  const H = height, L = 44, R = 8, T = 8, B = 18;
   const t0 = p[0][0], t1 = p[p.length - 1][0];
   let y0 = Math.min(...p.map((q) => q[1])), y1 = Math.max(...p.map((q) => q[1]));
   if (zero) { y0 = Math.min(y0, 0); y1 = Math.max(y1, 0); }
@@ -159,11 +167,15 @@ export function PricedRange({ index, iv30 }) {
 }
 
 /** One row per expiry: the priced ranges as bars on a shared price axis, with the index marked. */
-export function PricedByDate({ implied, index }) {
+export function PricedByDate(props) {
+  const [ref, width] = useElementWidth(640);
+  return <div ref={ref}><PricedByDateChart {...props} W2={Math.max(280, width)} /></div>;
+}
+function PricedByDateChart({ implied, index, W2 }) {
   const rows = (implied || []).slice(0, 9);
   if (!rows.length) return <p className="status">Too few expiries.</p>;
   const lo = Math.min(...rows.map((r) => r.q[0]), index), hi = Math.max(...rows.map((r) => r.q[4]), index);
-  const W2 = 640, L = 64, R = 12, rowH = 26, H = rows.length * rowH + 26;
+  const L = 52, R = 12, rowH = 26, H = rows.length * rowH + 26;
   const X = (v) => L + ((v - lo) / (hi - lo || 1)) * (W2 - L - R);
   return (
     <svg className="viz" viewBox={`0 0 ${W2} ${H}`} role="img" aria-label="Price ranges option prices imply, by expiry">
@@ -173,8 +185,9 @@ export function PricedByDate({ implied, index }) {
         return (
           <g key={r.expiry}>
             <text x={0} y={y + 13}>{new Date(r.expiry * 1000).toISOString().slice(5, 10)}</text>
-            <rect x={X(r.q[0])} y={y + 7} width={X(r.q[4]) - X(r.q[0])} height={4} fill="var(--orange-lo)" opacity=".7" />
-            <rect x={X(r.q[1])} y={y + 3} width={X(r.q[3]) - X(r.q[1])} height={12} fill="var(--orange)" />
+            <rect x={X(r.q[0])} y={y + 8} width={X(r.q[4]) - X(r.q[0])} height={2} fill="var(--seam-hi)" />
+            <rect x={X(r.q[1])} y={y + 5} width={X(r.q[2]) - X(r.q[1])} height={8} fill="var(--down)" opacity=".75" />
+            <rect x={X(r.q[2])} y={y + 5} width={X(r.q[3]) - X(r.q[2])} height={8} fill="var(--up)" opacity=".75" />
             <rect x={X(r.q[2]) - 1} y={y + 1} width={2} height={16} fill="var(--fg)" />
             <title>{`${Math.round(r.days)} days: middle ${price(r.q[2])}; half between ${price(r.q[1])} and ${price(r.q[3])}; eight in ten between ${price(r.q[0])} and ${price(r.q[4])}`}</title>
           </g>);
@@ -185,6 +198,9 @@ export function PricedByDate({ implied, index }) {
     </svg>
   );
 }
+
+const BOUGHT = { call: "var(--call)", put: "var(--put)", perp: "var(--fg-2)" };
+const SOLD = { call: "var(--call-sold)", put: "var(--put-sold)", perp: "color-mix(in srgb, var(--fg-2) 35%, var(--plate))" };
 
 /** Taker buying vs selling of calls, puts and the perp, as mirrored bars (notional). */
 export function TakerFlow({ flow }) {
@@ -203,10 +219,10 @@ export function TakerFlow({ flow }) {
             <span className="label" style={{ color: "var(--fg-2)" }}>{label}</span>
             <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, borderRight: "1px solid var(--seam-hi)", paddingRight: 6 }}>
               <span className="mono dim" style={{ fontSize: 12 }}>{usd(f.sell_notional_usd)}</span>
-              <i style={{ height: 14, width: `${(f.sell_notional_usd / max) * 70}%`, background: "var(--sig-exit)", display: "block" }} />
+              <i style={{ height: 14, width: `${(f.sell_notional_usd / max) * 70}%`, background: SOLD[k], display: "block" }} />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 6 }}>
-              <i style={{ height: 14, width: `${(f.buy_notional_usd / max) * 70}%`, background: "var(--orange)", display: "block" }} />
+              <i style={{ height: 14, width: `${(f.buy_notional_usd / max) * 70}%`, background: BOUGHT[k], display: "block" }} />
               <span className="mono dim" style={{ fontSize: 12 }}>{usd(f.buy_notional_usd)}</span>
             </div>
           </div>);

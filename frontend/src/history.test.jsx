@@ -80,7 +80,7 @@ it("inspects exact dated engine values by keyboard without filling the missing o
   expect(screen.getByText(/No recorded decision/)).toBeTruthy();
   fireEvent.keyDown(slider, { key: "ArrowRight" });
   expect(slider.getAttribute("aria-valuetext")).toContain("2026-10-01 12:00 UTC: Unavailable");
-  await userEvent.setup().click(screen.getByRole("tab", { name: "4 hours" }));
+  await userEvent.setup().click(screen.getByRole("tab", { name: "4H" }));
   expect(screen.getByRole("slider").getAttribute("aria-valuetext")).toContain("-1.00σ");
 });
 
@@ -90,49 +90,40 @@ it("supports pointer date inspection and exposes the coverage behind its informa
   vi.spyOn(slider, "getBoundingClientRect").mockReturnValue({ left: 0, width: 760 });
   fireEvent(slider, new MouseEvent("pointerdown", { bubbles: true, clientX: 66 }));
   expect(slider.getAttribute("aria-valuetext")).toContain("2026-09-30");
-  await userEvent.setup().click(screen.getByRole("button", { name: "History collection coverage" }));
+  await userEvent.setup().click(screen.getByRole("button", { name: "About history" }));
   expect(screen.getByRole("dialog").textContent).toContain("3 recorded engine readings; 1 price reconstructions");
 });
 
 it("uses the selected measurement status rather than withholding a ready field because another field is warming", async () => {
   render(<MetricHistory history={history} />);
-  await userEvent.setup().selectOptions(screen.getByRole("combobox", { name: "History measurement" }), "heat");
+  await userEvent.setup().click(screen.getByRole("tab", { name: "Heat" }));
   fireEvent.keyDown(screen.getByRole("slider"), { key: "Home" });
   expect(screen.getByText("Price reconstruction")).toBeTruthy();
   expect(screen.queryByText("Price reconstruction · Warming up")).toBeNull();
   expect(screen.getByRole("slider").getAttribute("aria-valuetext")).toContain(": 20.");
 });
 
-it("shows recorded options through time, percentage-point changes and daily partial coverage, with snapshot funding available", async () => {
-  render(<MetricHistory history={history} />);
-  const user = userEvent.setup();
-  await user.click(screen.getByRole("tab", { name: "Options & positioning" }));
-  expect(screen.getByRole("slider", { name: "30-day IV history" }).getAttribute("aria-valuetext")).toContain("55.00%");
-  expect(screen.getByText("+5.00 pts")).toBeTruthy();
-  expect(screen.getByText("Recorded · Partial UTC day")).toBeTruthy();
-  expect(screen.getByText("2 / 96 snapshots in this UTC day")).toBeTruthy();
-  expect(screen.getByRole("status").textContent).toContain("earlier surfaces unavailable from Derive");
-  await user.selectOptions(screen.getByRole("combobox", { name: "History measurement" }), "perp_funding_ann");
-  await user.click(screen.getByRole("tab", { name: "Snapshots" }));
-  expect(screen.getByRole("slider", { name: "Funding history" }).getAttribute("aria-valuetext")).toContain("4.00%");
-  expect(screen.getByText("3 usable samples · 94 missing")).toBeTruthy();
-});
-
 it("keeps empty or unavailable history explicit without drawing a projected series", async () => {
   render(<MetricHistory history={{ engine: {}, options: [], coverage: {} }} />);
   expect(screen.queryByRole("slider")).toBeNull();
   expect(screen.getByText("No observations in this window.")).toBeTruthy();
-  expect(screen.getByText("Recorded history is still collecting")).toBeTruthy();
-  await userEvent.setup().click(screen.getByRole("tab", { name: "Options & positioning" }));
-  expect(screen.queryByRole("slider")).toBeNull();
 });
 
 it("distinguishes engine bar time from saved ticker time and rechecks wallet history dates", async () => {
   const augmented = { ...history, engine: { ...history.engine, "1d": history.engine['1d'].map(row => ({ ...row, positioning_at: row.ts - 300 })) },
     coverage: { ...history.coverage, wallets: { ready: true, status: 'ready', through: '2026-10-01', expected_through: '2026-10-01' } } };
   render(<MetricHistory history={augmented} />);
-  await userEvent.setup().selectOptions(screen.getByRole('combobox', { name: 'History measurement' }), 'funding_ann');
+  const user = userEvent.setup();
+  await user.click(screen.getByRole('tab', { name: 'Funding' }));
   expect(screen.getByText('Bar close · 2026-10-03 12:00 UTC')).toBeTruthy();
   expect(screen.getByText('Ticker observed 2026-10-03 11:55 UTC')).toBeTruthy();
-  expect(screen.getByText('Wallet trade history incomplete through 2026-10-01 UTC')).toBeTruthy();
+  await user.click(screen.getByRole('button', { name: 'About history' }));
+  expect(screen.getByRole('dialog').textContent).toContain('Wallet trade history incomplete through 2026-10-01 UTC');
+});
+
+it("folds behind its head until opened", async () => {
+  render(<MetricHistory history={history} collapsible />);
+  expect(screen.queryByRole("slider")).toBeNull();
+  await userEvent.setup().click(screen.getByRole("button", { name: "History" }));
+  expect(screen.getByRole("slider", { name: "Price stretch history" })).toBeTruthy();
 });

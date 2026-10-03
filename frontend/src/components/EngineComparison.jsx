@@ -8,7 +8,7 @@ import { STATUS_NAMES } from "../lib/presentation.js";
 
 export const CONVERGENCE_HELP =
   "Compares the last completed 1D and 4H engine readings. The agreement score uses regime family, signal direction and heat; it is not a trade success rate. The combined signal follows the existing engine rules: exits take priority, conflicting or blocked entries wait. Daily remains the primary price view. Options pricing and wallet positioning do not enter this score.";
-export function EnginePair({ comparison, compact = false }) {
+export function EnginePair({ comparison, compact = false, explain = true }) {
   return (
     <div className={`engine-pair ${compact ? "compact" : ""}`}>
       {["1d", "4h"].map((tf) => {
@@ -22,7 +22,7 @@ export function EnginePair({ comparison, compact = false }) {
                 ? REGIME[r.regime] || title(r.regime)
                 : STATUS_NAMES[r?.status === "ready" ? "stale" : r?.status] ||
                   "Unavailable"}
-              {ready && (
+              {ready && explain && (
                 <Info label={`Explain ${tf} regime`}>
                   {REGIME_HELP[r.regime]} Last completed bar:{" "}
                   {utc(r.observed_at)}. Derive volume:{" "}
@@ -30,14 +30,14 @@ export function EnginePair({ comparison, compact = false }) {
                 </Info>
               )}
             </span>
-            {ready ? <Signal s={r.signal} /> : <span className="faint">—</span>}
+            {ready ? <Signal s={r.signal} explain={explain} /> : <span className="faint">—</span>}
           </div>
         );
       })}
     </div>
   );
 }
-export function Convergence({ comparison, compact = false }) {
+export function Convergence({ comparison, compact = false, explain = true }) {
   const { complete, confluence: c, unified } = comparisonView(comparison);
   return (
     <div className={`convergence ${compact ? "compact" : ""}`}>
@@ -49,14 +49,14 @@ export function Convergence({ comparison, compact = false }) {
               <small>/100</small>
             </b>
             <span>{title(c.label)} agreement</span>
-            <Info label="Explain timeframe agreement">{CONVERGENCE_HELP}</Info>
+            {explain && <Info label="Explain timeframe agreement">{CONVERGENCE_HELP}</Info>}
           </div>
           <div className="agreement-track" aria-hidden="true">
             <i style={{ width: `${c.score}%` }} />
           </div>
           <div className="combined-signal">
             <span>Combined</span>
-            <Signal s={unified} />
+            <Signal s={unified} explain={explain} />
           </div>
           {!compact && (
             <div className="agreement-evidence">

@@ -3,20 +3,21 @@ import { createPortal } from "react-dom";
 import { SIGNAL_HELP } from "../lib/explain.js";
 import { SIGNAL_LABEL, signalTone } from "../lib/format.js";
 
-export function Signal({ s, help = true }) {
-  return <span className={`sig ${signalTone(s)}`}>{s ? SIGNAL_LABEL[s] || s : "Unavailable"}{help && SIGNAL_HELP[s] && <Info label={`Explain ${SIGNAL_LABEL[s]}`}>{SIGNAL_HELP[s]}</Info>}</span>;
+// explain={false}: the convention for anything rendered inside a table row (no (i) per cell).
+export function Signal({ s, help = true, explain = help }) {
+  return <span className={`sig ${signalTone(s)}`}>{s ? SIGNAL_LABEL[s] || s : "Unavailable"}{explain && SIGNAL_HELP[s] && <Info label={`Explain ${SIGNAL_LABEL[s]}`}>{SIGNAL_HELP[s]}</Info>}</span>;
 }
 
 export function Tabs({ items, value, onChange, label }) {
   return (
     <div className="tabs" role="tablist" aria-label={label}>
-      {items.map(([v, text]) => (
+      {items.map(([v, text, short]) => (
         <button key={v} role="tab" aria-selected={value === v} tabIndex={value === v ? 0 : -1} onClick={() => onChange(v)}
           onKeyDown={e => {
             const index = items.findIndex(([key]) => key === v);
             const next = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : e.key === "ArrowRight" ? (index + 1) % items.length : e.key === "ArrowLeft" ? (index + items.length - 1) % items.length : null;
             if (next !== null) { e.preventDefault(); onChange(items[next][0]); e.currentTarget.parentElement.children[next]?.focus(); }
-          }}>{text}</button>
+          }}>{short ? <><span className="t-long">{text}</span><span className="t-short" aria-hidden="true">{short}</span></> : text}</button>
       ))}
     </div>
   );
@@ -59,15 +60,41 @@ export function Info({ children, label = "More information" }) {
   );
 }
 
+/** The one panel head: orange tick, title, controls on the right, at most one (i), one hairline. */
+export function PanelHead({ title, info, infoLabel, right, children, as: Tag = "h2" }) {
+  return (
+    <div className="panel-head">
+      <Tag className="panel-title">{title}{info && <Info label={infoLabel || `About ${typeof title === "string" ? title : "this panel"}`}>{info}</Info>}</Tag>
+      {(right || children) && <div className="panel-right">{right}{children}</div>}
+    </div>
+  );
+}
+
+/** App page head: 28px title, a mono meta line on the same baseline, optional tabs. */
+export function PageHead({ title, info, meta, tabs }) {
+  return (
+    <header className="page-head">
+      <h1>{title}{info && <Info label={`About ${title}`}>{info}</Info>}</h1>
+      {tabs}
+      {meta && <p className="page-meta">{meta}</p>}
+    </header>
+  );
+}
+
+/** A 12px right arrow drawn inline, so it never falls back to a system glyph. */
+export function Arrow({ className = "" }) {
+  return <svg className={`arrow-icon ${className}`} width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M1.5 6h8.5M6.5 2.5 10 6l-3.5 3.5" /></svg>;
+}
+
+/** A missing value: a faint em dash at normal size. */
+export function Empty({ label = "Unavailable" }) {
+  return <span className="empty-dash" aria-label={label}>—</span>;
+}
+
 export function Plate({ id, title, info, right, children, className = "", bodyClass = "" }) {
   return (
     <section id={id} className={`plate ${className}`}>
-      {(title || right) && (
-        <div className="plate-h">
-          {title && <span className="label"><i className="tick" />{title}{info && <Info>{info}</Info>}</span>}
-          {right}
-        </div>
-      )}
+      {(title || right) && <PanelHead title={title} info={info} right={right} />}
       <div className={`plate-b ${bodyClass}`}>{children}</div>
     </section>
   );

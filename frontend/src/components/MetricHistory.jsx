@@ -1,9 +1,9 @@
 import { useId, useMemo, useState } from "react";
-import { Info, Tabs } from "./ui.jsx";
+import { PanelHead, Tabs } from "./ui.jsx";
 import { REGIME, SIGNAL_LABEL, title, utc, usd } from "../lib/format.js";
 import { useElementWidth } from "../lib/useElementWidth.js";
 import { coverageReady } from "./HistoryStatus.jsx";
-import { dailyHistory, historyGeometry, historySource, historyWindow, metricValue, nearestObservation, orderedHistory } from "../lib/history.js";
+import { historyGeometry, historySource, historyWindow, metricValue, nearestObservation, orderedHistory } from "../lib/history.js";
 import "../history.css";
 
 const percent = value => `${(value * 100).toFixed(2)}%`;
@@ -12,21 +12,10 @@ const exactUsd = value => value.toLocaleString("en-US", { style: "currency", cur
 const number = value => value.toLocaleString("en-US", { maximumFractionDigits: 2 });
 const METRICS = {
   engine: [
-    { key: "zscore", label: "Price stretch", format: value => `${value.toFixed(2)}σ`, zero: true },
-    { key: "heat", label: "Heat", format: number, bounds: [0, 100] },
-    { key: "funding_ann", label: "Funding", format: percent, changeFormat: points, zero: true },
-    { key: "oi_usd", label: "Perp OI", format: exactUsd, axis: usd },
-  ],
-  options: [
-    { key: "atm_iv_30d", label: "30-day IV", format: percent, changeFormat: points },
-    { key: "atm_iv_7d", label: "7-day IV", format: percent, changeFormat: points },
-    { key: "atm_iv_90d", label: "90-day IV", format: percent, changeFormat: points },
-    { key: "rr25_30d", label: "30-day skew", format: points, zero: true },
-    { key: "bf25_30d", label: "30-day butterfly", format: points },
-    { key: "pc_oi_ratio", label: "Put / call OI", format: value => `${value.toFixed(3)}×` },
-    { key: "option_oi_contracts", label: "Option OI", format: value => `${number(value)} contracts`, axis: number },
-    { key: "perp_funding_ann", label: "Funding", format: percent, changeFormat: points, zero: true },
-    { key: "perp_oi_usd", label: "Perp OI", format: exactUsd, axis: usd },
+    { key: "zscore", label: "Price stretch", short: "Stretch", format: value => `${value.toFixed(2)}σ`, zero: true },
+    { key: "heat", label: "Heat", short: "Heat", format: number, bounds: [0, 100] },
+    { key: "funding_ann", label: "Funding", short: "Funding", format: percent, changeFormat: points, zero: true },
+    { key: "oi_usd", label: "Perp OI", short: "OI", format: exactUsd, axis: usd },
   ],
 };
 const SOURCE_NAMES = { recorded: "Recorded", reconstructed: "Price reconstruction" };
@@ -68,7 +57,7 @@ export function HistoryChart({ rows, metric, cadence, scope }) {
     <div className="history-reading" aria-live="polite">
       <div><span className="label">{metric.label}</span><strong>{exact}</strong></div>
       <div className="history-observation"><time>{positioning ? "Bar close · " : ""}{stamp(selected?.ts)}</time><span>{SOURCE_NAMES[source] || "Source unavailable"}{measurementStatus && measurementStatus !== "ready" ? ` · ${statusName}` : ""}{selected?.daily && selected.partial_day ? " · Partial UTC day" : ""}</span>{positioning && <span>{selected?.positioning_at ? `Ticker observed ${stamp(selected.positioning_at)}` : "Ticker observation time was not saved"}</span>}</div>
-      {change !== null && <div className="history-change"><span>Change across shown samples</span><b>{change > 0 ? "+" : change < 0 ? "−" : ""}{(metric.changeFormat || metric.format)(Math.abs(change))}</b></div>}
+      {change !== null && <div className="history-change"><span>Window change</span><b>{change > 0 ? "+" : change < 0 ? "−" : ""}{(metric.changeFormat || metric.format)(Math.abs(change))}</b></div>}
     </div>
     {geometry ? <>
       <p id={descriptionId} className="sr-only">Use left and right arrow keys to inspect observations. Home and End select the first and last sample. Move a pointer or touch the chart to inspect a date. Missing values and collection gaps remain blank.</p>
@@ -87,42 +76,46 @@ export function HistoryChart({ rows, metric, cadence, scope }) {
       </svg>
     </> : <div className="history-empty" role="status">{rows.length ? `No ${metric.label.toLowerCase()} observations in this window.` : "No observations in this window."}</div>}
     <div className="history-context">
-      <span>{valid.length.toLocaleString()} usable samples{geometry?.missing ? ` · ${geometry.missing.toLocaleString()} missing` : ""}</span>
       {scope === "engine" && selected && <span>{REGIME[selected.regime] || "Regime unavailable"} · {selected.source === "reconstructed" ? "No recorded decision" : SIGNAL_LABEL[selected.signal] || "Decision unavailable"}{selected.ribbon ? ` · Ribbon ${typeof selected.ribbon === "string" ? selected.ribbon : selected.ribbon.state || "unavailable"}` : ""}</span>}
       {selected?.daily && <span>{selected.day_samples} / {selected.day_expected} snapshots in this UTC day</span>}
     </div>
-    {scope === "engine" && geometry && <svg className="history-regime-strip" viewBox={`0 0 ${width} 12`} aria-label="Regimes at the shown observations" role="img">
-      {rows.map(row => row.regime && <line key={row.ts} x1={geometry.x(row.ts)} x2={geometry.x(row.ts)} y1="2" y2="10" stroke={REGIME_COLORS[row.regime] || "var(--seam-hi)"} strokeWidth={Math.min(8, Math.max(2, (width - geometry.left - geometry.right) / rows.length * .8))}><title>{stamp(row.ts)}: {REGIME[row.regime] || row.regime}. {SOURCE_NAMES[historySource(row)] || "Source unavailable"}</title></line>)}
-    </svg>}
   </div>;
 }
 
-export default function MetricHistory({ history }) {
-  const [scope, setScope] = useState("engine");
+export default function MetricHistory({ history, collapsible = false }) {
+  const [open, setOpen] = useState(!collapsible);
   const [timeframe, setTimeframe] = useState("1d");
-  const [sampling, setSampling] = useState("daily");
   const [window, setWindow] = useState("30d");
-  const [keys, setKeys] = useState({ engine: "zscore", options: "atm_iv_30d" });
+  const [key, setKey] = useState("zscore");
+  const scope = "engine";
   const now = Date.now() / 1000;
-  const interval = history?.coverage?.options?.interval_seconds || 900;
-  const rows = useMemo(() => {
-    const raw = scope === "engine" ? history?.engine?.[timeframe] || [] : history?.options || [];
-    const sampled = scope === "options" && sampling === "daily" ? dailyHistory(raw, now, interval) : orderedHistory(raw, now);
-    return historyWindow(sampled, window, now);
-  }, [history, scope, timeframe, sampling, window, interval]);
-  const metric = METRICS[scope].find(item => item.key === keys[scope]) || METRICS[scope][0];
-  const coverage = scope === "engine" ? history?.coverage?.engine?.[timeframe] : history?.coverage?.options;
-  const cadence = scope === "engine" ? timeframe === "1d" ? 86400 : 14400 : sampling === "daily" ? 86400 : interval;
-  const reconstructed = rows.some(row => historySource(row) === "reconstructed" && metricValue(row, metric.key) !== null);
-  const recordedStart = scope === "engine" ? coverage?.recorded_from : coverage?.history_available_from ?? coverage?.from;
+  const rows = useMemo(() => historyWindow(orderedHistory(history?.engine?.[timeframe] || [], now), window, now), [history, timeframe, window]);
+  const metric = METRICS.engine.find(item => item.key === key) || METRICS.engine[0];
+  const coverage = history?.coverage?.engine?.[timeframe];
+  const cadence = timeframe === "1d" ? 86400 : 14400;
+  const recordedStart = coverage?.recorded_from;
   const wallets = history?.coverage?.wallets;
   const expectedWalletDay = new Date((now - 3600 - 86400) * 1000).toISOString().slice(0, 10);
   const walletsReady = coverageReady(wallets) && wallets.through >= expectedWalletDay;
-  return <section className="metric-history" id="metric-history" aria-label="Market history">
-    <div className="history-heading"><div><span className="section-code">RECORDED THROUGH TIME</span><h2>Market history</h2></div><Info label="About market history">Solid lines are recorded observations. Dashed lines reconstruct price metrics from completed candles; they never recreate final signals, funding, open interest or option surfaces. Warming values use incomplete normalisation. Empty intervals remain gaps. Funding is the observed hourly rate annualised, not a fixed yield. Options use recorded surfaces only; Daily takes the last observed snapshot of each UTC date.</Info></div>
-    <div className="history-toolbar"><Tabs label="History source" value={scope} onChange={setScope} items={[["engine", "Price engine"], ["options", "Options & positioning"]]} /><div className="history-window-controls"><Tabs label="History window" value={window} onChange={setWindow} items={[["30d", "30 days"], ["90d", "90 days"], ["all", "Available history"]]} /><Info label="About available history windows">The published view retains up to 120 days of daily engine measurements, 30 days of 4-hour measurements and 90 days of recorded option snapshots. Available history shows that published window, which can be shorter than the selected range. Earlier original readings remain in the recorder archive; past option surfaces before collection are unavailable.</Info></div></div>
-    <div className="history-controls"><label className="history-metric-select">Measurement<select value={metric.key} onChange={event => setKeys(previous => ({ ...previous, [scope]: event.target.value }))} aria-label="History measurement">{METRICS[scope].map(item => <option value={item.key} key={item.key}>{item.label}</option>)}</select></label>{scope === "engine" ? <Tabs label="Engine history timeframe" value={timeframe} onChange={setTimeframe} items={[["1d", "Daily"], ["4h", "4 hours"]]} /> : <Tabs label="Options history sampling" value={sampling} onChange={setSampling} items={[["daily", "Daily"], ["snapshots", "Snapshots"]]} />}</div>
-    <HistoryChart key={`${scope}-${timeframe}-${sampling}-${metric.key}-${window}`} rows={rows} metric={metric} cadence={cadence} scope={scope} />
-    <div className="history-coverage" role="status"><span>{recordedStart != null ? scope === "options" ? `Options recording began ${dayLabel(recordedStart)}; earlier surfaces unavailable from Derive.` : `Original engine readings recorded from ${dayLabel(recordedStart)}.` : "Recorded history is still collecting"}<Info label="History collection coverage">{recordedStart != null ? `Recorded from ${stamp(recordedStart)}. ` : "No recorded starting timestamp. "}{coverage?.from != null ? `Available from ${stamp(coverage.from)}. ` : ""}{coverage?.to != null ? `Through ${stamp(coverage.to)}. ` : ""}{coverage?.requested_from != null ? `Requested from ${stamp(coverage.requested_from)}. ` : ""}{coverage?.requested_to != null ? `Requested through ${stamp(coverage.requested_to)}. ` : ""}{Number.isFinite(coverage?.expected_count) ? `${coverage.observed_count ?? coverage.count ?? 0} of ${coverage.expected_count} ${scope === "engine" ? "bar closes represented" : "snapshots collected"}. ` : ""}{Number.isFinite(coverage?.missing_count) ? `${coverage.missing_count} missing intervals. ` : ""}{Number.isFinite(coverage?.reconstructed_count) ? `${coverage.recorded_count || 0} recorded engine readings; ${coverage.reconstructed_count} price reconstructions. ` : ""}{scope === "options" ? coverage?.limitation || "Past option surfaces cannot be recovered from candles." : "Price reconstruction does not recreate the conditions or decisions that were available live."}</Info></span>{reconstructed && <span><i className="history-source-swatch" />Earlier price metrics reconstructed from candles</span>}{wallets && <span className={walletsReady ? "" : "warn"}>Wallet trade history {walletsReady ? "current" : "incomplete"}{wallets.through ? ` through ${wallets.through} UTC` : ""}<Info label="About history completeness">Price metrics can be reconstructed from past candles. Original engine decisions require a saved reading. Option surfaces require a saved snapshot. Wallet trades can be rebuilt from Derive's trade history; this does not recover historical option surfaces.{wallets.expected_through ? ` Wallet history must reach ${wallets.expected_through} UTC close.` : ""}{!walletsReady && " Wallet readings remain withheld until trade history is current."}</Info></span>}</div>
+  const info = <>
+    The engine's measurements at each {timeframe === "1d" ? "daily" : "4-hour"} close. Solid line: recorded readings{recordedStart != null ? `, from ${dayLabel(recordedStart)}` : ""}. Dashed line: earlier price metrics reconstructed from candles; they never recreate signals, funding or open interest. Gaps stay empty. Funding is the observed hourly rate annualised.
+    {" "}Windows show up to 120 days of daily and 30 days of 4-hour readings.
+    {coverage?.from != null ? ` Available ${stamp(coverage.from)}` : ""}{coverage?.to != null ? ` to ${stamp(coverage.to)}.` : ""}
+    {Number.isFinite(coverage?.reconstructed_count) ? ` ${coverage.recorded_count || 0} recorded engine readings; ${coverage.reconstructed_count} price reconstructions.` : ""}
+    {Number.isFinite(coverage?.missing_count) && coverage.missing_count ? ` ${coverage.missing_count} missing intervals.` : ""}
+    {wallets ? ` Wallet trade history ${walletsReady ? "current" : "incomplete"}${wallets.through ? ` through ${wallets.through} UTC` : ""}.` : ""}
+  </>;
+  const headTitle = collapsible
+    ? <button type="button" className="fold-toggle" aria-expanded={open} aria-controls="metric-history-body" onClick={() => setOpen(o => !o)}>History<i aria-hidden="true" /></button>
+    : "History";
+  return <section className={`plate metric-history${open ? " open" : ""}`} id="metric-history" aria-label="Market history">
+    <PanelHead title={headTitle} info={open ? info : null} infoLabel="About history" right={open ? <div className="tab-groups">
+      <Tabs label="History measurement" value={metric.key} onChange={setKey} items={METRICS.engine.map(item => [item.key, item.short])} />
+      <Tabs label="History timeframe" value={timeframe} onChange={setTimeframe} items={[["1d", "1D"], ["4h", "4H"]]} />
+      <Tabs label="History window" value={window} onChange={setWindow} items={[["30d", "30D"], ["90d", "90D"], ["all", "All"]]} />
+    </div> : null} />
+    {open && <div id="metric-history-body" className="metric-history-body">
+      <HistoryChart key={`${timeframe}-${metric.key}-${window}`} rows={rows} metric={metric} cadence={cadence} scope={scope} />
+    </div>}
   </section>;
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries, createSeriesMarkers, ColorType, CrosshairMode, LineStyle } from "lightweight-charts";
-import { cssVar, SIGNAL_LABEL, signalTone } from "../lib/format.js";
+import { cssVar, price, strike, SIGNAL_LABEL, signalTone } from "../lib/format.js";
 
 import { conePath } from "../lib/analytics.js";
 
@@ -19,7 +19,11 @@ function ema(values, n) {
 
 const TONE_VAR = { strong: "--sig-strong", long: "--sig-long", acc: "--sig-acc", wait: "--sig-wait", exit: "--sig-exit" };
 
-const HORIZON_DAYS = { "4h": 21, "1d": 120 };
+// Axis precision follows magnitude: whole numbers for BTC and ETH, cents for mid prices, four places below 1.
+function precisionFor(v) {
+  const a = Math.abs(v);
+  return a >= 1000 ? 0 : a >= 1 ? 2 : 4;
+}
 
 const pctFrom = (v, base) => `${v >= base ? "+" : ""}${((v / base - 1) * 100).toFixed(1)}%`;
 
@@ -27,13 +31,18 @@ const pctFrom = (v, base) => `${v >= base ? "+" : ""}${((v / base - 1) * 100).to
  * when options exist: the middle half of the outcomes option prices imply for each upcoming
  * expiry (upper edge in the up colour, lower edge in the down colour, so any lean shows), and
  * the levels where open interest sits (call and put walls, max pain). */
-export default function CandleChart({ candles, signals, tf, theme, implied = null, levels = null, optionsAt = null, optionsIndex = null }) {
+export default function CandleChart({ candles, signals, tf, theme, implied = null, levels = null, optionsAt = null, optionsIndex = null, coneDays = 30 }) {
   const box = useRef(null);
+  const tags = useRef(null);
   useEffect(() => {
     if (!box.current || !candles?.length) return;
     const c = (n) => cssVar(n);
+    const lastClose = candles[candles.length - 1][4];
+    const precision = precisionFor(lastClose);
+    const priceFormat = { type: "price", precision, minMove: 1 / 10 ** precision };
     const chart = createChart(box.current, {
       autoSize: true,
+      localization: { priceFormatter: price },
       layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: c("--muted"), fontFamily: "IBM Plex Mono, monospace", fontSize: 11, attributionLogo: false },
       grid: { vertLines: { color: c("--seam") + "66" }, horzLines: { color: c("--seam") + "66" } },
       rightPriceScale: { borderColor: c("--seam") },
@@ -41,10 +50,10 @@ export default function CandleChart({ candles, signals, tf, theme, implied = nul
       crosshair: { mode: CrosshairMode.Normal, vertLine: { color: c("--faint"), labelBackgroundColor: c("--plate-3") }, horzLine: { color: c("--faint"), labelBackgroundColor: c("--plate-3") } },
     });
     const up = c("--up"), down = c("--down");
-    const candle = chart.addSeries(CandlestickSeries, { upColor: up, downColor: down, borderVisible: false, wickUpColor: up, wickDownColor: down });
+    const candle = chart.addSeries(CandlestickSeries, { upColor: up, downColor: down, borderVisible: false, wickUpColor: up, wickDownColor: down, priceFormat });
     const bars = candles.map(([t, o, h, l, cl]) => ({ time: t, open: o, high: h, low: l, close: cl }));
-    const step = TF_SEC[tf], lastT = candles[candles.length - 1][0], lastC = candles[candles.length - 1][4];
-    const rangePath = (qi) => conePath(implied, optionsAt, optionsIndex, HORIZON_DAYS[tf], qi);
+    const step = TF_SEC[tf], lastT = candles[candles.length - 1][0];
+    const rangePath = (qi) => conePath(implied, optionsAt, optionsIndex, coneDays, qi);
     const cone = rangePath(2).slice(1);
     if (cone.length) { // empty future bars so dates in the future sit at their true distance
       const end = cone[cone.length - 1].time;
@@ -63,7 +72,7 @@ export default function CandleChart({ candles, signals, tf, theme, implied = nul
     if (cone.length) {
       // Both edges remain visible even if the whole band lies above or below the index.
       [[3, up], [1, down]].forEach(([qi, color]) => {
-        const s = chart.addSeries(LineSeries, { color, lineWidth: 2, priceLineVisible: false,
+        const s = chart.addSeries(LineSeries, { color, lineWidth: 2, priceLineVisible: false, priceFormat,
           crosshairMarkerVisible: false, lastValueVisible: true });
         const points = rangePath(qi);
         s.setData(points);
@@ -73,11 +82,28 @@ export default function CandleChart({ candles, signals, tf, theme, implied = nul
         priceLineVisible: false, crosshairMarkerVisible: false });
       mid.setData(rangePath(2));
     }
+    // Walls and max pain: dotted lines with their title on the line; only the last price and range ends get axis tags.
+    const lines = [];
     if (levels) {
-      [["call_wall", "Call wall", up], ["put_wall", "Put wall", down], ["max_pain", `Min payout ${levels.max_pain_expiry ? new Date(levels.max_pain_expiry * 1000).toISOString().slice(5, 10) : ""}`, c("--muted")]].forEach(([k, label, color]) => {
-        if (levels[k]) candle.createPriceLine({ price: levels[k], color, lineWidth: 1, lineStyle: LineStyle.SparseDotted, axisLabelVisible: true, title: label });
+      [["call_wall", "Call wall", c("--call")], ["put_wall", "Put wall", c("--put")], ["max_pain", "Max pain", c("--muted")]].forEach(([k, label, color]) => {
+        if (!levels[k]) return;
+        candle.createPriceLine({ price: levels[k], color, lineWidth: 1, lineStyle: LineStyle.SparseDotted, axisLabelVisible: false, title: "" });
+        lines.push({ value: levels[k], text: `${label} ${strike(levels[k], "")}`, color });
       });
     }
+    const placeTags = () => {
+      const host = tags.current;
+      if (!host) return;
+      const right = chart.priceScale("right").width() + 8;
+      host.replaceChildren(...lines.map((l) => {
+        const y = candle.priceToCoordinate(l.value);
+        const tag = document.createElement("span");
+        tag.textContent = l.text;
+        tag.style.cssText = `right:${right}px;top:${y == null ? -99 : y - 15}px;color:${l.color}`;
+        tag.hidden = y == null || y < 4 || y > box.current.clientHeight - 30;
+        return tag;
+      }));
+    };
     // A marker on each bar where the published signal changed.
     const markers = [];
     let prev = null;
@@ -94,7 +120,13 @@ export default function CandleChart({ candles, signals, tf, theme, implied = nul
     createSeriesMarkers(candle, markers);
     const ahead = bars.length - candles.length;
     chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, candles.length - (tf === "4h" ? 180 : 160)), to: candles.length + Math.max(3, ahead + 2) });
-    return () => chart.remove();
-  }, [candles, signals, tf, theme, implied, levels, optionsAt, optionsIndex]);
-  return <div ref={box} className="chart-box" />;
+    let frame = 0;
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(placeTags); };
+    chart.timeScale().subscribeVisibleLogicalRangeChange(schedule);
+    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
+    ro?.observe(box.current);
+    schedule();
+    return () => { cancelAnimationFrame(frame); ro?.disconnect(); chart.timeScale().unsubscribeVisibleLogicalRangeChange(schedule); chart.remove(); };
+  }, [candles, signals, tf, theme, implied, levels, optionsAt, optionsIndex, coneDays]);
+  return <div className="chart-frame"><div ref={box} className="chart-box" /><div ref={tags} className="chart-tags" aria-hidden="true" /></div>;
 }
