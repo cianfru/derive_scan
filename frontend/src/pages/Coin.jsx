@@ -159,7 +159,7 @@ export default function Coin() {
           </Step>
           <Step id="options" n={3} kind="options" title="Options"
             right={<span className="step-stamp mono">{dayTime(data.options.ts)}</span>}>
-            <OptionsWorkspace key={und} opts={data.options} und={und} flow={data.taker_flow} embedded />
+            <OptionsWorkspace key={und} opts={data.options} und={und} flow={data.taker_flow} hasSurface={data.has_surface === true} embedded />
           </Step>
         </>
       ) : <p className="status">{und} has no options on Derive.</p>}

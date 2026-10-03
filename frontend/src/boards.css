@@ -177,3 +177,62 @@ b.tone-unknown { color: var(--faint); font-weight: 400; }
   .rl-read b { font-size: var(--t-label); }
   .rl-read small { display: none; }
 }
+
+/* Options history: a daily strip under each dashboard figure, and the long view on the IV history tab.
+   Thin line: rebuilt from traded options; thick: recorded quotes; dot: the newest snapshot. No orange. */
+.options-dashboard > .dash-cell { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: start; }
+.dash-cell > .panel-head { grid-column: 1; grid-row: 1; }
+.dash-cell > .dash-rank { grid-column: 2; grid-row: 1; align-self: start; padding: 17px 20px 0 8px; font-size: var(--t-key); line-height: 1.4; color: var(--muted); white-space: nowrap; }
+.dash-cell > .dash-figures { grid-column: 1 / -1; grid-row: 2; min-width: 0; }
+.dash-cell > .history-strip { grid-column: 1 / -1; grid-row: 3; margin: 0 20px 18px; }
+@media (max-width: 1279px) {
+  .dash-cell > .dash-rank { grid-column: 1 / -1; grid-row: 3; justify-self: end; padding: 0 20px 6px; }
+  .dash-cell > .history-strip { grid-row: 4; }
+}
+@media (max-width: 600px) {
+  .dash-cell > .dash-rank { padding-inline: 16px; }
+  .dash-cell > .history-strip { margin: 0 16px 18px; }
+}
+.history-strip { position: relative; height: 56px; min-width: 0; cursor: crosshair; touch-action: pan-y; }
+.history-strip:focus-visible { outline-offset: 3px; }
+.history-strip svg { display: block; overflow: visible; }
+.hs-band { fill: var(--fg); opacity: .07; }
+.hs-zero { stroke: var(--seam-hi); stroke-width: 1; stroke-dasharray: 2 3; }
+.hs-area { stroke: none; }
+.hs-area.up { fill: var(--up); opacity: .22; }
+.hs-area.down { fill: var(--down); opacity: .22; }
+.hs-area-label, svg.viz .hs-area-label { font: 400 10px var(--font-body); fill: var(--faint); }
+.hs-traded, .hs-recorded, .sh-traded, .sh-recorded { fill: none; stroke-linejoin: round; stroke-linecap: round; }
+.hs-traded { stroke: var(--muted); stroke-width: 1; }
+.hs-recorded { stroke: var(--fg); stroke-width: 2.4; }
+.hs-dot, .sh-dot { stroke: var(--plate); stroke-width: 1.5; }
+.hs-dot { fill: var(--fg); }
+.hs-cross { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 2 3; pointer-events: none; }
+.hs-sel { fill: var(--plate); stroke: var(--fg); stroke-width: 1.5; pointer-events: none; }
+.hs-readout { position: absolute; left: 0; top: calc(100% + 1px); padding: 0 6px; background: var(--plate-2); border: 1px solid var(--seam); font-size: var(--t-key); line-height: 14px; color: var(--fg-2); white-space: nowrap; pointer-events: none; z-index: 2; }
+.hs-readout.right { left: auto; right: 0; }
+@media (max-width: 600px) { .history-strip { height: 44px; } }
+
+.surface-history { min-width: 0; }
+.surface-history > .panel-head { padding: 0 0 8px; border-bottom: 0; min-height: 0; }
+.surface-history > .panel-head .tabs button { padding-block: 4px; }
+.sh-readout { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 20px; min-height: 30px; padding-bottom: 10px; font-size: var(--t-label); color: var(--muted); }
+.sh-readout time { color: var(--fg-2); font-size: var(--t-label); }
+.sh-value { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.sh-value b { font-weight: 500; font-size: var(--t-cell); color: var(--fg); }
+.sh-key { display: inline-block; width: 12px; height: 2px; align-self: center; }
+.sh-source { margin-left: auto; color: var(--faint); }
+.sh-plot { min-width: 0; }
+.sh-plot svg { cursor: crosshair; touch-action: pan-y; }
+.sh-traded { stroke-width: 1.1; opacity: .9; }
+.sh-recorded { stroke-width: 2.6; }
+svg.viz .sh-label { fill: var(--fg-2); }
+.sh-legend { display: flex; flex-wrap: wrap; gap: 6px 20px; padding-top: 10px; font-size: var(--t-key); color: var(--muted); }
+.sh-legend span { display: inline-flex; align-items: center; gap: 8px; }
+.sh-swatch { display: inline-block; width: 18px; border-top: 1px solid var(--fg-2); }
+.sh-swatch.thick { border-top: 3px solid var(--fg); }
+@media (max-width: 600px) {
+  .surface-history > .panel-head { flex-wrap: wrap; }
+  .sh-readout { gap: 4px 14px; }
+  .sh-source { margin-left: 0; }
+}

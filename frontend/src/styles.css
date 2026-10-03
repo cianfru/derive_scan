@@ -28,6 +28,8 @@
   /* Ribbon states (chart lines, strips) and the regimes without a direction colour */
   --ribbon-gold: #bb8b25; --ribbon-blue: #4b8be0; --ribbon-grey: #6b7672; --ribbon-none: #3a4244;
   --regime-reacc: #819b77; --regime-accum: #c4b17b; --regime-cap: #b35c52; --regime-blowoff: #e0a050;
+  /* Option tenors beside --fg (30 days) on volatility history; checked for colour-blind separation */
+  --tenor-7: #6a92d6; --tenor-90: #b38a35;
   /* Type scale */
   --t-key: 11px; --t-label: 12px; --t-cell: 13px; --t-title: 14px; --t-num: 13px; --t-hero: 16px; --t-h2: 20px; --t-kpi: 24px; --t-kpi-big: 28px;
   --font-display: "Chakra Petch", "Chakra Petch Fallback", sans-serif;
@@ -46,6 +48,7 @@
   --call: #2f7d5c; --put: #b04c3f;
   --ribbon-gold: #94700f; --ribbon-blue: #2f62a8; --ribbon-grey: #9a9a93; --ribbon-none: #d4d4ce;
   --regime-reacc: #5f7d55; --regime-accum: #9a8240; --regime-cap: #8f3a30; --regime-blowoff: #a8650c;
+  --tenor-7: #3b62ad; --tenor-90: #8c6b1c;
   color-scheme: light;
 }
 @media (max-width: 600px) { :root { --header-h: 104px; } }

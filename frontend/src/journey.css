@@ -318,7 +318,7 @@ svg.viz text { font: 400 var(--t-key) var(--font-mono); }
 .coin-page .section-code { display: none; }
 @media (max-width: 1150px) {
   .options-dashboard { grid-template-columns: 1.2fr 1fr; }
-  .options-dashboard > .tenor-cell { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--seam); }
+  .options-dashboard > .term-cell { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--seam); }
   .options-dashboard .tenor-bars { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
 }
 @media (max-width: 600px) {
