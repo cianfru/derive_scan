@@ -7,10 +7,14 @@ never reach Derive. The site-data branch is force-pushed with a single commit ea
 keeps no history. Files:
 
   markets.json        every perp: price, change, signals, regime, heat, z, ribbon, funding, OI,
-                      data status, options summary, sparkline; market-wide context
-  coins/{UND}.json    candles (4H, 1D) with signal history, latest rows, options detail
-                      (term structure, per-strike open interest and IV, 14-day IV history,
-                      implied ranges, open-interest levels, options lean), alignment by horizon
+                      data status, options summary, sparkline; market-wide context; breadth_1d,
+                      the daily regime mix of all perps over the engine history window
+  coins/{UND}.json    candles (4H, 1D) with signal history, latest rows, ribbon state per daily
+                      candle, the engine's market inputs (engine_context), engine history (recorded
+                      and reconstructed price metrics, with coverage of the engine and the option
+                      recording), options detail (term structure, per-strike open interest and IV,
+                      14-day IV history, implied ranges, open-interest levels, options lean),
+                      alignment by horizon
   wallets/{UND}.json  per coin: the ranked traders holding its options (biggest delta first) and how
                       each cohort is positioned on it within 7 days, 30 days and all expiries
   traders.json        options traders' leaderboard (market makers left out) and cohorts by results
@@ -18,6 +22,12 @@ keeps no history. Files:
   flow.json           last 24 hours: large trades, most active wallets (market makers left out once
                       the rebuilt history has classed them), with each wallet's class
   strikes/{UND}.json  written by record_once.py (per-strike view of the newest chain)
+  surface/{UND}.json  daily option readings rebuilt from traded options (ATM 7/30/90 days, 25-delta
+                      risk reversal 7/30 days), gated, with the recorded daily medians beside them;
+                      only for coins whose history/surface CSV exists (has_surface in markets.json)
+  radar.json          the last 30 daily closes of every coin with options: the engine's z-score and
+                      saved reading, and the Smart wallets' delta balance (history/balance.json) for
+                      7 and 30 days, with the live gates; read by the Radar page only
 """
 from __future__ import annotations
 
@@ -26,15 +36,18 @@ import csv
 import json
 import math
 import time
-from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from collections import Counter, defaultdict
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from statistics import median
+
+import numpy as np
 
 from derive.candles import CandleCache
-from derive.signals import engine_comparison
+from derive.signals import engine_comparison, ribbon_trail
 from derive.quality import ANALYTICS_VERSION, engine_status, snapshot_status
 from derive.implied import implied_by_expiry, option_levels
-from derive.lean import alignment, options_lean, state_of
+from derive.lean import DEFENSIVE_SIGNALS, HORIZONS, UP_SIGNALS, WALLET_MIN_POSITIONS, WALLET_MIN_USD, alignment, options_lean, state_of
 from derive import traders as traders_mod
 from derive.history import last_complete_day, parse_option
 from derive.metric_history import build_engine_history
@@ -46,6 +59,10 @@ IV_DAYS = 14
 METRIC_DAYS = 90
 FLOW_LARGE = 80
 FLOW_WALLETS = 30
+RIBBON_CHAR = {"gold": "g", "blue": "b", "grey": "n"}  # "-": warm-up or no reading
+BREADTH_COLS = ("MARKUP", "BLOWOFF", "REACC", "ACCUM", "CAP", "MARKDOWN", "FLAT")
+# Price metrics a replay may supply for a saved close that was not ready; heat carries its phase.
+FILLABLE = {"regime": ("regime",), "zscore": ("zscore",), "heat": ("heat", "heat_phase"), "ribbon": ("ribbon",)}
 
 
 def _days(n: int, now: float) -> list[str]:
@@ -124,6 +141,7 @@ def recorded_metrics(data: Path, now: float) -> dict:
                     "funding_ann": funding * 24 * 365 if funding is not None else None,
                     "oi_usd": _num(row.get("oi_usd")), "oi_contracts": _num(row.get("oi_contracts")),
                     "positioning_at": _num(row.get("positioning_at")),
+                    "volume_status": row.get("volume_status") or None,
                 }
     return out
 
@@ -170,16 +188,43 @@ def option_metric_history(data: Path, und: str, now: float) -> tuple[list[dict],
                   "limitation": "Derive does not provide past option surfaces. History starts when recording began; missed snapshots cannot be recreated."}
 
 
+def fill_from_replay(saved: dict, replay: dict | None) -> dict:
+    """A saved close that was not ready takes the replay's ready price metrics at the same close.
+
+    Only regime, z-score, heat (with its phase) and ribbon, with their metric status; never the
+    signal, funding, open interest or option fields, and never a value the saved row holds.
+    The copied keys are listed in `filled_from_replay`.
+    """
+    if saved.get("status") == "ready" or not replay:
+        return saved
+    row, status, copied = dict(saved), dict(saved.get("metric_status") or {}), []
+    for metric, keys in FILLABLE.items():
+        if saved.get(metric) is not None or replay.get(metric) is None \
+                or (replay.get("metric_status") or {}).get(metric) != "ready":
+            continue
+        for key in keys:
+            row[key] = replay.get(key)
+        copied.extend(keys)
+        status[metric] = "ready"
+    if copied:
+        row.update(metric_status=status, filled_from_replay=copied)
+    return row
+
+
 def metric_history(data: Path, cache: CandleCache, und: str, now: float, recorded: dict) -> dict:
     engine, coverage = {}, {}
     for tf, days in (("1d", 120), ("4h", 30)):
-        saved = recorded.get(tf, {})
-        replay = build_engine_history(cache, und, tf, now, recorded_rows=list(saved.values()), days=days)
-        merged = {r["ts"]: r for r in replay["rows"]}
-        merged.update({ts: row for ts, row in saved.items() if now - days * 86400 < ts <= now})
+        saved = {ts: row for ts, row in recorded.get(tf, {}).items() if now - days * 86400 < ts <= now}
+        # Closes saved as ready are never replayed; the others are, so a ready replay can fill them.
+        replay = build_engine_history(cache, und, tf, now, days=days,
+                                      recorded_rows=[r for r in recorded.get(tf, {}).values() if r.get("status") == "ready"])
+        replayed = {r["ts"]: r for r in replay["rows"]}
+        merged = {ts: r for ts, r in replayed.items() if ts not in saved}
+        reconstructed = list(merged.values())
+        merged.update({ts: fill_from_replay(row, replayed.get(ts)) for ts, row in saved.items()})
         engine[tf] = []
         for ts in sorted(merged):
-            row = {k: v for k, v in merged[ts].items() if k not in ("input_id", "provenance")}
+            row = {k: v for k, v in merged[ts].items() if k not in ("input_id", "provenance", "volume_status")}
             provenance = merged[ts].get("provenance", {}).get("price")
             if provenance:
                 row["provenance"] = {"price": {k: provenance[k] for k in
@@ -189,11 +234,53 @@ def metric_history(data: Path, cache: CandleCache, und: str, now: float, recorde
         stored = [r for r in rows if r["source"] == "recorded"]
         coverage[tf] = {**replay["coverage"], "from": rows[0]["ts"] if rows else None,
                         "to": rows[-1]["ts"] if rows else None,
+                        "samples": len(reconstructed),
+                        "status_counts": dict(Counter(r.get("status") for r in reconstructed)),
+                        "metric_counts": {k: sum(r.get(k) is not None for r in reconstructed) for k in FILLABLE},
                         "recorded_from": stored[0]["ts"] if stored else None,
                         "recorded_count": len(stored), "reconstructed_count": len(rows) - len(stored),
+                        "filled_from_replay_count": sum(bool(r.get("filled_from_replay")) for r in stored),
                         "observed_count": len(rows), "expected_count": days * (6 if tf == "4h" else 1)}
-    options, options_coverage = option_metric_history(data, und, now)
-    return {"engine": engine, "options": options, "coverage": {"engine": coverage, "options": options_coverage}}
+    # Option rows are not published (the app reads options.iv_history); their coverage is.
+    _, options_coverage = option_metric_history(data, und, now)
+    return {"engine": engine, "coverage": {"engine": coverage, "options": options_coverage}}
+
+
+def count_breadth(breadth: dict, rows: list[dict]) -> None:
+    """Adds one coin's ready daily regimes to breadth[ts][regime].
+
+    A saved close filled from a ready replay counts like the replayed closes before it, so a coin
+    whose history was extended after the close is not dropped from those days.
+    """
+    for r in rows:
+        ready = r.get("status") == "ready" or "regime" in (r.get("filled_from_replay") or ())
+        if not ready or (r.get("metric_status") or {}).get("regime") != "ready" or not r.get("regime"):
+            continue
+        breadth[int(r["ts"])][r["regime"] if r["regime"] in BREADTH_COLS else "FLAT"] += 1
+
+
+def breadth_table(breadth: dict) -> dict:
+    return {"cols": list(BREADTH_COLS), "rows": [[ts, *(breadth[ts][c] for c in BREADTH_COLS)] for ts in sorted(breadth)]}
+
+
+def ribbon_chars(trail: dict, bars: list) -> str:
+    """One character per published candle: g gold, b blue, n grey, - warm-up or no reading."""
+    return "".join(RIBBON_CHAR.get(trail.get(bar[0]), "-") for bar in bars)
+
+
+def engine_context(sig: dict, rows: dict, meta: dict) -> dict:
+    """The market-wide inputs of the engine's checks, so a coin page needs one request.
+
+    BTC's regime is given only where the engine could read BTC (as the divergence check does).
+    """
+    context = sig.get("context") or {}
+    btc = {tf: rows[tf].get("BTC-PERP") for tf in ("4h", "1d")}
+    return {"consensus": meta["consensus_detail"],
+            "btc_regime": {tf: r.get("regime") if engine_status(r) == "ready" else None for tf, r in btc.items()},
+            "fear_greed": (context.get("sentiment") or {}).get("fear_greed_value"),
+            "stablecoin_7d_pct": (context.get("stablecoin") or {}).get("change_7d_pct"),
+            "observed_at": {"sentiment": context.get("sentiment_at"), "stablecoin": context.get("stablecoin_at"),
+                            "consensus": meta["bars"]}}
 
 
 def iv_history(data: Path, und: str, now: float) -> list[list]:
@@ -240,6 +327,167 @@ def taker_sides(data: Path, now: float) -> dict:
                   for w, kinds in d.items()} for u, d in out.items()}
     result["_coverage"] = coverage
     return result
+
+
+SURFACE_FILE_VERSION = 1
+SURFACE_METRICS = ("atm7", "atm30", "atm90", "rr7", "rr30")
+SURFACE_COVERAGE = (180, 0.70)       # trailing days, share of them with a reading
+SURFACE_RELIABILITY = 0.85           # corrected split-half rank correlation
+SURFACE_SEAM = (14, {"atm7": 0.03, "atm30": 0.03, "atm90": 0.03, "rr7": 0.02, "rr30": 0.02})  # overlap days, |median diff|
+SURFACE_RANGE = (365, 60)            # past-year window, values needed
+
+
+def _sig(v, digits=5):
+    return None if v is None else float(f"{v:.{digits}g}")
+
+
+def _r4(v):
+    return None if v is None else round(v, 4)
+
+
+def surface_block(data: Path, und: str, now: float) -> dict | None:
+    """site-data surface/{UND}.json (version 1), from history/surface/{UND}.csv (derive/surface_history.py).
+
+    traded: the daily readings rebuilt from traded options as a 5-day median (centred where later
+    days exist, at least 3 values; null is a gap), from the first day the trailing 30 days (counted
+    from the first day a fit was possible) have a 30-day ATM reading on at least half the days.
+    Only readings that pass the gates are included. The gates are recomputed every run, so a coin
+    qualifies by itself: a reading on at least 70% of the trailing 180 days, corrected split-half
+    reliability >= 0.85 and, once recorded and traded readings overlap on 14 days or more,
+    |median(recorded - traded)| <= 3 vol points for ATM and 2 for RR. No level offset is applied.
+    recorded: for the same readings, daily medians of the recorded 15-minute snapshots (full days
+    only) from offset `from`, never joined to traded. range_1y: the traded series over the past
+    year (p10, p50, p90, last, pct = percentile rank of the last value, 0-100). overlap: raw daily
+    traded readings against the recorded daily medians. day0: unix seconds of the UTC day of value 0.
+    """
+    from derive import surface_history as sh
+
+    rows = sh.read_rows(data / "history" / "surface" / f"{und}.csv")
+    if not rows:
+        return None
+    state_p = data / "history" / "state.json"
+    through = (json.loads(state_p.read_text()) if state_p.exists() else {}).get("surface_through") or ""
+    by = {r["day"]: r for r in rows}
+    # The series begins on the first day a fit was possible (options traded and an index known).
+    first = next((r["day"] for r in rows if r["carry"] is not None), rows[0]["day"])
+    d0, end = date.fromisoformat(first), date.fromisoformat(max(rows[-1]["day"], through))
+    days = [(d0 + timedelta(i)).isoformat() for i in range((end - d0).days + 1)]
+
+    def col(key):
+        return [by[d][key] if d in by else None for d in days]
+
+    raw = {m: col(m) for m in SURFACE_METRICS}
+    rec = {m: col(f"rec_{m}") for m in SURFACE_METRICS}
+    traded = {m: sh.smooth(v) for m, v in raw.items()}
+    i0 = sh.start_day(traded["atm30"])
+    quality, overlap = {}, {}
+    span_days, need = SURFACE_COVERAGE
+    for m in SURFACE_METRICS:
+        coverage = sum(v is not None for v in traded[m][-span_days:]) / span_days
+        rel = sh.reliability(col(f"{m}_a"), col(f"{m}_b"), i0) if i0 is not None else None
+        diffs = [r - t for r, t in zip(rec[m], raw[m]) if r is not None and t is not None]
+        overlap[m] = {"days": len(diffs), "median_diff": round(median(diffs), 4) if diffs else None}
+        seam_ok = len(diffs) < SURFACE_SEAM[0] or abs(overlap[m]["median_diff"]) <= SURFACE_SEAM[1][m]
+        quality[m] = {"coverage": round(coverage, 3), "reliability": rel,
+                      "shown": i0 is not None and coverage >= need and (rel or 0) >= SURFACE_RELIABILITY and seam_ok}
+    shown = [m for m in SURFACE_METRICS if quality[m]["shown"]]
+    doc = {"und": und, "version": SURFACE_FILE_VERSION, "generated_at": int(now), "status": "ready" if shown else "sparse",
+           "first_trade_day": next((r["day"] for r in rows if r["points"]), None),
+           "day0": None, "days": 0, "index": [], "traded": {}, "recorded": None,
+           "quality": quality, "range_1y": {}, "overlap": overlap}
+    if not shown:
+        return doc
+    span = days[i0:]
+    doc.update(day0=int(datetime.fromisoformat(span[0]).replace(tzinfo=timezone.utc).timestamp()), days=len(span),
+               index=[_sig(v) for v in col("index")[i0:]],
+               traded={m: [_r4(v) for v in traded[m][i0:]] for m in shown})
+    full = [(n or 0) >= sh.FULL_DAY_SNAPSHOTS for n in col("rec_n")[i0:]]
+    r0 = full.index(True) if any(full) else None
+    if r0 is not None:
+        doc["recorded"] = {"from": r0, **{m: [_r4(v) for v in rec[m][i0 + r0:]] for m in shown}}
+    window, enough = SURFACE_RANGE
+    for m in shown:
+        series = [v for v in traded[m][i0:][-window:] if v is not None]
+        last = next((v for v in reversed(traded[m][i0:]) if v is not None), None)
+        if len(series) >= enough and last is not None:
+            p10, p50, p90 = (float(x) for x in np.percentile(series, [10, 50, 90]))
+            doc["range_1y"][m] = {"p10": _r4(p10), "p50": _r4(p50), "p90": _r4(p90), "last": _r4(last),
+                                  "pct": round(100 * sum(v < last for v in series) / len(series), 1)}
+    return doc
+
+
+def surface_files(data: Path, site: Path, now: float) -> dict[str, dict]:
+    """Writes site/surface/{UND}.json for every coin with a surface CSV; drops files of coins without one."""
+    out = {}
+    for p in sorted((data / "history" / "surface").glob("*.csv")):
+        doc = surface_block(data, p.stem, now)
+        if doc:
+            out[p.stem] = doc
+            _write(site / "surface" / f"{p.stem}.json", doc)
+    for old in (site / "surface").glob("*.json"):
+        if old.stem not in out:
+            old.unlink()
+    return out
+
+
+RADAR_VERSION = 1
+RADAR_CLOSES = 30
+
+
+def radar_point(reading: list | None) -> list | None:
+    """[score, gross, flags] of a history/balance.json reading [score, net, gross, positions, flags]
+    when it passes the live gates (complete, gross >= $10k, >= 3 positions); otherwise None."""
+    if not reading:
+        return None
+    score, net, gross, positions, flags = reading
+    if score is None or net is None or gross is None or gross < WALLET_MIN_USD or positions < WALLET_MIN_POSITIONS:
+        return None
+    return [score, gross, flags]
+
+
+def radar_engine(row: dict) -> str:
+    """One character for the daily engine's reading saved at a close, by the live rule (saved as
+    ready, perp volume ok): 'u' up, 'd' defensive, 'n' neutral; '-' when none was saved there
+    (replayed closes carry no final signal)."""
+    if row.get("source") != "recorded" or row.get("status") != "ready" or not row.get("signal") \
+            or row.get("volume_status") != "ok":
+        return "-"
+    return "u" if row["signal"] in UP_SIGNALS else "d" if row["signal"] in DEFENSIVE_SIGNALS else "n"
+
+
+def radar_block(data: Path, engine_1d: dict[str, list], unds: list[str], now: float,
+                recorded: dict | None = None) -> dict | None:
+    """site-data radar.json (version 1): the last RADAR_CLOSES daily closes up to the newest close
+    in history/balance.json (derive/balance_history.py), one value per close, null for a gap.
+
+    z: the engine's daily z-score from the rows of coins/{UND}.json history.engine["1d"] (saved
+    closes, filled or replayed), null unless its metric status is ready. w: per horizon, the Smart
+    balance [score, gross USD delta, flags] (flags: bit 0 roll, bit 1 modelled) or null below the
+    live gates. e: the engine's saved reading per close (recorded_metrics rows, radar_engine) as
+    one string, so the Radar colours a past circle only where a final signal exists. None when
+    history/balance.json is missing or holds no close.
+    """
+    from derive import balance_history
+
+    doc = balance_history.read(data)
+    if not doc or doc.get("schema") != balance_history.SCHEMA or not doc.get("closes"):
+        return None
+    last = max(int(k) for k in doc["closes"])
+    closes = [last - (RADAR_CLOSES - 1 - i) * 86400 for i in range(RADAR_CLOSES)]
+    coins = {}
+    for und in unds:
+        rows = {int(r["ts"]): r for r in engine_1d.get(und, [])}
+        saved = {int(ts): r for ts, r in ((recorded or {}).get(und) or {}).get("1d", {}).items()}
+        z = []
+        for t in closes:
+            r = rows.get(t) or {}
+            ready = r.get("zscore") is not None and (r.get("metric_status") or {}).get("zscore") == "ready"
+            z.append(round(r["zscore"], 2) if ready else None)
+        held = [(doc["closes"].get(str(t)) or {}).get(und) or {} for t in closes]
+        coins[und] = {"z": z, "w": {h: [radar_point(c.get(h)) for c in held] for h in HORIZONS},
+                      "e": "".join(radar_engine(saved.get(t) or {}) for t in closes)}
+    return {"version": RADAR_VERSION, "generated_at": int(now), "through": doc.get("through"), "cohort": "smart",
+            "closes": closes, "coins": coins}
 
 
 def change_pct(closes: list[float], bars: int) -> float | None:
@@ -443,6 +691,14 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     coverage = history_coverage(held, now)
     chains: dict = {}  # und -> (strikes, index, ts) for valuing traders' positions
     markets = []
+    meta = {"analytics_version": ANALYTICS_VERSION, "generated_at": int(now), "bars": {tf: (sig["timeframes"].get(tf) or {}).get("bar_close") for tf in ("4h", "1d")},
+            "consensus": {tf: ((sig["timeframes"].get(tf) or {}).get("consensus") or {}).get("consensus") for tf in ("4h", "1d")},
+            "consensus_detail": {tf: (sig["timeframes"].get(tf) or {}).get("consensus") for tf in ("4h", "1d")},
+            "context": sig.get("context", {})}
+    context = engine_context(sig, rows, meta)
+    surfaces = surface_files(data, site, now)
+    breadth: dict = defaultdict(Counter)
+    engine_1d: dict = {}
     for sym in sig.get("universe", []):
         und = sym.split("-")[0]
         r4, r1 = rows["4h"].get(sym) or {}, rows["1d"].get(sym) or {}
@@ -455,12 +711,13 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                         "refresh_pending": isinstance(evaluated, (int, float)) and evaluated < min(599, daily_native + daily_early)}
         if history_meta["refresh_pending"] and r1.get("data_status") != "ready":
             r1 = {**r1, "data_status": "history_updated"}
-        candles = {}
+        candles, loaded = {}, {}
         for tf, keep in CANDLES_KEEP.items():
-            c = cache.load(und, tf)
+            c = loaded[tf] = cache.load(und, tf)
             candles[tf] = [] if c is None else [[int(c["timestamp"][i] // 1000), *(round(float(c[k][i]), 8) for k in
                                                 ("open", "high", "low", "close", "volume"))]
                                                 for i in range(max(0, len(c["close"]) - keep), len(c["close"]))]
+        ribbon = {"1d": ribbon_chars(ribbon_trail(loaded["1d"], "1d", now * 1000), candles["1d"])}
         closes4 = [b[4] for b in candles["4h"]]
         closes1 = [b[4] for b in candles["1d"]]
         opts = options_block(data, site, und, now)
@@ -474,9 +731,13 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                               now, options_at=opts["ts"])
             align["positions_through"] = held.get("through")
             align["wallet_coverage"] = coverage
+            # Readings above use full precision; the published rows keep 6 decimals (14 days of
+            # 15-minute rows would otherwise add about 200 KB to the coin file).
+            opts["iv_history"] = [[r[0], *(None if v is None else round(v, 6) for v in r[1:])] for r in opts["iv_history"]]
         comparison = engine_comparison(r4, r1, now)
         pos = r4.get("positioning") or {}
         price = (opts or {}).get("features", {}).get("index_price") or (closes4[-1] if closes4 else None)
+        has_surface = bool((surfaces.get(und) or {}).get("traded"))
         markets.append({
             "und": und, "symbol": sym, "price": price,
             "chg_1d": change_pct(closes1, 1), "chg_24h": change_pct(closes4, 6), "chg_7d": change_pct(closes4, 42),
@@ -489,7 +750,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "ribbon_1d": (r1.get("ribbon") or {}).get("state"), "ribbon_4h": (r4.get("ribbon") or {}).get("state"),
             "data_4h": r4.get("data_status"), "data_1d": r1.get("data_status"), "volume_status": r4.get("volume_status"),
             "funding_ann": pos["funding_rate"] * 24 * 365 if pos.get("funding_rate") is not None else None,
-            "oi_usd": pos.get("oi_value"), "has_options": opts is not None,
+            "oi_usd": pos.get("oi_value"), "has_options": opts is not None, "has_surface": has_surface,
             "atm_iv_30d": (opts or {}).get("features", {}).get("atm_iv_30d"),
             "rr25_30d": (opts or {}).get("features", {}).get("rr25_30d"),
             "lean": ((opts or {}).get("lean") or {}).get("state"),
@@ -499,28 +760,31 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                 "ts": opts["ts"], "status": opts["status"], "levels": opts["levels"],
                 "expiries": opts["expiries"], **{k: opts["features"].get(k) for k in ("atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_30d",
                                                                            "bf25_30d", "pc_oi_ratio", "option_oi_contracts")},
-                "term": [[round(e["tenor_days"], 3), e["atm_iv"]] for e in opts["expiries"] if e.get("atm_iv") is not None],
-                "iv30_hist": [[h[0], h[2]] for h in opts["iv_history"][-96 * 7:] if h[2] is not None][::4]},
+                "term": [[round(e["tenor_days"], 3), e["atm_iv"]] for e in opts["expiries"] if e.get("atm_iv") is not None]},
             "spark_1d": closes1[-60:],
             "spark_times_1d": [b[0] + 86400 for b in candles["1d"][-60:]],
             "spark": closes4[-42:],
             "spark_times": [b[0] + 14400 for b in candles["4h"][-42:]],
         })
         tracking = metric_history(data, cache, und, now, metrics.get(und, {}))
+        count_breadth(breadth, tracking["engine"]["1d"])
+        engine_1d[und] = tracking["engine"]["1d"]
         tracking["coverage"]["wallets"] = coverage
         _write(site / "coins" / f"{und}.json", {
             "und": und, "symbol": sym, "generated_at": int(now), "candles": candles, "daily_history": history_meta,
-            "engine_comparison": comparison,
+            "engine_comparison": comparison, "ribbon": ribbon, "engine_context": context,
             "history": tracking,
             "backfilled": {tf: cache.counts(und, tf)[1] for tf in CANDLES_KEEP},
             "signals": history.get(und, {}), "latest": {"4h": r4 or None, "1d": r1 or None}, "options": opts,
-            "taker_flow": coin_flows, "alignment": align,
+            "has_surface": has_surface, "taker_flow": coin_flows, "alignment": align,
         })
-    meta = {"analytics_version": ANALYTICS_VERSION, "generated_at": int(now), "bars": {tf: (sig["timeframes"].get(tf) or {}).get("bar_close") for tf in ("4h", "1d")},
-            "consensus": {tf: ((sig["timeframes"].get(tf) or {}).get("consensus") or {}).get("consensus") for tf in ("4h", "1d")},
-            "consensus_detail": {tf: (sig["timeframes"].get(tf) or {}).get("consensus") for tf in ("4h", "1d")},
-            "context": sig.get("context", {})}
+    meta["breadth_1d"] = breadth_table(breadth)
     _write(site / "markets.json", {**meta, "coins": markets})
+    radar = radar_block(data, engine_1d, [m["und"] for m in markets if m["has_options"]], now, metrics)
+    if radar:
+        _write(site / "radar.json", radar)
+    else:
+        (site / "radar.json").unlink(missing_ok=True)
     flow = flow_block(data, now, flows)
     tp = data / "history" / "traders.json"
     ranked = {t["address"].lower() for t in json.loads(tp.read_text())["traders"]} if tp.exists() else set()

@@ -8,12 +8,12 @@ import FlowSummary from "../components/FlowSummary.jsx";
 import WalletTag from "../components/WalletTag.jsx";
 import { TYPE as CLASS } from "../lib/traders.js";
 
-const CLASS_INFO = "Wallet types from every trade on Derive since December 2023. Directional traders who are in profit on options that have expired are ranked: Top (best fifth), Smart (best 50), Profitable (the rest in profit). Directional: taking a view, not in profit. Income: mostly sells out-of-the-money options. Hedger: offsets its options with perps. Occasional: too few trades to tell. Market makers are left out.";
+const CLASS_INFO = "Wallet types from every trade on Derive since December 2023. Directional traders who are in profit on options that have expired are ranked: Top (best fifth), Smart (the best 50, or every Top wallet when Top is larger), Profitable (the rest in profit). Directional: taking a view, not in profit. Income: mostly sells out-of-the-money options. Hedger: offsets its options with perps. Occasional: too few trades to tell. Market makers are left out.";
 const CAP = 15;
 const tone = (v) => (v > 0 ? "up" : v < 0 ? "down" : "");
 
 function Kind({ c }) {
-  return c ? <span className={c === "top" || c === "smart" ? "tier-tag" : "dim"}>{CLASS[c] || c}</span> : <span className="faint">–</span>;
+  return c ? <span className={c === "top" || c === "smart" ? "tier-tag" : "dim"}>{CLASS[c] || c}</span> : <span className="faint">—</span>;
 }
 
 function Who({ w, ranked }) {
@@ -54,7 +54,7 @@ export default function Flow() {
                 </td>
                 <td className="ft-side">{t.direction === "buy" ? "Buy" : "Sell"}</td>
                 <td className="num ft-notional" data-k="Notional">{usd(t.notional_usd)}</td>
-                <td className="num hero ft-prem">{t.kind === "option" ? usd(t.premium_usd) : <span className="faint">–</span>}</td>
+                <td className="num hero ft-prem">{t.kind === "option" ? usd(t.premium_usd) : <span className="faint">—</span>}</td>
                 <td className="ft-who"><Who w={t.wallet} ranked={t.ranked} /></td>
                 <td className="ft-kind"><Kind c={t.class} /></td>
               </tr>))}
@@ -76,7 +76,7 @@ export default function Flow() {
                   <td className="fw-kind"><Kind c={w.class} /></td>
                   <td className="num fw-perp" data-k="Perps">{usd(w.perp_notional_usd)}</td>
                   <td className="num fw-opt" data-k="Options">{usd(w.option_notional_usd)}</td>
-                  <td className={`num fw-net ${tone(net)}`} data-k="Premium">{w.premium_bought_usd || w.premium_sold_usd ? usd(net) : <span className="faint">–</span>}</td>
+                  <td className={`num fw-net ${tone(net)}`} data-k="Premium">{w.premium_bought_usd || w.premium_sold_usd ? usd(net) : <span className="faint">—</span>}</td>
                   <td className={`num hero fw-pnl ${tone(w.realized_pnl_usd)}`}>{usd(w.realized_pnl_usd)}</td>
                 </tr>);
             })}

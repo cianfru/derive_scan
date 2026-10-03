@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Tabs, Info } from "./ui.jsx";
+import { Tabs, Info, Empty } from "./ui.jsx";
 import { Asset } from "./MarketVisuals.jsx";
 import { usd, utc } from "../lib/format.js";
 import { COHORT_HELP } from "../lib/explain.js";
@@ -37,7 +37,7 @@ export function completeTotals(book) {
 const toneOf = (s) => (s >= 0.25 ? "up" : s <= -0.25 ? "down" : "dim");
 export function ExposureBar({ lean }) {
   const s = lean?.score;
-  if (s == null) return <span className="faint">–</span>;
+  if (s == null) return <Empty />;
   return (
     <span className={`exposure-reading ${toneOf(s)}`}>
       <span className="exposure-track">
@@ -119,8 +119,8 @@ export default function CohortExplorer({ cohorts, through, valuedAt }) {
                         <tr key={und}>
                           <td><Link className="asset-link" to={`/coin/${und}#wallets`}><Asset und={und} compact /></Link></td>
                           <td><ExposureBar lean={b} /></td>
-                          <td className={`num ${b.net_delta_usd > 0 ? "up" : b.net_delta_usd < 0 ? "down" : ""}`}>{complete(b) ? usd(b.net_delta_usd) : <span className="faint">–</span>}</td>
-                          <td className="num two-line">{complete(b) ? usd(b.gross_delta_usd) : <span className="faint">–</span>}<small>{b.positions} {b.positions === 1 ? "position" : "positions"}</small></td>
+                          <td className={`num ${b.net_delta_usd > 0 ? "up" : b.net_delta_usd < 0 ? "down" : ""}`}>{complete(b) ? usd(b.net_delta_usd) : <Empty />}</td>
+                          <td className="num two-line">{complete(b) ? usd(b.gross_delta_usd) : <Empty />}<small>{b.positions} {b.positions === 1 ? "position" : "positions"}</small></td>
                         </tr>
                       ))}
                     </tbody>

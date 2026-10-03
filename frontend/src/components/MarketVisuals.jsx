@@ -5,9 +5,12 @@ import { useElementWidth } from "../lib/useElementWidth.js";
 import { SIGNAL_HELP, REGIME_HELP, READING_HELP } from "../lib/explain.js";
 import { Info } from "./ui.jsx";
 
+// Marks drawn in white: an ink copy (public/coins/*-ink.svg) is shown on the light theme instead.
+const INK = new Set(["XRP", "XAUT"]);
 export function Asset({ und, compact = false }) {
   const ext = ["HYPE", "PUMP"].includes(und) ? "jpg" : ["CC", "LIT", "VVV"].includes(und) ? "png" : "svg";
-  return <span className="asset"><img className="asset-icon" src={`/coins/${und}.${ext}`} alt="" width="34" height="34" /><span><b>{und}</b>{!compact && <small>{ASSET_NAMES[und] || "Derive market"}</small>}</span></span>;
+  const icon = (cls, file) => <img className={`asset-icon${cls}`} src={`/coins/${file}`} alt="" width="34" height="34" />;
+  return <span className="asset">{INK.has(und) ? <>{icon(" on-dark", `${und}.${ext}`)}{icon(" on-light", `${und}-ink.svg`)}</> : icon("", `${und}.${ext}`)}<span><b>{und}</b>{!compact && <small>{ASSET_NAMES[und] || "Derive market"}</small>}</span></span>;
 }
 export function Reading({ alignment, horizon = "30d", kind, detail = false }) {
   const { state, label, row } = viewReading(alignment, horizon, kind);
@@ -50,9 +53,9 @@ export function MarketTrace({ values, times, label = "Price history", large = fa
       <title>{label}</title>
       {large && [g.lo, g.hi].map((v, i) => <g key={i}><line x1="10" y1={g.y(v)} x2={W - 68} y2={g.y(v)} className="trace-grid" /><text x={W - 1} y={g.y(v) + 4} textAnchor="end">{price(v)}</text></g>)}
       <line x1={g.x(g.first)} y1={g.y(values[g.first])} x2={g.x(g.last)} y2={g.y(values[g.first])} className="trace-baseline" />
-      <path d={g.path} fill="none" stroke={large ? "var(--orange)" : `var(--${tone === "dim" ? "muted" : tone})`} strokeWidth={large ? 2 : 1.5} strokeLinejoin="round" strokeLinecap="round" />
+      <path d={g.path} fill="none" stroke={large ? "var(--fg)" : `var(--${tone === "dim" ? "muted" : tone})`} strokeWidth={large ? 2 : 1.5} strokeLinejoin="round" strokeLinecap="round" />
       {large && active !== null && <line x1={g.x(at)} x2={g.x(at)} y1="5" y2={H - 20} className="trace-crosshair" />}
-      <circle cx={g.x(at)} cy={g.y(values[at])} r={large ? 4 : 2} fill={large ? "var(--orange)" : `var(--${tone === "dim" ? "muted" : tone})`} stroke="var(--plate)" strokeWidth="2" />
+      <circle cx={g.x(at)} cy={g.y(values[at])} r={large ? 4 : 2} fill={large ? (active !== null ? "var(--orange)" : "var(--fg)") : `var(--${tone === "dim" ? "muted" : tone})`} stroke="var(--plate)" strokeWidth="2" />
       {large && times?.length === values.length && <><text x="10" y={H - 2}>{dt(times[g.first])}</text><text x={W - 68} y={H - 2} textAnchor="end">{dt(times[g.last])}</text></>}
     </svg>
     {!large && <figcaption className={`trace-change ${tone}`}>{chg(change, 1)}</figcaption>}

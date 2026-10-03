@@ -14,7 +14,8 @@ BTC divergence, positioning (`_attach_positioning`) and the per-timeframe synthe
 - The CTO overlay and the range forecast are not computed; the CTO runs in shadow mode in
   Reflex by default and does not change the signal.
 - Also reported, outside the signal path as in Reflex: the four-EMA ribbon (Reflex's
-  larsson_engine). Its outputs are named "ribbon" here.
+  larsson_engine), as a snapshot per row and as a per-bar trail for the chart. Its outputs
+  are named "ribbon" here.
 """
 from __future__ import annotations
 
@@ -30,7 +31,7 @@ from confluence import compute_confluence, unified_signal  # noqa: E402
 from decision_pipeline import evaluate_decision, new_state  # noqa: E402
 from engines.exhaustion_engine import compute_exhaustion  # noqa: E402
 from engines.heatmap_engine import compute_heatmap  # noqa: E402
-from engines.larsson_engine import compute_larsson_snapshot  # noqa: E402
+from engines.larsson_engine import compute_larsson_chart, compute_larsson_snapshot  # noqa: E402
 from engines.positioning_engine import compute_positioning  # noqa: E402
 from engines.rcce_engine import LEN_LONG, compute_rcce  # noqa: E402
 from signal_synthesizer import synthesize_signal, enforce_signal_constraints  # noqa: E402
@@ -196,6 +197,22 @@ def ribbon(ohlcv: dict, timeframe: str, as_of_ms: float) -> dict:
     snap = compute_larsson_snapshot(ohlcv, timeframe, as_of_ms)
     snap.pop("version", None)
     return snap
+
+
+def ribbon_trail(ohlcv: dict | None, timeframe: str, as_of_ms: float) -> dict[int, str]:
+    """Ribbon state of every completed bar: {bar open (unix seconds): 'gold' | 'blue' | 'grey'}.
+
+    Reads the full closed history, as `ribbon` does, so the newest bar agrees with the
+    snapshot. Bars inside the chart warm-up (3 x 58 bars, Reflex's chart rule) are absent.
+    """
+    closed = closed_candles(ohlcv, timeframe, as_of_ms)
+    if closed is None or not len(closed["close"]):
+        return {}
+    try:
+        chart = compute_larsson_chart(closed["close"], closed["timestamp"])
+    except ValueError:
+        return {}
+    return dict(zip(chart["time"], chart["state"]))
 
 
 # -- market-wide (Reflex scanner.compute_consensus, detect_divergence) ----------

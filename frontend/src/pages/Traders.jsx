@@ -25,7 +25,7 @@ function WinRate({ v }) {
 }
 
 function Book({ t }) {
-  return t.lean?.score != null ? <LeanBar lean={t.lean} width={56} /> : <span className="faint">–</span>;
+  return t.lean?.score != null ? <LeanBar lean={t.lean} width={56} /> : <span className="faint">—</span>;
 }
 
 export default function Traders() {

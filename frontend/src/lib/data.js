@@ -15,9 +15,11 @@ export async function load(path) {
   return data;
 }
 
+/** A published file, refreshed every refreshMs. A null path reads nothing (no request). */
 export function useData(path, refreshMs = 5 * 60_000) {
   const [state, setState] = useState({ path, data: cache.get(path)?.data ?? null, error: null });
   useEffect(() => {
+    if (!path) return;
     let live = true;
     setState({ path, data: cache.get(path)?.data ?? null, error: null });
     const get = () => load(path).then(
@@ -27,5 +29,6 @@ export function useData(path, refreshMs = 5 * 60_000) {
     const t = setInterval(get, refreshMs);
     return () => { live = false; clearInterval(t); };
   }, [path, refreshMs]);
+  if (!path) return { data: null, error: null };
   return state.path === path ? state : { data: cache.get(path)?.data ?? null, error: null };
 }

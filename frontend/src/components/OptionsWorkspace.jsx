@@ -1,5 +1,9 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Tabs, Info, Plate, PanelHead } from "./ui.jsx";
+import HistoryStrip from "./HistoryStrip.jsx";
+import SurfaceHistory from "./SurfaceHistory.jsx";
+import { useData } from "../lib/data.js";
+import { FORMAT, dashboardStrips, decodeSurface } from "../lib/surface.js";
 import { OIWall, Smile, TermStructure, MiniSeries, PricedByDate, TakerFlow } from "./OptionsViz.jsx";
 import { MoveBand, SkewInstrument, VolatilityTenors } from "./OptionsInstruments.jsx";
 import { expiryDate, expiryEvidence } from "../lib/research.js";
@@ -102,12 +106,54 @@ function ExpiryDesk({ opts }) {
   );
 }
 
-export default function OptionsWorkspace({ opts, und, flow, embedded = false }) {
+/** The (i) text of each dashboard cell; "surface": with rebuilt daily history, "snapshots": recorded
+ * 15-minute quotes only, null: no history line shown. */
+export function cellInfo(kind, mode) {
+  const line = {
+    move: {
+      surface: " Line: each day's reading rebuilt from the options traded on Derive that day (thin, 5-day median), then the daily median of quotes recorded every 15 minutes since 1 Oct 2026 (thick). Dot: the latest snapshot. Band: the middle 80% of the past year. Rank (pct): where the latest rebuilt reading sits within that year, or within the whole history when it is shorter.",
+      snapshots: " Line: quotes recorded every 15 minutes over the past 14 days.",
+    },
+    skew: {
+      surface: " Area: above zero calls are priced richer, below zero puts. Thin line: rebuilt from traded options; thick line: recorded quotes since 1 Oct 2026; dot: the latest snapshot. Rank (pct): where the latest rebuilt reading sits within the past year, or within the whole history when it is shorter.",
+      snapshots: " Line: quotes recorded every 15 minutes over the past 14 days.",
+    },
+    term: {
+      surface: " Line: 7-day minus 30-day ATM volatility. Above zero, the coming week is priced higher than the month (an inverted curve). Thin line: rebuilt from traded options; thick line: recorded quotes since 1 Oct 2026; dot: the latest snapshot. Band and rank (pct): the middle 80% of the past year and where the latest rebuilt reading sits within it.",
+      snapshots: " Line: 7-day minus 30-day ATM volatility from quotes recorded every 15 minutes over the past 14 days.",
+    },
+  };
+  const base = {
+    move: "Index × annualised 30-day ATM implied volatility × √(30/365): the one-standard-deviation size of movement priced into options. Symmetric, ignores strike skew; the centre is the quoted index.",
+    skew: "25-delta call IV minus put IV, in volatility points, interpolated to 30 days. Negative: puts priced richer for comparable delta; positive: calls richer. It does not identify trade direction.",
+    term: "Annualised ATM implied volatility at 7, 30 and 90 days, interpolated across expiries, on one scale. Longer tenors above shorter ones form an upward curve.",
+  };
+  return `${base[kind]}${(mode && line[kind][mode]) || ""} Market pricing, not our view.`;
+}
+
+/** One dashboard cell: title and (i), the rank label, today's figures, then the history strip. */
+function DashCell({ kind, title, strip, className = "", children, ...stripProps }) {
+  const mode = strip ? (strip.snapshots ? "snapshots" : "surface") : null;
+  return (
+    <div className={`dash-cell ${className}`}>
+      <PanelHead as="h3" title={title} info={cellInfo(kind, mode)} />
+      {strip?.rank && <span className="dash-rank mono">{strip.rank}</span>}
+      <div className="dash-figures">{children}</div>
+      {strip && <HistoryStrip series={strip} label={`${title} history`} format={FORMAT[kind]} {...stripProps} />}
+    </div>
+  );
+}
+
+export default function OptionsWorkspace({ opts, und, flow, embedded = false, hasSurface = false }) {
   const [view, setView] = useState("expiry");
   const [window, setWindow] = useState("24h");
   const f = opts.features || {},
     hist = opts.iv_history || [];
   const historical = opts.status !== "ready" || Date.now() / 1000 - opts.ts > 1800;
+  // Daily history from traded options: a separate file, read only for coins that have one.
+  const { data: doc } = useData(hasSurface ? `surface/${und}.json` : null, 30 * 60_000);
+  const surface = useMemo(() => decodeSurface(doc), [doc]);
+  const strips = useMemo(() => dashboardStrips(surface, opts), [surface, opts]);
   return (
     <section id="options-detail" className={`options-workspace${embedded ? " embedded" : ""}`}>
       {!embedded && (
@@ -117,21 +163,15 @@ export default function OptionsWorkspace({ opts, und, flow, embedded = false }) 
         </div>
       )}
       <div className="options-dashboard plate">
-        <div>
-          <PanelHead as="h3" title="30-day move"
-            info="Index × annualised 30-day ATM implied volatility × √(30/365): the one-standard-deviation size of movement priced into options. Symmetric, ignores strike skew; the centre is the quoted index. Market pricing, not a forecast." />
+        <DashCell kind="move" title="30-day move" strip={strips.move}>
           <MoveBand index={f.index_price} iv={f.atm_iv_30d} bare />
-        </div>
-        <div>
-          <PanelHead as="h3" title="30-day skew"
-            info="25-delta call IV minus put IV, in volatility points, interpolated to 30 days. Negative: puts priced richer for comparable delta; positive: calls richer. It does not identify trade direction." />
+        </DashCell>
+        <DashCell kind="skew" title="30-day skew" strip={strips.skew} area>
           <SkewInstrument rr={f.rr25_30d} bare />
-        </div>
-        <div className="tenor-cell">
-          <PanelHead as="h3" title="Term structure"
-            info="Annualised ATM implied volatility at 7, 30 and 90 days, interpolated across expiries, on one scale. Longer tenors above shorter ones form an upward curve." />
+        </DashCell>
+        <DashCell kind="term" title="Term structure" strip={strips.term} className="term-cell" zero>
           <VolatilityTenors features={f} bare />
-        </div>
+        </DashCell>
       </div>
       <div className="options-desk plate">
         <div className="desk-tabs">
@@ -152,7 +192,7 @@ export default function OptionsWorkspace({ opts, und, flow, embedded = false }) 
           <div className="desk-panels">
             <Plate
               title="Priced ranges by expiry"
-              info="For each expiry, the thick band holds the middle half of the outcomes option prices imply (red below the median, green above) and the thin line eight in ten; the tick is the median. Each band uses its own expiry's pricing. Market pricing, not a forecast."
+              info="For each expiry, the thick band holds the middle half of the outcomes option prices imply (red below the median, green above) and the thin line eight in ten; the tick is the median. Each band uses its own expiry's pricing. Market pricing, not our view."
             >
               <PricedByDate implied={opts.implied} index={f.index_price} />
             </Plate>
@@ -177,7 +217,11 @@ export default function OptionsWorkspace({ opts, und, flow, embedded = false }) 
             </Plate>
           </div>
         )}
-        {view === "history" && (
+        {view === "history" && (surface ? (
+          <div className="desk-panels single">
+            <SurfaceHistory surface={surface} opts={opts} />
+          </div>
+        ) : (
           <div className="desk-panels">
             <Plate title="30-day ATM volatility" info="Recorded annualised 30-day at-the-money implied volatility.">
               <MiniSeries points={hist.map((h) => [h[0], h[2]])} />
@@ -186,7 +230,7 @@ export default function OptionsWorkspace({ opts, und, flow, embedded = false }) 
               <MiniSeries points={hist.map((h) => [h[0], h[4]])} zero format={(v) => (v * 100).toFixed(1)} />
             </Plate>
           </div>
-        )}
+        ))}
       </div>
     </section>
   );

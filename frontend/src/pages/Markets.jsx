@@ -1,17 +1,19 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import { price, chg, pct, usd, z, title, dayTime, clock, SIGNAL_RANK, SIGNAL_LABEL, signalTone, REGIME } from "../lib/format.js";
+import { price, chg, pct, usd, z, title, dayTime, clock, SIGNAL_RANK, REGIME } from "../lib/format.js";
 import { openMarketRow } from "../lib/explain.js";
-import { Signal, Tabs, Loading, Failed, Info, PanelHead, PageHead, Empty } from "../components/ui.jsx";
+import { Signal, Tabs, Loading, Failed, Info, PageHead, Empty } from "../components/ui.jsx";
 import { Asset, MarketTrace } from "../components/MarketVisuals.jsx";
 import { EnginePair, Convergence, CONVERGENCE_HELP } from "../components/EngineComparison.jsx";
 import { currentEngine } from "../lib/research.js";
-import FearGreed from "../components/FearGreed.jsx";
+import StructureBand, { isSignal } from "../components/StructureBand.jsx";
 import { ChainMini, ChainLegend, chainReadings } from "../components/Chain.jsx";
 
-const LADDER = ["STRONG_LONG", "LIGHT_LONG", "ACCUMULATE", "WAIT", "TRIM", "RISK_OFF"];
-const isSignal = (c, s) => (s === "TRIM" ? ["TRIM", "TRIM_HARD"].includes(c.signal_1d) : c.signal_1d === s);
+const SCOPE = { options: "options markets", entries: "daily entries", perps: "perps only" };
+const inView = (c, view) => (view === "perps" ? !c.has_options : c.has_options) && (view !== "entries" || (SIGNAL_RANK[c.signal_1d] ?? 0) >= 3);
+/** The markets a view holds that have a current daily engine: what the band counts, before search and the signal filter. */
+const scopeOf = (coins, view) => (coins || []).filter((c) => inView(c, view) && currentEngine(c.engine_comparison?.["1d"]));
 
 // How far the wallets and options layers agree with the engine for one window (engine first).
 function agreement(c, horizon) {
@@ -31,10 +33,9 @@ export default function Markets() {
     [view, setView] = useState("options"),
     [details, setDetails] = useState(false),
     [sort, setSort] = useState(["a7", -1]);
+  const scoped = useMemo(() => scopeOf(data?.coins, view), [data, view]);
   const rows = useMemo(() => {
-    let r = (data?.coins || []).filter((c) => c.und.toLowerCase().includes(q.trim().toLowerCase()));
-    r = r.filter((c) => (view === "perps" ? !c.has_options : c.has_options));
-    if (view === "entries") r = r.filter((c) => (SIGNAL_RANK[c.signal_1d] ?? 0) >= 3);
+    let r = (data?.coins || []).filter((c) => inView(c, view) && c.und.toLowerCase().includes(q.trim().toLowerCase()));
     if (signalFilter) r = r.filter((c) => currentEngine(c.engine_comparison?.["1d"]) && isSignal(c, signalFilter));
     const key = (c) => (sort[0] === "a7" ? agreement(c, "7d") : sort[0] === "a30" ? agreement(c, "30d") : c[sort[0]]);
     return [...r].sort((a, b) => {
@@ -55,54 +56,23 @@ export default function Markets() {
       </button>
     </th>
   );
-  const eligible = data.coins.filter((c) => currentEngine(c.engine_comparison?.["1d"]));
-  const groups = Object.entries(REGIME)
-    .map(([k, name]) => ({ k, name, n: eligible.filter((c) => c.regime_1d === k).length }))
-    .filter((g) => g.n);
-  const ladder = LADDER.map((s) => ({ s, n: eligible.filter((c) => isSignal(c, s)).length }));
-  const most = Math.max(1, ...ladder.map((x) => x.n));
-  const zero = ladder.filter((x) => !x.n && signalFilter !== x.s);
   const overview = !details && view !== "perps";
-  const consensus = data.consensus_detail?.["1d"]?.status === "unavailable" ? null : data.consensus?.["1d"];
+  // A view change keeps the signal filter only while the new view still holds that signal.
+  const changeView = (next) => {
+    setView(next);
+    if (signalFilter && !scopeOf(data.coins, next).some((c) => isSignal(c, signalFilter))) setSignalFilter(null);
+  };
 
   return (
     <div className="wrap page markets-page">
       <PageHead title="Markets"
         meta={<>Daily close {data.bars?.["1d"] ? dayTime(data.bars["1d"]) : "—"} · snapshot {clock(data.generated_at)}</>} />
       <div className="markets-layout">
-        <section className="plate market-structure" aria-label="Daily market structure">
-          <PanelHead title="Daily market structure" />
-          <div className="structure-body">
-            <div className="structure-title">
-              <strong>{consensus ? title(consensus) : <Empty />}</strong>
-              <span>{eligible.length}/{data.coins.length}</span>
-            </div>
-            <div className="regime-distribution" aria-label="Daily regime distribution">
-              {groups.map((g) => <span key={g.k} className={`regime-segment regime-${g.k}`} style={{ flex: g.n }} title={`${g.name}: ${g.n} markets`} />)}
-            </div>
-            <div className="regime-key">
-              {groups.map((g) => <span key={g.k}><i className={`regime-${g.k}`} />{g.name}<b>{g.n}</b></span>)}
-            </div>
-            <div className="signal-ladder" role="group" aria-label="Filter by daily signal">
-              {ladder.filter((x) => x.n || signalFilter === x.s).map(({ s, n }) => (
-                <button key={s} className={`ladder-row ${signalTone(s)}`} aria-pressed={signalFilter === s}
-                  onClick={() => setSignalFilter(signalFilter === s ? null : s)}>
-                  <span className="ladder-label">{SIGNAL_LABEL[s]}</span>
-                  <span className="ladder-bar" aria-hidden="true"><i style={{ width: `${(n / most) * 100}%` }} /></span>
-                  <b>{n}</b>
-                </button>))}
-              {zero.length > 0 && (
-                <div className="ladder-row ladder-zero" title={zero.map((x) => SIGNAL_LABEL[x.s]).join(", ")}>
-                  <span className="ladder-label">{zero.length} others</span><span className="ladder-bar" /><b>0</b>
-                </div>)}
-            </div>
-          </div>
-          <FearGreed sentiment={data.context?.sentiment} at={data.context?.sentiment_at} />
-        </section>
+        <StructureBand data={data} scoped={scoped} scopeLabel={SCOPE[view]} signalFilter={signalFilter} onSignal={setSignalFilter} />
 
         <section className="plate market-board" aria-label="Market readings">
           <div className="board-toolbar">
-            <Tabs label="Market filter" value={view} onChange={setView}
+            <Tabs label="Market filter" value={view} onChange={changeView}
               items={[["options", "Options markets", "Options"], ["entries", "Daily entries", "Entries"], ["perps", "Perps only", "Perps"]]} />
             <span className="board-count">
               <span className="mono">{rows.length}</span> markets

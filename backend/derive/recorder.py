@@ -34,6 +34,25 @@ def strike_rows(quotes: list[OptionQuote]) -> list[list]:
     return [by[k] for k in sorted(by)]
 
 
+def strikes_from_chain(chain: dict, ts: int) -> dict:
+    """{ts, index, expiries: {expiry: strike_rows}} from a kept raw chain
+    ({source}/{UND}/chains/YYYY-MM-DD/HH.json.gz, recorded at ts), as snapshot() builds it live."""
+    from .history import parse_option
+    by: dict[int, list[OptionQuote]] = {}
+    index = None
+    for name, t in (chain.get("options") or {}).items():
+        on, opt = parse_option_name(name), parse_option(name)
+        if on is None or opt is None or opt[1] <= ts:
+            continue
+        q = quote_from_ticker(name, on.strike, on.kind, t)
+        by.setdefault(opt[1], []).append(q)
+        index = index or q.index
+    perp = chain.get("perp")
+    if perp and perp.get("I"):
+        index = float(perp["I"])
+    return {"ts": ts, "index": index, "expiries": {str(e): strike_rows(by[e]) for e in sorted(by)}}
+
+
 class Recorder:
     def __init__(self, settings: Settings, store: Store, clients: dict[str, DeriveClient] | None = None):
         self.s = settings

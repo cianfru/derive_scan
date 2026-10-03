@@ -1,17 +1,18 @@
 import { useEffect } from "react";
 import { useOutletContext, useParams, useLocation } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import { price, chg, pct, usd, z, title, utc, dayTime, REGIME, DASH } from "../lib/format.js";
+import { price, chg, pct, usd, title, utc, dayTime, strike, DASH } from "../lib/format.js";
 import { Plate, Loading, Failed } from "../components/ui.jsx";
 import CandleChart from "../components/CandleChart.jsx";
 import { Asset } from "../components/MarketVisuals.jsx";
-import EngineComparison, { EngineEvidence } from "../components/EngineComparison.jsx";
+import EngineComparison from "../components/EngineComparison.jsx";
 import OptionsWorkspace from "../components/OptionsWorkspace.jsx";
 import Chain, { LayerIcon, chainReadings } from "../components/Chain.jsx";
 import CoinWallets from "../components/CoinWallets.jsx";
 import MetricHistory from "../components/MetricHistory.jsx";
 import { currentEngine } from "../lib/research.js";
 import { SIGNAL_HELP } from "../lib/explain.js";
+import { RegimeHeader, Readings, Checks } from "../components/RegimePanel.jsx";
 
 // The chart shows the priced range for the next 30 days only, so candles keep most of the width.
 const CONE_DAYS = 30;
@@ -21,9 +22,9 @@ const md = (t) => new Date(t * 1000).toISOString().slice(5, 10);
 function ChartLegend({ opts }) {
   const cone = (opts?.implied || []).filter((e) => e.days <= CONE_DAYS);
   const lv = opts?.levels;
-  if (!cone.length && !lv) return null;
   return (
     <div className="chart-legend" aria-label="Chart key">
+      <span><i className="ribbon-key" />Ribbon</span>
       {cone.length > 0 && <span><i className="range" />Range</span>}
       {lv?.call_wall && <span><i className="dots" style={{ color: "var(--call)" }} />Call wall</span>}
       {lv?.put_wall && <span><i className="dots" style={{ color: "var(--put)" }} />Put wall</span>}
@@ -38,9 +39,9 @@ function chartInfo(opts, backfilled) {
   const lv = opts?.levels;
   return (
     <>
-      Derive's index with traded volume. Orange line: fast average; grey: slow. Markers show where the daily signal changed.
+      Derive's index with traded volume. Lines: the ribbon's 32- and 58-day averages, coloured by each day's ribbon (gold: averages stacked upward; blue: downward; grey: mixed). Markers show where the daily signal changed.
       {end && <> Range: the middle half of outcomes option prices imply for each expiry to {md(end.expiry)}, from the option snapshot of {utc(opts.ts)} (green upper edge, red lower edge, dashed median). It is market pricing, not our view.</>}
-      {lv && <> Call wall: the strike above the index with the most calls open; put wall: the strike below with the most puts, on expiries in the next {lv.days} days. Max pain: the price with the smallest total payout at the {lv.max_pain_expiry ? md(lv.max_pain_expiry) : "nearest"} expiry. These are open-interest concentrations, not support or resistance.</>}
+      {lv && <> Call wall{lv.call_wall ? ` ${strike(lv.call_wall, "")}` : ""}: the strike above the index with the most calls open; put wall{lv.put_wall ? ` ${strike(lv.put_wall, "")}` : ""}: the strike below with the most puts, on expiries in the next {lv.days} days. Max pain{lv.max_pain ? ` ${strike(lv.max_pain, "")}` : ""}: the price with the smallest total payout at the {lv.max_pain_expiry ? md(lv.max_pain_expiry) : "nearest"} expiry. These are open-interest concentrations, not support or resistance.</>}
       {backfilled ? ` ${backfilled} earlier bars come from external spot markets (price only).` : ""}
     </>
   );
@@ -81,25 +82,10 @@ function JourneyStrip({ alignment }) {
   );
 }
 
-function RegimeFigs({ row, row4 }) {
-  if (!row) return null;
-  const ribbon = row.ribbon?.state;
-  return (
-    <div className="regime-figs">
-      <div><span>1D regime</span><strong>{REGIME[row.regime] || title(row.regime)}</strong></div>
-      <div><span>4H regime</span><strong>{REGIME[row4?.regime] || title(row4?.regime)}</strong></div>
-      <div><span>Z-score</span><strong className="mono">{z(row.zscore).replace("σ", "")}</strong></div>
-      <div><span>Heat</span><strong className="mono">{row.heat ?? DASH}</strong></div>
-      <div><span>Ribbon</span><strong className={`ribbon-${ribbon || "none"}`}>{title(ribbon)}</strong></div>
-      <div><span>Conditions</span><strong className="mono">{row.conditions_met ?? DASH} / {row.conditions_total ?? DASH}</strong></div>
-    </div>
-  );
-}
-
 function PerpFigs({ pos }) {
   if (!pos) return null;
   return (
-    <div className="regime-figs">
+    <div className="perp-figs">
       <div><span>Funding, annual</span><strong className={`mono${pos.funding_rate < 0 ? " down" : ""}`}>{pct(pos.funding_rate == null ? null : pos.funding_rate * 24 * 365)}</strong></div>
       <div><span>Funding regime</span><strong>{title(pos.funding_regime?.replace("_", " "))}</strong></div>
       <div><span>Perp OI</span><strong className="mono">{usd(pos.oi_value)}</strong></div>
@@ -131,6 +117,8 @@ export default function Coin() {
   const row4 = data.latest?.["4h"];
   const pos = data.latest?.["1d"]?.positioning;
   const engineReady = currentEngine(data.engine_comparison?.["1d"]);
+  const fourReady = currentEngine(data.engine_comparison?.["4h"]);
+  const ribbon = data.ribbon?.[tf] ?? null;
   const closed = row?.signal_bar_close_time ?? (last ? last[0] + 86400 : null);
   const history = <MetricHistory key={und} history={data.history} collapsible />;
   return (
@@ -144,20 +132,21 @@ export default function Coin() {
       <JourneyStrip alignment={data.alignment} />
 
       <Step id="regime" n={1} kind="engine" title="Regime">
-        {engineReady && <RegimeFigs row={row} row4={row4} />}
+        <RegimeHeader row={row} row4={row4} history={data.history} current={engineReady} current4={fourReady}
+          status={data.engine_comparison?.["1d"]?.status} />
         <Plate className="price-stage" id="price-chart" title={`${und} · 1D`} info={chartInfo(data.options, data.backfilled?.[tf])}
           right={<ChartLegend opts={data.options} />}>
           <CandleChart candles={candles} signals={data.signals?.[tf]} tf={tf} theme={theme} implied={data.options?.implied}
-            levels={data.options?.levels} optionsAt={data.options?.ts} optionsIndex={data.options?.features?.index_price} coneDays={CONE_DAYS} />
+            levels={data.options?.levels} optionsAt={data.options?.ts} optionsIndex={data.options?.features?.index_price} coneDays={CONE_DAYS}
+            ribbon={ribbon} />
         </Plate>
+        <Readings row={row} history={data.history} ribbon={ribbon} candles={candles} />
+        <Checks row={row} ctx={data.engine_context} />
         <details className="engine-detail">
           <summary>Engine detail</summary>
           <div>
             {row?.signal && row?.data_status === "ready" && <p className="signal-explanation">{SIGNAL_HELP[row.signal]}</p>}
-            <div className="engine-evidence-workspace">
-              <EngineComparison comparison={data.engine_comparison} />
-              <EngineEvidence latest={data.latest} />
-            </div>
+            <EngineComparison comparison={data.engine_comparison} />
             <PerpFigs pos={pos && { ...pos, exhaustion_state: row?.exhaustion_state }} />
           </div>
         </details>
@@ -170,7 +159,7 @@ export default function Coin() {
           </Step>
           <Step id="options" n={3} kind="options" title="Options"
             right={<span className="step-stamp mono">{dayTime(data.options.ts)}</span>}>
-            <OptionsWorkspace key={und} opts={data.options} und={und} flow={data.taker_flow} embedded />
+            <OptionsWorkspace key={und} opts={data.options} und={und} flow={data.taker_flow} hasSurface={data.has_surface === true} embedded />
           </Step>
         </>
       ) : <p className="status">{und} has no options on Derive.</p>}

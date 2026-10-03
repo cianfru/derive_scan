@@ -75,6 +75,18 @@
       "symbol": "LIT",
       "source": "https://coin-images.coingecko.com/coins/images/71121/large/lighter.png?1765888098",
       "file": "LIT.png"
+    },
+    {
+      "symbol": "XRP",
+      "file": "XRP-ink.svg",
+      "derived_from": "XRP.svg",
+      "change": "white fill (#fff) set to #23292f so the mark shows on the light theme"
+    },
+    {
+      "symbol": "XAUT",
+      "file": "XAUT-ink.svg",
+      "derived_from": "XAUT.svg",
+      "change": "white fills (#fff) set to #23292f so the mark shows on the light theme; gold kept"
     }
   ]
 }

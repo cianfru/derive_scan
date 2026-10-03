@@ -48,7 +48,7 @@ HEDGE_DAYS_SHARE = 0.50
 MIN_LEGS = 20
 MIN_ACTIVE_DAYS = 90
 TOP_FRACTION = 0.20   # tier "top": the study's main set
-SMART_COUNT = 50      # tier "smart": the 50 best profitable directional wallets
+SMART_COUNT = 50      # tier "smart": the 50 best profitable directional wallets not already "top" (none while top has 50 or more)
 TIERS = ("top", "smart", "profitable")
 
 
@@ -311,7 +311,8 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float,
     Directional: the rest with at least 20 option legs over at least 90 days. Skilled: directional
     wallets get a tier by option PnL (instruments already expired: premium received minus paid
     plus contracts held at expiry x settlement value), among those with positive PnL: "top" for
-    the top fifth of all directional wallets, "smart" for the best 50, "profitable" for the rest.
+    the top fifth of all directional wallets, "smart" for the rest of the best 50, "profitable"
+    for the rest.
     held, when given, receives {(wallet, instrument): net contracts} for instruments not yet expired.
     """
     if scan is None or scan.get("cutoff") != as_of:
@@ -352,17 +353,27 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float,
                  "option_pnl": round(a["option_pnl"], 2), "perp_pnl": round(a["perp_pnl"], 2),
                  "expired": int(a["expired"]), "win_rate": round(a["wins"] / a["expired"], 3) if a["expired"] else None,
                  "premium_traded": round(premium, 2)}
-        if stats["maker_share"] > MM_MAKER_SHARE or stats["both_sides_share"] > MM_BOTH_SIDES_SHARE:
-            cls = "market_maker"
-        elif stats["sold_share"] > INCOME_SOLD_SHARE and stats["otm_sold_share"] >= INCOME_OTM_SHARE:
-            cls = "income"
-        elif stats["hedged_days_share"] > HEDGE_DAYS_SHARE:
-            cls = "hedger"
-        elif stats["legs"] >= MIN_LEGS and span >= MIN_ACTIVE_DAYS:
-            cls = "directional"
-        else:
-            cls = "occasional"
-        out[wallet] = {"class": cls, **stats}
+        out[wallet] = {"class": classify_stats(stats), **stats}
+    return rank_tiers(out)
+
+
+def classify_stats(stats: dict) -> str:
+    """A wallet's class from its stats (legs, maker_share, both_sides_share, sold_share,
+    otm_sold_share, hedged_days_share, active_days); the rules of classify()."""
+    if stats["maker_share"] > MM_MAKER_SHARE or stats["both_sides_share"] > MM_BOTH_SIDES_SHARE:
+        return "market_maker"
+    if stats["sold_share"] > INCOME_SOLD_SHARE and stats["otm_sold_share"] >= INCOME_OTM_SHARE:
+        return "income"
+    if stats["hedged_days_share"] > HEDGE_DAYS_SHARE:
+        return "hedger"
+    if stats["legs"] >= MIN_LEGS and stats["active_days"] >= MIN_ACTIVE_DAYS:
+        return "directional"
+    return "occasional"
+
+
+def rank_tiers(out: dict) -> dict:
+    """Sets "tier" on every directional wallet of {wallet: {"class", "option_pnl", ...}} by option
+    PnL (classify()'s tiers) and returns out."""
     directional = sorted(((v["option_pnl"], k) for k, v in out.items() if v["class"] == "directional"), reverse=True)
     n_top = max(1, round(len(directional) * TOP_FRACTION)) if directional else 0
     for rank, (pnl, k) in enumerate(directional):
