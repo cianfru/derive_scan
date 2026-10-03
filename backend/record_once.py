@@ -47,18 +47,6 @@ async def discover(settings: Settings, out: Path, now: float) -> list[str]:
     return unds
 
 
-async def record_flow(settings: Settings, out: Path) -> dict:
-    from derive import flow
-    from derive.client import DeriveClient
-    from derive.config import SOURCES
-
-    client = DeriveClient(SOURCES[settings.sources[0]]["base"])
-    try:
-        return await flow.update(client, out, int(time.time() * 1000))
-    finally:
-        await client.close()
-
-
 def due_keys(settings: Settings, store: FileStore, slot: int) -> set[str]:
     status = store.load_status()
     keys = {f"{s}:{u}" for s in settings.sources for u in settings.underlyings}
@@ -121,10 +109,6 @@ def main() -> int:
         print(f"slot {slot} already recorded")
         return 0
     status = asyncio.run(record(settings, store, slot, keys, Path(args.site) if args.site else None))
-    try:
-        print("flow:", asyncio.run(record_flow(settings, out)))
-    except Exception as e:  # the radar's feed must never stop the options recording
-        logging.warning("flow update failed: %s", e)
     print(json.dumps(status, indent=1))
     # Fail the run only when nothing at all was recorded, so a dead source shows in Actions.
     return 0 if any(v.get("ok") for v in status.values()) else 1

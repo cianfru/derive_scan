@@ -45,22 +45,28 @@ jobs:
           python3 record_once.py --out ../store --due
           python3 signal_once.py --out ../store --due
           python3 history_once.py --out ../store --due
+          python3 flow_once.py --out ../store --due
 
       - uses: actions/setup-python@v5
-        if: steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true' || steps.due.outputs.history_due == 'true'
+        if: steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true' || steps.due.outputs.history_due == 'true' || steps.due.outputs.flow_due == 'true'
         with:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: backend/requirements.txt
 
       - name: Install
-        if: steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true' || steps.due.outputs.history_due == 'true'
+        if: steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true' || steps.due.outputs.history_due == 'true' || steps.due.outputs.flow_due == 'true'
         run: pip install -q httpx numpy
 
       - name: Record
         if: steps.due.outputs.due == 'true'
         working-directory: backend
         run: python record_once.py --out ../store --site ../site
+
+      - name: Flow and coverage recovery
+        if: always() && steps.due.outputs.flow_due == 'true'
+        working-directory: backend
+        run: python flow_once.py --out ../store --budget 120 --max-intervals 8
 
       - name: Signals
         if: always() && steps.due.outputs.signals_due == 'true'
@@ -75,12 +81,14 @@ jobs:
         run: python history_once.py --out ../store --budget 150
 
       - name: Build app data
-        if: always() && (steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true' || steps.due.outputs.history_due == 'true')
+        id: app_data
+        if: always() && (steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true' || steps.due.outputs.history_due == 'true' || steps.due.outputs.flow_due == 'true')
         working-directory: backend
         run: python publish_site.py --data ../store --site ../site
 
       - name: Commit
-        if: always() && (steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true' || steps.due.outputs.history_due == 'true')
+        id: data_commit
+        if: always() && (steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true' || steps.due.outputs.history_due == 'true' || steps.due.outputs.flow_due == 'true')
         working-directory: store
         run: |
           git add -A
@@ -91,7 +99,7 @@ jobs:
 
       # The app reads site-data only; it is replaced with a single commit each run (no history).
       - name: Publish app data
-        if: always() && (steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true' || steps.due.outputs.history_due == 'true')
+        if: always() && steps.app_data.outcome == 'success' && steps.data_commit.outcome == 'success'
         run: |
           git worktree add -q --orphan -b site-out site-out
           cp -r site/. site-out/

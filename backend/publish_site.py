@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -34,11 +35,13 @@ from derive.implied import implied_by_expiry, option_levels
 from derive.lean import alignment, options_lean, state_of
 from derive import traders as traders_mod
 from derive.history import last_complete_day, parse_option
+from derive.metric_history import build_engine_history
 
 SOURCE = "v2_mainnet"
 CANDLES_KEEP = {"4h": 500, "1d": 400}
 SIGNAL_DAYS = 120
 IV_DAYS = 14
+METRIC_DAYS = 90
 FLOW_LARGE = 80
 FLOW_WALLETS = 30
 
@@ -55,6 +58,8 @@ def _read_csv(p: Path) -> list[dict]:
 def _num(x):
     try:
         v = float(x)
+        if not math.isfinite(v):
+            return None
         return int(v) if v.is_integer() and abs(v) < 1e15 else v
     except (TypeError, ValueError):
         return None
@@ -75,6 +80,118 @@ def signal_history(data: Path, now: float) -> dict:
                 out[und][tf].append([int(r["bar_close"]), r["signal"], r["regime"], _num(r["zscore"]), _num(r["heat"]),
                                      r["heat_phase"], r["exhaustion_state"], r["ribbon"] or None, r["unified_signal"]])
     return out
+
+
+def recorded_metrics(data: Path, now: float) -> dict:
+    """Saved decisions retain their original timestamps and always win over replay."""
+    out: dict = defaultdict(lambda: defaultdict(dict))
+    latest_path = data / "signals" / "latest.json"
+    latest = json.loads(latest_path.read_text()) if latest_path.exists() else {}
+    metadata = {(tf, row["symbol"], row.get("signal_bar_close_time")): row
+                for tf, block in latest.get("timeframes", {}).items() for row in block.get("rows", [])}
+    for tf in ("4h", "1d"):
+        for day in _days(SIGNAL_DAYS + 1, now):
+            for row in _read_csv(data / "signals" / tf / f"{day}.csv"):
+                ts = _num(row.get("bar_close"))
+                if ts is None or ts > now:
+                    continue
+                status = row.get("data_status") or "unknown"
+                calculated = row.get("signal_status") == "ready"
+                ready = calculated and status == "ready"
+                funding = _num(row.get("funding_rate"))
+                original = metadata.get((tf, row["symbol"], ts), {})
+                heat_flag = _num(row.get("heat_valid"))
+                if heat_flag is None and isinstance(original.get("bmsb_valid"), bool):
+                    heat_flag = int(original["bmsb_valid"])
+                if heat_flag is None and _num(original.get("bmsb_mid")) is not None:
+                    heat_flag = int(_num(original["bmsb_mid"]) > 0)
+                heat = _num(row.get("heat"))
+                # Legacy zero may be the engine's unavailable default, rather than a measured zero.
+                heat_valid = calculated and (heat_flag == 1 or (heat_flag is None and heat is not None and heat > 0))
+                ribbon_quality = row.get("ribbon_quality") or (original.get("ribbon") or {}).get("data_quality") or "unknown"
+                out[row["symbol"].split("-")[0]][tf][ts] = {
+                    "ts": ts, "source": "recorded", "status": status if calculated else "unavailable",
+                    "signal": row.get("signal") if ready else None,
+                    "regime": row.get("regime") if ready else None,
+                    "zscore": _num(row.get("zscore")) if ready else None,
+                    "heat": heat if heat_valid else None,
+                    "ribbon": (row.get("ribbon") or None) if ribbon_quality == "ready" else None,
+                    "metric_status": {"zscore": "ready" if ready else status,
+                                      "regime": "ready" if ready else status,
+                                      "heat": "ready" if heat_valid else "unavailable", "ribbon": ribbon_quality},
+                    "funding_ann": funding * 24 * 365 if funding is not None else None,
+                    "oi_usd": _num(row.get("oi_usd")), "oi_contracts": _num(row.get("oi_contracts")),
+                    "positioning_at": _num(row.get("positioning_at")),
+                }
+    return out
+
+
+OPTION_METRICS = ("index_price", "atm_iv_7d", "atm_iv_30d", "atm_iv_90d", "rr25_7d", "rr25_30d",
+                  "bf25_30d", "pc_oi_ratio", "option_oi_contracts", "funding_ann", "perp_basis", "perp_oi_contracts")
+
+
+def option_metric_history(data: Path, und: str, now: float) -> tuple[list[dict], dict]:
+    """Publish all saved measurements, with gaps and the real recording start visible."""
+    directory = data / SOURCE / und / "features"
+    files = sorted(directory.glob("*.csv"))
+    cutoff = now - METRIC_DAYS * 86400
+    by: dict[int, dict] = defaultdict(dict)
+    first = None
+    for path in files:
+        if path.stem < datetime.fromtimestamp(cutoff, timezone.utc).date().isoformat():
+            if first is None:
+                times = [_num(r.get("ts")) for r in _read_csv(path)]
+                first = min((t for t in times if t is not None and t <= now), default=None)
+            continue
+        for r in _read_csv(path):
+            ts = _num(r.get("ts"))
+            if ts is None or ts > now:
+                continue
+            first = ts if first is None else min(first, ts)
+            if ts >= cutoff:
+                by[ts][r["feature"]] = _num(r.get("value"))
+    rows = []
+    for ts, features in sorted(by.items()):
+        row = {"ts": ts, "source": "recorded", **{k: features.get(k) for k in OPTION_METRICS}}
+        oi, index, basis = (features.get(k) for k in ("perp_oi_contracts", "index_price", "perp_basis"))
+        row["perp_oi_usd"] = oi * index * (1 + basis) if all(v is not None for v in (oi, index, basis)) else None
+        row["perp_funding_ann"] = row["funding_ann"]
+        rows.append(row)
+    start = rows[0]["ts"] if rows else None
+    end = int(now) // 900 * 900
+    expected = (end - start) // 900 + 1 if start is not None else 0
+    missing = max(0, expected - len(rows))
+    return rows, {"from": start, "to": rows[-1]["ts"] if rows else None,
+                  "count": len(rows), "expected_count": expected, "missing_count": missing,
+                  "interval_seconds": 900, "history_available_from": first,
+                  "status": "missing" if not rows else "partial" if missing else "ready",
+                  "limitation": "Derive does not provide past option surfaces. History starts when recording began; missed snapshots cannot be recreated."}
+
+
+def metric_history(data: Path, cache: CandleCache, und: str, now: float, recorded: dict) -> dict:
+    engine, coverage = {}, {}
+    for tf, days in (("1d", 120), ("4h", 30)):
+        saved = recorded.get(tf, {})
+        replay = build_engine_history(cache, und, tf, now, recorded_rows=list(saved.values()), days=days)
+        merged = {r["ts"]: r for r in replay["rows"]}
+        merged.update({ts: row for ts, row in saved.items() if now - days * 86400 < ts <= now})
+        engine[tf] = []
+        for ts in sorted(merged):
+            row = {k: v for k, v in merged[ts].items() if k not in ("input_id", "provenance")}
+            provenance = merged[ts].get("provenance", {}).get("price")
+            if provenance:
+                row["provenance"] = {"price": {k: provenance[k] for k in
+                    ("price_sources", "backfilled_bars", "history_bars") if k in provenance}}
+            engine[tf].append(row)
+        rows = engine[tf]
+        stored = [r for r in rows if r["source"] == "recorded"]
+        coverage[tf] = {**replay["coverage"], "from": rows[0]["ts"] if rows else None,
+                        "to": rows[-1]["ts"] if rows else None,
+                        "recorded_from": stored[0]["ts"] if stored else None,
+                        "recorded_count": len(stored), "reconstructed_count": len(rows) - len(stored),
+                        "observed_count": len(rows), "expected_count": days * (6 if tf == "4h" else 1)}
+    options, options_coverage = option_metric_history(data, und, now)
+    return {"engine": engine, "options": options, "coverage": {"engine": coverage, "options": options_coverage}}
 
 
 def iv_history(data: Path, und: str, now: float) -> list[list]:
@@ -281,6 +398,8 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
 
 def build(data: Path, site: Path, now: float | None = None) -> dict:
     now = time.time() if now is None else now
+    from derive.flow import replay_pending
+    replay_pending(data)
     sig_p = data / "signals" / "latest.json"
     sig = json.loads(sig_p.read_text()) if sig_p.exists() else {"timeframes": {}, "universe": [], "context": {}}
     rows = {tf: {r["symbol"]: r for r in (sig["timeframes"].get(tf) or {}).get("rows", [])} for tf in ("4h", "1d")}
@@ -288,6 +407,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     status_path = data / "signals" / "status.json"
     backfill_log = json.loads(status_path.read_text()).get("backfill", {}) if status_path.exists() else {}
     history = signal_history(data, now)
+    metrics = recorded_metrics(data, now)
     flows = taker_sides(data, now)
     held = tier_positions(data)
     coverage = history_coverage(held, now)
@@ -356,9 +476,12 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "spark": closes4[-42:],
             "spark_times": [b[0] + 14400 for b in candles["4h"][-42:]],
         })
+        tracking = metric_history(data, cache, und, now, metrics.get(und, {}))
+        tracking["coverage"]["wallets"] = coverage
         _write(site / "coins" / f"{und}.json", {
             "und": und, "symbol": sym, "generated_at": int(now), "candles": candles, "daily_history": history_meta,
             "engine_comparison": comparison,
+            "history": tracking,
             "backfilled": {tf: cache.counts(und, tf)[1] for tf in CANDLES_KEEP},
             "signals": history.get(und, {}), "latest": {"4h": r4 or None, "1d": r1 or None}, "options": opts,
             "taker_flow": coin_flows, "alignment": align,

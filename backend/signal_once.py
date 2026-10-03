@@ -32,6 +32,7 @@ CSV_FIELDS = ("bar_close", "symbol", "signal", "unified_signal", "signal_status"
               "raw_signal", "zscore", "heat", "heat_phase", "exhaustion_state", "divergence", "conditions_met",
               "conditions_total", "price", "funding_rate", "oi_trend", "ribbon", "data_status", "volume_status",
               "history_bars")
+CSV_FIELDS += ("oi_usd", "oi_contracts", "positioning_at", "heat_valid", "ribbon_quality")
 
 
 def newest_closed_open(tf: str, now: float) -> int:
@@ -61,7 +62,11 @@ def _csv_row(r: dict) -> list:
     pos = r.get("positioning") or {}
     rib = r.get("ribbon") or {}
     vals = {"bar_close": int(r["signal_bar_close_time"]), "funding_rate": pos.get("funding_rate"),
-            "oi_trend": pos.get("oi_trend"), "ribbon": rib.get("state")}
+            "oi_trend": pos.get("oi_trend"), "ribbon": rib.get("state"),
+            "oi_usd": pos.get("oi_value"), "oi_contracts": pos.get("oi_contracts"),
+            "positioning_at": pos.get("observed_at"),
+            "heat_valid": int(r["bmsb_valid"]) if isinstance(r.get("bmsb_valid"), bool) else None,
+            "ribbon_quality": rib.get("data_quality")}
     return [vals.get(k, r.get(k)) if k in vals else r.get(k) for k in CSV_FIELDS]
 
 
@@ -77,6 +82,19 @@ def slim(r: dict) -> dict:
 def append_csv(path: Path, rows: list[list]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     new = not path.exists()
+    if not new:
+        with path.open() as f:
+            reader = csv.DictReader(f)
+            header = reader.fieldnames
+            previous = list(reader) if header != list(CSV_FIELDS) else None
+        if previous is not None:
+            # Extend existing daily files by column name; old observations stay unknown.
+            tmp = path.with_suffix(".csv.tmp")
+            with tmp.open("w", newline="") as f:
+                writer = csv.DictWriter(f, fieldnames=CSV_FIELDS, lineterminator="\n")
+                writer.writeheader()
+                writer.writerows({k: r.get(k, "") for k in CSV_FIELDS} for r in previous)
+            tmp.replace(path)
     buf = io.StringIO()
     w = csv.writer(buf, lineterminator="\n")
     if new:

@@ -25,6 +25,7 @@ import EngineComparison, {
   EngineEvidence,
 } from "../components/EngineComparison.jsx";
 import OptionsWorkspace from "../components/OptionsWorkspace.jsx";
+import MetricHistory from "../components/MetricHistory.jsx";
 import { currentEngine } from "../lib/research.js";
 import { SIGNAL_HELP, REGIME_HELP } from "../lib/explain.js";
 import { QUALITY_LABEL } from "../components/AnalyticalDetails.jsx";
@@ -351,6 +352,7 @@ export default function Coin() {
       <nav className="section-nav" aria-label="Market sections">
         {data.alignment && <a href="#alignment">Three perspectives</a>}
         <a href="#price-chart">Price chart</a>
+        <a href="#metric-history">History</a>
         <a href="#engine-comparison">Engine comparison</a>
         {data.options && <a href="#options-detail">Options detail</a>}
       </nav>
@@ -358,6 +360,7 @@ export default function Coin() {
         <EngineComparison comparison={data.engine_comparison} />
         <EngineEvidence latest={data.latest} />
       </div>
+      <MetricHistory key={und} history={data.history} />
       <Plate
         className="price-stage"
         id="price-chart"
