@@ -3,7 +3,7 @@ import csv
 import json
 import pytest
 
-from publish_site import option_metric_history, recorded_metrics, metric_history
+from publish_site import fill_from_replay, option_metric_history, recorded_metrics, metric_history
 from derive.candles import CandleCache
 import signal_once
 
@@ -94,3 +94,71 @@ def test_legacy_default_heat_and_warmup_ribbon_are_unknown_until_validity_is_kno
     (tmp_path / 'signals/latest.json').write_text(json.dumps(latest))
     enriched = recorded_metrics(tmp_path, start + 2*86400)['BTC']['1d'][start]
     assert enriched['heat'] == 0 and enriched['ribbon'] == 'gold'
+
+
+READY = {k: "ready" for k in ("regime", "zscore", "heat", "ribbon")}
+
+
+def _replayed(ts, **values):
+    return {"ts": ts, "source": "reconstructed", "status": "ready", "signal": None, "unified_signal": None,
+            "funding_ann": None, "oi_usd": None, "metric_status": dict(READY), **values}
+
+
+def test_ready_replay_fills_price_metrics_of_a_close_saved_while_warming_up(tmp_path, monkeypatch):
+    import publish_site
+    start = 1790812800
+    fields = ['bar_close', 'symbol', 'signal', 'signal_status', 'data_status', 'regime', 'zscore', 'heat',
+              'ribbon', 'funding_rate', 'heat_valid', 'ribbon_quality']
+    write_csv(tmp_path / 'signals/1d/2026-10-01.csv', fields, [
+        [start, 'HYPE-PERP', 'WAIT', 'ready', 'warming up', 'REACC', '-0.4', '30', 'gold', '.00001', '1', 'warmup'],
+        [start + 86400, 'HYPE-PERP', 'ACCUMULATE', 'ready', 'ready', 'REACC', '-1.36', '28', 'gold', '.00001', '1', 'ready']])
+    saved = recorded_metrics(tmp_path, start + 86400)['HYPE']
+    calls = []
+
+    def replay(*args, **kwargs):
+        calls.append({int(r['ts']) for r in kwargs['recorded_rows']})
+        return {'coverage': {}, 'rows': [
+            _replayed(start - 86400, regime='MARKUP', zscore=.5, heat=10, heat_phase='Neutral', ribbon='gold'),
+            _replayed(start, regime='REACC', zscore=-1.22, heat=29.0, heat_phase='Extension', ribbon='gold'),
+            # a replay row at a close saved as ready never replaces it
+            _replayed(start + 86400, regime='MARKDOWN', zscore=-99, heat=99, heat_phase='Entry', ribbon='blue')]}
+
+    monkeypatch.setattr(publish_site, 'build_engine_history', replay)
+    result = metric_history(tmp_path, CandleCache(tmp_path), 'HYPE', start + 86400, saved)
+    assert calls[0] == {start + 86400}  # the warming-up close is replayed, the ready one is not
+    rows = {r['ts']: r for r in result['engine']['1d']}
+    filled = rows[start]
+    assert filled['zscore'] == -1.22 and filled['regime'] == 'REACC' and filled['ribbon'] == 'gold'
+    assert filled['filled_from_replay'] == ['regime', 'zscore', 'ribbon']
+    assert filled['heat'] == 30 and 'heat_phase' not in filled  # a saved value is kept
+    assert filled['signal'] is None and filled['funding_ann'] == pytest.approx(.0876)
+    assert filled['source'] == 'recorded' and filled['status'] == 'warming up'
+    assert filled['metric_status'] == READY
+    ready = rows[start + 86400]
+    assert ready['zscore'] == -1.36 and ready['signal'] == 'ACCUMULATE' and ready['regime'] == 'REACC'
+    assert ready['heat'] == 28 and ready['ribbon'] == 'gold' and 'filled_from_replay' not in ready
+    assert rows[start - 86400]['source'] == 'reconstructed'
+    coverage = result['coverage']['engine']['1d']
+    assert coverage['recorded_count'] == 2 and coverage['reconstructed_count'] == 1
+    assert coverage['filled_from_replay_count'] == 1 and coverage['samples'] == 1
+    assert 'options' not in result and set(result['coverage']) == {'engine', 'options'}
+
+
+def test_fill_copies_only_ready_price_metrics():
+    saved = {'ts': 1, 'source': 'recorded', 'status': 'not enough data', 'signal': None, 'regime': None,
+             'zscore': None, 'heat': None, 'ribbon': None, 'funding_ann': None, 'oi_usd': None,
+             'metric_status': {'regime': 'not enough data', 'zscore': 'not enough data', 'heat': 'unavailable', 'ribbon': 'unknown'}}
+    replay = _replayed(1, regime='MARKUP', zscore=1.1, heat=8.0, heat_phase='Neutral', ribbon=None,
+                       signal='LIGHT_LONG', funding_ann=.1, oi_usd=5.0, atm_iv_30d=.5)
+    replay['metric_status']['ribbon'] = 'warmup'
+    out = fill_from_replay(saved, replay)
+    assert out['filled_from_replay'] == ['regime', 'zscore', 'heat', 'heat_phase']
+    assert (out['regime'], out['zscore'], out['heat'], out['heat_phase']) == ('MARKUP', 1.1, 8.0, 'Neutral')
+    assert out['ribbon'] is None and out['metric_status']['ribbon'] == 'unknown'
+    assert out['signal'] is None and out['funding_ann'] is None and out['oi_usd'] is None and 'atm_iv_30d' not in out
+    assert saved['regime'] is None and 'filled_from_replay' not in saved  # the saved row is not mutated
+    assert fill_from_replay(dict(saved, status='ready'), replay)['regime'] is None
+    assert fill_from_replay(saved, None) is saved
+    unready = _replayed(1, regime='MARKUP', zscore=1.1, heat=8.0, heat_phase='Neutral', ribbon='gold')
+    unready['metric_status'] = {k: 'warming up' for k in READY}
+    assert 'filled_from_replay' not in fill_from_replay(saved, unready)

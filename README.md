@@ -38,11 +38,24 @@ Every Derive perp is listed. `data_status` says how far Reflex's engine can read
 
 Flow runs independently of options snapshots. A failed read remains due even when the current options slot succeeded. Missing complete 15-minute buckets in the trailing seven days are replayed from public trades, newest first, under a time budget. Full-bucket replacement and a write-ahead transaction make retries safe; coverage advances only after all pages and files are complete.
 
+## App data files (`site-data` branch)
+
+Built by `backend/publish_site.py` from the `data` branch after every recording run, then force-pushed as a single commit (no history). The app reads only these files, one request per screen.
+
+| Path | Content |
+|---|---|
+| `markets.json` | every perp: price, changes, signals, regime, heat, z-score, ribbon, funding, OI, data status, options summary, alignment, sparklines; market-wide context and consensus per timeframe; `breadth_1d`: the daily regime mix, `{cols, rows: [[close, perps per regime...]]}` with columns MARKUP, BLOWOFF, REACC, ACCUM, CAP, MARKDOWN, FLAT, over the 120-day engine history |
+| `coins/{UND}.json` | candles (4H, 1D) with signal history and the newest rows; `ribbon["1d"]`: one character per daily candle (`g` gold, `b` blue, `n` grey, `-` warm-up or no reading); `engine_context`: consensus per timeframe, BTC's regime, Fear & Greed, stablecoin 7-day change, with observation times; `history.engine` (recorded and reconstructed price metrics) and `history.coverage` (engine, option recording and wallet history; option rows are not published); options detail; alignment by horizon; taker flow |
+| `wallets/{UND}.json` | the ranked traders holding the coin's options and how each cohort is positioned on it |
+| `traders.json`, `traders/{address}.json` | options traders' leaderboard and cohorts (market makers left out); one file per ranked trader |
+| `flow.json` | last 24 hours: large trades and the most active wallets |
+| `strikes/{UND}.json` | per-strike view of the newest chain (written by `record_once.py`) |
+
 ## Tracking values over time
 
-Coin pages include **Market history**: dated engine metrics, funding, open interest, fixed-tenor IV, skew, butterfly and put/call ratios. Inspect exact samples by pointer, touch or keyboard; select daily/four-hour engine readings, daily option summaries or individual snapshots. Missing intervals remain gaps. Details: `docs/history-tracking.md`.
+Coin pages include **Market history**: dated engine metrics, funding and open interest. Inspect exact samples by pointer, touch or keyboard; select daily or four-hour readings. Missing intervals remain gaps. Details: `docs/history-tracking.md`.
 
-Historical price metrics cover up to 120 daily closes and 30 days of four-hour closes. They use the same engines on completed cached candles, with warmup and source provenance retained. Reconstructed metrics use dashed lines; final trading decisions are shown only where originally recorded. Recorded options measurements cover the latest 90 days as the archive grows. Derive provides no past surfaces, so missing snapshots and dates before recording began cannot be recovered from the trade history or price candles. Wallet trade reconstruction and option-surface recording have separate coverage dates.
+Historical price metrics cover up to 120 daily closes and 30 days of four-hour closes. They use the same engines on completed cached candles, with warmup and source provenance retained. Reconstructed metrics use dashed lines; final trading decisions are shown only where originally recorded. Option measurements stay in the `data` branch's feature files; the coin file carries their recording coverage and 14 days of IV history for the options panel. Derive provides no past surfaces, so missing snapshots and dates before recording began cannot be recovered from the trade history or price candles. Wallet trade reconstruction and option-surface recording have separate coverage dates.
 
 ## Options traders' history (`data` branch)
 

@@ -7,10 +7,14 @@ never reach Derive. The site-data branch is force-pushed with a single commit ea
 keeps no history. Files:
 
   markets.json        every perp: price, change, signals, regime, heat, z, ribbon, funding, OI,
-                      data status, options summary, sparkline; market-wide context
-  coins/{UND}.json    candles (4H, 1D) with signal history, latest rows, options detail
-                      (term structure, per-strike open interest and IV, 14-day IV history,
-                      implied ranges, open-interest levels, options lean), alignment by horizon
+                      data status, options summary, sparkline; market-wide context; breadth_1d,
+                      the daily regime mix of all perps over the engine history window
+  coins/{UND}.json    candles (4H, 1D) with signal history, latest rows, ribbon state per daily
+                      candle, the engine's market inputs (engine_context), engine history (recorded
+                      and reconstructed price metrics, with coverage of the engine and the option
+                      recording), options detail (term structure, per-strike open interest and IV,
+                      14-day IV history, implied ranges, open-interest levels, options lean),
+                      alignment by horizon
   wallets/{UND}.json  per coin: the ranked traders holding its options (biggest delta first) and how
                       each cohort is positioned on it within 7 days, 30 days and all expiries
   traders.json        options traders' leaderboard (market makers left out) and cohorts by results
@@ -26,12 +30,12 @@ import csv
 import json
 import math
 import time
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from derive.candles import CandleCache
-from derive.signals import engine_comparison
+from derive.signals import engine_comparison, ribbon_trail
 from derive.quality import ANALYTICS_VERSION, engine_status, snapshot_status
 from derive.implied import implied_by_expiry, option_levels
 from derive.lean import alignment, options_lean, state_of
@@ -46,6 +50,10 @@ IV_DAYS = 14
 METRIC_DAYS = 90
 FLOW_LARGE = 80
 FLOW_WALLETS = 30
+RIBBON_CHAR = {"gold": "g", "blue": "b", "grey": "n"}  # "-": warm-up or no reading
+BREADTH_COLS = ("MARKUP", "BLOWOFF", "REACC", "ACCUM", "CAP", "MARKDOWN", "FLAT")
+# Price metrics a replay may supply for a saved close that was not ready; heat carries its phase.
+FILLABLE = {"regime": ("regime",), "zscore": ("zscore",), "heat": ("heat", "heat_phase"), "ribbon": ("ribbon",)}
 
 
 def _days(n: int, now: float) -> list[str]:
@@ -170,13 +178,40 @@ def option_metric_history(data: Path, und: str, now: float) -> tuple[list[dict],
                   "limitation": "Derive does not provide past option surfaces. History starts when recording began; missed snapshots cannot be recreated."}
 
 
+def fill_from_replay(saved: dict, replay: dict | None) -> dict:
+    """A saved close that was not ready takes the replay's ready price metrics at the same close.
+
+    Only regime, z-score, heat (with its phase) and ribbon, with their metric status; never the
+    signal, funding, open interest or option fields, and never a value the saved row holds.
+    The copied keys are listed in `filled_from_replay`.
+    """
+    if saved.get("status") == "ready" or not replay:
+        return saved
+    row, status, copied = dict(saved), dict(saved.get("metric_status") or {}), []
+    for metric, keys in FILLABLE.items():
+        if saved.get(metric) is not None or replay.get(metric) is None \
+                or (replay.get("metric_status") or {}).get(metric) != "ready":
+            continue
+        for key in keys:
+            row[key] = replay.get(key)
+        copied.extend(keys)
+        status[metric] = "ready"
+    if copied:
+        row.update(metric_status=status, filled_from_replay=copied)
+    return row
+
+
 def metric_history(data: Path, cache: CandleCache, und: str, now: float, recorded: dict) -> dict:
     engine, coverage = {}, {}
     for tf, days in (("1d", 120), ("4h", 30)):
-        saved = recorded.get(tf, {})
-        replay = build_engine_history(cache, und, tf, now, recorded_rows=list(saved.values()), days=days)
-        merged = {r["ts"]: r for r in replay["rows"]}
-        merged.update({ts: row for ts, row in saved.items() if now - days * 86400 < ts <= now})
+        saved = {ts: row for ts, row in recorded.get(tf, {}).items() if now - days * 86400 < ts <= now}
+        # Closes saved as ready are never replayed; the others are, so a ready replay can fill them.
+        replay = build_engine_history(cache, und, tf, now, days=days,
+                                      recorded_rows=[r for r in recorded.get(tf, {}).values() if r.get("status") == "ready"])
+        replayed = {r["ts"]: r for r in replay["rows"]}
+        merged = {ts: r for ts, r in replayed.items() if ts not in saved}
+        reconstructed = list(merged.values())
+        merged.update({ts: fill_from_replay(row, replayed.get(ts)) for ts, row in saved.items()})
         engine[tf] = []
         for ts in sorted(merged):
             row = {k: v for k, v in merged[ts].items() if k not in ("input_id", "provenance")}
@@ -189,11 +224,53 @@ def metric_history(data: Path, cache: CandleCache, und: str, now: float, recorde
         stored = [r for r in rows if r["source"] == "recorded"]
         coverage[tf] = {**replay["coverage"], "from": rows[0]["ts"] if rows else None,
                         "to": rows[-1]["ts"] if rows else None,
+                        "samples": len(reconstructed),
+                        "status_counts": dict(Counter(r.get("status") for r in reconstructed)),
+                        "metric_counts": {k: sum(r.get(k) is not None for r in reconstructed) for k in FILLABLE},
                         "recorded_from": stored[0]["ts"] if stored else None,
                         "recorded_count": len(stored), "reconstructed_count": len(rows) - len(stored),
+                        "filled_from_replay_count": sum(bool(r.get("filled_from_replay")) for r in stored),
                         "observed_count": len(rows), "expected_count": days * (6 if tf == "4h" else 1)}
-    options, options_coverage = option_metric_history(data, und, now)
-    return {"engine": engine, "options": options, "coverage": {"engine": coverage, "options": options_coverage}}
+    # Option rows are not published (the app reads options.iv_history); their coverage is.
+    _, options_coverage = option_metric_history(data, und, now)
+    return {"engine": engine, "coverage": {"engine": coverage, "options": options_coverage}}
+
+
+def count_breadth(breadth: dict, rows: list[dict]) -> None:
+    """Adds one coin's ready daily regimes to breadth[ts][regime].
+
+    A saved close filled from a ready replay counts like the replayed closes before it, so a coin
+    whose history was extended after the close is not dropped from those days.
+    """
+    for r in rows:
+        ready = r.get("status") == "ready" or "regime" in (r.get("filled_from_replay") or ())
+        if not ready or (r.get("metric_status") or {}).get("regime") != "ready" or not r.get("regime"):
+            continue
+        breadth[int(r["ts"])][r["regime"] if r["regime"] in BREADTH_COLS else "FLAT"] += 1
+
+
+def breadth_table(breadth: dict) -> dict:
+    return {"cols": list(BREADTH_COLS), "rows": [[ts, *(breadth[ts][c] for c in BREADTH_COLS)] for ts in sorted(breadth)]}
+
+
+def ribbon_chars(trail: dict, bars: list) -> str:
+    """One character per published candle: g gold, b blue, n grey, - warm-up or no reading."""
+    return "".join(RIBBON_CHAR.get(trail.get(bar[0]), "-") for bar in bars)
+
+
+def engine_context(sig: dict, rows: dict, meta: dict) -> dict:
+    """The market-wide inputs of the engine's checks, so a coin page needs one request.
+
+    BTC's regime is given only where the engine could read BTC (as the divergence check does).
+    """
+    context = sig.get("context") or {}
+    btc = {tf: rows[tf].get("BTC-PERP") for tf in ("4h", "1d")}
+    return {"consensus": meta["consensus_detail"],
+            "btc_regime": {tf: r.get("regime") if engine_status(r) == "ready" else None for tf, r in btc.items()},
+            "fear_greed": (context.get("sentiment") or {}).get("fear_greed_value"),
+            "stablecoin_7d_pct": (context.get("stablecoin") or {}).get("change_7d_pct"),
+            "observed_at": {"sentiment": context.get("sentiment_at"), "stablecoin": context.get("stablecoin_at"),
+                            "consensus": meta["bars"]}}
 
 
 def iv_history(data: Path, und: str, now: float) -> list[list]:
@@ -443,6 +520,12 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     coverage = history_coverage(held, now)
     chains: dict = {}  # und -> (strikes, index, ts) for valuing traders' positions
     markets = []
+    meta = {"analytics_version": ANALYTICS_VERSION, "generated_at": int(now), "bars": {tf: (sig["timeframes"].get(tf) or {}).get("bar_close") for tf in ("4h", "1d")},
+            "consensus": {tf: ((sig["timeframes"].get(tf) or {}).get("consensus") or {}).get("consensus") for tf in ("4h", "1d")},
+            "consensus_detail": {tf: (sig["timeframes"].get(tf) or {}).get("consensus") for tf in ("4h", "1d")},
+            "context": sig.get("context", {})}
+    context = engine_context(sig, rows, meta)
+    breadth: dict = defaultdict(Counter)
     for sym in sig.get("universe", []):
         und = sym.split("-")[0]
         r4, r1 = rows["4h"].get(sym) or {}, rows["1d"].get(sym) or {}
@@ -455,12 +538,13 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                         "refresh_pending": isinstance(evaluated, (int, float)) and evaluated < min(599, daily_native + daily_early)}
         if history_meta["refresh_pending"] and r1.get("data_status") != "ready":
             r1 = {**r1, "data_status": "history_updated"}
-        candles = {}
+        candles, loaded = {}, {}
         for tf, keep in CANDLES_KEEP.items():
-            c = cache.load(und, tf)
+            c = loaded[tf] = cache.load(und, tf)
             candles[tf] = [] if c is None else [[int(c["timestamp"][i] // 1000), *(round(float(c[k][i]), 8) for k in
                                                 ("open", "high", "low", "close", "volume"))]
                                                 for i in range(max(0, len(c["close"]) - keep), len(c["close"]))]
+        ribbon = {"1d": ribbon_chars(ribbon_trail(loaded["1d"], "1d", now * 1000), candles["1d"])}
         closes4 = [b[4] for b in candles["4h"]]
         closes1 = [b[4] for b in candles["1d"]]
         opts = options_block(data, site, und, now)
@@ -507,19 +591,17 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "spark_times": [b[0] + 14400 for b in candles["4h"][-42:]],
         })
         tracking = metric_history(data, cache, und, now, metrics.get(und, {}))
+        count_breadth(breadth, tracking["engine"]["1d"])
         tracking["coverage"]["wallets"] = coverage
         _write(site / "coins" / f"{und}.json", {
             "und": und, "symbol": sym, "generated_at": int(now), "candles": candles, "daily_history": history_meta,
-            "engine_comparison": comparison,
+            "engine_comparison": comparison, "ribbon": ribbon, "engine_context": context,
             "history": tracking,
             "backfilled": {tf: cache.counts(und, tf)[1] for tf in CANDLES_KEEP},
             "signals": history.get(und, {}), "latest": {"4h": r4 or None, "1d": r1 or None}, "options": opts,
             "taker_flow": coin_flows, "alignment": align,
         })
-    meta = {"analytics_version": ANALYTICS_VERSION, "generated_at": int(now), "bars": {tf: (sig["timeframes"].get(tf) or {}).get("bar_close") for tf in ("4h", "1d")},
-            "consensus": {tf: ((sig["timeframes"].get(tf) or {}).get("consensus") or {}).get("consensus") for tf in ("4h", "1d")},
-            "consensus_detail": {tf: (sig["timeframes"].get(tf) or {}).get("consensus") for tf in ("4h", "1d")},
-            "context": sig.get("context", {})}
+    meta["breadth_1d"] = breadth_table(breadth)
     _write(site / "markets.json", {**meta, "coins": markets})
     flow = flow_block(data, now, flows)
     tp = data / "history" / "traders.json"
