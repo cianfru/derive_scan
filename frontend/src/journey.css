@@ -155,3 +155,7 @@ a.chain-tile:hover { background: var(--plate-2); }
   .wave-labels b { font-size: 13px; }
   .wave-labels small { display: none; }
 }
+
+/* Wallet emblems */
+.wtag-av { flex: none; display: block; }
+.wtag-av .em-plate { fill: #1c1f1b; stroke: #454b41; stroke-width: 1; }
