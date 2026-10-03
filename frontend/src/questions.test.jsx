@@ -163,6 +163,25 @@ describe("the question page", () => {
 });
 
 describe("My questions", () => {
+  it("values an open position at the sell-back price, a settled one by what it paid, and passes the word check", async () => {
+    localStorage.setItem("cowboy-questions", JSON.stringify([
+      { key: "a", id: "BTC-20261009-A-83000-89000", und: "BTC", side: "yes", lo: 83000, hi: 89000, contracts: 0.04407, paid: 103.01,
+        question: "BTC above $86,000 on Fri 9 Oct?", answer: "Yes", settle_ts: 1791532800 },
+      { key: "b", id: "BTC-20261003-A-80000-86000", und: "BTC", side: "yes", lo: 80000, hi: 86000, contracts: 0.01, paid: 50,
+        question: "BTC above $83,000 on Sat 3 Oct?", answer: "Yes", settle_ts: 1791014400 },
+    ]));
+    const { container } = show("/questions/mine");
+    expect(container.textContent).toContain("Sell back");
+    const user = userEvent.setup({ advanceTimers: () => {} });
+    await user.click(screen.getByRole("button", { name: "Sell back" }));
+    const legs = [...container.querySelectorAll(".q-legs li")].map((li) => li.textContent);
+    expect(legs[0]).toMatch(/^1Buy backBTC-20261009-89000-C/);
+    wordcheck(await allText(container));
+    await user.click(screen.getByRole("tab", { name: "Settled" }));
+    expect(container.textContent).toMatch(/Got\$45\.94 \(77c per \$1\)/);
+    localStorage.clear();
+  });
+
   it("has an empty state", () => {
     try { localStorage.clear(); } catch { /* blocked */ }
     show("/questions/mine");
