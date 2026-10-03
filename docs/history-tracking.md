@@ -82,6 +82,36 @@ Where the newest readings sat within their own past year on 2 October 2026: BTC 
 
 A full rebuild of all 1,037 day files took 31-33 seconds locally; with a 10-second budget it finished in four runs with byte-identical files. One new day takes well under a second. `surface/BTC.json` is 32 KB (8.6 KB gzipped), ETH 41.6 KB (11.7 KB), HYPE 8.8 KB (2.9 KB), growing by about 45 bytes a day.
 
+## Smart-wallet balance per daily close
+
+The live wallets reading (`derive/lean.py` `wallets_reading`) values the open options of the Smart cohort (tiers top and smart in `history/wallets.json`) at the newest chain: net delta over gross delta, for the expiries within 7 and 30 days. `history/balance.json` keeps the same reading at every daily close, so the Radar can draw where each coin has been (`radar.json`, last 30 closes). Code: `backend/derive/balance_history.py`; job: `history_once.py`; layout: README.
+
+### Recorded and modelled points
+
+- Recorded (flags bit 1 clear): the close valued with the chain the recorder kept at that close (`{source}/{UND}/chains/YYYY-MM-DD/00.json.gz`, turned into the live per-strike view by `recorder.strikes_from_chain`), through `wallets_reading` itself. It is the live reading as it stood at 00:00 UTC. Every new day is appended this way by `history_once.py`, from the positions it has just rebuilt for that day (`history/positions.json`).
+- Modelled (bit 1 set): no chain was recorded at the close (every close before 1 October 2026 for BTC and ETH, before 2 October for the other coins, or a coin whose chain is missing on a later day). The delta is Black-76 (`history.option_delta`) at the daily index close, with the instrument's last traded implied volatility from the trade history if at most 21 days old, otherwise the coin's last near-the-money traded volatility (within 10% of the index, 3 to 60 days to expiry). Against the quoted chain on 2 October the per-instrument delta error was median 0.012 (90th percentile 0.049); the 30-day score error was within 0.005 for BTC, ETH, SOL and HYPE, 0.024 to 0.063 for ZEC, XAUT and XRP and 0.108 for LIT. Thin coins' far-wing traded volatilities can be stale (XAUT's gross came out about three times too low), which is why modelled points are flagged.
+- The live gates apply to both: a score needs at least $10k of gross delta and at least 3 positions; with a chain it also needs every delta quoted (an estimated or missing delta leaves the score null, as live).
+
+### Point-in-time tiers
+
+A past close is never valued with today's cohort. The backfill (`Replay`) reads every day file once, in order, and keeps the running totals of `history.scan_days` (legs, maker share, premium bought and sold, out-of-the-money premium sold, instruments traded on both sides, hedged days, first and last day, cash and contracts per wallet and instrument). At each close it settles the instruments expired by then and applies the approved rules and thresholds through `history.classify_stats` and `history.rank_tiers`, the same functions `history.classify` uses. A wallet enters the cohort at the first close at which it qualifies, never before. On the saved history the replayed tiers equal `history.classify` at 5 July, 15 August and 24 September 2026 and `history/wallets.json` at 2 October (533, 556, 623 and 646 tiered wallets), and the replayed open positions equal `history/positions.json`. Valued with the same chain as the live page (12:15 UTC on 3 October), they reproduce every live reading to 3 decimals (30 days: BTC 0.295, ETH 0.254, HYPE 0.211, SOL -0.843, XAUT 0.912, XRP 0.741, ZEC 0.186, LIT -0.328). The appended 2 October close, valued at the 00:00 UTC chain, reads BTC 0.286, ETH 0.263, HYPE 0.204: the same positions twelve hours earlier.
+
+Applying today's tiers to past days instead would have moved BTC's 30-day balance by a median of 0.16 (SOL 0.59, up to 1.64). The Smart cohort grew from 420 wallets on 5 July to 481 on 2 October, so part of any trail's movement is wallets joining it, not trading.
+
+### Roll steps
+
+The window moves every day: expiries leave it and later ones enter. Roll share = (gross of the expiries that left the window since the previous close + gross of the expiries newly inside it) / max(gross then, gross now). From 0.25 the close is flagged (bit 0) and the step is drawn as a roll, since most of that move is the window, not wallets trading. Over the last 90 closes the 30-day window was flagged on 7 closes for BTC (25 September: the quarterly, $115M of gross expired), 9 for ETH and 6 for HYPE (30 September: the 30 October expiry entered); the 7-day window rolls every Friday (BTC 22, ETH 21, HYPE 15 closes).
+
+### Backfill and appends
+
+- Backfill: the last 90 closes, rebuilt once in one pass over the whole history, valued with the recorded chain where one exists and modelled otherwise. It runs behind `state["balance"]` (the definition version) only when the history is caught up, no day was added in the same run, the surface rebuild had already finished before the run began and at least 100 seconds of the 150-second budget remain; otherwise it waits, and `history_once.py --due` stays true until it is done. It never shares a run with the surface rebuild.
+- Append: each new day's close, after the wallets, positions and traders are rebuilt for it, and only once the history has caught up (closes skipped by a multi-day catch-up are not appended one by one). When an append finds the previous close missing, it clears `state["balance"]`, and the next eligible run rebuilds the last 90 closes, filling the gap.
+- A run with no new day leaves `history/balance.json` untouched; two such runs in a row are byte-identical, and a backfill on the same data gives the same bytes. Checked end to end on 3 October 2026: with 2 October removed, the job read the day again from Derive, rebuilt the wallets and appended its close; the file was byte-identical to the backfill's.
+
+### Runtime and size
+
+The backfill took 26-28 seconds locally (one pass over 1,037 day files and 851,304 rows, 90 point-in-time classifications and valuations). An append reads 12 small chain files. `history/balance.json` is 48 KB (16 KB gzipped) for 90 closes and grows about 0.5 KB a close. `radar.json` (30 closes, 12 coins) is 11.0 KB (3.6 KB gzipped). On 3 October 2026 the last 30 closes had both an engine z-score and a 30-day balance for BTC, ETH, HYPE and ZEC on every close and for SOL, XAUT and XRP on 25; ADA, CC, LIT, PUMP and VVV had none (no ready z-score, or Smart wallets hold too little).
+
 ## Independent flow recovery
 
 `flow_once.py --due` participates in the scheduled workflow independently of options, signals and wallet history. `flow_once.py --out DIR --budget 120 --max-intervals 8` collects live flow and replays uncovered complete buckets in the previous seven days. The newest gaps are prioritised so the 24-hour view recovers first.

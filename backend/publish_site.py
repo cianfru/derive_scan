@@ -25,6 +25,9 @@ keeps no history. Files:
   surface/{UND}.json  daily option readings rebuilt from traded options (ATM 7/30/90 days, 25-delta
                       risk reversal 7/30 days), gated, with the recorded daily medians beside them;
                       only for coins whose history/surface CSV exists (has_surface in markets.json)
+  radar.json          the last 30 daily closes of every coin with options: the engine's z-score and
+                      the Smart wallets' delta balance (history/balance.json) for 7 and 30 days, with
+                      the live gates; read by the Radar page only
 """
 from __future__ import annotations
 
@@ -44,7 +47,7 @@ from derive.candles import CandleCache
 from derive.signals import engine_comparison, ribbon_trail
 from derive.quality import ANALYTICS_VERSION, engine_status, snapshot_status
 from derive.implied import implied_by_expiry, option_levels
-from derive.lean import alignment, options_lean, state_of
+from derive.lean import HORIZONS, WALLET_MIN_POSITIONS, WALLET_MIN_USD, alignment, options_lean, state_of
 from derive import traders as traders_mod
 from derive.history import last_complete_day, parse_option
 from derive.metric_history import build_engine_history
@@ -426,6 +429,51 @@ def surface_files(data: Path, site: Path, now: float) -> dict[str, dict]:
     return out
 
 
+RADAR_VERSION = 1
+RADAR_CLOSES = 30
+
+
+def radar_point(reading: list | None) -> list | None:
+    """[score, gross, flags] of a history/balance.json reading [score, net, gross, positions, flags]
+    when it passes the live gates (complete, gross >= $10k, >= 3 positions); otherwise None."""
+    if not reading:
+        return None
+    score, net, gross, positions, flags = reading
+    if score is None or net is None or gross is None or gross < WALLET_MIN_USD or positions < WALLET_MIN_POSITIONS:
+        return None
+    return [score, gross, flags]
+
+
+def radar_block(data: Path, engine_1d: dict[str, list], unds: list[str], now: float) -> dict | None:
+    """site-data radar.json (version 1): the last RADAR_CLOSES daily closes up to the newest close
+    in history/balance.json (derive/balance_history.py), one value per close, null for a gap.
+
+    z: the engine's daily z-score from the rows of coins/{UND}.json history.engine["1d"] (saved
+    closes, filled or replayed), null unless its metric status is ready. w: per horizon, the Smart
+    balance [score, gross USD delta, flags] (flags: bit 0 roll, bit 1 modelled) or null below the
+    live gates. None when history/balance.json is missing or holds no close.
+    """
+    from derive import balance_history
+
+    doc = balance_history.read(data)
+    if not doc or doc.get("schema") != balance_history.SCHEMA or not doc.get("closes"):
+        return None
+    last = max(int(k) for k in doc["closes"])
+    closes = [last - (RADAR_CLOSES - 1 - i) * 86400 for i in range(RADAR_CLOSES)]
+    coins = {}
+    for und in unds:
+        rows = {int(r["ts"]): r for r in engine_1d.get(und, [])}
+        z = []
+        for t in closes:
+            r = rows.get(t) or {}
+            ready = r.get("zscore") is not None and (r.get("metric_status") or {}).get("zscore") == "ready"
+            z.append(round(r["zscore"], 2) if ready else None)
+        held = [(doc["closes"].get(str(t)) or {}).get(und) or {} for t in closes]
+        coins[und] = {"z": z, "w": {h: [radar_point(c.get(h)) for c in held] for h in HORIZONS}}
+    return {"version": RADAR_VERSION, "generated_at": int(now), "through": doc.get("through"), "cohort": "smart",
+            "closes": closes, "coins": coins}
+
+
 def change_pct(closes: list[float], bars: int) -> float | None:
     if len(closes) <= bars or not closes[-1 - bars]:
         return None
@@ -634,6 +682,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     context = engine_context(sig, rows, meta)
     surfaces = surface_files(data, site, now)
     breadth: dict = defaultdict(Counter)
+    engine_1d: dict = {}
     for sym in sig.get("universe", []):
         und = sym.split("-")[0]
         r4, r1 = rows["4h"].get(sym) or {}, rows["1d"].get(sym) or {}
@@ -701,6 +750,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
         })
         tracking = metric_history(data, cache, und, now, metrics.get(und, {}))
         count_breadth(breadth, tracking["engine"]["1d"])
+        engine_1d[und] = tracking["engine"]["1d"]
         tracking["coverage"]["wallets"] = coverage
         _write(site / "coins" / f"{und}.json", {
             "und": und, "symbol": sym, "generated_at": int(now), "candles": candles, "daily_history": history_meta,
@@ -712,6 +762,11 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
         })
     meta["breadth_1d"] = breadth_table(breadth)
     _write(site / "markets.json", {**meta, "coins": markets})
+    radar = radar_block(data, engine_1d, [m["und"] for m in markets if m["has_options"]], now)
+    if radar:
+        _write(site / "radar.json", radar)
+    else:
+        (site / "radar.json").unlink(missing_ok=True)
     flow = flow_block(data, now, flows)
     tp = data / "history" / "traders.json"
     ranked = {t["address"].lower() for t in json.loads(tp.read_text())["traders"]} if tp.exists() else set()

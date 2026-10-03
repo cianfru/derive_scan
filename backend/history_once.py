@@ -13,6 +13,12 @@ Then each new day adds one row per coin with options to history/surface/{UND}.cs
 volatility readings rebuilt from its traded options (derive/surface_history.py). A new
 SURFACE_VERSION rebuilds every row once, within the budget over as many runs as it needs, into
 history/surface_rebuild/, which then replaces history/surface/. No network call.
+
+Each new day's close is also appended to history/balance.json: the Smart wallets' option delta
+balance per coin, from the positions just rebuilt, valued with the chain recorded at the close
+(derive/balance_history.py). The last BALANCE_CLOSES closes are rebuilt once (point-in-time
+tiers) by a backfill, and again when a catch-up skipped a close. The backfill never shares a run
+with a new day or the surface rebuild, and waits for BALANCE_MIN_BUDGET seconds of budget.
 """
 from __future__ import annotations
 
@@ -34,17 +40,22 @@ REPAIR = "fractional_strikes"
 SCHEMA_VERSION = 3
 # Definitions of history/surface (derive/surface_history.py); a new version rebuilds every row.
 SURFACE_VERSION = 1
+# Definitions of history/balance.json (derive/balance_history.py); a new version rebuilds its closes.
+BALANCE_VERSION = 1
+BALANCE_CLOSES = 90
+BALANCE_MIN_BUDGET = 100  # seconds of budget left for a backfill to start
 
 
 def is_due(out: Path, now: float) -> bool:
-    """A finished day not yet read, a repair not finished, or surface rows not yet written
-    (no network; standard library only)."""
+    """A finished day not yet read, a repair not finished, surface rows not yet written, or the
+    balance backfill pending once wallets are classed (no network; standard library only)."""
     p = out / "history" / "state.json"
     state = json.loads(p.read_text()) if p.exists() else {}
     done = state.get("done_through")
     last = (datetime.fromtimestamp(now - 3600, timezone.utc) - timedelta(days=1)).date()
     return done is None or date.fromisoformat(done) < last or (bool(done) and (
-        state.get("repaired") != REPAIR or state.get("surface") != SURFACE_VERSION or state.get("surface_through") != done))
+        state.get("repaired") != REPAIR or state.get("surface") != SURFACE_VERSION or state.get("surface_through") != done
+        or (state.get("balance") != BALANCE_VERSION and (out / "history" / "wallets.json").exists())))
 
 
 def repair_days(out: Path) -> list[str]:
@@ -118,8 +129,25 @@ def surface_step(out: Path, state: dict, keep_going) -> None:
     history.save_state(out, state)
 
 
+def balance_step(out: Path, state: dict, *, added: bool, surface_ready: bool, now: float, left: float) -> int | None:
+    """The one-time balance backfill (derive/balance_history.py), when the history is caught up,
+    no day was added in this run, the surface rebuild had finished before it and at least
+    BALANCE_MIN_BUDGET seconds remain; otherwise it waits for a later run. Returns the closes written."""
+    from derive import balance_history, history
+
+    done = state.get("done_through")
+    if state.get("balance") == BALANCE_VERSION or not done or added or not surface_ready \
+            or state.get("repaired") != REPAIR or done < history.last_complete_day(now).isoformat() \
+            or left < BALANCE_MIN_BUDGET:
+        return None
+    n = balance_history.backfill(out, BALANCE_CLOSES)
+    state["balance"] = BALANCE_VERSION
+    history.save_state(out, state)
+    return n
+
+
 async def run(out: Path, budget: float, now: float | None = None, client=None) -> dict:
-    from derive import history, traders
+    from derive import balance_history, history, traders
     from derive.client import DeriveClient
     from derive.config import SOURCES, Settings
 
@@ -129,7 +157,10 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
     if own:
         client = DeriveClient(SOURCES[Settings().sources[0]]["base"])
     state = history.load_state(out)
+    # The balance backfill never shares a run with the surface rebuild.
+    surface_ready = state.get("surface") == SURFACE_VERSION and "surface_pending" not in state
     added = []
+    backfilled = None
     try:
         day, last = history.next_day(state), history.last_complete_day(now)
         while day <= last and time.monotonic() - t0 < budget:
@@ -168,13 +199,19 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
             scan = history.scan_days(out, as_of)
             classes = history.classify(out, settlements, as_of, held, scan=scan)
             meta = {"as_of": int(as_of), "through": state["done_through"], "schema_version": SCHEMA_VERSION}
+            positions = history.tier_positions(held, classes)
             (out / "history" / "wallets.json").write_text(json.dumps({**meta, "wallets": classes}, separators=(",", ":")))
-            (out / "history" / "positions.json").write_text(json.dumps(
-                {**meta, "positions": history.tier_positions(held, classes)}, separators=(",", ":")))
+            (out / "history" / "positions.json").write_text(json.dumps({**meta, "positions": positions}, separators=(",", ":")))
             (out / "history" / "traders.json").write_text(json.dumps(
                 {**meta, **traders.build(scan, classes, as_of)}, separators=(",", ":")))
+            # The close just classed, valued as the live reading was; earlier closes are the backfill's.
+            if state["done_through"] >= history.last_complete_day(now).isoformat() and state.get("repaired") == REPAIR:
+                if balance_history.append(out, state["done_through"], positions) and state.pop("balance", None):
+                    history.save_state(out, state)  # a close was skipped: the backfill fills it
         if state.get("done_through") and state.get("repaired") == REPAIR:
             surface_step(out, state, lambda: time.monotonic() - t0 < budget)
+            backfilled = balance_step(out, state, added=bool(added), surface_ready=surface_ready, now=now,
+                                      left=budget - (time.monotonic() - t0))
     finally:
         if own:
             await client.close()
@@ -183,6 +220,8 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
         out_doc["repair_pending"] = len(state["repair_pending"])
     if state.get("surface_pending"):
         out_doc["surface_pending"] = len(state["surface_pending"])
+    if backfilled is not None:
+        out_doc["balance_closes"] = backfilled
     return out_doc
 
 

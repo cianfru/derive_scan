@@ -168,4 +168,9 @@ def test_history_repair_rereads_days_with_fractional_strikes(tmp_path):
     row = {r["instrument"]: r for r in history.read_day(tmp_path / "history" / "days" / "2024-06-02.csv.gz")}["XRP-20240628-1_35-P"]
     assert -13 < float(row["delta_usd"]) < 0 and float(row["iv"]) > 0
     state = history.load_state(tmp_path)
-    assert state["repaired"] == history_once.REPAIR and history_once.is_due(tmp_path, datetime(2024, 6, 3, 2, tzinfo=timezone.utc).timestamp()) is False
+    now = datetime(2024, 6, 3, 2, tzinfo=timezone.utc).timestamp()
+    assert state["repaired"] == history_once.REPAIR and "repair_pending" not in state
+    # The balance backfill never shares a run with the surface rebuild: the next run does it.
+    assert history_once.is_due(tmp_path, now) and "balance" not in state
+    asyncio.run(history_once.run(tmp_path, budget=200, now=now, client=object()))
+    assert set(calls) == {"2024-06-02"} and history_once.is_due(tmp_path, now) is False
