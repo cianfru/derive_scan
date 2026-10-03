@@ -6,7 +6,8 @@ export function conePath(implied, snapshot, index, horizon, quantile) {
 }
 
 export function readingState(reading, kind, now = Date.now() / 1000) {
-  if (!reading || reading.status !== "ready") return null;
+  // Options tone from skew alone counts as a reading until taker flow covers its window.
+  if (!reading || !(reading.status === "ready" || (kind === "options" && reading.status === "skew_only"))) return null;
   const at = kind === "wallets" ? reading.valuation_at : reading.observed_at;
   const ttl = kind === "engine" ? (reading.timeframe === "1d" ? 86400 : 14400) + 1200 : 1800;
   return Number.isFinite(at) && now >= at && now - at <= ttl ? reading.state : null;

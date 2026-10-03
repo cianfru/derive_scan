@@ -87,14 +87,15 @@ def test_skew_does_not_change_definition_when_history_grows():
     assert relative_skew(history[::2], 4, -.02)["percentile"] is None
 
 
-def test_options_need_both_fresh_skew_and_covered_flow_and_ignore_nondirectional_context():
+def test_options_tone_uses_fresh_skew_adds_covered_flow_and_ignores_nondirectional_context():
     flow = {"coverage": {"ready": True}, "call": {"buy_premium_usd": 10000}}
     feature = {"rr25_30d": .02, "atm_iv_7d": .9, "atm_iv_30d": .3, "pc_oi_ratio": 10}
     reading = options_lean(feature, [], flow, observed_at=NOW, now=NOW)
     changed = options_lean({**feature, "atm_iv_7d": .1, "pc_oi_ratio": .1}, [], flow, observed_at=NOW, now=NOW)
     assert reading["score"] == changed["score"] == .75
     assert set(reading["parts"]) == {"skew", "flow"}
-    assert options_lean(feature, [], {**flow, "coverage": {"ready": False}}, observed_at=NOW, now=NOW)["state"] is None
+    skew_only = options_lean(feature, [], {**flow, "coverage": {"ready": False}}, observed_at=NOW, now=NOW)
+    assert skew_only["status"] == "skew_only" and skew_only["score"] == .5 and skew_only["state"] == "up"
     assert options_lean(feature, [], flow, observed_at=NOW - 3600, now=NOW)["state"] is None
 
 
@@ -197,3 +198,26 @@ def test_publisher_withholds_stale_option_ranges(tmp_path):
                                "expiries": [{"expiry": NOW + 7 * 86400, "forward": 100, "atm_iv": .5}]}))
     block = options_block(data, site, "BTC", NOW)
     assert block["status"] == "stale" and block["implied"] == [] and block["levels"] is None
+
+
+def test_coin_wallet_file_lists_holders_by_delta_and_cohorts(tmp_path):
+    import json
+    import publish_site
+    from derive.history import last_complete_day
+    name = "BTC-20991231-100000-C"
+    expiry = parse_option(name)[1]
+    now = NOW
+    trader = lambda addr, rank, net: {"address": addr, "rank": rank, "tier": "top", "class": "directional", "option_pnl": 1.0,
+                                      "open": [[name, net, 100.0]], "recent": []}
+    doc = {"schema_version": 2, "through": last_complete_day(now).isoformat(), "ranked_total": 2,
+           "traders": [trader("0xA", 1, 1.0), trader("0xB", 2, -5.0)],
+           "cohort_counts": {"pnl": {"Grinder": 2}}, "cohort_positions": {"pnl": {"Grinder": {"BTC": {name: [-4.0, 2, 6.0]}}}}}
+    (tmp_path / "history").mkdir()
+    (tmp_path / "history" / "traders.json").write_text(json.dumps(doc))
+    strikes = {"ts": now, "expiries": {str(expiry): [[100000, 0, 0, .5, .5, .5]]}}
+    publish_site.traders_block(tmp_path, tmp_path / "site", {"BTC": (strikes, 100000.0, now)}, {"large": []}, now)
+    out = json.loads((tmp_path / "site" / "wallets" / "BTC.json").read_text())
+    assert out["ready"] and [h["address"] for h in out["holders"]] == ["0xB", "0xA"]
+    assert out["holders"][0]["net_delta_usd"] < 0 and out["holders"][0]["legs"][0]["instrument"] == name
+    grinder = next(c for c in out["cohorts"]["pnl"] if c["name"] == "Grinder")
+    assert grinder["30d"]["positions"] == 0 and grinder["all"]["positions"] == 2

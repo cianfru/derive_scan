@@ -111,7 +111,7 @@ it("opens Money Printer exposure and changes the expiry window without changing 
     .click(screen.getByRole("tab", { name: "Beyond 30d" }));
   expect(screen.getAllByText("Short delta")).toHaveLength(2);
   expect(screen.getByRole("link", { name: "HYPE" }).getAttribute("href")).toBe(
-    "/coin/HYPE",
+    "/coin/HYPE#wallets",
   );
 });
 it("summarizes the recorded premium categories and selects a market for the tape", async () => {

@@ -11,6 +11,8 @@ keeps no history. Files:
   coins/{UND}.json    candles (4H, 1D) with signal history, latest rows, options detail
                       (term structure, per-strike open interest and IV, 14-day IV history,
                       implied ranges, open-interest levels, options lean), alignment by horizon
+  wallets/{UND}.json  per coin: the ranked traders holding its options (biggest delta first) and how
+                      each cohort is positioned on it within 7 days, 30 days and all expiries
   traders.json        options traders' leaderboard (market makers left out) and cohorts by results
                       and size with their positioning; traders/{address}.json per ranked trader
   flow.json           last 24 hours: large trades, most active wallets (market makers left out once
@@ -227,6 +229,9 @@ def cohort_lean(insts: dict, chains: dict, now: float, max_days=None, min_days=0
             "score": score, "state": state_of(score), "positions": positions, "quotes_complete": complete}
 
 
+COIN_HOLDERS = 12
+
+
 def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) -> None:
     """traders.json (leaderboard and cohorts) and traders/{address}.json (one per ranked trader)."""
     p = data / "history" / "traders.json"
@@ -240,6 +245,8 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
     coverage = history_coverage(doc, now)
     if not coverage["ready"]:
         _write(site / "traders.json", {"generated_at": int(now), **coverage})
+        for und in chains:
+            _write(site / "wallets" / f"{und}.json", {"generated_at": int(now), **coverage, "und": und})
         # Existing direct links must not continue serving a stale, apparently current book.
         for old in (site / "traders").glob("*.json"):
             _write(old, {"generated_at": int(now), **coverage})
@@ -251,8 +258,23 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
         if old.stem not in addresses:
             _write(old, {"generated_at": int(now), **coverage, "ready": False, "status": "not_ranked"})
     rows = []
+    holders: dict = defaultdict(list)  # und -> ranked traders holding options on it
     for t in doc["traders"]:
         book = _book(t["open"], chains, now)
+        by_und: dict = defaultdict(list)
+        for b in book:
+            by_und[b["und"]].append(b)
+        for und, legs in by_und.items():
+            if any(b["delta_usd"] is None for b in legs):
+                continue
+            legs.sort(key=lambda b: -abs(b["delta_usd"]))
+            holders[und].append({k: t.get(k) for k in ("address", "rank", "tier", "class", "pnl_cohort", "size_cohort",
+                                                       "option_pnl", "win_rate")} | {
+                "net_delta_usd": round(sum(b["delta_usd"] for b in legs), 2),
+                "gross_delta_usd": round(sum(abs(b["delta_usd"]) for b in legs), 2),
+                "positions": len(legs), "nearest_expiry": min(b["expiry"] for b in legs),
+                "legs": [{k: b[k] for k in ("instrument", "net", "strike", "type", "expiry", "delta_usd", "entry", "mark")}
+                         for b in legs[:4]]})
         summary = {k: v for k, v in t.items() if k not in ("open", "recent")}
         summary.update({"open_count": len(book), "lean": _lean(book),
                         "upnl": round(sum(b["upnl"] for b in book if b["upnl"] is not None), 2)
@@ -277,6 +299,14 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
                                  "coins": windows["all"]["coins"], "windows": windows})
     _write(site / "traders.json", {"generated_at": int(now), **coverage,
                                    "ranked_total": doc.get("ranked_total"), "traders": rows, "cohorts": cohorts})
+    for und in chains:
+        coin_cohorts = {dim: [{"name": c["name"], "wallets": c["wallets"],
+                               **{w: c["windows"][w]["coins"].get(und) for w in ("7d", "30d", "all")}} for c in cs]
+                        for dim, cs in cohorts.items()}
+        top = sorted(holders.get(und, []), key=lambda h: -abs(h["net_delta_usd"]))[:COIN_HOLDERS]
+        _write(site / "wallets" / f"{und}.json", {"generated_at": int(now), **coverage, "und": und,
+                                                  "holders": top, "holders_total": len(holders.get(und, [])),
+                                                  "cohorts": coin_cohorts})
 
 
 def build(data: Path, site: Path, now: float | None = None) -> dict:

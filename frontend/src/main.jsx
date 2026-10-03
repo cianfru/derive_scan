@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import "./styles.css";
 import "./research.css";
+import "./journey.css";
 import Shell from "./components/Shell.jsx";
 import Landing from "./pages/Landing.jsx";
 const Radar = lazy(() => import("./pages/Radar.jsx"));

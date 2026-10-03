@@ -12,10 +12,9 @@ import {
   SIGNAL_LABEL,
   REGIME,
 } from "../lib/format.js";
-import { WINDOWS, STATUS_NAMES } from "../lib/presentation.js";
-import { openMarketRow, REGIME_HELP, READING_HELP } from "../lib/explain.js";
+import { openMarketRow } from "../lib/explain.js";
 import { Signal, Tabs, Loading, Failed, Info } from "../components/ui.jsx";
-import { Asset, MarketTrace, Reading } from "../components/MarketVisuals.jsx";
+import { Asset, MarketTrace } from "../components/MarketVisuals.jsx";
 import {
   EnginePair,
   Convergence,
@@ -23,6 +22,7 @@ import {
 } from "../components/EngineComparison.jsx";
 import { currentEngine } from "../lib/research.js";
 import FearGreed from "../components/FearGreed.jsx";
+import { ChainMini, ChainLegend } from "../components/Chain.jsx";
 
 export default function Markets() {
   const { data, error } = useData("markets.json");
@@ -30,9 +30,8 @@ export default function Markets() {
   const [q, setQ] = useState(""),
     [signalFilter, setSignalFilter] = useState(null),
     [view, setView] = useState("options"),
-    [horizon, setHorizon] = useState("30d"),
     [details, setDetails] = useState(false),
-    [sort, setSort] = useState(["oi_usd", -1]);
+    [sort, setSort] = useState(["align", -1]);
   const rows = useMemo(() => {
     let r = (data?.coins || []).filter((c) =>
       c.und.toLowerCase().includes(q.trim().toLowerCase()),
@@ -49,8 +48,9 @@ export default function Markets() {
             : c.signal_1d === signalFilter),
       );
     return [...r].sort((a, b) => {
-      const x = a[sort[0]],
-        y = b[sort[0]];
+      const key = (c) => (sort[0] === "align" ? (c.align?.score ?? null) : c[sort[0]]);
+      const x = key(a),
+        y = key(b);
       if (x == null && y == null) return a.und.localeCompare(b.und);
       if (x == null) return 1;
       if (y == null) return -1;
@@ -153,7 +153,6 @@ export default function Markets() {
                 <i className={`regime-${g.k}`} />
                 {g.name}
                 <b>{g.n}</b>
-                <Info label={`Explain ${g.name}`}>{REGIME_HELP[g.k]}</Info>
               </span>
             ))}
           </div>
@@ -227,21 +226,11 @@ export default function Markets() {
         </div>
         <div className="board-controls">
           <span>
-            {rows.length} markets / Daily engine{" "}
-            <Info>{READING_HELP.engine}</Info>
+            {rows.length} markets{view !== "perps" && !details ? " · sorted by agreement" : ""}{" "}
+            <Info>Each market is read in three steps, always in this order: 1 Regime (the daily engine), 2 Wallets (what Derive's best options traders hold on expiries in the window), 3 Options (what option prices lean towards). A framed chain means all three point the same way. Context side by side, not a combined signal.</Info>
           </span>
           <div>
-            {view !== "perps" && !details && (
-              <Tabs
-                label="Options window"
-                value={horizon}
-                onChange={setHorizon}
-                items={[
-                  ["7d", "7-day options"],
-                  ["30d", "30-day options"],
-                ]}
-              />
-            )}
+            {view !== "perps" && !details && <ChainLegend />}
             <button
               className="text-control"
               aria-pressed={details}
@@ -256,25 +245,11 @@ export default function Markets() {
             <thead>
               <tr>
                 {sortHead("und", "Market")}
-                {sortHead("price", "Index / daily", "num")}
-                <th>
-                  60 daily closes{" "}
-                  <Info>
-                    Up to 60 completed daily closes. External spot history
-                    extends the chart before Derive's listing where available.
-                    Each trace has its own vertical scale; the percentage is
-                    change across its shown samples. The dashed reference is the
-                    first close.
-                  </Info>
-                </th>
-                <th>
-                  Engine pair · 1D / 4H <Info>{CONVERGENCE_HELP}</Info>
-                </th>
-                <th>
-                  Convergence <Info>{CONVERGENCE_HELP}</Info>
-                </th>
+                <th className="hide-md">60 days</th>
                 {details || view === "perps" ? (
                   <>
+                    <th>Engine pair · 1D / 4H <Info>{CONVERGENCE_HELP}</Info></th>
+                    <th>Convergence</th>
                     {sortHead("z_1d", "Daily stretch", "num")}
                     {sortHead("heat_1d", "Daily heat", "num")}
                     {sortHead("oi_usd", "Perp OI", "num")}
@@ -282,14 +257,9 @@ export default function Markets() {
                   </>
                 ) : (
                   <>
-                    <th>
-                      Option prices <Info>{READING_HELP.options}</Info>
-                      <small>{WINDOWS[horizon].options}</small>
-                    </th>
-                    <th>
-                      Smart wallets <Info>{READING_HELP.wallets}</Info>
-                      <small>{WINDOWS[horizon].wallets}</small>
-                    </th>
+                    <th>Regime</th>
+                    {sortHead("align", "Next 7 days")}
+                    <th>Next 30 days</th>
                   </>
                 )}
               </tr>
@@ -305,81 +275,30 @@ export default function Markets() {
                 >
                   <td>
                     <Link className="asset-link" to={`/coin/${c.und}`}>
-                      <Asset und={c.und} />
+                      <Asset und={c.und} compact />
                     </Link>
+                    <span className="market-price">${price(c.price)}{" "}
+                      <small className={c.chg_1d > 0 ? "up" : c.chg_1d < 0 ? "down" : ""}>{chg(c.chg_1d)}</small></span>
                   </td>
-                  <td className="num">
-                    ${price(c.price)}
-                    <small
-                      className={
-                        c.chg_1d > 0 ? "up" : c.chg_1d < 0 ? "down" : ""
-                      }
-                    >
-                      {chg(c.chg_1d)}
-                    </small>
-                  </td>
-                  <td>
-                    <MarketTrace
-                      values={c.spark_1d}
-                      times={c.spark_times_1d}
-                      label={`${c.und} daily closes`}
-                    />
-                  </td>
-                  <td>
-                    <EnginePair comparison={c.engine_comparison} compact />
-                    <span className="table-evidence">
-                      Daily conditions{" "}
-                      {currentEngine(c.engine_comparison?.["1d"])
-                        ? `${c.engine_comparison["1d"].conditions_met ?? "—"}/${c.engine_comparison["1d"].conditions_total ?? "—"}`
-                        : "—"}{" "}
-                      <Info>
-                        Checks passed at the displayed daily close, with unknown
-                        evidence earning no point. Open the market for the full
-                        checklist, freshness and sources.
-                      </Info>
-                    </span>
-                  </td>
-                  <td>
-                    <Convergence comparison={c.engine_comparison} compact />
+                  <td className="hide-md">
+                    <MarketTrace values={c.spark_1d} times={c.spark_times_1d} label={`${c.und} daily closes`} />
                   </td>
                   {details || view === "perps" ? (
                     <>
-                      <td className="num">
-                        {c.signal_1d && Number.isFinite(c.z_1d)
-                          ? `${c.z_1d.toFixed(2)}σ`
-                          : "—"}
-                        <Info>
-                          Daily price extension in standard deviations from the
-                          engine's trend baseline. Positive is above trend;
-                          negative is below. It is not a price target.
-                        </Info>
-                      </td>
-                      <td className="num">
-                        {c.signal_1d ? (c.heat_1d ?? "—") : "—"}
-                        <Info>
-                          Daily heat runs from 0 to 100 and measures extension
-                          from the engine's longer-term base.
-                        </Info>
-                      </td>
+                      <td><EnginePair comparison={c.engine_comparison} compact /></td>
+                      <td><Convergence comparison={c.engine_comparison} compact /></td>
+                      <td className="num">{c.signal_1d && Number.isFinite(c.z_1d) ? `${c.z_1d.toFixed(2)}σ` : "—"}</td>
+                      <td className="num">{c.signal_1d ? (c.heat_1d ?? "—") : "—"}</td>
                       <td className="num">{usd(c.oi_usd)}</td>
                       <td className="num">{pct(c.funding_ann)}</td>
                     </>
                   ) : (
                     <>
-                      <td>
-                        <Reading
-                          alignment={c.align}
-                          horizon={horizon}
-                          kind="options"
-                        />
+                      <td className="regime-td">
+                        <div className="regime-cell">{currentEngine(c.engine_comparison?.["1d"]) ? <><Signal s={c.signal_1d} help={false} /><small>{REGIME[c.regime_1d] || title(c.regime_1d)}</small></> : <span className="status">Short history</span>}</div>
                       </td>
-                      <td>
-                        <Reading
-                          alignment={c.align}
-                          horizon={horizon}
-                          kind="wallets"
-                        />
-                      </td>
+                      <td className="chain-td" data-h="7 days"><ChainMini alignment={c.align} horizon="7d" /></td>
+                      <td className="chain-td" data-h="30 days"><ChainMini alignment={c.align} horizon="30d" /></td>
                     </>
                   )}
                 </tr>
@@ -405,9 +324,7 @@ export default function Markets() {
         )}
         <div className="board-foot">
           <span>Open any part of a row to inspect the market.</span>
-          <span>
-            Price engine, option prices and wallet exposure remain separate.
-          </span>
+          <span>Regime, wallets and options are read separately and shown side by side.</span>
         </div>
       </section>
       <p className="status">

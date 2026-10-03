@@ -84,7 +84,7 @@ export default function Radar() {
         <Link to={`/coin/${selected.und}`} className="detail-trace" aria-label={`Open ${selected.und} chart`}><MarketTrace values={selected.spark_1d} label={`${selected.und} recent closes`} /><span className="status">Recent daily closes</span></Link>
         <div className="radar-measures"><div><span>1D price stretch <Info>Standard deviations from the engine’s trend. A missing or stale engine reading is withheld from the map.</Info></span><strong>{viewReading(selected.align, "30d", "engine").state && Number.isFinite(selected.z_1d) ? `${selected.z_1d > 0 ? "+" : ""}${selected.z_1d.toFixed(2)}σ` : "Unavailable"}</strong></div><div><span>Smart option delta balance</span><strong>{selectedPoint ? `${(selectedPoint.y * 100).toFixed(1)}%` : viewReading(selected.align, horizon, "wallets").label}</strong></div><div><span>Gross delta exposure</span><strong>{selectedPoint ? usd(selectedPoint.gross) : "Unavailable"}</strong></div></div>
         <ThreeReadings alignment={selected.align} horizon={horizon} />
-        <Link className="btn primary" to={`/coin/${selected.und}`}>Explore {selected.und}</Link>
+        <Link className="btn primary" to={`/coin/${selected.und}#wallets`}>Explore {selected.und}</Link>
         <Link className="text-link" to="/traders">Explore trader cohorts</Link>
       </aside>}
     </div>

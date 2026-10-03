@@ -1,6 +1,7 @@
 """Separate current options tone, surface context and held-wallet exposure.
 
-Version 2 tone averages two fixed components: absolute skew and covered taker premium.
+Version 2 tone averages two fixed components: absolute skew and covered taker premium; while
+taker flow does not yet cover its window (or is too thin), skew alone gives the tone ("skew_only").
 Term structure and put/call OI are descriptive context, never directional votes. This is
 not an input to the signal engine or the declared wallet study.
 """
@@ -68,8 +69,13 @@ def options_reading(horizon, features, iv_history, flows, *, observed_at=None, n
     flow = (flows or {}).get(window) or {}
     parts = {"skew": skew_reading([], rr) if fresh == "ready" else None, "flow": flow_reading(flow)}
     parts = {k: round(v, 3) if v is not None else None for k, v in parts.items()}
-    score = round((parts["skew"] + parts["flow"]) / 2, 3) if all(v is not None for v in parts.values()) else None
-    status = "ready" if score is not None else fresh if fresh != "ready" else "partial_flow" if not (flow.get("coverage") or {}).get("ready") else "insufficient_data"
+    if all(v is not None for v in parts.values()):
+        score, status = round((parts["skew"] + parts["flow"]) / 2, 3), "ready"
+    elif parts["skew"] is not None:
+        # Until taker flow covers its whole window (or is too thin to read), skew alone carries the tone.
+        score, status = parts["skew"], "skew_only"
+    else:
+        score, status = None, fresh if fresh != "ready" else "insufficient_data"
     iv7, iv30 = number(features.get("atm_iv_7d")), number(features.get("atm_iv_30d"))
     return {"version": ANALYTICS_VERSION, "state": state_of(score), "score": score, "parts": parts,
             "status": status, "observed_at": observed_at, "tenor_days": HORIZONS[horizon], "flow_window": window,

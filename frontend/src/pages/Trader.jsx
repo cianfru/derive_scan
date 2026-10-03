@@ -43,7 +43,7 @@ export default function Trader() {
             <tbody>
               {book.map((p) => (
                 <tr key={p.instrument} style={{ cursor: "default" }}>
-                  <td><Link to={`/coin/${p.und}`} style={{ fontWeight: 600 }}>{p.und}</Link> <span className="mono">{p.strike.toLocaleString()} {p.type === "C" ? "call" : "put"}</span> <span className="dim mono">{day(p.expiry)}</span></td>
+                  <td><Link to={`/coin/${p.und}#wallets`} style={{ fontWeight: 600 }}>{p.und}</Link> <span className="mono">{p.strike.toLocaleString()} {p.type === "C" ? "call" : "put"}</span> <span className="dim mono">{day(p.expiry)}</span></td>
                   <td className={p.net > 0 ? "up" : "down"}>{p.net > 0 ? "Long" : "Short"}</td>
                   <td className="num">{Math.abs(p.net).toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
                   <td className="num">{p.entry == null ? <span className="faint">Unavailable</span> : price(p.entry)}</td>

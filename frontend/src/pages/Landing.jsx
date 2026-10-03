@@ -1,10 +1,7 @@
-import { useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
-import ResearchLayers from "../components/ResearchLayers.jsx";
-import BitcoinExamples from "../components/BitcoinExamples.jsx";
+import HeroChain from "../components/HeroChain.jsx";
 import { Logo } from "../components/Shell.jsx";
 export default function Landing() {
-  const [layer, setLayer] = useState("price");
   const { theme } = useOutletContext();
   return (
     <div className="landing torq-landing">
@@ -25,9 +22,8 @@ export default function Landing() {
             </em>
           </h1>
           <p className="hero-description">
-            Price structure. The cost of risk.
-            <br />
-            The wallets behind the exposure.
+            Every coin with options on Derive, read in three steps: the price
+            regime, the wallets behind the exposure, and what option prices lean towards.
           </p>
           <div className="hero-cta">
             <Link className="btn primary" to="/markets">
@@ -38,9 +34,8 @@ export default function Landing() {
             </Link>
           </div>
         </div>
-        <ResearchLayers layer={layer} />
+        <HeroChain />
       </section>
-      <BitcoinExamples onSelect={setLayer} />
       <section className="wrap research-promise">
         <div className="brand-signature">
           <Logo theme={theme} height={95} />
@@ -53,8 +48,8 @@ export default function Landing() {
             only the start.
           </h2>
           <p>
-            Trace a setup back to its conditions. Follow exposure through
-            expiry. Look inside the evidence.
+            Start from a coin. Read its regime, see who holds it, then what
+            options price in. Every step opens the evidence behind it.
           </p>
           <Link className="text-link" to="/markets">
             Open the workspace ↗
