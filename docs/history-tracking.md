@@ -110,7 +110,7 @@ The window moves every day: expiries leave it and later ones enter. Roll share =
 
 ### Runtime and size
 
-The backfill took 26-28 seconds locally (one pass over 1,037 day files and 851,304 rows, 90 point-in-time classifications and valuations). An append reads 12 small chain files. `history/balance.json` is 48 KB (16 KB gzipped) for 90 closes and grows about 0.5 KB a close. `radar.json` (30 closes, 12 coins) is 11.0 KB (3.6 KB gzipped). On 3 October 2026 the last 30 closes had both an engine z-score and a 30-day balance for BTC, ETH, HYPE and ZEC on every close and for SOL, XAUT and XRP on 25; ADA, CC, LIT, PUMP and VVV had none (no ready z-score, or Smart wallets hold too little).
+The backfill took 26-28 seconds locally (one pass over 1,037 day files and 851,304 rows, 90 point-in-time classifications and valuations). An append reads 12 small chain files. `history/balance.json` is 48 KB (16 KB gzipped) for 90 closes and grows about 0.5 KB a close. `radar.json` (30 closes, 12 coins, with the engine's saved reading per close) is 11.5 KB (3.6 KB gzipped). On 3 October 2026 the last 30 closes had both an engine z-score and a 30-day balance for BTC, ETH, HYPE and ZEC on every close and for SOL, XAUT and XRP on 25; ADA, CC, LIT, PUMP and VVV had none (no ready z-score, or Smart wallets hold too little).
 
 ## Independent flow recovery
 

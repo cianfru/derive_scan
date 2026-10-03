@@ -52,7 +52,15 @@ These are useful wallet discovery and comparison fields. A displayed rank alone 
 
 A later enrichment can join official leaderboard observations by wallet address and observation period, preserving the reported source and its PnL definition. It needs a verified supported endpoint and coverage/reconciliation against the existing trade history first. Do not substitute rewards/points rankings for trading results, or use leaderboard rank as the radar's trader-quality filter.
 
-The current radar intentionally omits Reflex's replay, entry-price proximity and trader headcounts: the present public schema does not establish those measures. Adding them requires timestamped position snapshots and defined aggregation, without resetting the accumulating history or changing the approved study.
+The radar has history (October 3 revision), adapted from Reflex's trails and replay. It reads `radar.json` (the last 30 daily closes; README) only on this page; without it, the page draws the live map alone, with no trails and no Replay.
+
+- Trails: each plotted circle trails its last 7 daily closes, oldest faintest. A step is dotted when expiries left or entered the window at that close (the roll flag), and a dot is hollow when its delta was modelled from trade prices, filled when it was valued from recorded quotes. A missing close ends the trail: gaps are never bridged, and a live point more than a close after the newest saved close is not joined to it. The followed coin's trail is orange, with one date mark at its oldest close, placed clear of labels and circles.
+- Scales: circle size and the stretch axis hold one scale across the 30 closes, at rest too, so a circle's size is comparable between closes.
+- Replay: one text control in the map's footer opens Play/Pause, a scrubber over the 30 closes and now (arrow keys step whole closes, Home/End jump to the ends), date ticks every 7 closes (14 under 600px), the date and Close. Playback tweens at 450 ms a close and stops at now; with reduced motion it steps one close every 700 ms without a tween. Labels are placed at whole closes and keep their side between them.
+- Past frames: a circle is coloured by the engine's reading saved at that close (`e` in `radar.json`, the live rule: saved as ready, perp volume ok), otherwise grey, since final signals were only saved from 1 October 2026. Markets with a stretch but no wallet reading at that close sit on the strip; the map keeps the strip's tallest close's room so its height never changes during Replay.
+- Rail: under the three figures, two 30-close lines, Balance (thin where modelled, thick where recorded) and Stretch, each with an orange cursor at the playhead and the value now at its right end. During Replay the figures and the price slot follow the playhead; the Engine, Options and Wallets readings stay as of now.
+
+Entry-price proximity and trader headcounts are still left out: the public schema does not establish them.
 
 ## Preview verification
 

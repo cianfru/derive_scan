@@ -250,7 +250,12 @@ def test_radar_applies_the_live_gates_and_keeps_gaps(tmp_path):
     B.write(tmp_path, closes, {})
     engine = {"BTC": [{"ts": t, "zscore": 1.23456, "metric_status": {"zscore": "ready"}},
                       {"ts": t - 2 * 86400, "zscore": 0.5, "metric_status": {"zscore": "warming up"}}]}
-    doc = publish_site.radar_block(tmp_path, engine, ["BTC", "ETH", "SOL"], now=t + 3600)
+    saved = lambda signal, status="ready", volume="ok": {"source": "recorded", "status": status, "signal": signal, "volume_status": volume}
+    recorded = {"BTC": {"1d": {t: saved("LIGHT_LONG")}},
+                "ETH": {"1d": {t: saved("LIGHT_LONG", volume="thin"), t - 86400: saved("TRIM"), t - 2 * 86400: saved("WAIT"),
+                               t - 4 * 86400: saved(None, status="warming up")},
+                        "4h": {t - 3 * 86400: saved("LIGHT_LONG")}}}
+    doc = publish_site.radar_block(tmp_path, engine, ["BTC", "ETH", "SOL"], now=t + 3600, recorded=recorded)
     assert doc["version"] == 1 and doc["cohort"] == "smart" and doc["through"] == "2024-06-03"
     assert len(doc["closes"]) == 30 and doc["closes"][-1] == t and doc["closes"][-2] == t - 86400
     btc, eth, sol = (doc["coins"][u] for u in ("BTC", "ETH", "SOL"))
@@ -259,6 +264,9 @@ def test_radar_applies_the_live_gates_and_keeps_gaps(tmp_path):
     assert btc["w"]["7d"][-3:] == [None, None, None]                  # no score; fewer than 3 positions
     assert eth["w"]["30d"][-1] == [-0.4, 20000, 3] and eth["w"]["7d"][-1] is None  # incomplete quotes
     assert all(v is None for v in sol["z"] + sol["w"]["30d"] + sol["w"]["7d"])
+    # The engine's saved reading per close, by the live rule; replayed or withheld closes are "-".
+    assert btc["e"] == "-" * 29 + "u" and sol["e"] == "-" * 30
+    assert eth["e"][-5:] == "--nd-"  # warming up, not saved (4h only), WAIT, TRIM, thin volume
     assert publish_site.radar_block(tmp_path / "empty", engine, ["BTC"], now=t) is None
 
 

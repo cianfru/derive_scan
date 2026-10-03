@@ -26,8 +26,8 @@ keeps no history. Files:
                       risk reversal 7/30 days), gated, with the recorded daily medians beside them;
                       only for coins whose history/surface CSV exists (has_surface in markets.json)
   radar.json          the last 30 daily closes of every coin with options: the engine's z-score and
-                      the Smart wallets' delta balance (history/balance.json) for 7 and 30 days, with
-                      the live gates; read by the Radar page only
+                      saved reading, and the Smart wallets' delta balance (history/balance.json) for
+                      7 and 30 days, with the live gates; read by the Radar page only
 """
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ from derive.candles import CandleCache
 from derive.signals import engine_comparison, ribbon_trail
 from derive.quality import ANALYTICS_VERSION, engine_status, snapshot_status
 from derive.implied import implied_by_expiry, option_levels
-from derive.lean import HORIZONS, WALLET_MIN_POSITIONS, WALLET_MIN_USD, alignment, options_lean, state_of
+from derive.lean import DEFENSIVE_SIGNALS, HORIZONS, UP_SIGNALS, WALLET_MIN_POSITIONS, WALLET_MIN_USD, alignment, options_lean, state_of
 from derive import traders as traders_mod
 from derive.history import last_complete_day, parse_option
 from derive.metric_history import build_engine_history
@@ -141,6 +141,7 @@ def recorded_metrics(data: Path, now: float) -> dict:
                     "funding_ann": funding * 24 * 365 if funding is not None else None,
                     "oi_usd": _num(row.get("oi_usd")), "oi_contracts": _num(row.get("oi_contracts")),
                     "positioning_at": _num(row.get("positioning_at")),
+                    "volume_status": row.get("volume_status") or None,
                 }
     return out
 
@@ -223,7 +224,7 @@ def metric_history(data: Path, cache: CandleCache, und: str, now: float, recorde
         merged.update({ts: fill_from_replay(row, replayed.get(ts)) for ts, row in saved.items()})
         engine[tf] = []
         for ts in sorted(merged):
-            row = {k: v for k, v in merged[ts].items() if k not in ("input_id", "provenance")}
+            row = {k: v for k, v in merged[ts].items() if k not in ("input_id", "provenance", "volume_status")}
             provenance = merged[ts].get("provenance", {}).get("price")
             if provenance:
                 row["provenance"] = {"price": {k: provenance[k] for k in
@@ -444,14 +445,27 @@ def radar_point(reading: list | None) -> list | None:
     return [score, gross, flags]
 
 
-def radar_block(data: Path, engine_1d: dict[str, list], unds: list[str], now: float) -> dict | None:
+def radar_engine(row: dict) -> str:
+    """One character for the daily engine's reading saved at a close, by the live rule (saved as
+    ready, perp volume ok): 'u' up, 'd' defensive, 'n' neutral; '-' when none was saved there
+    (replayed closes carry no final signal)."""
+    if row.get("source") != "recorded" or row.get("status") != "ready" or not row.get("signal") \
+            or row.get("volume_status") != "ok":
+        return "-"
+    return "u" if row["signal"] in UP_SIGNALS else "d" if row["signal"] in DEFENSIVE_SIGNALS else "n"
+
+
+def radar_block(data: Path, engine_1d: dict[str, list], unds: list[str], now: float,
+                recorded: dict | None = None) -> dict | None:
     """site-data radar.json (version 1): the last RADAR_CLOSES daily closes up to the newest close
     in history/balance.json (derive/balance_history.py), one value per close, null for a gap.
 
     z: the engine's daily z-score from the rows of coins/{UND}.json history.engine["1d"] (saved
     closes, filled or replayed), null unless its metric status is ready. w: per horizon, the Smart
     balance [score, gross USD delta, flags] (flags: bit 0 roll, bit 1 modelled) or null below the
-    live gates. None when history/balance.json is missing or holds no close.
+    live gates. e: the engine's saved reading per close (recorded_metrics rows, radar_engine) as
+    one string, so the Radar colours a past circle only where a final signal exists. None when
+    history/balance.json is missing or holds no close.
     """
     from derive import balance_history
 
@@ -463,13 +477,15 @@ def radar_block(data: Path, engine_1d: dict[str, list], unds: list[str], now: fl
     coins = {}
     for und in unds:
         rows = {int(r["ts"]): r for r in engine_1d.get(und, [])}
+        saved = {int(ts): r for ts, r in ((recorded or {}).get(und) or {}).get("1d", {}).items()}
         z = []
         for t in closes:
             r = rows.get(t) or {}
             ready = r.get("zscore") is not None and (r.get("metric_status") or {}).get("zscore") == "ready"
             z.append(round(r["zscore"], 2) if ready else None)
         held = [(doc["closes"].get(str(t)) or {}).get(und) or {} for t in closes]
-        coins[und] = {"z": z, "w": {h: [radar_point(c.get(h)) for c in held] for h in HORIZONS}}
+        coins[und] = {"z": z, "w": {h: [radar_point(c.get(h)) for c in held] for h in HORIZONS},
+                      "e": "".join(radar_engine(saved.get(t) or {}) for t in closes)}
     return {"version": RADAR_VERSION, "generated_at": int(now), "through": doc.get("through"), "cohort": "smart",
             "closes": closes, "coins": coins}
 
@@ -762,7 +778,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
         })
     meta["breadth_1d"] = breadth_table(breadth)
     _write(site / "markets.json", {**meta, "coins": markets})
-    radar = radar_block(data, engine_1d, [m["und"] for m in markets if m["has_options"]], now)
+    radar = radar_block(data, engine_1d, [m["und"] for m in markets if m["has_options"]], now, metrics)
     if radar:
         _write(site / "radar.json", radar)
     else:
