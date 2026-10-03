@@ -9,6 +9,7 @@ import EngineComparison, { EngineEvidence } from "../components/EngineComparison
 import OptionsWorkspace from "../components/OptionsWorkspace.jsx";
 import Chain, { LayerIcon, HORIZON_LABEL, chainReadings } from "../components/Chain.jsx";
 import CoinWallets from "../components/CoinWallets.jsx";
+import MetricHistory from "../components/MetricHistory.jsx";
 import { currentEngine } from "../lib/research.js";
 import { SIGNAL_HELP } from "../lib/explain.js";
 
@@ -188,6 +189,7 @@ export default function Coin() {
             levels={data.options?.levels} optionsAt={data.options?.ts} optionsIndex={data.options?.features?.index_price} />
           <ChartLegend opts={data.options} tf={tf} last={last?.[4]} />
         </Plate>
+        <MetricHistory key={und} history={data.history} />
         <details className="engine-detail">
           <summary>Engine detail</summary>
           <div>
