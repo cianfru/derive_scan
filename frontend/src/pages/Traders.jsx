@@ -34,12 +34,12 @@ export default function Traders() {
         </div>
       </div>
       <CohortExplorer cohorts={data.cohorts} through={data.through} valuedAt={data.generated_at} />
-      <Plate title="Leaderboard" info={<>{TYPE_INFO} Gross options PnL counts expired options: premium received minus premium paid plus settlement value, before fees. Win rate: share of expired instruments with positive gross PnL. Book: positions reconstructed through the displayed UTC close and valued on the newest chain; subsequent trades are not included.</>}
+      <Plate title="Leaderboard" info={<>{TYPE_INFO} Gross options PnL counts expired options: premium received minus premium paid plus settlement value, before fees, across the collected history. Win rate: share of expired instruments with positive gross PnL; it ignores win and loss size. Premium traded: option premium bought and sold, before netting; it sets the size cohort. Book: net dollar delta of reconstructed unexpired options, through the displayed UTC close and valued on the newest chain; long delta gains from a small price rise, short delta from a fall; perp hedges excluded.</>}
         right={<Tabs label="Type" value={kind} onChange={(k) => { setKind(k); setAll(false); }} items={[["all", "All"], ["directional", "Directional"], ["income", "Income"], ["hedger", "Hedger"]]} />}
         bodyClass="table-wrap">
         <table className="grid" style={{ minWidth: 900 }}>
-          <thead><tr><th>Trader</th><th>Type</th><th className="num">Gross options PnL <Info>Premium received minus premium paid plus settlement value on expired options, before fees, across the collected history.</Info></th><th className="num">Win rate <Info>Share of expired option instruments with positive gross PnL. It ignores win/loss size.</Info></th><th className="num">Premium traded <Info>Total option premium bought and sold, before netting. It determines the size cohort.</Info></th>
-            <th>Results</th><th>Size</th><th>Book <Info>Net dollar delta of reconstructed unexpired options, valued at publication. Long delta gains from a small price rise; short delta gains from a fall. Perpetual hedges are excluded.</Info></th><th className="num">Last trade</th></tr></thead>
+          <thead><tr><th>Trader</th><th>Type</th><th className="num">Gross options PnL</th><th className="num">Win rate</th><th className="num">Premium traded</th>
+            <th>Results</th><th>Size</th><th>Book</th><th className="num">Last trade</th></tr></thead>
           <tbody>
             {shown.map((t) => (
               <tr key={t.address} onClick={() => nav(`/trader/${t.address.toLowerCase()}`)} tabIndex={0}

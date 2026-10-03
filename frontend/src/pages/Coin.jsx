@@ -109,7 +109,7 @@ function JourneyStrip({ alignment }) {
           return (
             <div key={h} className={`journey-row${agreed ? " agreed" : ""}`}>
               <span>{HORIZON_LABEL[h]}{agreed ? " · aligned" : ""}</span>
-              <Chain alignment={alignment} horizon={h} />
+              <Chain alignment={alignment} horizon={h} compact />
             </div>);
         })}
       </div>

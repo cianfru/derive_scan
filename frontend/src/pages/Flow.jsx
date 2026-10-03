@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { usd, ago, price } from "../lib/format.js";
-import { Plate, Tabs, Loading, Failed, Info } from "../components/ui.jsx";
+import { Plate, Tabs, Loading, Failed } from "../components/ui.jsx";
 import { FlowCoverage } from "../components/AnalyticalDetails.jsx";
 import FlowSummary from "../components/FlowSummary.jsx";
 import WalletTag from "../components/WalletTag.jsx";
@@ -38,10 +38,10 @@ export default function Flow() {
       <FlowSummary data={data} selected={selected} onSelect={setSelected}/>
       {!data.classes_ready && <p className="status">Wallet classification is still building. Activity is shown without a Smart label.</p>}
       <div style={{ display: "grid", gap: 16 }}>
-        <details className="flow-tape"><summary>Inspect {selected === "all" ? "all markets" : selected} / large-trade tape <span>{matching.length} recorded trades</span></summary><Plate title="Large trades" info="Up to 80 of the largest recorded taker trades across all markets; the market filter applies to that sample. Trades that crossed the spread at $25K or more on perps, $100K notional or $2K premium on options. RFQ marks block trades negotiated off the book."
+        <details className="flow-tape"><summary>Inspect {selected === "all" ? "all markets" : selected} / large-trade tape <span>{matching.length} recorded trades</span></summary><Plate title="Large trades" info={"Up to 80 of the largest recorded taker trades across all markets; the market filter applies to that sample. Trades that crossed the spread at $25K or more on perps, $100K notional or $2K premium on options. RFQ marks block trades negotiated off the book. " + CLASS_INFO}
           right={<Tabs label="Kind" value={kind} onChange={(k) => { setKind(k); setAll(false); }} items={[["option", "Options"], ["perp", "Perps"], ["all", "All"]]} />} bodyClass="table-wrap">
           <table className="grid" style={{ minWidth: 720 }}>
-            <thead><tr><th>Time</th><th>Instrument</th><th>Side</th><th className="num">Notional</th><th className="num">Premium</th><th>Wallet</th><th>Type <Info>{CLASS_INFO}</Info></th></tr></thead>
+            <thead><tr><th>Time</th><th>Instrument</th><th>Side</th><th className="num">Notional</th><th className="num">Premium</th><th>Wallet</th><th>Type</th></tr></thead>
             <tbody>
               {large.map((t, i) => (
                 <tr key={i} style={{ cursor: "default" }}>
@@ -58,9 +58,9 @@ export default function Flow() {
           </table>
           {matching.length > large.length && <button className="btn" style={{ marginTop: 12 }} onClick={() => setAll(true)}>Show all {matching.length}</button>}
         </Plate>
-        </details><details className="flow-tape"><summary>Inspect active wallets <span>Across all markets / 24h</span></summary><Plate title="Most active wallets, 24h" info="Volume and realised profit and loss per wallet from Derive's public trades. Premium is what the wallet paid for options (bought) and received (sold)." bodyClass="table-wrap">
+        </details><details className="flow-tape"><summary>Inspect active wallets <span>Across all markets / 24h</span></summary><Plate title="Most active wallets, 24h" info={"Volume and realised profit and loss per wallet from Derive's public trades. Premium is what the wallet paid for options (bought) and received (sold). " + CLASS_INFO} bodyClass="table-wrap">
           <table className="grid" style={{ minWidth: 640 }}>
-            <thead><tr><th>Wallet</th><th>Type <Info>{CLASS_INFO}</Info></th><th className="num">Perp volume</th><th className="num">Options notional</th><th className="num">Premium net</th><th className="num">Realised PnL</th></tr></thead>
+            <thead><tr><th>Wallet</th><th>Type</th><th className="num">Perp volume</th><th className="num">Options notional</th><th className="num">Premium net</th><th className="num">Realised PnL</th></tr></thead>
             <tbody>
               {data.wallets.map((w) => {
                 const net = w.premium_sold_usd - w.premium_bought_usd;

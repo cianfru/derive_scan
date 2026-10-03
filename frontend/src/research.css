@@ -1,17 +1,4 @@
 /* Torq's machined graphite surfaces; the charting planes are the landing signature. */
-:root {
-  --bg: #111314;
-  --bg-deep: #0b0d0e;
-  --plate: #191c1d;
-  --plate-2: #222627;
-  --plate-3: #2d3233;
-  --seam: #343b3d;
-  --seam-hi: #566064;
-  --fg: #eef0e9;
-  --fg-2: #c7cecb;
-  --muted: #a4afab;
-  --faint: #87948e;
-}
 body {
   isolation: isolate;
 }
@@ -44,16 +31,6 @@ body {
   opacity: 0.14;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8 .12' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' opacity='.6' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-.wrap {
-  max-width: 1500px;
-}
-h1 {
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-h2 {
-  letter-spacing: -0.01em;
-}
 .hdr {
   box-shadow: 0 4px 18px #0002;
 }
@@ -76,15 +53,11 @@ h2 {
   background: linear-gradient(155deg, var(--orange-hi), var(--orange) 65%);
 }
 .plate,
-.market-board,
-.daily-briefing,
 .radar-stage,
 .radar-detail,
 .cohort-workspace,
 .flow-briefing {
-  box-shadow:
-    inset 0 1px 0 #ffffff0b,
-    0 12px 28px #0002;
+  box-shadow: inset 0 1px 0 #ffffff0b;
   background: linear-gradient(
     145deg,
     color-mix(in srgb, var(--plate-2) 30%, var(--plate)),
@@ -104,42 +77,6 @@ h2 {
 }
 .torq-landing {
   overflow-x: clip;
-}
-.torq-hero {
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.35fr);
-  min-height: 750px;
-  padding-block: 65px;
-  gap: 0;
-}
-.torq-hero-copy {
-  z-index: 1;
-}
-.torq-hero h1 {
-  font-size: clamp(50px, 5.3vw, 82px);
-  line-height: 0.98;
-  font-weight: 700;
-  letter-spacing: -0.035em;
-}
-.torq-hero h1 em {
-  font-style: normal;
-  color: var(--fg-2);
-}
-.hero-purpose {
-  font: 500 11px/1.8 var(--font-mono);
-  letter-spacing: 0.04em;
-  margin-bottom: 25px;
-}
-.hero-description {
-  font-size: 17px;
-  line-height: 1.6;
-  margin: 24px 0 0;
-}
-.torq-hero .hero-cta {
-  gap: 24px;
-}
-.research-object {
-  width: 120%;
-  margin-left: -10%;
 }
 .wave-stage {
   aspect-ratio: 620 / 460;
@@ -313,33 +250,6 @@ h2 {
   line-height: 1.7;
   margin-block: 20px;
 }
-.research-promise {
-  padding-block: 75px 90px;
-  margin-top: 20px;
-  border-top: 1px solid var(--seam);
-  gap: 100px;
-}
-.brand-signature {
-  display: grid;
-  gap: 28px;
-  justify-items: start;
-}
-.brand-signature img {
-  max-width: 90%;
-  height: auto !important;
-  width: 360px !important;
-}
-.brand-signature span {
-  font: 400 9px var(--font-mono);
-  letter-spacing: 0.08em;
-  color: var(--faint);
-}
-.research-promise h2 {
-  font-size: clamp(30px, 3.2vw, 48px);
-}
-.research-promise p {
-  font-size: 16px;
-}
 /* The engine's own evidence, with sources behind each information control. */
 .engine-pair {
   display: grid;
@@ -454,65 +364,6 @@ h2 {
   width: 12px;
   height: 12px;
   font-size: 8px;
-}
-.market-grid .engine-pair {
-  min-width: 228px;
-}
-.market-grid .convergence {
-  min-width: 178px;
-}
-.market-grid .convergence p {
-  white-space: normal;
-  max-width: 160px;
-}
-.market-grid .engine-pair .info {
-  width: 12px;
-  height: 12px;
-  font-size: 8px;
-}
-.signal-distribution {
-  display: flex;
-  align-items: center;
-  background: var(--plate);
-  border: 1px solid var(--seam);
-  padding-right: 14px;
-}
-.signal-distribution > button:not(.info) {
-  flex: 1;
-  display: flex;
-  position: relative;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 18px;
-  border: 0;
-  border-right: 1px solid var(--seam);
-  background: transparent;
-}
-.signal-distribution > button:not(.info)[aria-pressed="true"] {
-  background: var(--plate-3);
-  color: var(--orange);
-}
-.signal-distribution > button:not(.info):disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-.signal-distribution span {
-  font: 500 12px var(--font-display);
-}
-.signal-distribution b {
-  font: 500 19px var(--font-mono);
-}
-.signal-distribution i {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  height: 2px;
-  background: var(--orange);
-  max-width: 100%;
-}
-.signal-distribution > .info {
-  margin-left: 14px;
 }
 .engine-evidence-workspace {
   display: grid;
@@ -1065,12 +916,6 @@ h2 {
   .wrap {
     padding-inline: 28px;
   }
-  .torq-hero {
-    min-height: 650px;
-  }
-  .torq-hero h1 {
-    font-size: 65px;
-  }
   .research-example {
     padding-inline: 18px;
   }
@@ -1083,13 +928,7 @@ h2 {
   .condition-tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .signal-distribution > button:not(.info) {
-    padding-inline: 12px;
-  }
-  .signal-distribution span {
-    font-size: 11px;
-  }
-  .engine-evidence-workspace {
+      .engine-evidence-workspace {
     grid-template-columns: 1fr 1fr;
   }
   .options-dashboard {
@@ -1116,23 +955,6 @@ h2 {
   }
 }
 @media (max-width: 900px) {
-  .torq-hero {
-    grid-template-columns: 1fr 1.1fr;
-    min-height: 610px;
-  }
-  .torq-hero h1 {
-    font-size: 54px;
-  }
-  .hero-purpose {
-    font-size: 10px;
-  }
-  .hero-description {
-    font-size: 15px;
-  }
-  .research-object {
-    max-width: none;
-    margin-top: 0;
-  }
   .hero-cta {
     gap: 18px;
   }
@@ -1171,12 +993,6 @@ h2 {
   .research-example > .status {
     margin-top: 0;
   }
-  .research-promise {
-    gap: 50px;
-  }
-  .brand-signature span {
-    font-size: 8px;
-  }
   .options-dossiers {
     grid-template-columns: 1fr;
   }
@@ -1199,44 +1015,13 @@ h2 {
     border: 0;
     padding: 0;
   }
-  .signal-distribution {
-    flex-wrap: wrap;
-    padding-right: 0;
-  }
-  .signal-distribution > button:not(.info) {
-    flex-basis: 30%;
-    border-bottom: 1px solid var(--seam);
-  }
-  .signal-distribution > .info {
-    margin: 10px;
-  }
-  .research-example .move-reading {
+        .research-example .move-reading {
     margin-top: 10px;
   }
 }
 @media (max-width: 600px) {
   .wrap {
     padding-inline: 20px;
-  }
-  .torq-hero {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    padding-block: 42px 15px;
-    overflow: hidden;
-  }
-  .torq-hero h1 {
-    font-size: clamp(48px, 12vw, 70px);
-  }
-  .hero-purpose {
-    font-size: 10px;
-  }
-  .hero-description {
-    margin-top: 22px;
-  }
-  .research-object {
-    width: 116%;
-    margin: -2px -8% -15px;
   }
   .bitcoin-examples {
     padding-block: 22px 30px;
@@ -1269,17 +1054,6 @@ h2 {
   }
   .wallet-balance {
     margin-block: 24px;
-  }
-  .brand-signature img {
-    width: 270px !important;
-  }
-  .research-promise {
-    grid-template-columns: 1fr;
-    gap: 45px;
-    padding-block: 50px 60px;
-  }
-  .research-promise h2 {
-    font-size: 35px;
   }
   .options-reading-guide {
     gap: 18px;
@@ -1432,16 +1206,7 @@ h2 {
   .move-labels {
     font-size: 10px;
   }
-  .signal-distribution > button:not(.info) {
-    padding: 11px 10px;
-  }
-  .signal-distribution span {
-    font-size: 10px;
-  }
-  .signal-distribution b {
-    font-size: 16px;
-  }
-}
+      }
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -1470,13 +1235,6 @@ h2 {
 }
 .recorded-engine-facts b {
   font: 500 19px var(--font-display);
-}
-.signal-distribution > .info {
-  flex: none;
-  padding: 0;
-  width: 16px;
-  height: 16px;
-  border: 1px solid var(--faint);
 }
 @media (min-width: 601px) {
   .expiry-rail {

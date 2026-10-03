@@ -20,7 +20,7 @@ export function ThreeReadings({ alignment, horizon = "30d" }) {
 export function MarketTrace({ values, times, label = "Price history", large = false }) {
   const [active, setActive] = useState(null);
   const [figure, width] = useElementWidth(620);
-  const W = large ? Math.max(280, Math.min(620, width)) : 136, H = large ? (W < 400 ? 190 : 230) : 38;
+  const W = large ? Math.max(280, Math.min(620, width)) : 88, H = large ? (W < 400 ? 190 : 230) : 28;
   const g = traceGeometry(values, large ? W - 66 : W, large ? H - 24 : H, large ? 10 : 3);
   if (!g) return <span className="status">History unavailable</span>;
   const at = Number.isInteger(active) && Number.isFinite(values[active]) ? active : g.last;

@@ -151,9 +151,7 @@ export default function CohortExplorer({ cohorts, through, valuedAt }) {
                   <thead>
                     <tr>
                       <th>Market</th>
-                      <th>
-                        Delta balance <Info>{COHORT_HELP}</Info>
-                      </th>
+                      <th>Delta balance</th>
                       <th className="num">Net delta</th>
                       <th className="num">Gross delta</th>
                     </tr>

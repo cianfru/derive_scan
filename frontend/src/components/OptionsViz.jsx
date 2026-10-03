@@ -46,8 +46,8 @@ function OIWallChart({ rows, index, height = 360, allStrikes = false, width = 64
       <text x={mid + 8} y={10}>Calls</text>
       {list.map((r, i) => (
         <g key={i}>
-          <rect x={mid - 2 - (r[2] / max) * half} y={ys[i] + 1} width={(r[2] / max) * half} height={rowH - 2} fill="var(--sig-exit)" opacity=".75"><title>{price(r[0])} strike: {r[2].toLocaleString()} put contracts</title></rect>
-          <rect x={mid + 2} y={ys[i] + 1} width={(r[1] / max) * half} height={rowH - 2} fill="var(--orange)" opacity=".9"><title>{price(r[0])} strike: {r[1].toLocaleString()} call contracts</title></rect>
+          <rect x={mid - 2 - (r[2] / max) * half} y={ys[i] + 1} width={(r[2] / max) * half} height={rowH - 2} fill="var(--put)"><title>{price(r[0])} strike: {r[2].toLocaleString()} put contracts</title></rect>
+          <rect x={mid + 2} y={ys[i] + 1} width={(r[1] / max) * half} height={rowH - 2} fill="var(--call)"><title>{price(r[0])} strike: {r[1].toLocaleString()} call contracts</title></rect>
           {(list.length <= 18 || i % Math.ceil(list.length / 16) === 0) &&
             <text x={W - 4} y={ys[i] + rowH - 3} textAnchor="end">{price(r[0])}</text>}
         </g>))}
@@ -82,7 +82,7 @@ function SmileChart({ rows, index, height = 200, width = 640 }) {
       {ticks.map((t, i) => <g key={i}><line className="gridline" x1={L} x2={W - R} y1={Y(t)} y2={Y(t)} /><text x={L - 6} y={Y(t) + 3} textAnchor="end">{pct(t, 0)}</text></g>)}
       <line x1={X(index)} x2={X(index)} y1={T} y2={H - B} stroke="var(--fg)" strokeDasharray="4 3" />
       <path d={d} fill="none" stroke="var(--orange)" strokeWidth="2" />
-      {pts.map((p, i) => <circle key={i} cx={X(p[0])} cy={Y(p[1])} r="2.5" fill="var(--bg)" stroke={p[0] < index ? "var(--sig-exit)" : "var(--orange)"} strokeWidth="1.5"><title>{price(p[0])}: {pct(p[1])}</title></circle>)}
+      {pts.map((p, i) => <circle key={i} cx={X(p[0])} cy={Y(p[1])} r="2.5" fill="var(--bg)" stroke={p[0] < index ? "var(--put)" : "var(--call)"} strokeWidth="1.5"><title>{price(p[0])}: {pct(p[1])}</title></circle>)}
       <text x={L} y={H - 6}>{price(x0)}</text><text x={W - R} y={H - 6} textAnchor="end">{price(x1)}</text>
       <text x={X(index)} y={H - 6} textAnchor="middle" style={{ fill: "var(--fg)" }}>{price(index)}</text>
     </svg>

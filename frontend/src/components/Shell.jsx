@@ -1,4 +1,4 @@
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { NavLink, Link, Outlet, useLocation } from "react-router-dom";
 import { Loading } from "./ui.jsx";
 import ErrorBoundary from "./ErrorBoundary.jsx";
@@ -39,16 +39,27 @@ export function Logo({ theme, height = 24 }) {
 export default function Shell() {
   const [theme, toggle] = useTheme();
   const { pathname, hash } = useLocation();
+  const header = useRef(null);
   useEffect(() => {
     if (!hash) window.scrollTo(0, 0);
   }, [pathname, hash]);
+  // Sticky elements sit under the header: its height is published as --header-h.
+  useEffect(() => {
+    const el = header.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const set = () => document.documentElement.style.setProperty("--header-h", `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
     <>
       <div className="industrial-ground" aria-hidden="true" />
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <header className="hdr">
+      <header className="hdr" ref={header}>
         <div className="wrap">
           <Link to="/" className="logo" aria-label="Torq home">
             <Logo theme={theme} />

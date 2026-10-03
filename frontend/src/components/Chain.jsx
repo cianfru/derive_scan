@@ -36,18 +36,18 @@ export function ChainMini({ alignment, horizon = "30d" }) {
       {r.map((x, i) => (
         <span key={x.kind} className="chain-mini-cell">
           {i > 0 && <i className="chain-link" />}
-          <b className={`chain-sq ${x.state || "unknown"}`} title={`${x.name}: ${x.text}`}><LayerIcon kind={x.kind} size={12} /></b>
+          <b className={`chain-sq ${x.state || "unknown"}`} title={`${x.name}: ${x.text}`}><LayerIcon kind={x.kind} size={15} /></b>
         </span>))}
     </span>
   );
 }
 
 /** Full: the three layers with their reading in words; each links to its section on the coin page. */
-export default function Chain({ alignment, horizon = "30d", linked = true }) {
+export default function Chain({ alignment, horizon = "30d", linked = true, compact = false }) {
   const r = chainReadings(alignment, horizon);
   const agreed = agreedOf(r);
   return (
-    <div className={`chain${agreed ? ` agreed ${agreed}` : ""}`}>
+    <div className={`chain${compact ? " compact" : ""}${agreed ? ` agreed ${agreed}` : ""}`}>
       {r.map((x, i) => {
         const Tag = linked ? "a" : "div";
         return (
