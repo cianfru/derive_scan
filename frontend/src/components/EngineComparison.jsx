@@ -1,6 +1,4 @@
-import { useState } from "react";
-import { Conditions } from "./AnalyticalDetails.jsx";
-import { Info, Signal, Tabs } from "./ui.jsx";
+import { Info, Signal } from "./ui.jsx";
 import { REGIME, title, utc } from "../lib/format.js";
 import { REGIME_HELP } from "../lib/explain.js";
 import { currentEngine, comparisonView } from "../lib/research.js";
@@ -104,24 +102,3 @@ export default function EngineComparison({ comparison }) {
   );
 }
 
-export function EngineEvidence({ latest }) {
-  const [tf, setTf] = useState("1d");
-  return (
-    <section className="condition-scorecard">
-      <div className="evidence-heading">
-        <span className="section-code">SETUP EVIDENCE</span>
-        <h2>What supports the reading?</h2>
-        <Tabs
-          label="Evidence timeframe"
-          value={tf}
-          onChange={setTf}
-          items={[
-            ["1d", "Daily"],
-            ["4h", "4 hours"],
-          ]}
-        />
-      </div>
-      <Conditions row={latest?.[tf]} expanded />
-    </section>
-  );
-}

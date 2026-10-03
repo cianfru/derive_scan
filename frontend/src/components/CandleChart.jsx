@@ -5,7 +5,14 @@ import { cssVar, price, strike, SIGNAL_LABEL, signalTone } from "../lib/format.j
 import { conePath } from "../lib/analytics.js";
 
 const TF_SEC = { "4h": 14400, "1d": 86400 };
+// The ribbon's fastest (32) and slowest (58) averages, 2px and 1px.
 const RIBBON = [32, 58];
+// Ribbon state per published candle (backend trail): g gold, b blue, n grey, - warm-up.
+const RIBBON_VAR = { g: "--ribbon-gold", b: "--ribbon-blue", n: "--ribbon-grey" };
+// Wall and max-pain tags: slot height, the pitch kept between tags, the clearance from a range-edge axis label,
+// and the horizontal room under which a tag counts as beside that label (its title box: about 6.6px a character plus padding).
+const TAG_H = 15, TAG_PITCH = 16, EDGE_CLEAR = 18, EDGE_ROOM = 24;
+const titleWidth = (text) => text.length * 6.6 + 12;
 
 function ema(values, n) {
   const out = new Array(values.length).fill(null);
@@ -27,11 +34,28 @@ function precisionFor(v) {
 
 const pctFrom = (v, base) => `${v >= base ? "+" : ""}${((v / base - 1) * 100).toFixed(1)}%`;
 
-/** Candles with volume, the ribbon (fast and slow EMAs), a marker wherever the signal changed and,
+/** Place wall and max-pain tags: each sits just above its line (or just below when that is taken),
+ * at least TAG_PITCH from another tag and EDGE_CLEAR from a range-edge axis label; a tag with no
+ * free slot is hidden (its value stays in the chart's (i)). Returns [{...item, top}] with top null when hidden. */
+export function stackTags(items, edges, height) {
+  const placed = [];
+  const free = (top) => top >= 2 && top + TAG_H <= height
+    && placed.every((p) => Math.abs(p - top) >= TAG_PITCH)
+    && edges.every((y) => Math.abs(top + TAG_H / 2 - y) >= EDGE_CLEAR);
+  return [...items].sort((a, b) => a.y - b.y).map((it) => {
+    const top = [it.y - TAG_H, it.y + 2].find(free);
+    if (top == null) return { ...it, top: null };
+    placed.push(top);
+    return { ...it, top };
+  });
+}
+
+/** Candles with volume, the ribbon (its 32- and 58-day averages, each day coloured by the published
+ * ribbon trail, `ribbon`: one character per candle), a marker wherever the signal changed and,
  * when options exist: the middle half of the outcomes option prices imply for each upcoming
  * expiry (upper edge in the up colour, lower edge in the down colour, so any lean shows), and
- * the levels where open interest sits (call and put walls, max pain). */
-export default function CandleChart({ candles, signals, tf, theme, implied = null, levels = null, optionsAt = null, optionsIndex = null, coneDays = 30 }) {
+ * the levels where open interest sits (call and put walls, max pain), tagged at the cone's apex. */
+export default function CandleChart({ candles, signals, tf, theme, implied = null, levels = null, optionsAt = null, optionsIndex = null, coneDays = 30, ribbon = null }) {
   const box = useRef(null);
   const tags = useRef(null);
   useEffect(() => {
@@ -64,11 +88,14 @@ export default function CandleChart({ candles, signals, tf, theme, implied = nul
     vol.priceScale().applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
     vol.setData(candles.map(([t, o, , , cl, v]) => ({ time: t, value: v, color: (cl >= o ? up : down) + "55" })));
     const closes = candles.map((k) => k[4]);
+    // Colours come only from the published trail; days without a state use the neutral line colour.
+    const tint = Object.fromEntries(["none", ...Object.keys(RIBBON_VAR)].map((k) => [k, c(RIBBON_VAR[k] || "--ribbon-none")]));
     RIBBON.forEach((n, j) => {
       const e = ema(closes, n);
-      const s = chart.addSeries(LineSeries, { color: j ? c("--faint") : c("--orange"), lineWidth: j ? 1 : 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
-      s.setData(candles.map((k, i) => (e[i] == null ? null : { time: k[0], value: e[i] })).filter(Boolean));
+      const s = chart.addSeries(LineSeries, { color: tint.none, lineWidth: j ? 1 : 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false });
+      s.setData(candles.map((k, i) => (e[i] == null ? null : { time: k[0], value: e[i], color: tint[ribbon?.[i]] || tint.none })).filter(Boolean));
     });
+    const edges = [];
     if (cone.length) {
       // Both edges remain visible even if the whole band lies above or below the index.
       [[3, up], [1, down]].forEach(([qi, color]) => {
@@ -76,7 +103,9 @@ export default function CandleChart({ candles, signals, tf, theme, implied = nul
           crosshairMarkerVisible: false, lastValueVisible: true });
         const points = rangePath(qi);
         s.setData(points);
-        s.applyOptions({ title: pctFrom(points[points.length - 1].value, optionsIndex) });
+        const title = pctFrom(points[points.length - 1].value, optionsIndex);
+        s.applyOptions({ title });
+        edges.push({ series: s, value: points[points.length - 1].value, left: (pane) => pane - titleWidth(title) });
       });
       const mid = chart.addSeries(LineSeries, { color: c("--fg"), lineWidth: 1, lineStyle: LineStyle.Dashed, lastValueVisible: false,
         priceLineVisible: false, crosshairMarkerVisible: false });
@@ -91,16 +120,26 @@ export default function CandleChart({ candles, signals, tf, theme, implied = nul
         lines.push({ value: levels[k], text: `${label} ${strike(levels[k], "")}`, color });
       });
     }
+    // Tags end 8px left of the cone's apex (the option snapshot), or of the last candle without a cone,
+    // so they never sit under the range-edge labels at the price scale.
+    const anchorTime = cone.length ? optionsAt : lastT;
     const placeTags = () => {
       const host = tags.current;
-      if (!host) return;
-      const right = chart.priceScale("right").width() + 8;
+      if (!host || !box.current) return;
+      const width = box.current.clientWidth, height = box.current.clientHeight - 30;
+      const pane = chart.timeScale().width();
+      const ax = chart.timeScale().timeToCoordinate(anchorTime);
+      const anchor = Math.max(120, Math.min(pane - 8, ax == null ? pane - 8 : ax - 8));
+      // The range-edge labels sit at the price scale: they only constrain tags that end close to them.
+      const ys = edges.filter((e) => anchor > e.left(pane) - EDGE_ROOM).map((e) => e.series.priceToCoordinate(e.value)).filter((y) => y != null);
+      const items = lines.map((l) => ({ ...l, y: candle.priceToCoordinate(l.value) })).filter((l) => l.y != null && l.y >= 4 && l.y <= height);
+      const spots = new Map(stackTags(items, ys, height).map((t) => [t.text, t.top]));
       host.replaceChildren(...lines.map((l) => {
-        const y = candle.priceToCoordinate(l.value);
+        const top = spots.get(l.text);
         const tag = document.createElement("span");
         tag.textContent = l.text;
-        tag.style.cssText = `right:${right}px;top:${y == null ? -99 : y - 15}px;color:${l.color}`;
-        tag.hidden = y == null || y < 4 || y > box.current.clientHeight - 30;
+        tag.style.cssText = `right:${width - anchor}px;top:${top == null ? -99 : top}px;color:${l.color}`;
+        tag.hidden = top == null;
         return tag;
       }));
     };
@@ -127,6 +166,6 @@ export default function CandleChart({ candles, signals, tf, theme, implied = nul
     ro?.observe(box.current);
     schedule();
     return () => { cancelAnimationFrame(frame); ro?.disconnect(); chart.timeScale().unsubscribeVisibleLogicalRangeChange(schedule); chart.remove(); };
-  }, [candles, signals, tf, theme, implied, levels, optionsAt, optionsIndex, coneDays]);
+  }, [candles, signals, tf, theme, implied, levels, optionsAt, optionsIndex, coneDays, ribbon]);
   return <div className="chart-frame"><div ref={box} className="chart-box" /><div ref={tags} className="chart-tags" aria-hidden="true" /></div>;
 }

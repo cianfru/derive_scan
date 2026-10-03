@@ -4,6 +4,7 @@ import { REGIME, SIGNAL_LABEL, title, utc, usd } from "../lib/format.js";
 import { useElementWidth } from "../lib/useElementWidth.js";
 import { coverageReady } from "./HistoryStatus.jsx";
 import { historyGeometry, historySource, historyWindow, metricValue, nearestObservation, orderedHistory } from "../lib/history.js";
+import { REGIME_COLORS } from "../lib/regime.js";
 import "../history.css";
 
 const percent = value => `${(value * 100).toFixed(2)}%`;
@@ -19,7 +20,6 @@ const METRICS = {
   ],
 };
 const SOURCE_NAMES = { recorded: "Recorded", reconstructed: "Price reconstruction" };
-const REGIME_COLORS = { MARKUP: "var(--up)", REACC: "#819b77", ACCUM: "#c4b17b", MARKDOWN: "var(--down)", CAP: "var(--down)", BLOWOFF: "var(--orange)", FLAT: "var(--muted)" };
 const stamp = ts => Number.isFinite(ts) ? utc(ts) : "Observation time unavailable";
 const dayLabel = ts => new Date(ts * 1000).toISOString().slice(0, 10);
 
@@ -68,7 +68,7 @@ export function HistoryChart({ rows, metric, cadence, scope }) {
         {[geometry.high, (geometry.high + geometry.low) / 2, geometry.low].map((tick, i) => <g key={i}><line className="history-grid" x1={geometry.left} x2={width - geometry.right} y1={geometry.y(tick)} y2={geometry.y(tick)} /><text x={geometry.left - 9} y={geometry.y(tick) + 4} textAnchor="end">{(metric.axis || metric.format)(tick)}</text></g>)}
         {metric.zero && <line className="history-zero" x1={geometry.left} x2={width - geometry.right} y1={geometry.y(0)} y2={geometry.y(0)} />}
         {Object.entries(geometry.paths).map(([kind, path]) => <path key={kind} className={`history-line ${kind === "reconstructed" ? "reconstructed" : "recorded"}`} d={path.trim()} />)}
-        {geometry.isolated.map(row => <circle key={row.ts} cx={geometry.x(row.ts)} cy={geometry.y(row[metric.key])} r="3" fill={historySource(row) === "reconstructed" ? "var(--muted)" : "var(--orange)"} />)}
+        {geometry.isolated.map(row => <circle key={row.ts} cx={geometry.x(row.ts)} cy={geometry.y(row[metric.key])} r="3" fill={historySource(row) === "reconstructed" ? "var(--muted)" : "var(--fg)"} />)}
         {selected && <line className="history-crosshair" x1={geometry.x(selected.ts)} x2={geometry.x(selected.ts)} y1={geometry.top} y2={height - geometry.bottom} />}
         {value !== null && <circle cx={geometry.x(selected.ts)} cy={geometry.y(value)} r="4" className="history-selected" />}
         <text x={geometry.left} y={height - 8}>{dayLabel(geometry.from)}</text>
@@ -76,7 +76,7 @@ export function HistoryChart({ rows, metric, cadence, scope }) {
       </svg>
     </> : <div className="history-empty" role="status">{rows.length ? `No ${metric.label.toLowerCase()} observations in this window.` : "No observations in this window."}</div>}
     <div className="history-context">
-      {scope === "engine" && selected && <span>{REGIME[selected.regime] || "Regime unavailable"} · {selected.source === "reconstructed" ? "No recorded decision" : SIGNAL_LABEL[selected.signal] || "Decision unavailable"}{selected.ribbon ? ` · Ribbon ${typeof selected.ribbon === "string" ? selected.ribbon : selected.ribbon.state || "unavailable"}` : ""}</span>}
+      {scope === "engine" && selected && <span>{selected.regime && <i className="regime-chip" style={{ "--rc": REGIME_COLORS[selected.regime] || "var(--faint)" }} aria-hidden="true" />}{REGIME[selected.regime] || "Regime unavailable"} · {selected.source === "reconstructed" ? "No recorded decision" : SIGNAL_LABEL[selected.signal] || "Decision unavailable"}{selected.ribbon ? ` · Ribbon ${typeof selected.ribbon === "string" ? selected.ribbon : selected.ribbon.state || "unavailable"}` : ""}</span>}
       {selected?.daily && <span>{selected.day_samples} / {selected.day_expected} snapshots in this UTC day</span>}
     </div>
   </div>;

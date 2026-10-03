@@ -25,6 +25,7 @@
 .history-crosshair { stroke: var(--faint); stroke-dasharray: 3 4; pointer-events: none; }
 .history-selected { fill: var(--plate); stroke: var(--orange); stroke-width: 2; pointer-events: none; }
 .history-context { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 8px; color: var(--muted); font-size: var(--t-label); }
+.history-context .regime-chip { display: inline-block; width: 8px; height: 8px; margin-right: 6px; background: var(--rc); clip-path: polygon(2px 0, 100% 0, 100% calc(100% - 2px), calc(100% - 2px) 100%, 0 100%, 0 2px); }
 .history-regime-strip { display: block; width: 100%; height: 12px; margin-top: 8px; }
 .history-empty { min-height: 160px; display: grid; align-content: center; color: var(--muted); font-size: var(--t-cell); }
 .history-coverage { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 15px 28px 18px; border-top: 1px solid var(--seam); color: var(--muted); font-size: 11px; }
