@@ -220,7 +220,7 @@ svg.viz { width: 100%; height: auto; display: block; overflow: visible; }svg.viz
 
 
 
-.foot { border-top: 1px solid var(--seam); padding-block: 30px; color: var(--muted); font-size: 11px; }.foot .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 22px; align-items: center; }.foot img { opacity: .75; }.foot a:hover { color: var(--orange); }
+.foot { border-top: 1px solid var(--seam); padding-block: 30px; color: var(--muted); font-size: 11px; }.foot .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 22px; align-items: center; }.foot img { opacity: .75; }.foot-note { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; }.foot a:hover { color: var(--orange); }
 .spin { width: 18px; height: 18px; border: 2px solid var(--seam-hi); border-top-color: var(--orange); border-radius: 50%; animation: spin .8s linear infinite; }@keyframes spin { to { transform: rotate(360deg); } }.loading { display: grid; place-items: center; min-height: 260px; }.error { padding: 28px; color: var(--down); font-size: 13px; border: 1px solid var(--seam); border-radius: 2px; }
 @media (max-width: 1050px) {
   .hero { gap: 36px; }.market-preview { padding-inline: 22px; }.preview-link { margin-inline: -22px; padding-inline: 22px; }.preview-top .status { display: none; }.hero h1 { font-size: 49px; }.three-readings { gap: 10px; }.three-readings .label { font-size: 11px; }.three-readings .reading-value { font-size: 12px; }

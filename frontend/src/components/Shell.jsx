@@ -121,8 +121,9 @@ export default function Shell() {
       <footer className="foot">
         <div className="wrap">
           <Logo theme={theme} height={18} />
-          <span>
-            Independent analytics for Derive. Snapshots every 15 minutes.
+          <span className="foot-note">
+            <span>Independent analytics for Derive. Snapshots every 15 minutes.</span>
+            <span>Market data and positioning for research. Not investment advice.</span>
           </span>
           <a href="https://www.derive.xyz/" target="_blank" rel="noreferrer">
             Visit Derive ↗

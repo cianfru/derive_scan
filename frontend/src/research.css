@@ -1,14 +1,21 @@
 /* Torq's machined graphite surfaces; the charting planes are the landing signature. */
 body {
   isolation: isolate;
+  position: relative;
 }
+/* The plate covers the whole document, so its pattern runs to the footer on every page and in both
+   themes. The first screen is lit from the top; below it, a steady veil of the deep ground. */
 .industrial-ground {
-  position: fixed;
+  --veil: color-mix(in srgb, var(--bg-deep) 62%, transparent);
+  position: absolute;
   inset: 0;
   z-index: -1;
+  overflow: hidden;
   pointer-events: none;
   background:
-    radial-gradient(ellipse at 65% 0%, transparent 10%, var(--bg-deep) 100%),
+    radial-gradient(ellipse 92% 100vh at 65% 0%, transparent 10%, var(--veil) 100%)
+      0 0 / 100% 100vh no-repeat,
+    linear-gradient(var(--veil), var(--veil)) 0 100vh / 100% 100% no-repeat,
     radial-gradient(circle at 9px 9px, var(--seam-hi) 1px, transparent 2px) 0
       0 / 192px 160px,
     linear-gradient(
