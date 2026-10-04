@@ -8,9 +8,11 @@ import {
   ANSWER, cents, closeTicket, countdown, dayLabel, findLevel, fullPay, money, noPriceReason, parseId, priceAge, questionText, signed,
 } from "../lib/questions.js";
 import {
-  closePosition, exportPositions, importPositions, loadPositions, partial, positionFigures, positionStatus, prune, removePosition,
+  closePosition, exportPositions, importPositions, loadPositions, partial, persistent, positionFigures, positionStatus, prune, removePosition,
 } from "../lib/positions.js";
+import { compareReadings, hasJournal } from "../lib/journal.js";
 import "../questions.css";
+import "../journal.css";
 
 const usd = (v) => money(v, { cents: true });
 
@@ -31,9 +33,107 @@ function Fig({ label, info, sub, value, missing, className = "" }) {
   );
 }
 
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "3 Oct 14:05 UTC". */
+function when(ts) {
+  if (!Number.isFinite(ts)) return null;
+  const d = new Date(ts * 1000);
+  return `${d.getUTCDate()} ${MON[d.getUTCMonth()]} ${d.toISOString().slice(11, 16)} UTC`;
+}
+
+const You = () => <small className="q-you">Entered by you</small>;
+
+function Cell({ c, label }) {
+  if (!c.show) return <Missing text={c.text} label={label} why={c.why} />;
+  return <span className="q-since-v"><b className={c.state || ""}>{c.text}</b><small className="mono">{when(c.ts) || "time unknown"}</small></span>;
+}
+
+/** Since you entered: the three readings saved at entry beside the latest ones, each with its own
+ * time. Saved-later, missing and differently calculated readings say so; no direction is picked. */
+function SinceStrip({ p, markets, now }) {
+  const rows = compareReadings(p, markets, now);
+  const ctx = p.journal?.context;
+  const status = !ctx ? "Saved before entry records" : ctx.status === "at_fill" ? "Saved at your fill" : "Saved later";
+  const why = !ctx ? "This position was saved before Cowboy kept the readings at entry. They stay unknown; the latest readings show for reference."
+    : `Filled ${ctx.fill_ts ? `${when(ctx.fill_ts)} (entered by you)` : "at a time not entered"}. Saved ${when(ctx.snapshot_ts)}. Readings published ${when(ctx.published_at) || "at an unknown time"}. ${ctx.status === "at_fill"
+      ? "Every reading here was published at or before your fill; each shows its own time and can be older than the fill."
+      : "A reading counts as entry context only when it was published at or before your fill. The others are kept as later context and are not shown as what you had at the fill."}`;
+  return (
+    <section className="q-since" aria-label="Since you entered">
+      <div className="q-since-head">
+        <h3>Since you entered</h3>
+        <span className="q-since-status">{status}<Info label="About these readings">{why}</Info></span>
+      </div>
+      <table className="q-since-t">
+        <thead><tr><th scope="col"><span className="sr-only">Reading</span></th><th scope="col">At entry</th><th scope="col">Latest</th></tr></thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.kind}>
+              <th scope="row">{r.name}</th>
+              <td><Cell c={r.entry} label={`${r.name} at entry`} /></td>
+              <td><Cell c={r.latest} label={`${r.name} latest`} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+/** The entry record: the package as placed, what filled and what it cost, as entered by the user,
+ * apart from the board's estimate and Derive's mark. Older entries show their unknowns. */
+function EntryRecord({ p }) {
+  const j = p.journal;
+  if (!hasJournal(p)) {
+    return (
+      <details className="q-entry">
+        <summary>Entry record</summary>
+        <p className="q-note">Saved before Cowboy kept entry records: the fill time, fees, Derive's mark and the readings at entry are unknown.</p>
+        <dl className="q-figs">
+          <div><dt>Paid, fees included<You /></dt><dd className="mono">{usd(p.paid)}</dd></div>
+          <div><dt>Options</dt><dd className="mono">{p.legs?.length ? p.legs.join(", ") : "Not recorded"}</dd></div>
+          <div><dt>Saved</dt><dd className="mono">{when(p.at) || "Not recorded"}</dd></div>
+        </dl>
+      </details>
+    );
+  }
+  const f = j.fill || {};
+  const c = j.cost || {};
+  const m = j.mark;
+  const e = j.board_estimate;
+  const nr = <span className="q-noprice">Not entered</span>;
+  return (
+    <details className="q-entry">
+      <summary>Entry record</summary>
+      <dl className="q-figs">
+        <div><dt>Filled<You /></dt><dd className="mono">{when(f.ts) || nr}</dd></div>
+        <div><dt>Saved by Cowboy</dt><dd className="mono">{when(j.saved_ts)}</dd></div>
+        <div><dt>Where</dt><dd>{j.venue} · {j.network}</dd></div>
+        <div className="q-entry-legs"><dt>Package<small>{j.package?.direction} · {j.package?.zone}</small></dt>
+          <dd><ul>{(f.legs || []).map((l) => (
+            <li key={l.name} className="mono">{l.signed_qty > 0 ? "+" : l.signed_qty < 0 ? "-" : ""}{Math.abs(l.signed_qty ?? 0)} {l.name}
+              {l.qty < l.planned ? <small> of {l.planned}</small> : null}{l.price != null ? <small> at {usd(l.price)}</small> : null}</li>))}</ul></dd></div>
+        <div><dt>Filled amounts<You /></dt><dd>{f.complete ? "Whole package" : <span className="warn-text">Not fully filled</span>}</dd></div>
+        <div><dt>Premium, before fees<You />{f.limitation === "package_total" && <small>one total; leg prices not entered</small>}</dt><dd className="mono">{usd(c.premium)}</dd></div>
+        <div><dt>Derive's fees{c.fees_basis === "entered" ? <You /> : <small>{c.fees_basis === "estimated" ? "not entered · estimated" : "not entered"}</small>}</dt>
+          <dd className="mono">{c.fees != null ? usd(c.fees) : nr}</dd></div>
+        <div className="q-lose"><dt>Total cost{c.fees_basis !== "entered" && <small>{c.fees_basis === "estimated" ? "with estimated fees" : "before fees"}</small>}</dt>
+          <dd className="mono">{usd(c.total ?? c.premium)} {f.currency && <small>{f.currency}</small>}</dd></div>
+        <div><dt>Breakeven at settlement{c.breakeven_basis !== "exact" && c.breakeven != null && <small>estimated</small>}</dt>
+          <dd className="mono">{c.breakeven != null ? money(c.breakeven) : <Missing text="Not available yet" label="Why no breakeven"
+            why={f.complete ? "The cost is at or above the most the answer pays, so it has no breakeven." : "The package did not fully fill, so the answer has no breakeven."} />}</dd></div>
+        {e && <div><dt>Board estimate<small>from the Saloon's screen, not a fill</small></dt><dd className="mono">{usd(e.total)}{e.ts ? <small> · {when(e.ts)}</small> : null}</dd></div>}
+        <div><dt>Derive's mark<Info label="About the mark">Derive's mark for the package from Cowboy's board: a valuation benchmark, separate from your fill prices and from the sell-back price.{m?.timing === "later" ? " Taken after your fill, or with no fill time entered." : ""}</Info></dt>
+          <dd className="mono">{m ? <>{usd(m.value)}{m.ts ? <small> · {when(m.ts)}</small> : null}</> : <span className="q-noprice">Not available yet</span>}</dd></div>
+      </dl>
+    </details>
+  );
+}
+
 function Card({ p, onRemove, onClose }) {
   const q = parseId(p.id);
   const { data: board } = useData(q ? `questions/${q.und}.json` : null);
+  const { data: markets } = useData("markets.json");
   const found = board ? findLevel(board, p.id) : null;
   const now = Date.now() / 1000;
   const settleTs = p.settle_ts || (q ? Date.UTC(+q.expiry.slice(0, 4), +q.expiry.slice(4, 6) - 1, +q.expiry.slice(6, 8), 8) / 1000 : 0);
@@ -73,7 +173,7 @@ function Card({ p, onRemove, onClose }) {
           : "You placed the orders on Derive yourself and told Cowboy what you paid. Cowboy cannot see your Derive account, so these figures are only as good as what you entered."}</Info>
       </p>
       <dl className="q-figs grid">
-        <Fig label="You paid" sub="fees included" value={usd(p.paid)} />
+        <Fig label="You paid" sub={p.journal?.cost?.fees_basis === "estimated" ? "estimated fees included" : p.journal?.cost?.fees_basis === "unknown" ? "fees not entered" : "fees included"} value={usd(p.paid)} />
         {f.closed ? (
           <>
             <Fig label="Got back" sub="after fees" value={usd(f.got)} />
@@ -102,6 +202,8 @@ function Card({ p, onRemove, onClose }) {
           sub={!f.closed && !f.settled && !settling ? countdown(settleTs, now) : settling && !f.settled ? "settling now" : null} missing={na("No date saved.", "Why no date")} />
       </dl>
       {q && !half && <PayZone lo={q.lo} hi={q.hi} side={p.side} index={settle ?? board?.index} compact />}
+      <SinceStrip p={p} markets={markets} now={now} />
+      <EntryRecord p={p} />
       <div className="q-card-actions">
         {t && <button className="btn" onClick={() => setClosing((s) => !s)} aria-expanded={closing}>{closing ? "Keep it open" : "Close"}</button>}
         <button className="text-control" onClick={() => onRemove(p.key)}>Remove</button>
@@ -118,8 +220,11 @@ function Card({ p, onRemove, onClose }) {
 
 /** Positions: kept in this browser only, with export and import under "Saved in this browser". */
 export default function MyQuestions() {
-  const [list, setList] = useState(() => prune(loadPositions()));
+  const [list, setListRaw] = useState(() => prune(loadPositions()));
+  const setList = (l) => setListRaw(prune(l));
+  const testnet = loadPositions("testnet").length;
   const [tab, setTab] = useState("open");
+  const [importError, setImportError] = useState(null);
   const file = useRef(null);
   const now = Date.now() / 1000;
   const settleOf = (p) => p.settle_ts || 0;
@@ -135,7 +240,10 @@ export default function MyQuestions() {
   const upload = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    try { setList(importPositions(await f.text())); } catch { /* not a positions file */ }
+    try { setList(importPositions(await f.text())); setImportError(null); } catch (err) {
+      setImportError(err?.message === "Saved by a newer Cowboy" ? "This file was saved by a newer Cowboy; nothing was imported." : "That is not a Positions file; nothing was imported.");
+    }
+    e.target.value = "";
   };
   return (
     <div className="wrap page q-page q-mine">
@@ -144,6 +252,7 @@ export default function MyQuestions() {
           <h1>Positions</h1>
           <Link to="/saloon" className="text-link">Back to the Saloon</Link>
         </div>
+        {!persistent() && <p className="q-note warn" role="status">This browser is not saving data: Positions last only for this visit. Export a copy to keep them.</p>}
         <Tabs label="Positions" value={tab} onChange={setTab} items={[["open", "Open"], ["closed", "Closed"]]} />
       </header>
       {rows.length ? rows.map((p) => <Card key={p.key} p={p} onRemove={(k) => setList(removePosition(k))} onClose={(k, got) => setList(closePosition(k, got))} />)
@@ -155,12 +264,14 @@ export default function MyQuestions() {
           </section>
         )}
       <details className="q-saved">
-        <summary>Saved in this browser<Info label="Where these are kept">Saved from "I placed it", in this browser only. Nothing is sent anywhere, and clearing the browser's data removes them: export a copy to keep one.</Info></summary>
+        <summary>Saved in this browser<Info label="Where these are kept">Saved from "I placed it", in this browser only. Nothing is sent anywhere, and clearing the browser's data removes them: export a copy to keep one. The export keeps closed trades, entry records and partial fills; importing a file twice adds nothing.</Info></summary>
         <div className="q-card-actions">
           <button className="text-control" onClick={download} disabled={!list.length}>Export</button>
           <button className="text-control" onClick={() => file.current?.click()}>Import</button>
           <input ref={file} type="file" accept="application/json" hidden onChange={upload} aria-label="Import a saved file" />
         </div>
+        {importError && <p className="q-note warn" role="alert">{importError}</p>}
+        {testnet > 0 && <p className="q-note">{testnet} testnet {testnet === 1 ? "record is" : "records are"} kept apart from these and included in Export.</p>}
       </details>
     </div>
   );

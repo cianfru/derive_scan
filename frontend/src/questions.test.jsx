@@ -262,16 +262,19 @@ describe("the question page", () => {
     expect(within(ticket).getByText(/Nothing saved/)).toBeTruthy();
     expect(within(ticket).queryByRole("button", { name: "Save to Positions" })).toBeNull();
     await user.click(within(ticket).getByRole("radio", { name: "Only the first" }));
-    const paid = within(ticket).getByRole("textbox", { name: "What you paid in total" });
-    expect(paid.value).toBe("103.01");
-    await user.clear(paid);
-    await user.type(paid, "108.50");
+    // The board's estimate is never filled in as the user's fill (journal J1).
+    const premium = within(ticket).getByRole("textbox", { name: "Premium paid, before fees" });
+    expect(premium.value).toBe("");
+    fireEvent.change(within(ticket).getByLabelText("When it filled, UTC"), { target: { value: "2026-10-03T14:05" } });
+    await user.type(premium, "107.10");
+    await user.type(within(ticket).getByRole("textbox", { name: "Derive's fees" }), "1.40");
     await user.click(within(ticket).getByRole("button", { name: "Save to Positions" }));
     const saved = JSON.parse(localStorage.getItem("cowboy-questions"));
     expect(saved).toHaveLength(1);
     expect(saved[0].estimate).toBeCloseTo(103.01, 2);
-    expect(saved[0]).toMatchObject({ exec: "hand_partial", paid: 108.5, side: "yes",
+    expect(saved[0]).toMatchObject({ exec: "hand_partial", paid: 108.5, side: "yes", network: "mainnet",
       legs: ["BTC-20261009-83000-C", "BTC-20261009-89000-C"] });
+    expect(saved[0].journal.fill).toMatchObject({ complete: false, premium: 107.1, fees: 1.4, limitation: "package_total" });
     localStorage.clear();
   });
 

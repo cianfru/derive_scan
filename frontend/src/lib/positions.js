@@ -1,10 +1,19 @@
 import { payAt, sameLegs } from "./questions.js";
 
-// Positions: what the user says they placed on Derive, kept in this browser only. Nothing is sent
-// anywhere. Storage can be blocked or cleared, so every read and write falls back to memory.
+// Positions and the trade journal: what the user says they placed on Derive, kept in this browser
+// only. Nothing is sent anywhere. Storage can be blocked or cleared, so every read and write falls
+// back to memory, and `persistent()` says when nothing survives a reload.
+//
+// Layout (journal version 2): mainnet records under the original key "cowboy-questions" (an array,
+// as version 1 kept them), testnet records apart under "cowboy-questions:testnet". A record saved
+// with the journal carries `v: 2`, its `network` and a `journal` block (lib/journal.js); older
+// records have neither and stay visible with those fields unknown.
 
-const KEY = "cowboy-questions";
-let memory = [];
+export const JOURNAL_VERSION = 2;
+export const NETWORKS = ["mainnet", "testnet"];
+const KEYS = { mainnet: "cowboy-questions", testnet: "cowboy-questions:testnet" };
+let memory = { mainnet: [], testnet: [] };
+let lastWriteOk = true;
 
 function storage() {
   try {
@@ -18,25 +27,44 @@ function storage() {
   }
 }
 
-export function loadPositions() {
+/** False when this browser keeps nothing past the visit (storage blocked or the last save failed). */
+export function persistent() {
+  return !!storage() && lastWriteOk;
+}
+
+const netOf = (network) => (NETWORKS.includes(network) ? network : "mainnet");
+
+/** A record as this version keeps it: older ones gain only their network (stage 1 was mainnet). */
+export function migrateRecord(r, network = "mainnet") {
+  if (!r || typeof r !== "object") return r;
+  return r.network ? r : { ...r, network: netOf(network) };
+}
+
+export function loadPositions(network = "mainnet") {
+  const net = netOf(network);
   const s = storage();
-  if (!s) return [...memory];
+  if (!s) return [...memory[net]];
   try {
-    const v = JSON.parse(s.getItem(KEY) || "[]");
-    return Array.isArray(v) ? v.filter(valid) : [];
+    const raw = s.getItem(KEYS[net]);
+    if (raw == null) return [];
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.filter(valid).map((r) => migrateRecord(r, net)) : [];
   } catch {
-    return [...memory];
+    return [...memory[net]];
   }
 }
 
-export function savePositions(list) {
-  memory = [...list];
+export function savePositions(list, network = "mainnet") {
+  const net = netOf(network);
+  memory[net] = [...list];
   const s = storage();
-  if (!s) return false;
+  if (!s) { lastWriteOk = false; return false; }
   try {
-    s.setItem(KEY, JSON.stringify(list));
+    s.setItem(KEYS[net], JSON.stringify(list));
+    lastWriteOk = true;
     return true;
   } catch {
+    lastWriteOk = false;
     return false;
   }
 }
@@ -46,48 +74,84 @@ function valid(p) {
 }
 
 /** Saved from "I placed it": the question, the side, contracts, what the user says they paid (fees
- * included), how it was placed (`exec`: "hand_both", or "hand_partial" when only the first option
- * filled; older entries have none and count as both) and the exact instruments held (`legs`). */
-export function addPosition(p) {
-  const list = loadPositions();
-  const row = { key: `${p.id}:${p.side}:${Date.now()}`, at: Math.floor(Date.now() / 1000), ...p };
+ * included), how it was placed (`exec`: "hand_both", or "hand_partial" when the package did not fully
+ * fill; older entries have none and count as both), the exact instruments held (`legs`) and, from
+ * version 2, the journal block with the fills, costs, mark and readings at entry. */
+export function addPosition(p, now = Date.now()) {
+  const net = netOf(p.network);
+  const list = loadPositions(net);
+  const row = { ...p, key: `${p.id}:${p.side}:${now}`, at: Math.floor(now / 1000), network: net };
   if (!valid(row)) return list;
   list.push(row);
-  savePositions(list);
+  savePositions(list, net);
   return list;
 }
 
 /** Sold back by hand: what came back after fees closes the position. */
-export function closePosition(key, proceeds, now = Date.now() / 1000) {
-  const list = loadPositions().map((p) => (p.key === key ? { ...p, closed_at: Math.floor(now), proceeds } : p));
-  savePositions(list);
+export function closePosition(key, proceeds, now = Date.now() / 1000, network = "mainnet") {
+  const t = Math.floor(now);
+  const list = loadPositions(network).map((p) => (p.key === key ? { ...p, closed_at: t, proceeds, updated_at: t } : p));
+  savePositions(list, network);
   return list;
 }
 
+/** Only part of the package filled (only the first option, or unequal amounts): never valued as the answer. */
 export const partial = (p) => p.exec === "hand_partial";
 
-export function removePosition(key) {
-  const list = loadPositions().filter((p) => p.key !== key);
-  savePositions(list);
+export function removePosition(key, network = "mainnet") {
+  const list = loadPositions(network).filter((p) => p.key !== key);
+  savePositions(list, network);
   return list;
 }
 
-/** Positions settled more than 90 days ago are dropped. */
+/** Positions settled more than 90 days ago leave the list, except journal entries: those stay. */
 export function prune(list, now = Date.now() / 1000) {
-  return list.filter((p) => !p.settle_ts || now - p.settle_ts < 90 * 86400);
+  return list.filter((p) => p.journal || !p.settle_ts || now - p.settle_ts < 90 * 86400);
 }
 
 export function exportPositions() {
-  return JSON.stringify({ kind: "cowboy-questions", version: 1, positions: loadPositions() }, null, 1);
+  const networks = Object.fromEntries(NETWORKS.map((n) => [n, loadPositions(n)]));
+  return JSON.stringify({ kind: "cowboy-journal", version: JOURNAL_VERSION, networks }, null, 1);
 }
 
+/** The rows of an export, by network, from any version: a bare array or {positions} (version 1,
+ * mainnet), or {networks} (version 2). A newer version than this one is refused. */
+export function importRows(doc) {
+  if (Array.isArray(doc)) return { mainnet: doc, testnet: [] };
+  if (!doc || typeof doc !== "object") throw new Error("Not a Positions file");
+  if (Number(doc.version) > JOURNAL_VERSION) throw new Error("Saved by a newer Cowboy");
+  if (doc.networks) return { mainnet: doc.networks.mainnet || [], testnet: doc.networks.testnet || [] };
+  if (Array.isArray(doc.positions)) return { mainnet: doc.positions, testnet: [] };
+  throw new Error("Not a Positions file");
+}
+
+// The more complete of two copies of one record: closed beats open, then the later update.
+const better = (a, b) => ((!!b.closed_at !== !!a.closed_at) ? (b.closed_at ? b : a) : ((b.updated_at || 0) > (a.updated_at || 0) ? b : a));
+
+/** Adds an export's records to this browser. A record is matched by its key, so importing the same
+ * file twice adds nothing; a record placed under the wrong network goes to its own. Returns the
+ * mainnet list (what Positions shows). */
 export function importPositions(text) {
-  const doc = JSON.parse(text);
-  const rows = (Array.isArray(doc) ? doc : doc?.positions || []).filter(valid);
-  const have = new Set(loadPositions().map((p) => p.key));
-  const list = [...loadPositions(), ...rows.filter((r) => !have.has(r.key))];
-  savePositions(list);
-  return list;
+  const rows = importRows(JSON.parse(text));
+  const incoming = { mainnet: [], testnet: [] };
+  for (const net of NETWORKS) {
+    for (const r of rows[net] || []) {
+      if (!valid(r) || typeof r.key !== "string") continue;
+      const m = migrateRecord(r, net);
+      incoming[netOf(m.network)].push(m);
+    }
+  }
+  for (const net of NETWORKS) {
+    if (!incoming[net].length) continue;
+    const list = loadPositions(net);
+    const at = new Map(list.map((p, i) => [p.key, i]));
+    for (const r of incoming[net]) {
+      if (at.has(r.key)) list[at.get(r.key)] = better(list[at.get(r.key)], r);
+      else { at.set(r.key, list.length); list.push(r); }
+    }
+    savePositions(list, net);
+  }
+  return loadPositions("mainnet");
 }
 
 /** What a position is worth now at the published sell-back price after Derive's exit fees, what it
@@ -114,7 +178,8 @@ export function valuePosition(p, found, settlePrice = null, exitFees = null) {
 export function positionStatus(p, { settled = false, settling = false } = {}) {
   if (p.closed_at) return { key: "closed", text: "Closed · sold back by hand" };
   if (settled && !partial(p)) return { key: "settled", text: "Settled" };
-  if (partial(p)) return { key: "partial", text: "Placed by hand · only the first filled", warn: true };
+  if (partial(p)) return { key: "partial", warn: true, text: p.journal?.fill?.legs?.[1]?.qty > 0
+    ? "Placed by hand · not fully filled" : "Placed by hand · only the first filled" };
   if (settling) return { key: "settling", text: "Settling · average from 07:30 to 08:00 UTC" };
   return { key: "both", text: "Placed by hand · both filled" };
 }
@@ -159,5 +224,6 @@ export function closeSummary(t, paid, holdPayout = null) {
 }
 
 export function _resetMemory() {
-  memory = [];
+  memory = { mainnet: [], testnet: [] };
+  lastWriteOk = true;
 }

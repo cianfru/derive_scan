@@ -1,10 +1,11 @@
-import { Suspense, lazy, useId, useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { Link } from "react-router-dom";
 import { Info } from "./ui.jsx";
 import OutcomePreview from "./OutcomePreview.jsx";
 import { TRADE_ON } from "../lib/flags.js";
 import { amountText, copyText, deriveLink, fullPay, handRisk, limitText, money, orderedLegs, parseId, signed } from "../lib/questions.js";
-import { addPosition, closeSummary } from "../lib/positions.js";
+import { closeSummary } from "../lib/positions.js";
+import JournalPlaced from "./JournalPlaced.jsx";
 
 const tone = (v) => (v > 0.004 ? "up" : v < -0.004 ? "down" : "");
 
@@ -33,36 +34,6 @@ function WithTrade(props) {
   return <Suspense fallback={hand}><TradePanel {...props} fallback={hand} /></Suspense>;
 }
 export default TRADE_ON ? WithTrade : QuestionTicket;
-
-/** "I placed it": what actually filled and what was paid, so Positions never shows more than the
- * user confirmed. Not yet saves nothing. */
-function Placed({ estimate, onSave }) {
-  const [fill, setFill] = useState(null);
-  const [paid, setPaid] = useState(estimate.toFixed(2));
-  const name = useId();
-  const amount = Number(paid);
-  const can = (fill === "both" || fill === "first") && amount > 0;
-  return (
-    <form className="q-placed" onSubmit={(e) => { e.preventDefault(); if (can) onSave(fill, amount); }}>
-      <fieldset>
-        <legend>Did both orders fill on Derive?</legend>
-        {[["both", "Both filled"], ["first", "Only the first"], ["none", "Not yet"]].map(([k, label]) => (
-          <label key={k} className="q-choice"><input type="radio" name={name} value={k} checked={fill === k} onChange={() => setFill(k)} />{label}</label>
-        ))}
-      </fieldset>
-      {fill === "none" ? <p className="q-note">Nothing saved. Come back to this question once they fill.</p> : (
-        <>
-          <label className="q-paid">
-            <span>What you paid in total, fees included<Info label="Why Cowboy asks">Cowboy cannot see your Derive account. Enter what Derive charged for the {fill === "first" ? "option that filled" : "two options"}, fees included; the estimate from this screen is filled in.</Info></span>
-            <span className="q-dollar-field"><span>$</span><input inputMode="decimal" value={paid} aria-label="What you paid in total"
-              onChange={(e) => setPaid(e.target.value.replace(/[^\d.]/g, ""))} /></span>
-          </label>
-          <button type="submit" className="btn" disabled={!can}>Save to Positions</button>
-        </>
-      )}
-    </form>
-  );
-}
 
 /** "I sold it back": both orders filled and what came back after Derive's fees, so the position closes
  * with what the user actually got. */
@@ -96,13 +67,6 @@ function QuestionTicket({ und, question, answer, level, sideKey, t, board, price
   if (!t || !legs.length) return <p className="status">No price on Derive's screen for this right now.</p>;
   const tick = board.spec?.tick;
   const text = copyText({ question, answer, legs, contracts: t.contracts, tick, settleTs });
-  const save = (fill, paid) => {
-    addPosition({ id: level.id, und, side: sideKey, lo: level.lo, hi: level.hi, contracts: t.contracts,
-      paid, estimate: t.mostLose, exec: fill === "both" ? "hand_both" : "hand_partial",
-      legs: legs.map((l) => l.name), question, answer, settle_ts: settleTs });
-    setStep("saved");
-    onPlaced?.();
-  };
   return (
     <section className="q-ticket" aria-label={closing ? "Sell back on Derive" : "Place on Derive"}>
       <h3>{question} <span className="q-ticket-side">{closing ? `Sell back ${answer}` : <>{answer} · {fullPay(level, sideKey)}</>}</span></h3>
@@ -158,7 +122,8 @@ function QuestionTicket({ und, question, answer, level, sideKey, t, board, price
         <a className="btn primary" href={deriveLink()} target="_blank" rel="noreferrer" onClick={() => !closing && setStep((x) => x || "opened")}>Open Derive ↗</a>
         {step !== "saved" && step !== "asking" && <button className="text-control" onClick={() => setStep("asking")}>{closing ? "I sold it back" : "I placed it"}</button>}
       </div>
-      {!closing && step === "asking" && <Placed estimate={t.mostLose} onSave={save} />}
+      {!closing && step === "asking" && <JournalPlaced und={und} level={level} sideKey={sideKey} t={t} board={board} legs={legs} settleTs={settleTs}
+        pricesTs={pricesTs} question={question} answer={answer} onSaved={() => { setStep("saved"); onPlaced?.(); }} />}
       {closing && step === "asking" && <Sold estimate={t.proceeds} onSave={(got) => { setStep("saved"); onSold?.(got); }} />}
       {step === "saved" && !closing && <p className="q-note">Saved to <Link className="text-link" to="/saloon/mine">Positions</Link>.</p>}
     </section>
