@@ -53,7 +53,7 @@ describe("a wallet with no Derive account", () => {
     // A new subaccount under PRIME Standard, and nothing private was asked.
     expect(fake.calls("public/register_deposit_address")[0].params).toEqual({ wallet: wallet.address, subaccount_id: 0, manager_id: 1 });
     expect(fake.log.filter((m) => m.method.startsWith("private/"))).toHaveLength(0);
-    expect(read(KEYS.known(wallet.address))).toEqual([]);
+    expect(read(KEYS.known(wallet.address))).toMatchObject({ ids: [] });
 
     // The deposit is on its way: public pending deposits show it, without a wallet prompt.
     derive.pending = [{ ...shapes["public/get_pending_deposits"].pending_deposits[0], amount: "50000000", status: "pending" }];

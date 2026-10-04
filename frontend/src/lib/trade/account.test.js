@@ -7,6 +7,7 @@ import { fakeWallet } from "./fakeWallet.js";
 import { _resetAssets, arriving, depositAddress, depositCheck, depositParams, findNew, findSaloon, pickSaloon, rememberKnown, summarise } from "./account.js";
 import { connectWallet, usdcTransfer, usdcUnits } from "./wallet.js";
 import { plainError } from "./derive.js";
+import { KEYS, write } from "./store.js";
 
 const client = (handlers, recorded = []) => {
   const fake = fakeDerive({ handlers, recorded });
@@ -45,7 +46,7 @@ describe("the Saloon account", () => {
     expect(saloon.id).toBe(90212);
     expect(fake.calls("private/change_subaccount_label")[0].params).toEqual({ subaccount_id: 90212, label: "Cowboy" });
     // a subaccount that was there before the deposit is never claimed
-    expect(findNew([summarise(subs[90212])], [90212])).toBeNull();
+    expect(findNew([summarise(subs[90212])], { ids: [90212], at: 0 })).toBeNull();
     // nor a subaccount under another manager
     expect(pickSaloon([{ id: 5, label: "Cowboy", manager: 5 }])).toBeNull();
   });
@@ -100,7 +101,23 @@ describe("the Saloon account", () => {
     expect(fake.calls("private/change_subaccount_label").map((m) => m.params)).toEqual([{ subaccount_id: 9, label: "Cowboy" }]);
     expect(others).toEqual({ count: 1, usdc: 10, ids: [10] });
     // with nothing funded, none of several is picked
-    expect(findNew([summarise(mk(3, 0)), summarise(mk(4, 0))], [])).toBeNull();
+    expect(findNew([summarise(mk(3, 0)), summarise(mk(4, 0))], null)).toBeNull();
+  });
+
+  it("claims a funded new account even when a list taken after the deposit names it as known", async () => {
+    const base = shapes["private/get_subaccount"][90212];
+    const mk = (id, usdc, since) => ({ ...structuredClone(base), subaccount_id: id, manager_id: 1, label: "",
+      collaterals: usdc ? base.collaterals.map((x) => ({ ...x, amount: String(usdc), creation_timestamp: since })) : [] });
+    // The owner's run: the first version wrote both new accounts into a plain array after the deposits.
+    write(KEYS.known("0xw"), [9, 10]);
+    const subs = { 9: mk(9, 10, 1791089400000), 10: mk(10, 10, 1791089700000) };
+    const { c } = client(subHandlers(subs));
+    const { saloon, others } = await findSaloon(c, "0xw");
+    expect(saloon).toMatchObject({ id: 9, label: "Cowboy" });
+    expect(others).toMatchObject({ count: 1, ids: [10] });
+    // A list taken before the deposit still protects an account funded before it.
+    expect(findNew([summarise(mk(5, 40, 1000))], { ids: [5], at: 2000 })).toBeNull();
+    expect(findNew([summarise(mk(5, 40, 1000)), summarise(mk(6, 10, 3000))], { ids: [5], at: 2000 })).toMatchObject({ id: 6 });
   });
 
   it("refuses under $10, suggests $50 or more, and warns when gas is over 5%", () => {

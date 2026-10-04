@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { NETWORK, SENT_HOLD_MS, TRADE_COINS } from "./config.js";
 import { NO_ACCOUNT, at, createClient, failure } from "./derive.js";
-import { arriving, depositAddress, findSaloon, knownIds, rememberKnown, summarise } from "./account.js";
+import { arriving, depositAddress, findSaloon, knownList, rememberKnown, summarise } from "./account.js";
 import { connectWallet, findProvider, gasEth, personalSign, sendTransaction, usdcTransfer } from "./wallet.js";
 import { approveCowboy, keySigner, switchOff as retireKey, usableKey } from "./sessionKey.js";
 import { KEYS, read, remove, write } from "./store.js";
@@ -116,7 +116,7 @@ async function load() {
     return toFund(null);
   }
   const { saloon, subs, others } = await at("find account", findSaloon(client, wallet));
-  if (!saloon && !knownIds(wallet).length) rememberKnown(wallet, subs);
+  if (!saloon && !knownList(wallet)) rememberKnown(wallet, subs); // only once, before any deposit
   set({ others });
   if (!saloon || !(saloon.usdc > 0)) return toFund(saloon);
   remove(KEYS.sent(wallet));
