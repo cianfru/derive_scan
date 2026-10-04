@@ -28,7 +28,7 @@
 .history-context .regime-chip { display: inline-block; width: 8px; height: 8px; margin-right: 6px; background: var(--rc); border-radius: var(--r-sm); }
 .history-regime-strip { display: block; width: 100%; height: 12px; margin-top: 8px; }
 .history-empty { min-height: 160px; display: grid; align-content: center; color: var(--muted); font-size: var(--t-cell); }
-.history-coverage { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 15px 28px 18px; border-top: 1px solid var(--seam); color: var(--muted); font-size: 11px; }
+.history-coverage { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 15px 28px 18px; border-top: 1px solid var(--seam); color: var(--muted); font-size: 12px; }
 .history-coverage > span { display: inline-flex; align-items: center; gap: 8px; }
 .history-source-swatch { width: 22px; border-top: 2px dashed var(--muted); }
 @media (max-width: 600px) {

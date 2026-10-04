@@ -2,7 +2,7 @@
 .cohort-workspace, .flow-briefing { background: var(--surface-1); border-radius: var(--r-lg); }
 .section-code {
   color: var(--accent-text);
-  font: 500 10px/1.5 var(--font-mono);
+  font: 500 12px/1.5 var(--font-mono);
   display: block;
   margin-bottom: 14px;
 }
@@ -35,7 +35,7 @@
   grid-column: 1/-1;
   text-align: right;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .example-grid {
   display: grid;
@@ -117,13 +117,13 @@
   font: 600 27px var(--font-display);
 }
 .wallet-example-reading .reading small {
-  font-size: 11px;
+  font-size: 12px;
 }
 .wallet-balance {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   margin-block: 22px;
 }
@@ -169,14 +169,14 @@
   gap: 8px;
 }
 .wallet-example-values span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .wallet-example-values strong {
   font: 500 20px var(--font-mono);
 }
 .research-example > .status {
-  font-size: 10px;
+  font-size: 12px;
   line-height: 1.7;
   margin-block: 20px;
 }
@@ -197,7 +197,7 @@
   border-bottom: 0;
 }
 .tf-label {
-  font: 500 10px var(--font-mono);
+  font: 500 12px var(--font-mono);
   color: var(--muted);
 }
 .engine-pair-regime {
@@ -228,7 +228,7 @@
   color: var(--fg);
 }
 .agreement-score small {
-  font: 400 10px var(--font-mono);
+  font: 400 12px var(--font-mono);
   color: var(--muted);
   margin-left: 3px;
 }
@@ -253,14 +253,14 @@
   justify-content: space-between;
 }
 .combined-signal > span {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .convergence.compact .agreement-score > b {
   font-size: 22px;
 }
 .convergence.compact .agreement-score > span {
-  font-size: 10px;
+  font-size: 12px;
 }
 .convergence.compact .agreement-score {
   gap: 6px;
@@ -276,7 +276,7 @@
   gap: 25px;
   margin-top: 20px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .agreement-evidence b {
   display: block;
@@ -287,7 +287,7 @@
 .table-evidence {
   display: block;
   color: var(--faint);
-  font: 400 10px var(--font-body);
+  font: 400 12px var(--font-body);
   padding-top: 5px;
 }
 .table-evidence .info {
@@ -367,7 +367,7 @@
   justify-content: space-between;
   gap: 12px;
   margin-top: 16px;
-  font: 400 11px var(--font-mono);
+  font: 400 12px var(--font-mono);
 }
 .move-labels > span {
   display: grid;
@@ -380,7 +380,7 @@
   text-align: right;
 }
 .move-labels small {
-  font: 400 10px var(--font-body);
+  font: 400 12px var(--font-body);
   color: var(--muted);
 }
 .skew-instrument {
@@ -423,7 +423,7 @@
 .instrument-extents {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .tenor-bars {
@@ -436,7 +436,7 @@
   grid-template-columns: 24px 1fr 50px;
   align-items: center;
   gap: 10px;
-  font: 400 10px var(--font-mono);
+  font: 400 12px var(--font-mono);
 }
 .tenor-bars > div > span {
   color: var(--muted);
@@ -537,7 +537,7 @@
 }
 .expiry-rail span {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .expiry-rail i {
   height: 2px;
@@ -588,13 +588,13 @@
 }
 .expiry-metrics span {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .expiry-metrics b {
   font: 500 20px var(--font-display);
 }
 .expiry-metrics small {
-  font: 400 10px var(--font-mono);
+  font: 400 12px var(--font-mono);
   color: var(--muted);
 }
 .expiry-charts {
@@ -623,7 +623,7 @@
 }
 .selected-range > span:last-child {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .desk-panels {
   padding: 26px;
@@ -857,7 +857,7 @@
     padding: 18px 5px;
   }
   .move-labels {
-    font-size: 10px;
+    font-size: 12px;
   }
       }
 @media (prefers-reduced-motion: reduce) {
