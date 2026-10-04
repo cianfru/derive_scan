@@ -14,6 +14,7 @@ history/wallets.json             each wallet's class and tier from all days so f
 history/positions.json           open option contracts per instrument held by each tier's wallets
 history/traders.json             leaderboard, open positions, recent activity, cohorts (derive/traders.py)
 history/state.json               days done
+history/anomalies.json           days kept although their pages did not reconcile (fetch_day)
 
 Positions are not stored: a wallet's open contracts in an instrument are the running sum of its
 daily buys minus sells, and an option held to expiry settles at the settlement price.
@@ -162,25 +163,78 @@ def read_day(p: Path) -> list[dict]:
         return list(csv.DictReader(fh))
 
 
-async def fetch_day(client, day: date) -> list[dict]:
-    """Every option and perp leg of one UTC day; raises if the count does not add up."""
+def _day_window(day: date) -> tuple[int, int]:
     start = int(datetime(day.year, day.month, day.day, tzinfo=timezone.utc).timestamp() * 1000)
-    out = []
+    return start, start + 86_400_000 - 1
+
+
+async def fetch_day(client, day: date, anomalies: list | None = None) -> list[dict]:
+    """Every option and perp leg of one UTC day, read exactly (flow.read_exact: deduplicated, the
+    listed count reconciled, time slices when offset paging does not add up). When the slicing
+    bound is reached the deduplicated legs are kept and the day is noted in `anomalies`, so the
+    history never stalls on one day."""
+    from .flow import read_exact
+    a, b = _day_window(day)
+    out, calls = [], {}
     for kind in ("option", "perp"):
-        got, page, count = [], 1, 0
-        while True:
-            res = await client.public("get_trade_history", {"from_timestamp": start, "to_timestamp": start + 86_400_000 - 1,
-                                                            "instrument_type": kind, "page_size": PAGE, "page": page})
-            got.extend(res.get("trades", []))
-            pag = res.get("pagination") or {}
-            count = pag.get("count", len(got))
-            if page >= pag.get("num_pages", 1):
-                break
-            page += 1
-        if len(got) != count:
-            raise RuntimeError(f"{day} {kind}: {len(got)} legs read, {count} listed")
-        out.extend(got)
+        legs, exact = await read_exact(client, {"instrument_type": kind}, a, b, calls=calls)
+        if not exact and anomalies is not None:
+            anomalies.append({"day": day.isoformat(), "query": kind, "legs": len(legs), "reason": "not_reconciled"})
+        out.extend(legs)
     return out
+
+
+async def fetch_instrument_day(client, day: date, instrument: str, anomalies: list | None = None) -> list[dict]:
+    """Every leg of one instrument on one UTC day, read exactly (as fetch_day)."""
+    from .flow import read_exact
+    a, b = _day_window(day)
+    legs, exact = await read_exact(client, {"instrument_name": instrument}, a, b)
+    if not exact and anomalies is not None:
+        anomalies.append({"day": day.isoformat(), "query": instrument, "legs": len(legs), "reason": "not_reconciled"})
+    return legs
+
+
+ANOMALIES_KEEP = 500
+
+
+def record_anomalies(root: Path, items: list[dict]) -> None:
+    """Appends to history/anomalies.json (days kept although their reading did not reconcile)."""
+    if not items:
+        return
+    p = root / "history" / "anomalies.json"
+    old = json.loads(p.read_text()).get("anomalies", []) if p.exists() else []
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"anomalies": (old + items)[-ANOMALIES_KEEP:]}, separators=(",", ":")))
+
+
+def imbalanced_pairs(root: Path) -> list[tuple[str, str]]:
+    """(day, instrument) pairs whose contracts do not net to zero across wallets. Every trade has a
+    buyer and a seller, so a complete day nets to zero per instrument (to rounding); a leg dropped
+    or repeated by paging shows here. A trade whose two legs fall either side of midnight shows
+    on both days."""
+    out = []
+    for p in sorted((root / "history" / "days").glob("*.csv.gz")):
+        net: dict = defaultdict(float)
+        gross: dict = defaultdict(float)
+        rows: dict = defaultdict(int)
+        for r in read_day(p):
+            b, s = _f(r["buy_contracts"]), _f(r["sell_contracts"])
+            net[r["instrument"]] += b - s
+            gross[r["instrument"]] += b + s
+            rows[r["instrument"]] += 1
+        out += [(p.name[:10], name) for name in sorted(net)
+                if abs(net[name]) > max(1e-6 * rows[name], 1e-9 * gross[name])]
+    return out
+
+
+def replace_instrument(root: Path, day: date, instrument: str, rows: list[list]) -> Path:
+    """Rewrites one day file with `instrument`'s rows replaced by `rows` (day_rows output); every
+    other row is written back unchanged."""
+    p = root / "history" / "days" / f"{day.isoformat()}.csv.gz"
+    kept = [[r.get(k, "") for k in FIELDS] for r in read_day(p) if r["instrument"] != instrument] if p.exists() else []
+    merged = sorted(kept + [[str(v) if not isinstance(v, str) else v for v in r] for r in rows],
+                    key=lambda r: (r[0], r[1]))
+    return write_day(root, day, merged)
 
 
 def load_state(root: Path) -> dict:

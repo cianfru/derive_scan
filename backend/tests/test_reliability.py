@@ -88,7 +88,8 @@ def test_partial_history_hides_rankings_and_existing_direct_links(tmp_path):
     (site / "traders").mkdir(parents=True)
     (site / "traders" / "old.json").write_text('{"ready":true,"book":[1]}')
     traders_block(data, site, {}, {}, NOW)
-    for path in [site / "traders.json", site / "traders" / "old.json", site / "traders" / "alice.json"]:
+    assert not (site / "traders" / "old.json").exists()  # off the leaderboard: no file at all
+    for path in [site / "traders.json", site / "traders" / "alice.json"]:
         doc = json.loads(path.read_text())
         assert doc["ready"] is False and doc["through"] == "2025-06-13"
         assert "book" not in doc and "traders" not in doc
@@ -100,7 +101,8 @@ def test_expired_positions_are_not_marked_as_open():
 
 def test_snapshot_upgrade_preserves_accumulation_and_uses_history_cutoff(tmp_path, monkeypatch):
     option = "BTC-20240628-100000-C"
-    write(tmp_path, "2024-06-01", buy=1, bv=100, name=option)
+    history.write_day(tmp_path, date(2024, 6, 1), [["alice", option, 1, 0, 100, 0, 0, 1, 0, "", 0, 0, 0],
+                                                   ["bob", option, 0, 1, 0, 100, 1, 0, 0, "", 0, 0, 0]])
     history.save_state(tmp_path, {"done_through": "2024-06-01"})
     stored = {p: p.read_bytes() for p in (tmp_path / "history").rglob("*") if p.is_file()}
 

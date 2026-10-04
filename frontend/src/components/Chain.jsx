@@ -61,13 +61,20 @@ export default function Chain({ alignment, horizon = "30d", linked = true, compa
   );
 }
 
+/** The key above the chain columns: what each of the three tiles reads, in order, then what its colour means. */
 export function ChainLegend() {
   return (
-    <span className="chain-legend">
-      <span><b className="chain-sq up" />Up</span>
-      <span><b className="chain-sq neutral" />Balanced</span>
-      <span><b className="chain-sq defensive" />Defensive</span>
-      <span><b className="chain-sq unknown" />Building</span>
+    <span className="chain-key">
+      <span className="chain-key-layers">
+        {LAYERS.map(([kind, name], i) => (
+          <span key={kind}>{i > 0 && <i className="chain-key-sep" aria-hidden="true">·</i>}<LayerIcon kind={kind} size={12} />{name}</span>))}
+      </span>
+      <span className="chain-legend">
+        <span><b className="chain-sq up" />Up</span>
+        <span><b className="chain-sq neutral" />Balanced</span>
+        <span><b className="chain-sq defensive" />Defensive</span>
+        <span><b className="chain-sq unknown" />Building</span>
+      </span>
     </span>
   );
 }

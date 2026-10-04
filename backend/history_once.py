@@ -33,10 +33,16 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 
-# One-time repairs: days written before a parsing fix are read again from Derive. Days holding
-# fractional strikes ("XRP-...-1_35-P") were stored with strike 135 instead of 1.35, which made
-# their delta, implied volatility and out-of-the-money figures wrong (contracts and premiums were right).
-REPAIR = "fractional_strikes"
+# One-time repairs, in order: days written before a fix are read again from Derive.
+# "fractional_strikes": days holding fractional strikes ("XRP-...-1_35-P") were stored with strike
+# 135 instead of 1.35, which made their delta, implied volatility and out-of-the-money figures wrong
+# (contracts and premiums were right); the whole day is read again.
+# "paging": offset paging could drop one leg and repeat another while the listed count still
+# matched. Every (day, instrument) whose contracts do not net to zero across wallets is read again
+# by instrument in exact time slices, replacing only that instrument's rows; then the surface rows
+# and the balance closes are rebuilt from the repaired days.
+REPAIRS = ("fractional_strikes", "paging")
+REPAIR = REPAIRS[-1]
 SCHEMA_VERSION = 3
 # Definitions of history/surface (derive/surface_history.py); a new version rebuilds every row.
 SURFACE_VERSION = 1
@@ -56,6 +62,13 @@ def is_due(out: Path, now: float) -> bool:
     return done is None or date.fromisoformat(done) < last or (bool(done) and (
         state.get("repaired") != REPAIR or state.get("surface") != SURFACE_VERSION or state.get("surface_through") != done
         or (state.get("balance") != BALANCE_VERSION and (out / "history" / "wallets.json").exists())))
+
+
+def next_repair(state: dict) -> str | None:
+    """The first repair in REPAIRS not finished yet, or None."""
+    done = state.get("repaired")
+    i = REPAIRS.index(done) + 1 if done in REPAIRS else 0
+    return REPAIRS[i] if i < len(REPAIRS) else None
 
 
 def repair_days(out: Path) -> list[str]:
@@ -172,26 +185,47 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
     try:
         day, last = history.next_day(state), history.last_complete_day(now)
         while day <= last and time.monotonic() - t0 < budget:
-            rows = history.day_rows(await history.fetch_day(client, day))
+            anomalies: list = []
+            rows = history.day_rows(await history.fetch_day(client, day, anomalies))
             history.write_day(out, day, rows)
+            history.record_anomalies(out, anomalies)
             state["done_through"] = day.isoformat()
             history.save_state(out, state)
             added.append(day.isoformat())
             day = history.next_day(state)
         repaired_now = False
-        if state.get("done_through") and state.get("repaired") != REPAIR:
+        while state.get("done_through") and next_repair(state):  # each pass finishes a repair or stops
+            name = next_repair(state)
+            if state.get("repairing", REPAIRS[0]) != name:
+                state.pop("repair_pending", None)
             if "repair_pending" not in state:
-                state["repair_pending"] = repair_days(out)
+                state["repairing"] = name
+                state["repair_pending"] = repair_days(out) if name == "fractional_strikes" else \
+                    [list(pair) for pair in history.imbalanced_pairs(out)]
+                history.save_state(out, state)
             while state["repair_pending"] and time.monotonic() - t0 < budget:
-                fix = date.fromisoformat(state["repair_pending"][0])
-                history.write_day(out, fix, history.day_rows(await history.fetch_day(client, fix)))
+                item, anomalies = state["repair_pending"][0], []
+                if name == "fractional_strikes":
+                    fix = date.fromisoformat(item)
+                    history.write_day(out, fix, history.day_rows(await history.fetch_day(client, fix, anomalies)))
+                else:
+                    fix, instrument = date.fromisoformat(item[0]), item[1]
+                    legs = await history.fetch_instrument_day(client, fix, instrument, anomalies)
+                    history.replace_instrument(out, fix, instrument, history.day_rows(
+                        [t for t in legs if t.get("instrument_name") == instrument]))
+                history.record_anomalies(out, anomalies)
                 state["repair_pending"].pop(0)
                 history.save_state(out, state)
-            if not state["repair_pending"]:
-                state["repaired"] = REPAIR
-                state.pop("repair_pending")
-                history.save_state(out, state)
-                repaired_now = True
+            if state["repair_pending"]:
+                break
+            state["repaired"] = name
+            state.pop("repair_pending")
+            state.pop("repairing", None)
+            if name == "paging":  # rebuild what was derived from the repaired days
+                for key in ("surface", "surface_pending", "surface_rebuilt_through", "balance"):
+                    state.pop(key, None)
+            history.save_state(out, state)
+            repaired_now = True
         snapshots = [out / "history" / f"{name}.json" for name in ("wallets", "positions", "traders")]
         needs_rebuild = False
         for p in snapshots:
@@ -218,7 +252,7 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
                     history.save_state(out, state)  # a close was skipped: the backfill fills it
         if state.get("done_through") and state.get("repaired") == REPAIR:
             surface_step(out, state, lambda: time.monotonic() - t0 < budget)
-            backfilled = balance_step(out, state, added=bool(added), surface_ready=surface_ready, now=now,
+            backfilled = balance_step(out, state, added=bool(added), surface_ready=surface_ready and not repaired_now, now=now,
                                       left=budget - (time.monotonic() - t0))
     finally:
         if own:

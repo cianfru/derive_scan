@@ -85,11 +85,12 @@ function Holders({ holders, total }) {
 
 /** Step 2 of the coin page: what the ranked options traders hold on this coin. */
 export default function CoinWallets({ und, alignment }) {
-  const { data } = useData(`wallets/${und}.json`, 5 * 60_000);
+  const { data, missing } = useData(`wallets/${und}.json`, 5 * 60_000);
   return (
     <>
       <SmartRead alignment={alignment} />
-      {!data ? <Loading /> : !data.ready ? (
+      {missing ? <p className="status">No ranked trader holds options on this coin right now.</p>
+        : !data ? <Loading /> : !data.ready ? (
         <p className="status">Wallet positions appear once the trade history has caught up{data.through ? ` (through ${data.through})` : ""}.</p>
       ) : (
         <div className="wallet-grid">

@@ -11,7 +11,7 @@
   /* Ground and surfaces: warm charcoal, borders one step above the surface */
   --ground: #0e0d0b; --surface-1: #161412; --surface-2: #1e1b18; --surface-3: #27231f;
   --border: #2f2a25; --border-strong: #48413a;
-  --text-1: #f2ede6; --text-2: #cfc7bc; --text-3: #a39a8e;
+  --text-1: #f2ede6; --text-2: #d9d2c8; --text-3: #b5ac9f;
   /* Orange: interaction, selection, focus and the brand. Never a data series. */
   --accent: #ff5e00; --accent-hover: #ff7c30; --accent-deep: #d54f00; --accent-text: #ff7a2b;
   --accent-soft: rgb(255 94 0 / .12); --on-accent: #140b05; --focus: #ff7c30;
@@ -47,7 +47,7 @@
 :root[data-theme="light"] {
   --ground: #f5f2ec; --surface-1: #fcfaf6; --surface-2: #efebe4; --surface-3: #e6e1d8;
   --border: #e0dad0; --border-strong: #c2baad;
-  --text-1: #1d1a16; --text-2: #413b34; --text-3: #6a6258;
+  --text-1: #1d1a16; --text-2: #37312b; --text-3: #5a534a;
   --accent: #c24600; --accent-hover: #a83c00; --accent-deep: #933400; --accent-text: #b03f00;
   --accent-soft: rgb(194 70 0 / .08); --on-accent: #ffffff; --focus: #c24600;
   --up: #1f6b4d; --down: #a93a2e; --neutral: #67635c;

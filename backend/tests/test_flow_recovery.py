@@ -191,10 +191,12 @@ def test_query_deadline_does_not_commit_a_partial_interval(tmp_path):
 def test_fetch_page_limit_and_counts(tmp_path):
     class Paged:
         async def public(self, method, params):
-            return {"trades": [trade(str(params["page"]))], "pagination": {"num_pages": 3, "count": 3}}
+            tid = str(params["page"])  # both legs of one trade per page
+            return {"trades": [trade(tid), trade(tid, wallet="bob", role="maker")],
+                    "pagination": {"num_pages": 3, "count": 6}}
     with pytest.raises(RuntimeError, match="page limit"):
         asyncio.run(flow.fetch_since(Paged(), GAP * 1000, NOW * 1000, max_pages=2))
-    assert len(asyncio.run(flow.fetch_since(Paged(), GAP * 1000, NOW * 1000, max_pages=3))) == 3
+    assert len(asyncio.run(flow.fetch_since(Paged(), GAP * 1000, NOW * 1000, max_pages=3))) == 6
 
 
 def test_missing_intervals_and_due_retry_without_options_snapshot(tmp_path):

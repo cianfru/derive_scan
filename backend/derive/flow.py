@@ -25,6 +25,7 @@ import asyncio
 import io
 import json
 import logging
+import math
 import os
 import time
 from collections import defaultdict
@@ -170,6 +171,8 @@ def summarise(trades: list[dict], run_ts: int) -> tuple[list[list], list[list]]:
             continue
         name = t.get("instrument_name", "")
         kind = kind_of(name)
+        if kind == "other":  # spot (erc20) legs: not perp or option flow
+            continue
         amount, price, index = _f(t.get("trade_amount")), _f(t.get("trade_price")), _f(t.get("index_price"))
         notional = amount * (price if kind == "perp" else index)
         premium = amount * price if kind == "option" else 0.0
@@ -192,18 +195,31 @@ def summarise(trades: list[dict], run_ts: int) -> tuple[list[list], list[list]]:
     return large, wallet_rows
 
 
-async def fetch_since(client: DeriveClient, since_ms: int, until_ms: int, *,
-                      deadline: float | None = None, max_pages: int = MAX_PAGES) -> list[dict]:
-    out, page = [], 1
-    expected = None
+SLICE_MAX_DEPTH = 6     # time slicing of a window whose pages do not reconcile
+SLICE_MAX_CALLS = 400   # requests per reading (history: per day)
+SLICE_FILL = 0.8        # a slice is sized to hold this share of a page at the listed rate
+
+
+def paired(legs: list[dict]) -> bool:
+    """Every trade appears once per side: each trade_id carries exactly two legs."""
+    per: dict = defaultdict(int)
+    for t in legs:
+        per[t.get("trade_id")] += 1
+    return all(n == 2 for n in per.values())
+
+
+async def _pages(client, params: dict, from_ms: int, to_ms: int, deadline, max_pages: int, calls: dict):
+    """All pages of one query: (legs, listed count or None, pages read)."""
+    out, page, expected = [], 1, None
     while True:
         if page > max_pages:
             raise RuntimeError(f"Flow query exceeds the {max_pages}-page limit")
         remaining = deadline - time.monotonic() if deadline is not None else None
         if remaining is not None and remaining <= 0:
             raise TimeoutError("Flow query budget exhausted")
-        call = client.public("get_trade_history", {"from_timestamp": since_ms, "to_timestamp": until_ms,
+        call = client.public("get_trade_history", {**params, "from_timestamp": from_ms, "to_timestamp": to_ms,
                                                    "page_size": PAGE, "page": page})
+        calls["n"] = calls.get("n", 0) + 1
         res = await asyncio.wait_for(call, remaining) if remaining is not None else await call
         out.extend(res.get("trades", []))
         pagination = res.get("pagination") or {}
@@ -213,10 +229,59 @@ async def fetch_since(client: DeriveClient, since_ms: int, until_ms: int, *,
                 raise RuntimeError("Flow pagination count changed during the query")
             expected = int(count)
         if page >= int(pagination.get("num_pages", 1)):
-            if expected is not None and len(out) != expected:
-                raise RuntimeError(f"Flow query read {len(out)} legs, {expected} listed")
-            return out
+            return out, expected, page
         page += 1
+
+
+async def read_exact(client, params: dict, from_ms: int, to_ms: int, *, deadline: float | None = None,
+                     max_pages: int = MAX_PAGES, max_depth: int = SLICE_MAX_DEPTH,
+                     calls: dict | None = None, max_calls: int = SLICE_MAX_CALLS) -> tuple[list[dict], bool]:
+    """Every leg of [from_ms, to_ms] (inclusive), deduplicated on leg_key, and whether the reading is exact.
+
+    Offset paging can drop one leg and repeat another while the total still matches the listed
+    count. A window is accepted when its unique legs equal the count and every trade carries both
+    legs, or when one page holds every listed leg (no offset involved). Otherwise the window
+    is read again in time slices sized to fit one page each, recursively up to max_depth and
+    max_calls requests (shared through `calls`). When that bound is reached the union of
+    everything read is returned with exact=False.
+    """
+    calls = {} if calls is None else calls
+
+    async def window(a: int, b: int, depth: int) -> tuple[dict, bool]:
+        legs, count, pages = await _pages(client, params, a, b, deadline, max_pages, calls)
+        unique = {leg_key(t): t for t in legs}
+        if count is None:
+            count = len(legs)
+        # One page is exact on its own (no offset): every listed leg arrived, repeats aside.
+        if (pages == 1 and len(legs) == count) or (len(unique) == count and paired(list(unique.values()))):
+            return unique, True
+        if depth >= max_depth or b <= a or calls.get("n", 0) >= max_calls:
+            return unique, False
+        n = min(max(2, math.ceil(count / (PAGE * SLICE_FILL))), b - a + 1)
+        edges = [a + (b - a + 1) * i // n for i in range(n + 1)]
+        sliced, exact = {}, True
+        for lo, hi in zip(edges, edges[1:]):
+            if calls.get("n", 0) >= max_calls:
+                exact = False
+                break
+            got, ok = await window(lo, hi - 1, depth + 1)
+            sliced.update(got)
+            exact = exact and ok
+        # Exact slices partition the window: their union is its legs. Otherwise keep all read.
+        return (sliced, True) if exact else ({**unique, **sliced}, False)
+
+    got, exact = await window(from_ms, to_ms, 0)
+    return list(got.values()), exact
+
+
+async def fetch_since(client: DeriveClient, since_ms: int, until_ms: int, *,
+                      deadline: float | None = None, max_pages: int = MAX_PAGES) -> list[dict]:
+    """Every leg from since_ms to until_ms (inclusive), read exactly (read_exact); raises when the
+    pages cannot be reconciled within the slicing bound (the next run reads the window again)."""
+    legs, exact = await read_exact(client, {}, since_ms, until_ms, deadline=deadline, max_pages=max_pages)
+    if not exact:
+        raise RuntimeError(f"Flow query could not be reconciled ({len(legs)} unique legs read)")
+    return legs
 
 
 def event_buckets(trades: list[dict]):
