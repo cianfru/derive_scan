@@ -9,9 +9,11 @@ import { markBenchmark } from "./journal.js";
 export { budgetTicket };
 
 export const DEFAULT_BUDGET = 100;
-// The default order is the lowest cost over Derive's mark (owner, 4 October 2026).
-export const DEFAULT_SORT = "mark";
+// The default view is by date: one row per coin and settlement date, soonest first, levels from
+// low to high (owner, 4 October 2026). The other orders show one flat grid of outcome cards.
+export const DEFAULT_SORT = "date";
 export const SORTS = [
+  ["date", "By date"],
   ["mark", "Lowest cost over mark"],
   ["near", "Closest to today's price"],
   ["soon", "Soonest settlement"],
@@ -123,6 +125,7 @@ export function filterRows(rows, { coin = "all", range = "all", side = "all" } =
 const missingLast = (a, b) => (a == null ? (b == null ? 0 : 1) : b == null ? -1 : 0);
 const byNum = (a, b, dir = 1) => missingLast(a, b) || (a == null ? 0 : dir * (a - b));
 const COMPARE = {
+  date: (a, b) => byNum(a.settleTs, b.settleTs) || byNum(a.k, b.k),
   mark: (a, b) => byNum(a.overMark, b.overMark),
   near: (a, b) => byNum(a.distance, b.distance),
   soon: (a, b) => byNum(a.settleTs, b.settleTs),
@@ -140,3 +143,34 @@ export function sortRows(rows, sort = DEFAULT_SORT) {
 
 /** The horizon of the three layers shown as context beside a row. */
 export const contextHorizon = (settleTs, now = Date.now() / 1000) => ((settleTs - now) / 86400 <= 10 ? "7d" : "30d");
+
+/** Coins on the same date: Bitcoin, then Ethereum, then the coin bar's order (`coins`), then by name. */
+export function coinRank(coins = []) {
+  const order = ["BTC", "ETH", ...coins.filter((u) => u !== "BTC" && u !== "ETH")];
+  return (u) => {
+    const i = order.indexOf(u);
+    return i < 0 ? order.length : i;
+  };
+}
+
+/**
+ * The "By date" view: outcomes (anything with und, expiry, settleTs and k; `index` is the coin's
+ * index) in one row per coin and settlement date. Rows run soonest first, then by coin (see
+ * coinRank); levels inside a row run from low to high. `nowAt` is where the coin's index sits in
+ * the row: the number of levels at or below it (0 = below every level), or null without an index.
+ */
+export function dateRows(items, coins = []) {
+  const rank = coinRank(coins);
+  const rows = new Map();
+  for (const it of items || []) {
+    const key = `${it.und}:${it.expiry}`;
+    if (!rows.has(key)) rows.set(key, { key, und: it.und, expiry: it.expiry, settleTs: it.settleTs, index: ok(it.index) ? it.index : null, items: [] });
+    rows.get(key).items.push(it);
+  }
+  const out = [...rows.values()];
+  for (const r of out) {
+    r.items.sort((a, b) => a.k - b.k || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    r.nowAt = r.index == null ? null : r.items.filter((it) => it.k <= r.index).length;
+  }
+  return out.sort((a, b) => a.settleTs - b.settleTs || rank(a.und) - rank(b.und) || (a.und < b.und ? -1 : a.und > b.und ? 1 : 0));
+}

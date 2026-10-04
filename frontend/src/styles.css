@@ -1,11 +1,10 @@
 /* Cowboy: warm charcoal, one orange accent, calm parts. Fonts are self-hosted (OFL, latin subsets in /public/fonts).
    Palette, type scale, radius and the neon recipe follow the approved brand spec; the dark ground sits a step darker. */
 @font-face { font-family: "Manrope"; font-style: normal; font-weight: 400 700; font-display: swap; src: url("/fonts/manrope-latin-variable.woff2") format("woff2"); }
-@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/ibm-plex-mono-latin-400.woff2") format("woff2"); }
-@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/ibm-plex-mono-latin-500.woff2") format("woff2"); }
+@font-face { font-family: "Chivo Mono"; font-style: normal; font-weight: 100 900; font-display: swap; src: url("/fonts/chivo-mono-latin-variable.woff2") format("woff2"); }
 /* Metric-matched fallbacks keep the layout still while the brand faces swap in. */
 @font-face { font-family: "Manrope Fallback"; src: local("Arial"), local("Liberation Sans"), local("Helvetica"); size-adjust: 103%; ascent-override: 102%; descent-override: 29%; line-gap-override: 0%; }
-@font-face { font-family: "IBM Plex Mono Fallback"; src: local("Courier New"), local("DejaVu Sans Mono"), local("Liberation Mono"), local("Menlo"); size-adjust: 100%; ascent-override: 102.5%; descent-override: 27.5%; line-gap-override: 0%; }
+@font-face { font-family: "Chivo Mono Fallback"; src: local("Courier New"), local("DejaVu Sans Mono"), local("Liberation Mono"), local("Menlo"); size-adjust: 100%; ascent-override: 94%; descent-override: 25%; line-gap-override: 0%; }
 
 :root {
   /* Ground and surfaces: warm charcoal, borders one step above the surface */
@@ -33,12 +32,24 @@
   --brand-tile: #201d1a; --brand-tile-line: #38322b;
   /* Type */
   --font-sans: "Manrope", "Manrope Fallback", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", "IBM Plex Mono Fallback", ui-monospace, monospace;
+  --font-mono: "Chivo Mono", "Chivo Mono Fallback", ui-monospace, monospace;
   --t-key: 12px; --t-label: 12px; --t-cell: 13px; --t-title: 15px; --t-num: 13px; --t-hero: 16px; --t-h2: 20px; --t-kpi: 24px; --t-kpi-big: 28px;
   /* Shape */
   --r-sm: 4px; --r-md: 8px; --r-lg: 12px;
   --shadow-pop: 0 10px 30px rgb(0 0 0 / .4), 0 1px 0 rgb(255 255 255 / .03) inset;
   --shadow-lift: 0 1px 2px rgb(0 0 0 / .3);
+  /* Elevation: a soft top-lit surface, a 1px inner highlight, a tight and a wide warm-black shadow */
+  --elev-fill: linear-gradient(180deg, var(--surface-2), var(--surface-1) 62%);
+  --elev-highlight: inset 0 1px 0 rgb(255 236 214 / .055);
+  --elev-1: var(--elev-highlight), 0 1px 2px rgb(10 6 3 / .55), 0 10px 28px -8px rgb(10 6 3 / .6);
+  --elev-2: inset 0 1px 0 rgb(255 236 214 / .075), 0 2px 4px rgb(10 6 3 / .55), 0 18px 40px -10px rgb(10 6 3 / .7);
+  --elev-tile: inset 0 1px 0 rgb(255 236 214 / .07), 0 1px 2px rgb(10 6 3 / .45);
+  --elev-tile-press: inset 0 1px 2px rgb(10 6 3 / .45);
+  --elev-lift: -2px;
+  /* The page ground: a faint warm light under the header, a soft vignette and fine grain against banding */
+  --ground-glow: radial-gradient(ellipse 70% 420px at 50% 0, rgb(255 132 54 / .045), transparent 100%);
+  --ground-vignette: radial-gradient(ellipse 120% 90% at 50% 30%, transparent 55%, rgb(4 3 2 / .38) 100%);
+  --ground-grain-opacity: .05;
   --ease: cubic-bezier(.2, .7, .2, 1);
   /* Layout */
   --wrap: 1440px; --header-h: 60px;
@@ -61,6 +72,15 @@
   --brand-tile: #f2ede5; --brand-tile-line: #ddd4c6;
   --shadow-pop: 0 10px 30px rgb(60 40 20 / .12), 0 1px 2px rgb(60 40 20 / .06);
   --shadow-lift: 0 1px 2px rgb(60 40 20 / .08);
+  --elev-fill: linear-gradient(180deg, #ffffff, var(--surface-1) 62%);
+  --elev-highlight: inset 0 1px 0 rgb(255 255 255 / .9);
+  --elev-1: var(--elev-highlight), 0 1px 2px rgb(60 40 20 / .06), 0 8px 24px -10px rgb(60 40 20 / .14);
+  --elev-2: var(--elev-highlight), 0 2px 4px rgb(60 40 20 / .07), 0 16px 34px -12px rgb(60 40 20 / .2);
+  --elev-tile: inset 0 1px 0 rgb(255 255 255 / .7), 0 1px 2px rgb(60 40 20 / .07);
+  --elev-tile-press: inset 0 1px 2px rgb(60 40 20 / .12);
+  --ground-glow: radial-gradient(ellipse 70% 420px at 50% 0, rgb(255 170 110 / .09), transparent 100%);
+  --ground-vignette: radial-gradient(ellipse 120% 90% at 50% 30%, transparent 60%, rgb(120 90 60 / .06) 100%);
+  --ground-grain-opacity: .025;
   color-scheme: light;
 }
 /* The app's older names, mapped onto the tokens above so every page follows them. */
@@ -76,6 +96,10 @@
 html { scroll-behavior: smooth; }
 html, body { margin: 0; }
 body { background: var(--ground); color: var(--text-1); font: 400 14px/1.55 var(--font-sans); -webkit-font-smoothing: antialiased; min-height: 100vh; }
+/* The ground's light, vignette and grain sit on a fixed layer behind everything; colours stay charcoal (or off-white). */
+body::before, body::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+body::before { background: var(--ground-glow), var(--ground-vignette); }
+body::after { opacity: var(--ground-grain-opacity); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 1.6 -.3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E"); background-size: 160px 160px; }
 a { color: inherit; text-decoration: none; }
 button, input, select { font: inherit; color: inherit; }
 button, a, input { -webkit-tap-highlight-color: transparent; }

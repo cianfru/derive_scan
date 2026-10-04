@@ -12,7 +12,7 @@
 .q-portfolio-line .q-realized-sum b.up { color: var(--up); } .q-portfolio-line .q-realized-sum b.down { color: var(--down); }
 .marketplace-positions .q-position > .q-position-realized { grid-column: 1 / -1; margin: 0; }
 .marketplace-positions .q-position-expanded .q-real { border-top: 1px solid var(--border); padding-top: 5px; }
-.marketplace-positions .q-position { display: grid; grid-template-columns: minmax(260px, .95fr) minmax(520px, 1.6fr); gap: 8px 24px; padding: 22px 24px 6px; box-shadow: var(--shadow-lift); }
+.marketplace-positions .q-position { display: grid; grid-template-columns: minmax(260px, .95fr) minmax(520px, 1.6fr); gap: 8px 24px; padding: 22px 24px 6px; background: var(--elev-fill); box-shadow: var(--elev-1); }
 .marketplace-positions .q-position-heading { grid-column: 1; display: flex; align-items: flex-start; justify-content: start; gap: 12px; }
 .q-position-heading > .asset { flex: 0 0 34px; }
 .q-position-heading > .asset > span { display: none; }
@@ -75,7 +75,7 @@
 
 /* Combined exposure ("At settlement") inside the compact Positions layout: the chart beside its figures on wide screens. */
 .marketplace-positions .q-exp { margin: 4px 0 6px; }
-.marketplace-positions .q-exp-g { padding: 18px 24px; box-shadow: var(--shadow-lift); }
+.marketplace-positions .q-exp-g { padding: 18px 24px; background: var(--elev-fill); box-shadow: var(--elev-1); }
 .marketplace-positions .ex-figs dd small { font-family: var(--font-sans); font-weight: 400; }
 .marketplace-positions .ex-figs > div:last-child dd { font-family: var(--font-sans); font-size: 13px; color: var(--text-2); }
 @media (min-width: 1051px) {

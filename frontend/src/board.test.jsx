@@ -12,7 +12,7 @@ vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.curren
 import Board from "./pages/Board.jsx";
 import { SaloonNotices } from "./components/SaloonNotices.jsx";
 import { BANNED, ticket } from "./lib/questions.js";
-import { DEFAULT_SORT, SORTS, boardRows, budgetTicket, cleanBudget, costOverMark, exitCost, filterRows, markFor, sortRows } from "./lib/board.js";
+import { DEFAULT_SORT, SORTS, boardRows, budgetTicket, cleanBudget, coinRank, costOverMark, dateRows, exitCost, filterRows, markFor, sortRows } from "./lib/board.js";
 import {
   KEY, _resetMemory, computeNotices, dismiss, exportFollows, follow, importFollows, loadBudget, loadDoc, migrate,
   researchChanges, saveBudget, saveDoc, setLevel,
@@ -135,11 +135,12 @@ describe("cost over mark", () => {
     expect(r.markReason).toMatch(/missing/);
     expect(boardRows([btc], 100, { now: btc.prices_ts + 40 * 60 }).rows.every((x) => x.overMark == null)).toBe(true);
   });
-  it("is the default order, lowest first, with rows not available yet last", () => {
-    expect(DEFAULT_SORT).toBe("mark");
-    expect(SORTS[0]).toEqual(["mark", "Lowest cost over mark"]);
+  it("orders lowest first, with rows not available yet last", () => {
+    // By date became the default view (owner, 4 October 2026); cost over mark is the first of the other orders.
+    expect(DEFAULT_SORT).toBe("date");
+    expect(SORTS.slice(0, 2)).toEqual([["date", "By date"], ["mark", "Lowest cost over mark"]]);
     const noMark = { ...btc, dates: btc.dates.map((d) => ({ ...d, levels: d.levels.map((l) => (l.id === H ? { ...l, fair: null } : l)) })) };
-    const sorted = sortRows(boardRows([noMark, hype], 100, { now: NOW }).rows);
+    const sorted = sortRows(boardRows([noMark, hype], 100, { now: NOW }).rows, "mark");
     const n = sorted.findIndex((r) => r.overMark == null);
     expect(n).toBeGreaterThan(0);
     expect(sorted.slice(n).every((r) => r.overMark == null)).toBe(true);
@@ -168,7 +169,7 @@ describe("filters and order", () => {
     expect(sortRows([...rows].reverse(), "size").map((r) => r.key)).toEqual(sortRows(rows, "size").map((r) => r.key));
   });
   it("never uses the research layers: attaching any reading changes no order", () => {
-    for (const sort of ["mark", "near", "soon", "size"]) {
+    for (const sort of ["date", "mark", "near", "soon", "size"]) {
       const plain = sortRows(rows, sort).map((r) => r.key);
       const up = rows.map((r) => ({ ...r, align: align("up"), regime: "MARKUP", lean: "up" }));
       const down = rows.map((r, i) => ({ ...r, align: align(i % 2 ? "defensive" : "up"), regime: "MARKDOWN", lean: "defensive" }));
@@ -180,10 +181,14 @@ describe("filters and order", () => {
 
 describe("the board page", () => {
   const order = () => screen.getAllByRole("link", { name: /view outcome/ }).map((a) => a.getAttribute("href"));
-  it("groups a coin, level and date without letting research alter its order", () => {
+  it("groups a coin, level and date without letting research alter its order", async () => {
+    const u = userEvent.setup({ advanceTimers: () => {} });
+    const pick = async () => u.selectOptions(screen.getByRole("combobox", { name: "Order" }), "mark");
     const { container } = show();
+    const byDate = order();
+    await pick();
     const first = order();
-    const want = [...new Set(sortRows(boardRows([btc, hype], 100, { now: NOW }).rows).map((r) => `/q/${r.id}`))].slice(0, 24);
+    const want = [...new Set(sortRows(boardRows([btc, hype], 100, { now: NOW }).rows, "mark").map((r) => `/q/${r.id}`))].slice(0, 24);
     expect(first).toEqual(want);
     expect(screen.getByText(/answers for/).textContent).toMatch(/\$100\.00/);
     const card = [...container.querySelectorAll(".bd-card")].find((c) => c.querySelectorAll("a.bd-choice").length === 2);
@@ -192,14 +197,14 @@ describe("the board page", () => {
     expect(card.textContent).toMatch(/Pays in part\$[\d,]+–\$[\d,]+/);
     expect(card.textContent).toMatch(/Cost per \$1 of maximum payout · before fees/);
     cleanup();
-    docs.current = { ...docs.current, "markets.json": markets("defensive") }; show(); expect(order()).toEqual(first);
+    docs.current = { ...docs.current, "markets.json": markets("defensive") }; show(); expect(order()).toEqual(byDate); await pick(); expect(order()).toEqual(first);
     cleanup();
-    docs.current = { ...docs.current, "markets.json": null }; show(); expect(order()).toEqual(first);
+    docs.current = { ...docs.current, "markets.json": null }; show(); expect(order()).toEqual(byDate); await pick(); expect(order()).toEqual(first);
   });
   it("keeps comparisons behind details and missing-mark reasons available", async () => {
     const u = userEvent.setup({ advanceTimers: () => {} });
     const { container } = show();
-    expect(screen.getByRole("combobox", { name: "Order" }).value).toBe("mark");
+    expect(screen.getByRole("combobox", { name: "Order" }).value).toBe("date");
     const comparison = container.querySelector(".bd-comparison");
     expect(comparison.open).toBe(false);
     await u.click(comparison.querySelector("summary"));
@@ -283,6 +288,81 @@ describe("the board page", () => {
     expect(loadDoc().follows.find((x) => x.id === f.id).level).toBe(40);
     await u.type(screen.getByRole("searchbox"), "85000");
     expect(screen.queryAllByRole("link", { name: /see what it pays/ }).every((a) => a.getAttribute("href") === `/q/${f.id}?side=no`)).toBe(true);
+  });
+});
+
+describe("by date", () => {
+  const eth = { ...JSON.parse(JSON.stringify(btc).replaceAll("BTC-", "ETH-")), und: "ETH", index: 84500 };
+  const groupsOf = (rows) => [...new Map(rows.map((r) => [r.id, r])).values()];
+  const rowsOf = (boards, coins = ["BTC", "ETH", "HYPE"], f = {}) => dateRows(groupsOf(filterRows(boardRows(boards, 100, { now: NOW }).rows, f, NOW)), coins);
+  it("puts rows by settlement, soonest first, Bitcoin then Ethereum then the coin bar on the same date", () => {
+    const rows = rowsOf([hype, eth, btc], ["HYPE", "ETH", "BTC"]);
+    expect(rows.every((r, i) => i === 0 || rows[i - 1].settleTs <= r.settleTs)).toBe(true);
+    const fri = rows.filter((r) => r.expiry === "20261009").map((r) => r.und);
+    expect(fri).toEqual(["BTC", "ETH", "HYPE"]);
+    expect(new Set(rows.map((r) => r.key)).size).toBe(rows.length);
+    const rank = coinRank(["XRP", "HYPE", "ETH"]);
+    expect(["HYPE", "ZZZ", "ETH", "XRP", "BTC"].sort((a, b) => rank(a) - rank(b))).toEqual(["BTC", "ETH", "XRP", "HYPE", "ZZZ"]);
+  });
+  it("runs levels from low to high inside a row, one card per level", () => {
+    for (const r of rowsOf([btc, hype])) {
+      expect(r.items.every((it, i) => i === 0 || r.items[i - 1].k < it.k)).toBe(true);
+      expect(r.items.every((it) => it.und === r.und && it.expiry === r.expiry)).toBe(true);
+    }
+  });
+  it("marks the index between the levels that straddle it", () => {
+    for (const r of rowsOf([btc, hype])) {
+      expect(r.index).toBe(r.und === "BTC" ? btc.index : hype.index);
+      expect(r.items.slice(0, r.nowAt).every((it) => it.k <= r.index)).toBe(true);
+      expect(r.items.slice(r.nowAt).every((it) => it.k > r.index)).toBe(true);
+    }
+    const one = (k) => ({ und: "BTC", expiry: "20261009", settleTs: 1, k, id: String(k), index: 84823.1 });
+    expect(dateRows([one(86000), one(83000), one(85000), one(84000)])[0].nowAt).toBe(2);
+    expect(dateRows([one(86000)])[0].nowAt).toBe(0);
+    expect(dateRows([one(80000)])[0].nowAt).toBe(1);
+    expect(dateRows([{ ...one(80000), index: null }])[0].nowAt).toBeNull();
+  });
+  it("applies the coin, date and answer filters to the rows", () => {
+    expect(rowsOf([btc, hype], undefined, { coin: "HYPE" }).every((r) => r.und === "HYPE")).toBe(true);
+    const near = rowsOf([btc, hype], undefined, { range: "2" });
+    expect(near.length).toBeGreaterThan(0);
+    expect(near.every((r) => r.settleTs - NOW <= 2 * 86400)).toBe(true);
+  });
+  it("shows rows with a header and the index mark by default, and one flat grid for another order", async () => {
+    const u = userEvent.setup({ advanceTimers: () => {} });
+    const { container } = show();
+    expect(screen.getByRole("combobox", { name: "Order" }).value).toBe("date");
+    const rows = [...container.querySelectorAll(".bd-row")];
+    expect(rows.length).toBeGreaterThan(1);
+    expect(container.querySelector(".bd-grid")).toBeNull();
+    const head = rows[0].querySelector(".bd-row-head").textContent;
+    expect(head).toMatch(/^Bitcoin·Mon 5 Oct, 08:00 UTC·in \d+d \d+h/);
+    expect(head).toMatch(/now \$84,823/);
+    // The card drops what the header says.
+    expect(rows[0].querySelector(".bd-card-top")).toBeNull();
+    expect(rows[0].querySelector(".bd-card h3")).toBeTruthy();
+    const levels = (row) => [...row.querySelectorAll(".bd-row-cards > li")].map((li) => (li.classList.contains("bd-now") ? "now"
+      : Number(li.querySelector(".bd-question").getAttribute("aria-label").match(/at \$([\d,.]+)/)[1].replace(/,/g, ""))));
+    const first = levels(rows[0]);
+    const at = first.indexOf("now");
+    expect(at).toBeGreaterThan(0);
+    expect(first[at - 1]).toBeLessThanOrEqual(btc.index);
+    expect(first[at + 1]).toBeGreaterThan(btc.index);
+    const ks = first.filter((x) => x !== "now");
+    expect(ks).toEqual([...ks].sort((a, b) => a - b));
+    // Rows run by date across coins.
+    const dates = rows.map((r) => r.getAttribute("aria-label"));
+    expect(dates.slice(0, 2).every((d) => d.includes("Mon 5 Oct") || d.includes("Tue 6 Oct"))).toBe(true);
+    // Filters keep working on the rows.
+    await u.click(screen.getByRole("tab", { name: "HYPE" }));
+    expect([...container.querySelectorAll(".bd-row")].every((r) => r.getAttribute("aria-label").startsWith("Hyperliquid"))).toBe(true);
+    await u.click(screen.getByRole("tab", { name: "All coins" }));
+    // Another order: the flat grid, with the coin and date back on each card.
+    await u.selectOptions(screen.getByRole("combobox", { name: "Order" }), "mark");
+    expect(container.querySelector(".bd-row")).toBeNull();
+    expect(container.querySelector(".bd-grid .bd-card-top")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Filters/ }).textContent).toBe("Filters1");
+    expect(container.textContent).not.toMatch(BANNED);
   });
 });
 

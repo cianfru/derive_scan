@@ -70,8 +70,8 @@
 
 .bd-marketplace { display: grid; gap: 20px; }
 .bd-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; align-items: start; }
-.bd-card { position: relative; min-width: 0; padding: 20px 20px 0; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); box-shadow: 0 3px 12px rgb(0 0 0 / .06); transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease); }
-.bd-card:hover { border-color: var(--border-strong); box-shadow: 0 5px 18px rgb(0 0 0 / .10); }
+.bd-card { position: relative; min-width: 0; padding: 20px 20px 0; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--elev-fill); box-shadow: var(--elev-1); transition: border-color 180ms var(--ease), box-shadow 180ms var(--ease), transform 180ms var(--ease); }
+.bd-card:hover, .bd-card:focus-within { border-color: var(--border-strong); box-shadow: var(--elev-2); transform: translateY(var(--elev-lift, -2px)); }
 .bd-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .bd-card .asset { gap: 10px; }
 .bd-card .asset-icon { width: 34px; height: 34px; }
@@ -79,7 +79,9 @@
 .bd-card .asset small { font-size: 12px; }
 .bd-settle { text-align: right; font-size: 12px; color: var(--text-2); white-space: nowrap; }
 .bd-settle small { display: block; font: 400 12px/1.5 var(--font-mono); color: var(--text-3); }
-.bd-card h2 { margin: 24px 0 18px; font: 600 17px/1.45 var(--font-sans); letter-spacing: -.02em; }
+.bd-card-q { margin: 24px 0 18px; font: 600 17px/1.45 var(--font-sans); letter-spacing: -.02em; }
+.bd-card-q strong.mono { font-family: var(--font-sans); font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: -.02em; }
+.bd-card.in-row .bd-card-q { margin: 0 0 16px; }
 .bd-question { color: var(--text-1); text-decoration: none; }
 .bd-question strong { display: block; margin-top: 3px; font-size: 30px; font-weight: 500; letter-spacing: -.04em; }
 .bd-question::after { content: ""; position: absolute; inset: 0; border-radius: var(--r-lg); }
@@ -89,7 +91,8 @@
 .bd-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .bd-choices.single { grid-template-columns: 1fr; }
 .bd-answer { min-width: 0; }
-.bd-choice { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 56px; padding: 10px 12px; border: 1px solid transparent; border-radius: var(--r-md); font: 600 14px/1.3 var(--font-sans); text-decoration: none; transition: background 120ms var(--ease), border-color 120ms var(--ease); }
+.bd-choice { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 56px; padding: 10px 12px; border: 1px solid transparent; border-radius: var(--r-md); font: 600 14px/1.3 var(--font-sans); text-decoration: none; box-shadow: var(--elev-tile); transition: background 120ms var(--ease), border-color 120ms var(--ease), box-shadow 120ms var(--ease), transform 120ms var(--ease); }
+.bd-choice:active { transform: translateY(1px); box-shadow: var(--elev-tile-press); }
 .bd-choice.yes { color: var(--up); background: var(--up-soft); border-color: color-mix(in srgb, var(--up) 20%, transparent); }
 .bd-choice.no { color: var(--down); background: var(--down-soft); border-color: color-mix(in srgb, var(--down) 20%, transparent); }
 .bd-choice.yes:hover { background: color-mix(in srgb, var(--up) 17%, var(--surface-1)); border-color: var(--up); }
@@ -97,7 +100,7 @@
 .bd-choice > span { display: flex; align-items: center; gap: 5px; }
 .bd-choice b { font-size: 24px; font-weight: 500; letter-spacing: -.05em; }
 .bd-choice b small { font-size: 14px; }
-.bd-choice.off { background: var(--surface-2); color: var(--text-3); font-size: 12px; }
+.bd-choice.off { background: var(--surface-2); color: var(--text-3); font-size: 12px; box-shadow: var(--elev-tile-press); }
 .bd-choice.off .q-noprice { font-size: 12px; }
 .bd-choice-note { display: flex; gap: 4px; align-items: center; justify-content: space-between; min-height: 44px; }
 .bd-choice-note > span { color: var(--text-3); font-size: 12px; line-height: 1.3; }
@@ -133,6 +136,47 @@
 .bd-empty { padding: 64px 24px; border: 1px dashed var(--border-strong); border-radius: var(--r-lg); text-align: center; }
 .bd-empty h2 { margin: 0 0 10px; font-size: 22px; }
 .bd-empty p { font-size: 14px; color: var(--text-3); max-width: 48ch; margin: 0 auto 20px; }
+/* By date: one row per coin and settlement date, levels from low to high, the index marked. */
+.bd-rows { display: grid; gap: 34px; min-width: 0; }
+.bd-rows > * { min-width: 0; }
+.bd-row { display: grid; gap: 12px; min-width: 0; }
+.bd-row-head { display: flex; align-items: center; justify-content: space-between; gap: 6px 16px; flex-wrap: wrap; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.bd-row-head h2 { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin: 0; font: 600 16px/1.35 var(--font-sans); letter-spacing: -.01em; color: var(--text-1); }
+.bd-row-head .asset-icon { width: 24px; height: 24px; margin-right: 2px; }
+.bd-row-sep { color: var(--text-3); font-weight: 400; }
+.bd-row-date { font-weight: 500; }
+.bd-row-in { font-size: 13px; font-weight: 400; color: var(--text-3); }
+.bd-row-meta { display: inline-flex; align-items: baseline; gap: 14px; font-size: 12px; color: var(--text-3); }
+.bd-row-index { font-size: 14px; color: var(--text-1); }
+.bd-row-scroll { position: relative; min-width: 0; }
+.bd-row-cards { --gap: 14px; --now: 30px; position: relative; list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--gap); align-items: stretch; }
+.bd-row-cards > .bd-card { flex: 0 0 calc((100% - var(--now) - 4 * var(--gap)) / 4); padding-top: 18px; }
+.bd-now { flex: 0 0 var(--now); display: flex; flex-direction: column; align-items: center; gap: 8px; padding-block: 6px; color: var(--text-2); }
+.bd-now-line { flex: 1; width: 0; border-left: 1px dashed var(--border-strong); min-height: 24px; }
+.bd-now-text { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 12px; white-space: nowrap; color: var(--text-1); }
+@media (max-width: 1190px) {
+  .bd-row-cards > .bd-card { flex-basis: calc((100% - var(--now) - 3 * var(--gap)) / 3); }
+}
+@media (max-width: 900px) {
+  .bd-row-cards > .bd-card { flex-basis: calc((100% - var(--now) - 2 * var(--gap)) / 2); }
+}
+@media (max-width: 700px) {
+  /* Phones: each row scrolls sideways, about 1.2 cards in view, snapping card by card. */
+  .bd-rows { gap: 28px; }
+  .bd-row-head { align-items: flex-start; }
+  .bd-row-head h2 { font-size: 15px; }
+  .bd-row-scroll { margin-inline: calc(-1 * clamp(16px, 3vw, 40px)); }
+  .bd-row-cards { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scroll-padding-inline: clamp(16px, 3vw, 40px); padding: 0 clamp(16px, 3vw, 40px) 12px; --gap: 12px; --now: 26px;
+    scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+  .bd-row-cards::-webkit-scrollbar { height: 4px; }
+  .bd-row-cards::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+  .bd-row-cards > .bd-card { flex: 0 0 78%; scroll-snap-align: start; }
+  .bd-now { scroll-snap-align: none; }
+  .bd-row-scroll::before, .bd-row-scroll::after { content: ""; position: absolute; top: 0; bottom: 12px; width: 28px; z-index: 2; pointer-events: none; opacity: 0; transition: opacity 160ms var(--ease); }
+  .bd-row-scroll::before { left: 0; background: linear-gradient(to right, var(--ground), transparent); }
+  .bd-row-scroll::after { right: 0; background: linear-gradient(to left, var(--ground), transparent); }
+  .bd-row-scroll.more-start::before, .bd-row-scroll.more-end::after { opacity: 1; }
+}
 @media (max-width: 1190px) {
   .bd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .bd-filters { display: grid; }
@@ -161,7 +205,7 @@
   .bd-settle small { font-size: 12px; }
   .bd-budget-preview dd { font-size: 13px; }
 }
-@media (prefers-reduced-motion: reduce) { .bd-card, .bd-choice { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .bd-card, .bd-choice { transition: none; } .bd-card:hover, .bd-card:focus-within, .bd-choice:active { transform: none; } }
 @media (pointer: coarse) {
   .bd-choice-note .fl-btn, .q-follow .fl-btn { min-width: 44px; min-height: 44px; }
 }

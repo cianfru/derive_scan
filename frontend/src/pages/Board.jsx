@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { useFeeds } from "../components/Feeds.jsx";
 import { Info, Loading, Failed, Tabs } from "../components/ui.jsx";
-import { Asset } from "../components/MarketVisuals.jsx";
+import { Asset, CoinIcon } from "../components/MarketVisuals.jsx";
 import { ChainMini } from "../components/Chain.jsx";
 import { ASSET_NAMES } from "../lib/presentation.js";
 import SaloonHead from "../components/SaloonNotices.jsx";
 import { FollowButton, FollowLevel } from "../components/Follow.jsx";
-import { DEFAULT_SORT, RANGES, SIDES, SORTS, boardRows, cleanBudget, contextHorizon, filterRows, sortRows } from "../lib/board.js";
+import { DEFAULT_SORT, RANGES, SIDES, SORTS, boardRows, cleanBudget, contextHorizon, dateRows, filterRows, sortRows } from "../lib/board.js";
 import { exportFollows, importFollows, saveBudget, unfollow, useFollowsDoc } from "../lib/follows.js";
 import { ANSWER, countdown, dayLabel, fullPay, money, noPriceReason, priceAge, signed } from "../lib/questions.js";
 import "../questions.css";
@@ -97,15 +97,18 @@ function outcomeGroups(rows, unavailable, includeMissing = () => false) {
   return [...groups.values()];
 }
 
-function OutcomeCard({ outcome: r, align, budget }) {
+/** One outcome card. In the date rows (`inRow`) the row header carries the coin and the date, so the
+ * card leaves them out. */
+function OutcomeCard({ outcome: r, align, budget, inRow = false }) {
   const [expanded, setExpanded] = useState(false);
   const answers = [r.answers.yes, r.answers.no].filter(Boolean);
+  const Heading = inRow ? "h3" : "h2";
   return (
-    <li className="bd-card">
-      <div className="bd-card-top"><Asset und={r.und} /><span className="bd-settle">{dayLabel(r.expiry)}<small>08:00 UTC · {countdown(r.settleTs)}</small></span></div>
-      <h2><Link className="bd-question" to={`/q/${r.id}`} state={{ dollars: budget }} aria-label={`${r.und} at ${money(r.k)} on ${dayLabel(r.expiry)}: view outcome`}>
+    <li className={`bd-card${inRow ? " in-row" : ""}`}>
+      {!inRow && <div className="bd-card-top"><Asset und={r.und} /><span className="bd-settle">{dayLabel(r.expiry)}<small>08:00 UTC · {countdown(r.settleTs)}</small></span></div>}
+      <Heading className="bd-card-q"><Link className="bd-question" to={`/q/${r.id}`} state={{ dollars: budget }} aria-label={`${r.und} at ${money(r.k)} on ${dayLabel(r.expiry)}: view outcome`}>
         Higher or lower than <strong className="mono">{money(r.k)}?</strong>
-      </Link></h2>
+      </Link></Heading>
       <div className="bd-price-key">Cost per $1 of maximum payout · before fees<Info label={`About ${r.und} answer prices at ${money(r.k)}`}>This is the upfront cost of the option spread per $1 of maximum payout, rounded up to the next cent. It is an upfront cost; the spread can pay in part at settlement. Your budget figures below include Derive's fees; what it pays is before any settlement fees.</Info></div>
       <div className={`bd-choices${answers.length === 1 ? " single" : ""}`}>{answers.map((a) => <AnswerChoice key={a.side} r={a} budget={budget} />)}</div>
       <div className="bd-partial"><span>Pays in part</span><b className="mono">{money(r.lo)}–{money(r.hi)}</b><Info label={`About partial payout for ${r.und} at ${money(r.k)}`}>Between these prices, the spread pays part of its maximum, in a straight line. Higher reaches full payout at the upper price; Lower reaches full payout at the lower price. Opening an outcome shows the complete payout curve.</Info></div>
@@ -118,6 +121,45 @@ function OutcomeCard({ outcome: r, align, budget }) {
         </>}
       </details>
     </li>
+  );
+}
+
+/** Where the coin's index sits within a row's ladder: a slim mark between two levels. */
+function NowMark({ index }) {
+  return <li className="bd-now" aria-label={`${money(index)}, the coin's index now, sits here`}><span className="bd-now-text mono" aria-hidden="true">now {money(index)}</span><span className="bd-now-line" aria-hidden="true" /></li>;
+}
+
+/** One coin and settlement date: a header, then its levels from low to high with the index marked.
+ * On phones the cards scroll sideways; the edges fade while there is more to see. */
+function DateRow({ row, align, budget }) {
+  const scroller = useRef(null);
+  const [edges, setEdges] = useState({ start: false, end: false });
+  const name = ASSET_NAMES[row.und] || row.und;
+  const when = `${dayLabel(row.expiry)}, 08:00 UTC`;
+  const n = row.items.length;
+  const measure = () => {
+    const el = scroller.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setEdges({ start: el.scrollLeft > 4, end: max > 4 && el.scrollLeft < max - 4 });
+  };
+  useEffect(() => {
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [n]);
+  const cards = row.items.map((g) => <OutcomeCard key={g.id} outcome={g} align={align} budget={budget} inRow />);
+  if (row.nowAt != null) cards.splice(row.nowAt, 0, <NowMark key="now" index={row.index} />);
+  return (
+    <section className="bd-row" aria-label={`${name}, settles ${when}`}>
+      <header className="bd-row-head">
+        <h2><CoinIcon und={row.und} /><span className="bd-row-name">{name}</span><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-date">{when}</span>{countdown(row.settleTs) && <><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-in mono">{countdown(row.settleTs)}</span></>}</h2>
+        <span className="bd-row-meta"><span className="bd-row-n">{n} {n === 1 ? "level" : "levels"}</span>{row.index != null && <span className="bd-row-index mono">now {money(row.index)}</span>}</span>
+      </header>
+      <div className={`bd-row-scroll${edges.start ? " more-start" : ""}${edges.end ? " more-end" : ""}`}>
+        <ol ref={scroller} className="bd-row-cards" onScroll={measure} aria-label={`${name} levels on ${dayLabel(row.expiry)}, low to high`}>{cards}</ol>
+      </div>
+    </section>
   );
 }
 
@@ -216,6 +258,12 @@ export default function Board({ followingOnly = false }) {
   const list = sortRows(filterRows(rows, filters, now).filter(matches), sort);
   const off = filterRows(noPrice, filters, now).filter(matches);
   const groups = outcomeGroups(list, off, (id, answer) => side === "all" && (!followingOnly || follows.has(`${id}:${answer}`)));
+  const byDate = sort === "date";
+  const rowsByDate = byDate ? dateRows(groups, coins) : [];
+  // The rows shown: whole rows until about PAGE cards are on screen.
+  const shownRows = [];
+  for (let i = 0, cards = 0; i < rowsByDate.length && cards < shown; i++) { shownRows.push(rowsByDate[i]); cards += rowsByDate[i].items.length; }
+  const shownCards = shownRows.reduce((n, r) => n + r.items.length, 0);
   const activeFilters = Number(range !== "all") + Number(side !== "all") + Number(sort !== DEFAULT_SORT);
   const alignOf = Object.fromEntries((markets?.coins || []).map((c) => [c.und, c.align]));
   useEffect(() => { setShown(PAGE); }, [coin, range, side, sort, budget, search, followingOnly]);
@@ -246,18 +294,25 @@ export default function Board({ followingOnly = false }) {
       {!index || !ready ? <Loading /> : (
         <>
           <p className="bd-count status" aria-live="polite">
-            <span className="bd-count-main"><span className="mono">{groups.length}</span> {groups.length === 1 ? "outcome" : "outcomes"}<span className="bd-answer-count"> · {list.length} {list.length === 1 ? "answer" : "answers"} for <span className="mono">{usd(budget)}</span></span></span>
+            <span className="bd-count-main"><span className="mono">{groups.length}</span> {groups.length === 1 ? "outcome" : "outcomes"}{byDate && <> on <span className="mono">{rowsByDate.length}</span> {rowsByDate.length === 1 ? "date" : "dates"}</>}<span className="bd-answer-count"> · {list.length} {list.length === 1 ? "answer" : "answers"} for <span className="mono">{usd(budget)}</span></span></span>
             <span className="bd-count-time">
             Defined cost · Partial payouts
             {paused ? " · prices paused" : index?.prices_ts ? <> · prices {new Date(index.prices_ts * 1000).toISOString().slice(11, 16)} UTC</> : null}
-            <Info label="About this list">Answers are grouped by coin, price level and settlement date. Each card takes the position of its first answer in your selected order: cost over Derive's mark before fees, closeness to the coin's price, settlement or size. Missing comparison figures go last. Research is separate from this order. Answers that fail Cowboy's checks are left out; answers with no price have a reason below.</Info></span>
+            <Info label="About this list">{byDate
+              ? "Each row is one coin and settlement date, soonest first; on the same date Bitcoin comes first, then Ethereum, then the other coins. Inside a row the levels run from low to high, and the slim mark shows where the coin's index is now. Choose another order under Filters to see one grid ranked by cost over Derive's mark, closeness to the price, settlement or size."
+              : "Answers are grouped by coin, price level and settlement date. Each card takes the position of its first answer in your selected order: cost over Derive's mark before fees, closeness to the coin's price, settlement or size. Missing comparison figures go last."} Research is separate from this order. Answers that fail Cowboy's checks are left out; answers with no price have a reason below.</Info></span>
           </p>
           {list.length ? (
             <div className="bd-marketplace" role="region" aria-label="Outcomes">
-              <ol className="bd-grid">
-                {groups.slice(0, shown).map((r) => <OutcomeCard key={r.id} outcome={r} align={alignOf[r.und]} budget={budget} />)}
-              </ol>
-              {groups.length > shown && <button className="text-control bd-more" onClick={() => setShown((n) => n + PAGE)}>Show {Math.min(PAGE, groups.length - shown)} more outcomes</button>}
+              {byDate ? <>
+                <div className="bd-rows">{shownRows.map((row) => <DateRow key={row.key} row={row} align={alignOf[row.und]} budget={budget} />)}</div>
+                {rowsByDate.length > shownRows.length && <button className="text-control bd-more" onClick={() => setShown(shownCards + PAGE)}>Show later dates</button>}
+              </> : <>
+                <ol className="bd-grid">
+                  {groups.slice(0, shown).map((r) => <OutcomeCard key={r.id} outcome={r} align={alignOf[r.und]} budget={budget} />)}
+                </ol>
+                {groups.length > shown && <button className="text-control bd-more" onClick={() => setShown((n) => n + PAGE)}>Show {Math.min(PAGE, groups.length - shown)} more outcomes</button>}
+              </>}
             </div>
           ) : <div className="bd-empty"><h2>{followingOnly && !doc.follows.length ? "Keep an eye on an answer." : "No outcomes match these filters."}</h2><p>{followingOnly && !doc.follows.length ? "Use the bookmark beside Higher or Lower to follow that answer. It stays in this browser." : "Try another coin, date or price. Answers without a price are listed below when available."}</p>{followingOnly && !doc.follows.length && <Link className="btn" to="/saloon">Browse outcomes</Link>}</div>}
           <NoPriceList list={off} />
