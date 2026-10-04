@@ -184,6 +184,7 @@ describe("the question page", () => {
     // The budget convention: $100 typed is the total, Derive's fees included. 0.04277 contracts:
     // $97.05 for the two options + $2.95 fees = $100.00 (was $99.99 + $3.01 = $103.01 before fees).
     expect(figs).toContain("You payi$100.00 incl. fees");
+    expect(container.querySelector(".md-preview .op-fees-line").textContent).toBe("Derive fees $2.95");
     expect(figs).toContain("Most it paystotal back, full $1 from $89,000$256.62");
     expect(figs).toContain("Most you can makeafter what you pay+$156.62");
     expect(figs).toContain("BreakeveniBTC at $85,338");

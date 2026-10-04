@@ -73,6 +73,7 @@
 .md-preview .op-figs .op-total { padding-block: 0 10px; margin-bottom: 3px; }
 .md-preview .op-figs .op-total dd { font-size: 20px; letter-spacing: -.04em; }
 .md-preview .op-figs .op-total dt { max-width: 24ch; }
+.md-preview .op-figs .op-total .op-fees-line { display: block; margin-top: 2px; font: 400 12px/1.4 var(--font-mono); letter-spacing: 0; color: var(--text-3); text-align: right; }
 .md-loss-note { font-size: 12px; color: var(--text-3); line-height: 1.6; margin: 12px 0 0; }
 .md-payoff-study { display: grid; gap: 18px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
 .md-payoff-study h2 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
@@ -123,4 +124,13 @@
   .md-evidence .q-context .chain-text { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .md-section-heading .q-time { max-width: 160px; margin-left: auto; width: auto; flex-wrap: wrap; justify-content: flex-end; text-align: right; }
   .md-ticket .q-legs li { grid-template-columns: 22px auto minmax(0, 1fr); grid-template-areas: "n act name" "n a l"; }
+}
+
+/* Touch: 44px hit areas for the back link, Follow and the chart range tabs. */
+@media (max-width: 900px), (pointer: coarse) {
+  .md-detail .md-back { min-height: 44px; }
+  .md-detail .fl-btn { min-height: 44px; min-width: 44px; }
+  .md-detail .q-chart-head .tabs { gap: 0 4px; }
+  .md-detail .q-chart-head .tabs button { min-height: 44px; min-width: 44px; padding-inline: 10px; }
+  .md-detail .q-chart-head .tabs button[aria-selected="true"] { border-bottom-color: transparent; background: linear-gradient(var(--accent), var(--accent)) no-repeat 50% 100% / calc(100% - 20px) 2px; }
 }

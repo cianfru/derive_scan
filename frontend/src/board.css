@@ -162,3 +162,6 @@
   .bd-budget-preview dd { font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) { .bd-card, .bd-choice { transition: none; } }
+@media (pointer: coarse) {
+  .bd-choice-note .fl-btn, .q-follow .fl-btn { min-width: 44px; min-height: 44px; }
+}

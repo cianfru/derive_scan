@@ -49,7 +49,7 @@ function AnswerChoice({ r, budget }) {
     <div className={`bd-answer ${r.side}`}>
       {available ? <Link to={`/q/${r.id}?side=${r.side}`} state={{ step: "preview", dollars: budget }} className={`bd-choice ${r.side}`} aria-label={`${name}: see what it pays`}>
         <span><i className={`q-arrow ${r.side}`} aria-hidden="true" />{ANSWER[r.side]}</span><b className="mono">{r.buyCents}<small>¢</small></b>
-      </Link> : <div className="bd-choice off"><span>{ANSWER[r.side]}</span><span className="q-noprice">No price<Info label={`Why ${name} has no price`}>{r.reason}</Info></span></div>}
+      </Link> : <div className="bd-choice off"><span>{ANSWER[r.side]}</span><span className="q-noprice">No price now<Info label={`Why ${name} has no price`}>{r.reason}</Info></span></div>}
       <div className="bd-choice-note"><span>{fullPay(r.level, r.side)}</span><FollowButton id={r.id} side={r.side} k={r.k} board={r.board} compact /></div>
       {available && <dl className="bd-budget-preview">
         <div><dt>You pay</dt><dd>{usd(r.total)}</dd></div>
