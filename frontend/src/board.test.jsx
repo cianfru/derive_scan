@@ -12,7 +12,7 @@ vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.curren
 import Board from "./pages/Board.jsx";
 import { SaloonNotices } from "./components/SaloonNotices.jsx";
 import { BANNED, ticket } from "./lib/questions.js";
-import { boardRows, budgetTicket, cleanBudget, filterRows, sortRows } from "./lib/board.js";
+import { DEFAULT_SORT, SORTS, boardRows, budgetTicket, cleanBudget, costOverMark, exitCost, filterRows, markFor, sortRows } from "./lib/board.js";
 import {
   KEY, _resetMemory, computeNotices, dismiss, exportFollows, follow, importFollows, loadBudget, loadDoc, migrate,
   researchChanges, saveBudget, saveDoc, setLevel,
@@ -64,8 +64,24 @@ describe("board maths per budget", () => {
     expect([r.lo, r.hi]).toEqual([82000, 88000]);
     expect(r.size).toBe(1500);
     expect(r.settleTs).toBe(Date.UTC(2026, 9, 5, 8) / 1000);
-    expect(r.overMark).toBeCloseTo(r.total / r.payout - level.fair, 9);
-    expect(r.overMark).toBeGreaterThan(0);
+    // Cost over mark per $1 of payout, before fees: 49c paid per $1 minus Derive's mark 47.37c = +1.63c.
+    expect(r.overMark).toBeCloseTo(r.premium / r.payout - level.fair, 9);
+    expect(r.overMark).toBeCloseTo(0.0163, 9);
+    // Fees are their own figure; exit cost now is the mark minus the sell-back price per $1 (47.37c - 45.43c).
+    expect(r.fees).toBeCloseTo(r.total - r.premium, 9);
+    expect(r.feesPer).toBeCloseTo(r.fees / r.payout, 9);
+    expect(r.exitCost).toBeCloseTo(0.4737 - 0.4543, 9);
+    expect(r.markTs).toBe(btc.prices_ts);
+  });
+  it("prices a $100 row and a $100 guided ticket the same: the amount is the total, fees included", () => {
+    const r = boardRows([btc], 100, { now: NOW }).rows.find((x) => x.key === `${H}:yes`);
+    const g = budgetTicket(level, "yes", 100, btc);
+    expect([r.total, r.premium, r.fees, r.payout]).toEqual([g.mostLose, g.premium, g.fees, g.payout]);
+    expect(g.budget).toBe(100);
+    // A budget below Derive's base fees buys nothing and says the smallest total.
+    const tiny = budgetTicket(level, "yes", 0.5, btc);
+    expect(tiny.belowMin).toBe(true);
+    expect(tiny.minTotal).toBeCloseTo(tiny.minCost + 2 * 0.5 + (Math.min(0.0003 * btc.index, 0.125 * 2962) + Math.min(0.0003 * btc.index, 0.125 * 22)) * btc.spec.min, 9);
   });
   it("stops at the size at this price for a large budget", () => {
     const r = boardRows([btc], 100000, { now: NOW }).rows.find((x) => x.key === `${H}:yes`);
@@ -82,6 +98,47 @@ describe("board maths per budget", () => {
     expect(boardRows([btc], 100, { now: NOW, paused: true }).rows).toHaveLength(0);
     expect(cleanBudget("abc")).toBe(100);
     expect(cleanBudget("$250")).toBe(250);
+  });
+});
+
+describe("cost over mark", () => {
+  const level = btc.dates[1].levels.find((l) => l.id === H);
+  it("normalises to $1 of maximum payout, so the budget does not change it", () => {
+    const at = (b) => boardRows([btc], b, { now: NOW }).rows.find((x) => x.key === `${H}:no`).overMark;
+    // Lower: 54.4c per $1 before fees minus the mark 1 - 47.37c = 52.63c.
+    expect(at(50)).toBeCloseTo(0.544 - (1 - 0.4737), 9);
+    expect(at(500)).toBeCloseTo(at(50), 9);
+    expect(costOverMark({ premium: 49, payout: 100 }, 0.4737)).toBeCloseTo(0.0163, 9);
+    expect(costOverMark({ premium: 49, payout: 0 }, 0.4737)).toBeNull();
+    expect(exitCost(level, "yes", null)).toBeNull();
+    expect(exitCost({ yes: {} }, "yes", 0.5)).toBeNull();
+  });
+  it("is not available when the mark is missing, older than the prices or stale, with the reason", () => {
+    expect(markFor(level, "yes", btc, NOW)).toMatchObject({ per: 0.4737, ts: btc.prices_ts, reason: null });
+    expect(markFor({ ...level, fair: null }, "yes", btc, NOW).reason).toMatch(/missing/);
+    const older = markFor({ ...level, fair_ts: btc.prices_ts - 900 }, "yes", btc, NOW);
+    expect(older.per).toBeNull();
+    expect(older.reason).toMatch(/older than the prices/);
+    const stale = markFor(level, "yes", btc, btc.prices_ts + 36 * 60);
+    expect(stale.per).toBeNull();
+    expect(stale.reason).toMatch(/more than 35 minutes ago/);
+    // On the board: the row stays, with no cost over mark and no exit cost, and the reason kept.
+    const noMark = { ...btc, dates: btc.dates.map((d) => ({ ...d, levels: d.levels.map((l) => (l.id === H ? { ...l, fair: null } : l)) })) };
+    const r = boardRows([noMark], 100, { now: NOW }).rows.find((x) => x.key === `${H}:yes`);
+    expect([r.overMark, r.exitCost, r.markPer]).toEqual([null, null, null]);
+    expect(r.markReason).toMatch(/missing/);
+    expect(boardRows([btc], 100, { now: btc.prices_ts + 40 * 60 }).rows.every((x) => x.overMark == null)).toBe(true);
+  });
+  it("is the default order, lowest first, with rows not available yet last", () => {
+    expect(DEFAULT_SORT).toBe("mark");
+    expect(SORTS[0]).toEqual(["mark", "Lowest cost over mark"]);
+    const noMark = { ...btc, dates: btc.dates.map((d) => ({ ...d, levels: d.levels.map((l) => (l.id === H ? { ...l, fair: null } : l)) })) };
+    const sorted = sortRows(boardRows([noMark, hype], 100, { now: NOW }).rows);
+    const n = sorted.findIndex((r) => r.overMark == null);
+    expect(n).toBeGreaterThan(0);
+    expect(sorted.slice(n).every((r) => r.overMark == null)).toBe(true);
+    expect(sorted.slice(n).map((r) => r.key)).toEqual(expect.arrayContaining([`${H}:yes`, `${H}:no`]));
+    expect(sorted.slice(0, n).every((r, i) => i === 0 || sorted[i - 1].overMark <= r.overMark)).toBe(true);
   });
 });
 
@@ -130,6 +187,23 @@ describe("the board page", () => {
     docs.current = { ...docs.current, "markets.json": null };
     show();
     expect(order()).toEqual(first);
+  });
+  it("orders by lowest cost over mark by default, shows fees and exit cost apart, and Not available yet when the mark is stale", () => {
+    const { container } = show();
+    expect(screen.getByRole("combobox", { name: "Order" }).value).toBe("mark");
+    const want = sortRows(boardRows([btc, hype], 100, { now: NOW }).rows, "mark").slice(0, 24).map((r) => r.key);
+    const got = [...container.querySelectorAll(".bd-link")].map((a) => { const u = new URL(a.href, "http://x"); return `${u.pathname.slice(3)}:${u.searchParams.get("side")}`; });
+    expect(got).toEqual(want);
+    const head = container.querySelector(".bd-head").textContent;
+    expect(head).toMatch(/Fees.*Cost over mark.*Exit cost now/);
+    // Fresh prices: the first rows all have a cost over mark (rows without one go last).
+    expect(container.querySelectorAll(".bd-over .bd-notyet")).toHaveLength(0);
+    cleanup();
+    vi.setSystemTime((btc.prices_ts + 40 * 60) * 1000); // prices 40 minutes old: stale, not paused
+    const stale = show().container;
+    expect(stale.querySelectorAll(".bd-row").length).toBeGreaterThan(0);
+    expect(stale.querySelectorAll(".bd-over .bd-notyet").length).toBe(stale.querySelectorAll(".bd-row").length);
+    expect(stale.textContent).not.toMatch(BANNED);
   });
   it("keeps the budget, filters by coin and answer, and passes the word check", async () => {
     const u = userEvent.setup({ advanceTimers: () => {} });

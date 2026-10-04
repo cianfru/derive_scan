@@ -76,23 +76,23 @@ describe("journal J1: recording a manual trade", () => {
   it("keeps the package, fills, costs, mark and readings, and survives reload and export/import intact", async () => {
     const [p] = await place();
     const j = p.journal;
-    expect(p).toMatchObject({ v: 2, network: "mainnet", exec: "hand_both", contracts: 0.04407 });
+    expect(p).toMatchObject({ v: 2, network: "mainnet", exec: "hand_both", contracts: 0.04277 });
     expect(j.package.legs).toEqual([
-      { name: "BTC-20261009-83000-C", act: "buy", signed_qty: 0.04407 },
-      { name: "BTC-20261009-89000-C", act: "sell", signed_qty: -0.04407 },
+      { name: "BTC-20261009-83000-C", act: "buy", signed_qty: 0.04277 },
+      { name: "BTC-20261009-89000-C", act: "sell", signed_qty: -0.04277 },
     ]);
     expect(j.package).toMatchObject({ venue: "Derive", network: "mainnet", direction: "Higher", expiry: "20261009", lo: 83000, hi: 89000 });
-    // Premium from the legs (2,431 - 162) x 0.04407, fees apart, both entered by the user.
+    // Premium from the legs (2,431 - 162) x 0.04277, fees apart, both entered by the user.
     expect(j.fill).toMatchObject({ ts: Date.UTC(2026, 9, 3, 13, 55) / 1000, complete: true, currency: "USDC", fees: 1.52, fees_known: true, limitation: null });
-    expect(j.fill.premium).toBeCloseTo((2431 - 162) * 0.04407, 6);
+    expect(j.fill.premium).toBeCloseTo((2431 - 162) * 0.04277, 6);
     expect(j.cost.total).toBeCloseTo(j.fill.premium + 1.52, 6);
     expect(p.paid).toBeCloseTo(j.cost.total, 6);
     expect(j.cost.breakeven_basis).toBe("exact");
-    expect(j.cost.breakeven).toBeCloseTo(83000 + j.cost.total / 0.04407, 1);
+    expect(j.cost.breakeven).toBeCloseTo(83000 + j.cost.total / 0.04277, 1);
     // The board's estimate is kept apart and labelled as one; the mark is a benchmark with its time.
-    expect(j.board_estimate.total).toBeCloseTo(103.01, 2);
+    expect(j.board_estimate.total).toBeCloseTo(100.00, 2); // $100 typed: the total, fees included
     expect(j.mark).toMatchObject({ source: "Derive mark, Cowboy board", ts: btc.prices_ts });
-    expect(j.mark.value).toBeCloseTo(lv.fair * 6000 * 0.04407, 6);
+    expect(j.mark.value).toBeCloseTo(lv.fair * 6000 * 0.04277, 6);
     // Three times kept apart; every reading published 13:45, before the 13:55 fill.
     expect(j.context).toMatchObject({ status: "at_fill", fill_ts: Date.UTC(2026, 9, 3, 13, 55) / 1000, snapshot_ts: T14 + 600, published_at: G, horizon: "7d" });
     expect(j.context.readings.engine).toMatchObject({ label: "Leaning up", timing: "entry", published_at: G, version: { align: 2, analytics: 2 } });
@@ -154,7 +154,7 @@ describe("journal J1: recording a manual trade", () => {
     const [p] = await place({ choice: "Only the first" });
     expect(p.exec).toBe("hand_partial");
     expect(p.journal.fill.complete).toBe(false);
-    expect(p.journal.fill.legs.map((l) => l.qty)).toEqual([0.04407, 0]);
+    expect(p.journal.fill.legs.map((l) => l.qty)).toEqual([0.04277, 0]);
     expect(p.journal.cost.breakeven_basis).toBe("unavailable");
     expect(positionFigures(p, { found: { level: lv }, settlePrice: 86000 })).toMatchObject({ partial: true, maxPayout: null, got: null });
     // Unequal amounts on the two lines are partial too, even when the user says both filled.

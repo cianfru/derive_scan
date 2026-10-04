@@ -1,6 +1,7 @@
 import React, { lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import "./styles.css";
 import "./research.css";
 import "./journey.css";
@@ -43,5 +44,7 @@ createRoot(document.getElementById("root")).render(
         </Route>
       </Routes>
     </BrowserRouter>
+    {/* Vercel Web Analytics: page views only, no custom events, no cookies, no personal data. */}
+    <Analytics />
   </React.StrictMode>,
 );

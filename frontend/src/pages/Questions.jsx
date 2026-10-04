@@ -14,7 +14,7 @@ import { FollowButton, FollowLevel } from "../components/Follow.jsx";
 import { loadBudget } from "../lib/follows.js";
 import {
   ANSWER, buyCents, cents, centsDown, countdown, dayLabel, findLevel, fullPay, gap, live, money, noPriceReason, parseId, priceAge,
-  questionText, settlingNow, ticket, payAt,
+  budgetTicket, questionText, settlingNow, payAt,
 } from "../lib/questions.js";
 import "../questions.css";
 
@@ -158,7 +158,7 @@ function ActionBar({ und, level, sideKey, date, t, label, onGo, disabled, hidden
     <div className={`q-actbar${hidden ? " hide" : ""}`} aria-label="Your answer">
       <span className="q-actbar-sum">
         <b>{ANSWER[sideKey]} · {money(level.k)}<span className="q-actbar-date"> · {date.label}</span></b>
-        <small className="mono">{t ? <><span className="q-actbar-amt">{money(t.premium, { cents: true })} · </span>most you can lose {money(t.mostLose, { cents: true })}</> : "No price now"}</small>
+        <small className="mono">{t ? <>most you can lose {money(t.mostLose, { cents: true })}<span className="q-actbar-amt"> · fees included</span></> : "No price now"}</small>
       </span>
       <button ref={goRef} className="btn primary lg q-get" onClick={onGo} disabled={disabled}>{label}</button>
     </div>
@@ -204,10 +204,11 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
   const question = questionText(und, level, date.expiry);
   const paused = age.state === "paused" || board.paused;
   // The first amount: the board's budget when opened from it, else the budget kept in this browser.
+  // An amount is the total spend, Derive's fees included (budgetTicket), as on the board.
   const [dollars, setDollars] = useState(() => (Number.isFinite(initialDollars) && initialDollars > 0 ? initialDollars : loadBudget()));
   const [sheet, setSheet] = useState(false);
   const [step, setStep] = useState(() => (sideKey ? initialStep || "preview" : "pick"));
-  const t = sideKey && live(level, sideKey, paused) ? ticket(level, sideKey, dollars, board) : null;
+  const t = sideKey && live(level, sideKey, paused) ? budgetTicket(level, sideKey, dollars, board) : null;
   const side = sideKey ? level[sideKey] : null;
   const settling = settlingNow(level); // by the clock now, from 07:30 UTC
   const days = (date.settle_ts - Date.now() / 1000) / 86400;
@@ -274,7 +275,9 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
           <Step n={4} title="Amount" stepRef={amountRef} className="q-step-amount">
             <div className="q-amount">
               <div className="q-amount-in">
-                <label htmlFor="q-dollars" className="label">Amount</label>
+                <label htmlFor="q-dollars" className="label">Amount, fees included
+                  <Info label="About the amount">The total you spend, Derive's fees included. Cowboy sizes the two options so their price plus Derive's fees fit this amount; what is left over from rounding stays with you.</Info>
+                </label>
                 <span className="q-dollar-field"><span>$</span>
                   <input id="q-dollars" inputMode="decimal" value={dollars} onChange={(e) => setDollars(Math.max(0, Number(e.target.value.replace(/[^\d.]/g, "")) || 0))} />
                 </span>
@@ -282,9 +285,9 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
               </div>
               {t ? (
                 <>
-                  {t.belowMin && <p className="q-note warn">Smallest amount for this question: {money(t.minCost, { cents: true })}.</p>}
+                  {t.belowMin && <p className="q-note warn">Smallest amount for this question: {money(t.minTotal, { cents: true })} with Derive's fees.</p>}
                   {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
-                  {t.premium > 0 && t.premium < 50 && <p className="q-note">Fees are a large share of small amounts.</p>}
+                  {t.mostLose > 0 && t.mostLose < 50 && <p className="q-note">Fees are a large share of small amounts.</p>}
                 </>
               ) : (
                 <>

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import btc from "../fixtures/questions/BTC.json";
 import {
   centsUp, centsDown, gap, priceAge, ticket, parseId, copyText, orderedLegs, findLevel, deriveLink, closeTicket, payAt,
-  outcome, breakeven, sliderStep, questionText, answerNames, handRisk, live, legFee, buyCents, noPriceReason, settleOf,
+  outcome, breakeven, sliderStep, budgetTicket, questionText, answerNames, handRisk, live, legFee, buyCents, noPriceReason, settleOf,
 } from "./questions.js";
 import { loadPositions, savePositions, addPosition, _resetMemory, valuePosition, closePosition } from "./positions.js";
 
@@ -138,6 +138,34 @@ describe("the outcome preview", () => {
     const t = ticket(lv, "yes", 100, btc);
     expect(t.payout.toFixed(2)).toBe("264.42");
     expect(t.mostLose.toFixed(2)).toBe("103.01");
+  });
+  // The budget convention (owner, 4 October 2026): the amount typed is the total, Derive's fees
+  // included. The two examples above size $100 of premium (ticket); the screens now size through
+  // budgetTicket, so $100 typed gives these figures.
+  it("G1 with $100 as the total: 0.02013 contracts, $98.23 + $1.75 fees = $99.98, pays at most $120.78, makes at most $20.80", () => {
+    const t = budgetTicket(lv83, "yes", 100, mon);
+    expect(t.contracts).toBe(0.02013);
+    expect(t.premium.toFixed(2)).toBe("98.23");
+    expect(t.fees.toFixed(2)).toBe("1.75");
+    expect(t.mostLose.toFixed(2)).toBe("99.98");
+    expect(t.mostLose).toBeLessThanOrEqual(100);
+    expect(t.payout.toFixed(2)).toBe("120.78");
+    expect((t.payout - t.mostLose).toFixed(2)).toBe("20.80");
+    expect(Math.round(breakeven(t, lv83, "yes"))).toBe(84967);
+    expect(outcome(t, lv83, "yes", 84854.3).pl).toBeCloseTo(-2.27, 2);
+  });
+  it("2.2 with $100 as the total: 0.04277 contracts, $97.05 + $2.95 fees = $100.00, pays at most $256.62", () => {
+    const t = budgetTicket(lv, "yes", 100, btc);
+    expect(t.contracts).toBe(0.04277);
+    expect(t.premium.toFixed(2)).toBe("97.05");
+    expect(t.fees.toFixed(2)).toBe("2.95");
+    expect(t.mostLose.toFixed(2)).toBe("100.00");
+    expect(t.mostLose).toBeLessThanOrEqual(100);
+    expect(t.payout.toFixed(2)).toBe("256.62");
+    expect(Math.round(breakeven(t, lv, "yes"))).toBe(85338);
+    // Below Derive's base fees nothing is bought, and the smallest total is given.
+    expect(budgetTicket(lv, "yes", 1, btc).belowMin).toBe(true);
+    expect(budgetTicket(lv, "yes", 1, btc).minTotal).toBeGreaterThan(budgetTicket(lv, "yes", 1, btc).minCost);
   });
   it("gives the same payout as the ramp at lo, K and hi, and mirrors Lower", () => {
     const t = ticket(lv, "yes", 100, btc);

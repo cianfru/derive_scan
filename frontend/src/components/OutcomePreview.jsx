@@ -20,10 +20,10 @@ function Figures({ und, level, side, t, expiry, settleTs, summary }) {
           <dd className="mono">{usd(t.mostLose)} <small>incl. fees</small></dd></div>
       ) : (
         <>
-          <div><dt>You pay</dt><dd className="mono">{usd(t.premium)}</dd></div>
+          <div><dt>The two options</dt><dd className="mono">{usd(t.premium)}</dd></div>
           <div><dt>Derive fees, about<Info label="About Derive's fees">Derive charges a fee per option: $0.50 plus a small share of the coin's price, at most an eighth of the option's price. Two options means two fees. These are Derive's published rates; fills often pay less.</Info></dt>
             <dd className="mono">{usd(t.fees)}</dd></div>
-          <div className="op-total q-lose"><dt>Total, the most you can lose</dt><dd className="mono">{usd(t.mostLose)}</dd></div>
+          <div className="op-total q-lose"><dt>You pay, the most you can lose<small>fees included{t.budget != null ? `, within your ${usd(t.budget)}` : ""}</small></dt><dd className="mono">{usd(t.mostLose)}</dd></div>
         </>
       )}
       <div><dt>Most it pays<small>total back, {fullPay(level, side)}</small></dt><dd className="mono">{usd(t.payout)}</dd></div>

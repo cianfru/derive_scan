@@ -7,7 +7,7 @@ import { Asset } from "../components/MarketVisuals.jsx";
 import { ChainMini } from "../components/Chain.jsx";
 import SaloonHead from "../components/SaloonNotices.jsx";
 import { FollowButton, FollowLevel } from "../components/Follow.jsx";
-import { RANGES, SIDES, SORTS, boardRows, cleanBudget, contextHorizon, filterRows, sortRows } from "../lib/board.js";
+import { DEFAULT_SORT, RANGES, SIDES, SORTS, boardRows, cleanBudget, contextHorizon, filterRows, sortRows } from "../lib/board.js";
 import { exportFollows, importFollows, saveBudget, unfollow, useFollowsDoc } from "../lib/follows.js";
 import { ANSWER, countdown, dayLabel, fullPay, money, priceAge, signed } from "../lib/questions.js";
 import "../questions.css";
@@ -15,7 +15,8 @@ import "../board.css";
 
 const PAGE = 24;
 const usd = (v) => money(v, { cents: true });
-const overText = (v) => (v == null ? "—" : `${v >= 0 ? "+" : "-"}${Math.abs(v * 100).toFixed(1)}c`);
+const perText = (v, plus = true) => `${v < 0 ? "-" : plus ? "+" : ""}${Math.abs(v * 100).toFixed(1)}c`;
+const clock = (t) => `${new Date(t * 1000).toISOString().slice(11, 16)} UTC`;
 
 function Budget({ value }) {
   const [text, setText] = useState(String(value));
@@ -24,7 +25,7 @@ function Budget({ value }) {
   return (
     <div className="bd-budget">
       <label htmlFor="bd-budget" className="label">Budget
-        <Info label="About the budget">Every row shows what this amount buys, Derive's fees included. It is kept in this browser and is the first amount in the guided flow too.</Info>
+        <Info label="About the budget">This is the total you spend, Derive's fees included: Cowboy sizes each answer so its price plus fees fit it. Every row shows what it buys. It is kept in this browser and is the first amount in the guided flow too.</Info>
       </label>
       <span className="q-dollar-field"><span>$</span>
         <input id="bd-budget" inputMode="decimal" value={text} onChange={(e) => setText(e.target.value.replace(/[^\d.]/g, ""))}
@@ -39,16 +40,22 @@ function Budget({ value }) {
 const HEAD = [
   ["Outcome"], ["Settles"],
   ["You pay", "What your budget pays for this answer, Derive's fees included. It is the most you can lose."],
+  ["Fees", "Derive's fees inside what you pay, about: $0.50 per option plus a small share per contract. They weigh more on small amounts."],
   ["Most it pays", "The total back at settlement when the coin settles in the answer's full-pay range."],
   ["Most you can make", "Most it pays minus what you pay."],
   ["Pays in part", "Inside this range the answer pays part of the $1, in a straight line."],
-  ["Over mark", "What this costs per $1 of payout, fees included, above Derive's mark for the same answer. The lower, the closer to the mark."],
+  ["Cost over mark", "What you pay per $1 of payout, before fees, minus Derive's mark for the same answer per $1, from the same read as the prices. The lower, the closer to the mark. Fees are shown apart."],
+  ["Exit cost now", "Derive's mark minus what selling back now would get per $1, before Derive's exit fees: what leaving straight away costs against the mark."],
   ["Size", "Up to this much payout is on Derive's screen at this price. A larger amount costs more."],
   ["Context", "Cowboy's three layers for the coin (regime, wallets, options) over the next 7 days for dates within 10 days, else 30 days. They describe the market and never change the order of this list."],
   [""],
 ];
 
-function Row({ r, align }) {
+function NotYet({ label, why }) {
+  return <span className="q-noprice bd-notyet">Not available yet<Info label={label}>{why}</Info></span>;
+}
+
+function Row({ r, align, budget }) {
   const h = contextHorizon(r.settleTs);
   const name = `${r.und} ${ANSWER[r.side]} than ${money(r.k)} on ${dayLabel(r.expiry)}`;
   return (
@@ -56,7 +63,7 @@ function Row({ r, align }) {
       <div className="bd-cell bd-outcome">
         <Asset und={r.und} compact />
         <span className="bd-title">
-          <Link to={`/q/${r.id}?side=${r.side}`} state={{ step: "preview", dollars: Math.floor(r.premium * 100) / 100 }} className="bd-link" aria-label={`${name}: see what it pays`}>
+          <Link to={`/q/${r.id}?side=${r.side}`} state={{ step: "preview", dollars: budget }} className="bd-link" aria-label={`${name}: see what it pays`}>
             <i className={`q-arrow ${r.side}`} aria-hidden="true" />{ANSWER[r.side]} · <span className="mono">{money(r.k)}</span>
           </Link>
           <small>{fullPay(r.level, r.side)}{r.thin && <span className="bd-thin"> · Thin book</span>}</small>
@@ -65,10 +72,16 @@ function Row({ r, align }) {
       <dl className="bd-figs">
         <div className="bd-cell bd-settle"><dt>Settles</dt><dd>{dayLabel(r.expiry)}<small> 08:00 UTC · {countdown(r.settleTs)}</small></dd></div>
         <div className="bd-cell bd-pay"><dt>You pay</dt><dd className="mono">{usd(r.total)}{r.capped && <small>all the size here</small>}</dd></div>
+        <div className="bd-cell"><dt>Fees</dt><dd className="mono">{usd(r.fees)}</dd></div>
         <div className="bd-cell"><dt>Most it pays</dt><dd className="mono">{usd(r.payout)}</dd></div>
         <div className="bd-cell"><dt>Most you can make</dt><dd className={`mono ${r.make > 0 ? "up" : ""}`}>{r.make > 0 ? signed(r.make) : "None"}</dd></div>
         <div className="bd-cell bd-zone"><dt>Pays in part</dt><dd className="mono">{money(r.lo)}–<wbr />{money(r.hi)}</dd></div>
-        <div className="bd-cell"><dt>Over mark</dt><dd className="mono">{overText(r.overMark)}</dd></div>
+        <div className="bd-cell bd-over"><dt>Cost over mark</dt><dd className="mono">{r.overMark != null
+          ? <span title={`Mark ${perText(r.markPer, false)} per $1 at ${clock(r.markTs)}`}>{perText(r.overMark)}</span>
+          : <NotYet label={`Why cost over mark is not available for ${r.und} ${ANSWER[r.side]} at ${money(r.k)}`} why={r.markReason} />}</dd></div>
+        <div className="bd-cell"><dt>Exit cost now</dt><dd className="mono">{r.exitCost != null ? perText(r.exitCost)
+          : <NotYet label={`Why exit cost is not available for ${r.und} ${ANSWER[r.side]} at ${money(r.k)}`}
+            why={r.markReason || "Derive's screen has no sell-back price for this answer right now."} />}</dd></div>
         <div className="bd-cell"><dt>Size</dt><dd className="mono">{r.size != null ? money(r.size) : "—"}</dd></div>
         <div className="bd-cell bd-ctx"><dt>Context</dt><dd>{align ? <ChainMini alignment={align} horizon={h} /> : <span className="dim">Unavailable</span>}</dd></div>
       </dl>
@@ -149,7 +162,7 @@ export default function Board() {
   const [coin, setCoin] = useState("all");
   const [range, setRange] = useState("all");
   const [side, setSide] = useState("all");
-  const [sort, setSort] = useState("near");
+  const [sort, setSort] = useState(DEFAULT_SORT);
   const [shown, setShown] = useState(PAGE);
   const now = Date.now() / 1000;
   const boards = coins.map((u) => files[`questions/${u}.json`]).filter(Boolean);
@@ -192,7 +205,7 @@ export default function Board() {
           <p className="bd-count status">
             <span className="mono">{list.length}</span> {list.length === 1 ? "answer" : "answers"} for <span className="mono">{usd(budget)}</span>
             {paused ? " · prices paused" : index?.prices_ts ? <> · prices {new Date(index.prices_ts * 1000).toISOString().slice(11, 16)} UTC</> : null}
-            <Info label="About this list">Every answer with a price on Derive's screen now, across coins and dates. The order is yours: by cost over Derive's mark, closeness of the level to the coin's price, settlement date or size. Answers that fail Cowboy's checks are left out; those on the board with no price now are listed below with the reason.</Info>
+            <Info label="About this list">Every answer with a price on Derive's screen now, across coins and dates. The order is yours: by cost over Derive's mark per $1 before fees (rows where it is not available yet go last), closeness of the level to the coin's price, settlement date or size. Answers that fail Cowboy's checks are left out; those on the board with no price now are listed below with the reason.</Info>
           </p>
           {list.length ? (
             <div className="bd-table" role="region" aria-label="Outcomes">
@@ -200,7 +213,7 @@ export default function Board() {
                 {HEAD.map(([t, help]) => <span key={t || "f"} className="bd-cell">{t}{help && <Info label={`About ${t}`}>{help}</Info>}</span>)}
               </div>
               <ol className="bd-list">
-                {list.slice(0, shown).map((r) => <Row key={r.key} r={r} align={alignOf[r.und]} />)}
+                {list.slice(0, shown).map((r) => <Row key={r.key} r={r} align={alignOf[r.und]} budget={budget} />)}
               </ol>
               {list.length > shown && <button className="text-control bd-more" onClick={() => setShown((n) => n + PAGE)}>Show {Math.min(PAGE, list.length - shown)} more</button>}
             </div>

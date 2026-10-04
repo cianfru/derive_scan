@@ -54,9 +54,9 @@ describe("the guided flow", () => {
     const amount = step("Amount");
     expect(primaries(amount)).toHaveLength(1);
     expect(within(amount).getByRole("button", { name: "See what it pays" }).classList.contains("primary")).toBe(true);
-    // The bar names the chosen answer, the amount and the most you can lose.
+    // The bar names the chosen answer and the most you can lose, which is the amount, fees included.
     const bar = within(amount).getByLabelText("Your answer");
-    expect(bar.textContent).toMatch(/^Lower · \$[\d,]+ · Mon 5 Oct\$[\d.]+ · most you can lose \$[\d.]+/);
+    expect(bar.textContent).toMatch(/^Lower · \$[\d,]+ · Mon 5 Octmost you can lose \$[\d.]+ · fees included/);
     await u.click(within(amount).getByRole("button", { name: "See what it pays" })); // 2
     const preview = step("What it pays");
     expect(preview.querySelector(".op-figs")).not.toBeNull();
