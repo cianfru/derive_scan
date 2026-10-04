@@ -6,7 +6,6 @@ export function coverageReady(data) {
 }
 
 export default function HistoryStatus({ data }) {
-  if (data?.status === "not_ranked") return <p className="status">This wallet is outside the currently published leaderboard. Open Traders to see the current ranking.</p>;
   const updating = data?.status === "updating";
   return <div className="plate" role="status"><div className="plate-b">
     <strong>{updating ? "Updating wallet calculations" : "Wallet history is still accumulating"}</strong>{" "}

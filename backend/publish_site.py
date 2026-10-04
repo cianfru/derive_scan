@@ -19,6 +19,8 @@ keeps no history. Files:
                       each cohort is positioned on it within 7 days, 30 days and all expiries
   traders.json        options traders' leaderboard (market makers left out) and cohorts by results
                       and size with their positioning; traders/{address}.json per ranked trader
+                      (no other wallet has a file); traders/index.json lists every non-market-maker
+                      wallet active in the last year with its last active day
   flow.json           last 24 hours: large trades, most active wallets (market makers left out once
                       the rebuilt history has classed them), with each wallet's class
   strikes/{UND}.json  written by record_once.py (per-strike view of the newest chain)
@@ -621,31 +623,65 @@ def cohort_lean(insts: dict, chains: dict, now: float, max_days=None, min_days=0
 COIN_HOLDERS = 12
 
 
+INDEX_DAYS = 365
+
+
+def wallet_index(data: Path, ranked: set[str]) -> dict | None:
+    """traders/index.json: every wallet active within INDEX_DAYS of the history's newest day, market
+    makers left out, as [address, books, days before `through` of its last activity, has a file].
+    Books: "o" options (only options wallets are classed so far)."""
+    p = data / "history" / "wallets.json"
+    if not p.exists():
+        return None
+    doc = json.loads(p.read_text())
+    through = doc.get("through")
+    if not through:
+        return None
+    end = date.fromisoformat(through)
+    rows = []
+    for address, v in doc.get("wallets", {}).items():
+        if v.get("class") == "market_maker" or not v.get("last"):
+            continue
+        offset = (end - date.fromisoformat(v["last"])).days
+        if 0 <= offset <= INDEX_DAYS:
+            rows.append([address.lower(), "o", offset, int(address.lower() in ranked)])
+    rows.sort()
+    return {"through": through, "fields": ["address", "books", "last_offset_days", "has_file"], "wallets": rows}
+
+
+def _publish_wallet_files(site: Path, files: dict[str, dict], index: dict | None) -> None:
+    """Writes traders/{address}.json for `files` and traders/index.json, and deletes every other
+    file in traders/: a wallet off the leaderboard has no file (its index row says so)."""
+    keep = set(files) | ({"index"} if index is not None else set())
+    for old in (site / "traders").glob("*.json"):
+        if old.stem not in keep:
+            old.unlink()
+    for address, doc in files.items():
+        _write(site / "traders" / f"{address}.json", doc)
+    if index is not None:
+        _write(site / "traders" / "index.json", index)
+
+
 def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) -> None:
-    """traders.json (leaderboard and cohorts) and traders/{address}.json (one per ranked trader)."""
+    """traders.json (leaderboard and cohorts), traders/{address}.json (one per ranked trader, no
+    publish time: freshness lives in traders.json) and traders/index.json (wallet_index)."""
     p = data / "history" / "traders.json"
     if not p.exists():
-        unavailable = {"generated_at": int(now), **history_coverage({}, now)}
-        _write(site / "traders.json", unavailable)
-        for old in (site / "traders").glob("*.json"):
-            _write(old, unavailable)
+        _write(site / "traders.json", {"generated_at": int(now), **history_coverage({}, now)})
+        _publish_wallet_files(site, {}, None)
         return
     doc = json.loads(p.read_text())
     coverage = history_coverage(doc, now)
+    ranked = {t["address"].lower() for t in doc["traders"]}
+    index = wallet_index(data, ranked)
     if not coverage["ready"]:
         _write(site / "traders.json", {"generated_at": int(now), **coverage})
         for und in chains:
             _write(site / "wallets" / f"{und}.json", {"generated_at": int(now), **coverage, "und": und})
-        # Existing direct links must not continue serving a stale, apparently current book.
-        for old in (site / "traders").glob("*.json"):
-            _write(old, {"generated_at": int(now), **coverage})
-        for t in doc["traders"]:
-            _write(site / "traders" / f"{t['address'].lower()}.json", {"generated_at": int(now), **coverage})
+        # Direct links must not keep serving a stale, apparently current book.
+        _publish_wallet_files(site, {a: dict(coverage) for a in ranked}, index)
         return
-    addresses = {t["address"].lower() for t in doc["traders"]}
-    for old in (site / "traders").glob("*.json"):
-        if old.stem not in addresses:
-            _write(old, {"generated_at": int(now), **coverage, "ready": False, "status": "not_ranked"})
+    files: dict[str, dict] = {}
     rows = []
     holders: dict = defaultdict(list)  # und -> ranked traders holding options on it
     for t in doc["traders"]:
@@ -670,9 +706,10 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
                         if book and all(b["upnl"] is not None for b in book) else None})
         rows.append(summary)
         large = [r for r in flow.get("large", []) if (r.get("wallet") or "").lower() == t["address"].lower()]
-        _write(site / "traders" / f"{t['address'].lower()}.json",
-               {"generated_at": int(now), **coverage, **summary, "book": book, "recent": t["recent"],
-                "large_24h": large})
+        valued = [b["valuation_at"] for b in book if b.get("valuation_at")]
+        files[t["address"].lower()] = {**coverage, **summary, "valued_at": max(valued) if valued else None,
+                                       "book": book, "recent": t["recent"], "large_24h": large}
+    _publish_wallet_files(site, files, index)
     cohorts = {}
     order = {"pnl": [c[0] for c in traders_mod.PNL_COHORTS][::-1], "size": [c[0] for c in traders_mod.SIZE_COHORTS][::-1]}
     for dim, names in order.items():

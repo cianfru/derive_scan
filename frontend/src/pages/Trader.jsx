@@ -101,11 +101,44 @@ function Recent({ recent }) {
   );
 }
 
+/** The wallet's last active day from a traders/index.json row ([address, books, days before through, has file]). */
+export function lastActive(index, address) {
+  const row = (index?.wallets || []).find((r) => r[0] === address.toLowerCase());
+  if (!row || !index.through) return null;
+  const d = new Date(`${index.through}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - row[2]);
+  return d.toISOString().slice(0, 10);
+}
+
+/** A wallet with no file: off the leaderboard (its last active day from the index) or never public. */
+export function NoProfile({ address, index }) {
+  const last = lastActive(index, address);
+  return (
+    <section className="plate trader-id">
+      <div className="tid">
+        <WalletEmblem address={address} size={44} />
+        <div className="tid-t">
+          <h1>{codename(address)}</h1>
+          <p className="tid-sub"><span className="mono" title={address}>{shortAddr(address)}</span></p>
+          <p className="status">{last ? `Not on the leaderboard · last active ${last}` : "No public profile for this wallet."}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Missing({ address, crumb }) {
+  const { data: index, error } = useData("traders/index.json", 30 * 60_000);
+  if (!index && !error) return <div className="wrap page"><Loading /></div>;
+  return <div className="wrap page people-page trader-page">{crumb(codename(address))}<NoProfile address={address} index={index} /></div>;
+}
+
 export default function Trader() {
   const { address } = useParams();
-  const { data, error } = useData(`traders/${address.toLowerCase()}.json`, 5 * 60_000);
+  const { data, error, missing } = useData(`traders/${address.toLowerCase()}.json`, 5 * 60_000);
   const [copied, setCopied] = useState(false);
   const crumb = (name) => <nav className="crumbs" aria-label="Breadcrumb"><Link to="/traders">Traders</Link><span>/</span><span>{name}</span></nav>;
+  if (missing) return <Missing address={address} crumb={crumb} />;
   if (error && !data) return <div className="wrap page">{crumb(codename(address))}<Failed error={error} /></div>;
   if (!data) return <div className="wrap page"><Loading /></div>;
   if (!coverageReady(data)) return <div className="wrap page">{crumb(codename(address))}<HistoryStatus data={data} /></div>;
@@ -163,7 +196,7 @@ export default function Trader() {
       <Plate title="Recent activity" info="Options bought and sold per day over the last 45 rebuilt days, with the average price." bodyClass="flush">
         {data.recent?.length ? <Recent recent={data.recent} /> : <p className="status pad">—</p>}
       </Plate>
-      <p className="status">History to {data.through} UTC · book valued {utc(data.generated_at)}{Date.now() / 1000 - data.generated_at > 1800 ? " · historical snapshot" : ""}</p>
+      <p className="status">History to {data.through} UTC{data.valued_at ? <> · book valued {utc(data.valued_at)}{Date.now() / 1000 - data.valued_at > 1800 ? " · historical snapshot" : ""}</> : null}</p>
     </div>
   );
 }

@@ -88,7 +88,8 @@ def test_partial_history_hides_rankings_and_existing_direct_links(tmp_path):
     (site / "traders").mkdir(parents=True)
     (site / "traders" / "old.json").write_text('{"ready":true,"book":[1]}')
     traders_block(data, site, {}, {}, NOW)
-    for path in [site / "traders.json", site / "traders" / "old.json", site / "traders" / "alice.json"]:
+    assert not (site / "traders" / "old.json").exists()  # off the leaderboard: no file at all
+    for path in [site / "traders.json", site / "traders" / "alice.json"]:
         doc = json.loads(path.read_text())
         assert doc["ready"] is False and doc["through"] == "2025-06-13"
         assert "book" not in doc and "traders" not in doc
