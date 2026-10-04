@@ -142,7 +142,7 @@ describe("panel", () => {
   });
   it("marks a reading that is no longer current", () => {
     render(<RegimeHeader row={{ ...BTC, signal_bar_close_time: END }} row4={null} history={history} current={false} status="ready" />);
-    expect(screen.getByText("Stale reading")).toBeTruthy();
+    expect(screen.getByText("Updating")).toBeTruthy();
     expect(screen.getByText("Last reading at the 3 Oct 00:00 UTC close.")).toBeTruthy();
     expect(screen.getByText("Unavailable")).toBeTruthy();
   });

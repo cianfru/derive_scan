@@ -5,7 +5,7 @@
 import { Info, Signal, Empty } from "./ui.jsx";
 import { DASH, REGIME, SIGNAL_LABEL, title, dayTime } from "../lib/format.js";
 import { SIGNAL_HELP } from "../lib/explain.js";
-import { STATUS_NAMES } from "../lib/presentation.js";
+import { STATUS_NAMES, STATUS_WHY } from "../lib/presentation.js";
 import {
   REGIME_COLORS, REGIME_SHORT, REGIME_LINE, REGIME_INFO, Z_INFO, HEAT_INFO, BAND_INFO, RIBBON_INFO, CHECKS_INFO,
   RIBBON_STATE, HEAT_PHASE, regimeTerm, checks, bandGate, against, whyLine, lastRun, fmtZ,
@@ -79,7 +79,7 @@ export function RegimeHeader({ row, row4, history, current = true, current4 = tr
           </>
         ) : (
           <>
-            <strong style={{ "--rc": REGIME_COLORS[row.regime] || "var(--faint)" }}>{REGIME[row.regime] || title(row.regime)}{!current && <small className="rh-stale">{STATUS_NAMES[!status || status === "ready" ? "stale" : status] || STATUS_NAMES.unavailable}</small>}</strong>
+            <strong style={{ "--rc": REGIME_COLORS[row.regime] || "var(--faint)" }}>{REGIME[row.regime] || title(row.regime)}{!current && <small className="rh-stale">{STATUS_NAMES[!status || status === "ready" ? "stale" : status] || STATUS_NAMES.unavailable}<Info label="Why this reading is not current">{STATUS_WHY[!status || status === "ready" ? "stale" : status] || STATUS_WHY.unavailable}</Info></small>}</strong>
             <span className="rh-sub">{REGIME_SHORT[row.regime]}</span>
             {cells.length > 0 && (
               <div className="rh-strip">

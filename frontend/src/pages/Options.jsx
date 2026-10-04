@@ -4,7 +4,8 @@ import { useData } from "../lib/data.js";
 import { price, strike, clock } from "../lib/format.js";
 import { Asset } from "../components/MarketVisuals.jsx";
 import { MoveBand, SkewInstrument, VolatilityTenors } from "../components/OptionsInstruments.jsx";
-import { Loading, Failed, PageHead, PanelHead, Tabs, Empty, Arrow } from "../components/ui.jsx";
+import { Loading, Failed, PageHead, PanelHead, Tabs, Empty, Arrow, Lead } from "../components/ui.jsx";
+import { optionsLead } from "../lib/takeaway.js";
 
 const DAYS = { "7d": 7, "30d": 30 };
 const roundUp = (v, step) => Math.max(step, Math.ceil((v - 1e-9) / step) * step);
@@ -65,6 +66,7 @@ export default function Options() {
   return (
     <div className="wrap page options-page">
       <PageHead title="Options" info={PAGE_HELP} tabs={tabs} meta={<>{coins.length} markets · {clock(data.generated_at)}</>} />
+      <Lead lead={optionsLead(data)} />
       <section className="plate options-board" aria-label="Options markets">
         <PanelHead title="Surfaces" info={BOARD_HELP} infoLabel="How to read the options board" />
         <div className="ob-head" aria-hidden="true">

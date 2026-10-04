@@ -3,7 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { radarPoint, radarLabels, viewReading, traceGeometry, STATE_NAMES } from "../lib/presentation.js";
 import { price, usd, z, chg, clock, REGIME, DASH } from "../lib/format.js";
-import { Tabs, Loading, Failed, PageHead, PanelHead, Empty, Arrow, Info } from "../components/ui.jsx";
+import { Tabs, Loading, Failed, PageHead, PanelHead, Empty, Arrow, Info, Lead } from "../components/ui.jsx";
+import { radarLead } from "../lib/takeaway.js";
 import { Asset } from "../components/MarketVisuals.jsx";
 import { useElementWidth } from "../lib/useElementWidth.js";
 import { radarFrames, frameAt, trailAt, closeLabel, nearest, walletAt, NO_IV_HELP } from "../lib/radarHistory.js";
@@ -434,6 +435,7 @@ export default function Radar() {
   return (
     <div className="wrap page radar-page">
       <PageHead title="Radar" info={info} tabs={tabs} meta={<>{coins.length} markets · {clock(data.generated_at)}</>} />
+      <Lead lead={radarLead(coins, horizon)} />
       <div className="plate radar-workspace">
         <section className="radar-stage" aria-label="Positioning map">
           <PanelHead title="Positioning map" right={<span className="radar-count" title={atNow ? "Markets with a current Smart wallet reading" : "Markets with a Smart wallet reading at that close"}>{points.length}/{coins.length}</span>} />
@@ -454,10 +456,10 @@ export default function Radar() {
               <RailTrace values={traceValues} label={past ? `${selected.und} daily closes to ${closeLabel(closeAt)}` : `${selected.und} daily closes`} />
             </Link>
             <div className="rd-figs">
-              <div><span>1D stretch</span><b>{Number.isFinite(zShown) ? z(zShown) : <Empty />}</b></div>
-              <div><span>Delta balance{wUnavailable && <> <Info label="Why the wallet reading is unavailable">{NO_IV_HELP}</Info></>}</span>
+              <div><span>1D stretch<Info label="About stretch">How far the price sits from its daily trend, in standard deviations, from the 1D engine. Context, not a signal.</Info></span><b>{Number.isFinite(zShown) ? z(zShown) : <Empty />}</b></div>
+              <div><span>Delta balance<Info label="About delta balance">The Smart cohort's net option delta divided by its gross option delta on expiries in the window: +100% all long delta, −100% all short. Exposure, not a count of traders.</Info>{wUnavailable && <> <Info label="Why the wallet reading is unavailable">{NO_IV_HELP}</Info></>}</span>
                 <b>{wValue ? `${(wValue.y * 100).toFixed(0)}%` : wUnavailable ? "Unavailable" : <Empty />}</b></div>
-              <div><span>Gross delta</span><b>{wValue ? usd(wValue.gross) : wUnavailable ? "Unavailable" : <Empty />}</b></div>
+              <div><span>Gross delta<Info label="About gross delta">The dollar size of the Smart cohort's option delta on this coin, long and short added together.</Info></span><b>{wValue ? usd(wValue.gross) : wUnavailable ? "Unavailable" : <Empty />}</b></div>
             </div>
             {hasHist && (
               <div className="rd-hist" aria-label={`${selected.und}: balance and stretch over the last ${last} closes`}>

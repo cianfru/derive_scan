@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { usd, ago, optionLabel } from "../lib/format.js";
-import { Plate, Tabs, Loading, Failed, PageHead } from "../components/ui.jsx";
+import { Plate, Tabs, Loading, Failed, PageHead, Lead } from "../components/ui.jsx";
+import { flowLead } from "../lib/takeaway.js";
 import { FlowCoverage } from "../components/AnalyticalDetails.jsx";
 import FlowSummary from "../components/FlowSummary.jsx";
 import WalletTag from "../components/WalletTag.jsx";
@@ -33,6 +34,7 @@ export default function Flow() {
   return (
     <div className="wrap page people-page flow-page">
       <PageHead title="Flow" meta={<FlowCoverage coverage={data.coverage} as="span" />} />
+      <Lead lead={flowLead(data)} />
       <FlowSummary data={data} selected={selected} onSelect={(u) => { setSelected(u); setAll(false); }} />
       <Plate title="Large trades" bodyClass="flush"
         info={"Up to 80 of the largest recorded taker trades across all markets; the market filter applies to that sample. Trades that crossed the spread at $25K or more on perps, $100K notional or $2K premium on options. RFQ marks block trades negotiated off the book. " + CLASS_INFO}

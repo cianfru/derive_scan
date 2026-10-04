@@ -1,4 +1,5 @@
 import { viewReading } from "../lib/presentation.js";
+import { Info } from "./ui.jsx";
 
 // The three layers of a market, always in this order and always drawn the same way (soft tiles
 // joined by a thin line that lights orange when all three agree):
@@ -20,8 +21,8 @@ export function LayerIcon({ kind, size = 16 }) {
 
 export function chainReadings(alignment, horizon) {
   return LAYERS.map(([kind, name, anchor]) => {
-    const { label, state } = viewReading(alignment, horizon, kind);
-    return { kind, name, anchor, text: label, state };
+    const { label, state, why } = viewReading(alignment, horizon, kind);
+    return { kind, name, anchor, text: label, state, why };
   });
 }
 
@@ -52,9 +53,10 @@ export default function Chain({ alignment, horizon = "30d", linked = true, compa
       {r.map((x, i) => {
         const Tag = linked ? "a" : "div";
         return (
-          <Tag key={x.kind} className={`chain-tile ${x.state || "unknown"}`} {...(linked ? { href: `#${x.anchor}` } : {})}>
+          <Tag key={x.kind} className={`chain-tile ${x.state || "unknown"}`} {...(linked ? { href: `#${x.anchor}`, title: x.why || undefined } : {})}>
             <span className="chain-icon"><LayerIcon kind={x.kind} size={18} /></span>
-            <span className="chain-text"><small><i className="step-n">0{i + 1}</i>{x.name}</small><b>{x.text}</b></span>
+            <span className="chain-text"><small><i className="step-n">0{i + 1}</i>{x.name}</small>
+              <b>{x.text}{!linked && x.why && <Info label={`Why ${x.name} reads ${x.text}`}>{x.why}</Info>}</b></span>
           </Tag>);
       })}
     </div>
