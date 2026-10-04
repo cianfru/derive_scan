@@ -143,3 +143,21 @@ Owner: the token distributes voting rights through Cowboy, to wallets that conne
 - **The manual path pays more in fees.** Two book orders cost about $2.95 in fees on example 2.2. Whether those fees count toward Cowboy depends on referral attribution.
 - **The 10% broker share is unconfirmed.** It is our reading of Derive's docs; the actual terms come with programme acceptance.
 - **Earning revenue adds a hosting cost.** Vercel's Hobby plan is for non-commercial use, so once Cowboy earns, Pro (about $20 a month) is the first operating cost.
+
+## Owner's direction, second pass (4 October 2026)
+
+- **Registering one-tap wallets.**
+  - **Direction:** Cowboy needs its own record of wallets that connect and trade through one-tap. Manual trading is temporary and will be sunset, so attribution is designed for one-tap only.
+  - **Derive's side:** every one-tap order already carries Cowboy's `referral_code`. Derive's broker dashboard shows accrued rewards per code; whether Derive reports them per wallet is a question for Derive.
+  - **Fallback:** a small registry. At connect, the wallet signs a "register with Cowboy" message. After each fill, the browser reports the trade id, which is checked against Derive's trade record for that wallet. This needs a small store, the first piece of Cowboy-side infrastructure; design it when one-tap reaches mainnet.
+- **How votes are allocated to wallets:** to be designed later.
+- **Wallet splitting:** the only lever is a maximum distribution per wallet.
+- **Fees, a staged plan.**
+  - **Stage one:** no Cowboy fee while traffic builds.
+  - **Stage two:** once there is traction, a small Cowboy fee, kept low enough not to be felt.
+  - **Mechanism:** Derive V3 builder codes: each order carries `referral_code` plus an optional `extra_fee`, which accrues to the builder's Derive wallet and is paid every four weeks, on top of the API Broker share. Because the browser sets `extra_fee` per order, a discount is simply a lower `extra_fee` for qualifying wallets.
+- **Token utility: lower fees for stakers.** Reference model: Definitive's EDGE.
+  - **Definitive's own rules:** stake any amount and unstake any time, with a 7-day cooldown during which the unstaked tokens cannot be traded or withdrawn. Staking unlocks lower fee tiers set by trading volume over a rolling 30-day window; larger stakes extend that lookback, from 30 days up to 180.
+  - **The owner's variant:** while tokens are staked, the discount grows with each month of consistent trading and resets to zero after a month without.
+  - **Open design points:** the definition of "consistent" (active weeks or a minimum number of trades a month); the discount steps; whether unstaking resets the discount; and a cooldown on unstaking, so tokens cannot be staked just before a trade and withdrawn right after.
+- **Supersedes:** "Using Cowboy never requires the token" now reads: using Cowboy never requires the token, and holding and staking it lowers Cowboy's own fee once that fee exists. Derive's exchange fees are unaffected.
