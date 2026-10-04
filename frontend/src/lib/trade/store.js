@@ -40,4 +40,5 @@ export const KEYS = {
   key: (wallet) => scope("key", wallet),
   known: (wallet) => scope("known", wallet),
   day: (wallet) => scope("day", wallet),
+  sent: (wallet) => scope("sent", wallet),
 };
