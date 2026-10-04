@@ -11,7 +11,7 @@ export function summarise(sub) {
   const usdc = (sub.collaterals || []).find((c) => c.asset_name === "USDC" || c.currency === "USDC");
   return {
     id: sub.subaccount_id, label: sub.label || "", manager: sub.manager_id,
-    usdc: usdc ? num(usdc.amount) : 0, value: num(sub.subaccount_value), positions: (sub.positions || []).length,
+    usdc: usdc ? num(usdc.amount) : 0, usdcSince: usdc ? num(usdc.creation_timestamp) : null, value: num(sub.subaccount_value), positions: (sub.positions || []).length,
   };
 }
 
@@ -28,34 +28,46 @@ export function pickSaloon(subs) {
 }
 
 /**
- * After the first deposit: the new, unlabelled PRIME Standard subaccount that was not there before.
- * When there are several (two deposits to the new-account address each open one), the lowest id that
- * holds USDC; subaccounts the wallet had before are never claimed.
+ * The wallet's subaccounts from before its first deposit through Cowboy: `{ ids, at }` (ms), or null
+ * when never recorded. A plain array (the first version, which could be written after the deposit
+ * and so name the account it opened) reads as never recorded.
  */
-export function findNew(subs, knownIds) {
-  const fresh = freshSubs(subs, knownIds);
+const asKnown = (k) => (k == null || Array.isArray(k) ? null : { ids: k.ids || [], at: k.at ?? 0 });
+export const rememberKnown = (wallet, subs, at = Date.now()) => write(KEYS.known(wallet), { ids: subs.map((s) => s.id), at });
+export const knownList = (wallet) => asKnown(read(KEYS.known(wallet)));
+
+/**
+ * New, unlabelled PRIME Standard subaccounts: not in the known list, or holding USDC that arrived after
+ * the list was taken (a list written after the deposit must not hide the account it opened).
+ */
+const freshSubs = (subs, known) => {
+  const k = asKnown(known);
+  const ids = new Set(k?.ids || []);
+  return subs.filter((s) => s.manager === PRIME_STANDARD && !s.label
+    && (!ids.has(s.id) || (s.usdc > 0 && s.usdcSince != null && s.usdcSince > k.at)));
+};
+
+/**
+ * After the first deposit: the new, unlabelled PRIME Standard subaccount. When there are several (two
+ * deposits to the new-account address each open one), the lowest id that holds USDC; subaccounts the
+ * wallet had before are never claimed.
+ */
+export function findNew(subs, known) {
+  const fresh = freshSubs(subs, known);
   if (fresh.length === 1) return fresh[0];
   return fresh.filter((s) => s.usdc > 0).sort((a, b) => a.id - b.id)[0] || null;
 }
-const freshSubs = (subs, knownIds) => {
-  const known = new Set(knownIds || []);
-  return subs.filter((s) => s.manager === PRIME_STANDARD && !s.label && !known.has(s.id));
-};
 
 /** Other new, unlabelled PRIME Standard subaccounts holding USDC besides the Saloon account (no funds move). */
-export function otherAccounts(subs, knownIds, saloonId) {
-  const rest = freshSubs(subs, knownIds).filter((s) => s.id !== saloonId && s.usdc > 0);
+export function otherAccounts(subs, known, saloonId) {
+  const rest = freshSubs(subs, known).filter((s) => s.id !== saloonId && s.usdc > 0);
   return rest.length ? { count: rest.length, usdc: rest.reduce((a, s) => a + s.usdc, 0), ids: rest.map((s) => s.id) } : null;
 }
-
-/** Remember the wallet's subaccounts before the first deposit, so the new one can be told apart. */
-export const rememberKnown = (wallet, subs) => write(KEYS.known(wallet), subs.map((s) => s.id));
-export const knownIds = (wallet) => read(KEYS.known(wallet)) || [];
 
 /** Find the Saloon account, labelling a newly funded one "Cowboy" (an owner-login call). */
 export async function findSaloon(client, wallet) {
   const subs = await listSubaccounts(client, wallet);
-  const known = knownIds(wallet);
+  const known = knownList(wallet);
   const saloon = pickSaloon(subs);
   if (saloon) return { saloon, subs, others: otherAccounts(subs, known, saloon.id) };
   const fresh = findNew(subs, known);
