@@ -222,7 +222,7 @@ export default function Questions() {
   if (!index || (und && !board && !error)) return <div className="wrap page"><Loading /></div>;
   const coins = index.coins || [];
   if (!und || (error && !board)) {
-    return <div className="wrap page q-page"><h1>Questions</h1><p className="status">No questions with a price on Derive's screen right now.</p></div>;
+    return <div className="wrap page q-page"><h1>Saloon</h1><p className="status">No questions with a price on Derive's screen right now.</p></div>;
   }
   const age = priceAge(board.prices_ts, Date.now() / 1000, board.paused || index.paused);
   const paused = age.state === "paused";
@@ -239,16 +239,16 @@ export default function Questions() {
   // (phones show the board alone).
   const found = chosen || (date?.headline ? findLevel(board, date.headline) : null);
   const coinItems = (coins.some((c) => c.und === und) ? coins : [...coins, { und }]).map((c) => [c.und, c.und]);
-  const back = () => navigate(`/questions/${und}`);
+  const back = () => navigate(`/saloon/${und}`);
   const thin = board.thin;
   return (
     <div className={`wrap page q-page${id ? " has-q" : ""}`}>
       <header className="q-head">
         <div className="q-head-top">
-          <h1>Questions</h1>
-          <Link to="/questions/mine" className="text-link">My questions{held ? ` (${held})` : ""}</Link>
+          <h1>Saloon</h1>
+          <Link to="/saloon/mine" className="text-link">My seat{held ? ` (${held})` : ""}</Link>
         </div>
-        <Tabs label="Coin" value={und} onChange={(u) => navigate(`/questions/${u}`)} items={coinItems} />
+        <Tabs label="Coin" value={und} onChange={(u) => navigate(`/saloon/${u}`)} items={coinItems} />
       </header>
       <div className="q-cols">
         <section className="q-board" aria-label={`${und} questions`}>
@@ -261,7 +261,7 @@ export default function Questions() {
           {dates.length ? (
             <>
               <div className="q-dates">
-                <Tabs label="Settlement date" value={date.expiry} onChange={(e) => { setPickedDate(e); if (id) navigate(`/questions/${und}`); }}
+                <Tabs label="Settlement date" value={date.expiry} onChange={(e) => { setPickedDate(e); if (id) navigate(`/saloon/${und}`); }}
                   items={dates.map((d) => [d.expiry, d.label])} />
               </div>
               <QuestionLadder board={board} date={date} more={more} onMore={() => setMore((m) => !m)} paused={paused}

@@ -33,9 +33,9 @@ createRoot(document.getElementById("root")).render(
           <Route path="traders" element={<Traders />} />
           <Route path="trader/:address" element={<Trader />} />
           <Route path="flow" element={<Flow />} />
-          {QUESTIONS_ON && <Route path="questions" element={<Questions />} />}
-          {QUESTIONS_ON && <Route path="questions/mine" element={<MyQuestions />} />}
-          {QUESTIONS_ON && <Route path="questions/:und" element={<Questions />} />}
+          {QUESTIONS_ON && <Route path="saloon" element={<Questions />} />}
+          {QUESTIONS_ON && <Route path="saloon/mine" element={<MyQuestions />} />}
+          {QUESTIONS_ON && <Route path="saloon/:und" element={<Questions />} />}
           {QUESTIONS_ON && <Route path="q/:id" element={<Questions />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

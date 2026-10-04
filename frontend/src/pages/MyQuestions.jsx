@@ -83,13 +83,13 @@ export default function MyQuestions() {
     <div className="wrap page q-page q-mine">
       <header className="q-head">
         <div className="q-head-top">
-          <h1>My questions<Info label="Where these are kept">Saved from "I placed it", in this browser only. Nothing is sent anywhere, and clearing the browser's data removes them: export a copy to keep one.</Info></h1>
-          <Link to="/questions" className="text-link">All questions</Link>
+          <h1>My seat<Info label="Where these are kept">Saved from "I placed it", in this browser only. Nothing is sent anywhere, and clearing the browser's data removes them: export a copy to keep one.</Info></h1>
+          <Link to="/saloon" className="text-link">Back to the Saloon</Link>
         </div>
         <Tabs label="Positions" value={tab} onChange={setTab} items={[["open", "Open"], ["settled", "Settled"]]} />
       </header>
       {rows.length ? rows.map((p) => <Card key={p.key} p={p} onRemove={(k) => setList(removePosition(k))} />)
-        : <p className="status">No questions yet. <Link className="text-link" to="/questions">See the questions</Link></p>}
+        : <p className="status">Nothing here yet. <Link className="text-link" to="/saloon">Visit the Saloon</Link></p>}
       <div className="q-card-actions">
         <button className="text-control" onClick={download} disabled={!list.length}>Export</button>
         <button className="text-control" onClick={() => file.current?.click()}>Import</button>

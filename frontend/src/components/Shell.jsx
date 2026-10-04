@@ -52,7 +52,7 @@ export default function Shell() {
           </Link>
           <nav aria-label="Main navigation">
             <NavLink to="/markets">Markets</NavLink>
-            {QUESTIONS_ON && <NavLink to="/questions" className={({ isActive }) => (isActive || pathname.startsWith("/q/") ? "active" : "")}>Questions</NavLink>}
+            {QUESTIONS_ON && <NavLink to="/saloon" className={({ isActive }) => (isActive || (pathname.startsWith("/q/") || pathname.startsWith("/saloon")) ? "active" : "")}>Saloon</NavLink>}
             <NavLink to="/radar">Radar</NavLink>
             <NavLink to="/options">Options</NavLink>
             <NavLink to="/traders">Traders</NavLink>

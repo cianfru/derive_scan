@@ -161,7 +161,7 @@ export default function Coin() {
           </Step>
           <Step id="options" n={3} kind="options" title="Options"
             right={<span className="step-stamp mono">{dayTime(data.options.ts)}</span>}>
-            {QUESTIONS_ON && data.questions === true && <Link className="text-link q-coin-link" to={`/questions/${und}`}>Questions on {und}</Link>}
+            {QUESTIONS_ON && data.questions === true && <Link className="text-link q-coin-link" to={`/saloon/${und}`}>{und} in the Saloon</Link>}
             <OptionsWorkspace key={und} opts={data.options} und={und} flow={data.taker_flow} hasSurface={data.has_surface === true} embedded />
           </Step>
         </>

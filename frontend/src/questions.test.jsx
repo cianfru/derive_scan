@@ -31,9 +31,9 @@ afterEach(() => { cleanup(); vi.useRealTimers(); });
 const show = (path) => render(
   <MemoryRouter initialEntries={[path]}>
     <Routes>
-      <Route path="/questions" element={<Questions />} />
-      <Route path="/questions/mine" element={<MyQuestions />} />
-      <Route path="/questions/:und" element={<Questions />} />
+      <Route path="/saloon" element={<Questions />} />
+      <Route path="/saloon/mine" element={<MyQuestions />} />
+      <Route path="/saloon/:und" element={<Questions />} />
       <Route path="/q/:id" element={<Questions />} />
     </Routes>
   </MemoryRouter>,
@@ -63,7 +63,7 @@ function wordcheck(texts) {
 
 describe("the board", () => {
   it("lists every coin with a live question and the dates that pass, nearest first", () => {
-    const { container } = show("/questions/BTC");
+    const { container } = show("/saloon/BTC");
     const coins = screen.getByRole("tablist", { name: "Coin" });
     expect(within(coins).getAllByRole("tab").map((t) => t.textContent)).toEqual(index.coins.map((c) => c.und));
     const dates = within(screen.getByRole("tablist", { name: "Settlement date" })).getAllByRole("tab").map((t) => t.textContent);
@@ -74,7 +74,7 @@ describe("the board", () => {
   });
 
   it("shows the pay zone and the full-pay line in every row, the headline included", async () => {
-    show("/questions/BTC");
+    show("/saloon/BTC");
     await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("tab", { name: "This Friday · 9 Oct" }));
     const rows = screen.getAllByRole("row");
     expect(rows[0].getAttribute("aria-label")).toBe("Up or down from $85,000");
@@ -89,7 +89,7 @@ describe("the board", () => {
   });
 
   it("passes the word check on every string and (i)", async () => {
-    const { container } = show("/questions/BTC");
+    const { container } = show("/saloon/BTC");
     const texts = await allText(container);
     expect(texts.length).toBeGreaterThanOrEqual(3);
     expect(texts.some((t) => t.startsWith("[(i) About the pay zone]") && t.includes("%"))).toBe(true);
@@ -97,7 +97,7 @@ describe("the board", () => {
   });
 
   it("marks a thin coin's book, with an (i)", async () => {
-    const { container } = show("/questions/HYPE");
+    const { container } = show("/saloon/HYPE");
     expect(screen.getByText("Thin book")).toBeTruthy();
     wordcheck(await allText(container));
   });
@@ -108,16 +108,16 @@ describe("the board", () => {
     const lv = d.levels.find((x) => x.ladder === 7);
     lv.no = { state: "no_quote" };
     docs.current["questions/BTC.json"] = b;
-    show("/questions/BTC");
+    show("/saloon/BTC");
     const row = screen.getAllByRole("row").find((r) => r.getAttribute("aria-label") === `Above $${lv.k.toLocaleString("en-US")}`);
     expect(within(row).getByLabelText("No no price now").textContent).toContain("—");
     cleanup();
     vi.setSystemTime((T14 + 40 * 60) * 1000);
-    show("/questions/BTC");
+    show("/saloon/BTC");
     expect(screen.getByText(/40 min old/)).toBeTruthy();
     cleanup();
     vi.setSystemTime((T14 + 120 * 60) * 1000);
-    const { container } = show("/questions/BTC");
+    const { container } = show("/saloon/BTC");
     expect(screen.getByText("Prices paused since 14:00 UTC")).toBeTruthy();
     expect(container.querySelectorAll("a.q-btn")).toHaveLength(0);
   });
@@ -170,7 +170,7 @@ describe("My questions", () => {
       { key: "b", id: "BTC-20261003-A-80000-86000", und: "BTC", side: "yes", lo: 80000, hi: 86000, contracts: 0.01, paid: 50,
         question: "BTC above $83,000 on Sat 3 Oct?", answer: "Yes", settle_ts: 1791014400 },
     ]));
-    const { container } = show("/questions/mine");
+    const { container } = show("/saloon/mine");
     expect(container.textContent).toContain("Sell back");
     const user = userEvent.setup({ advanceTimers: () => {} });
     await user.click(screen.getByRole("button", { name: "Sell back" }));
@@ -184,7 +184,7 @@ describe("My questions", () => {
 
   it("has an empty state", () => {
     try { localStorage.clear(); } catch { /* blocked */ }
-    show("/questions/mine");
-    expect(screen.getByText(/No questions yet/)).toBeTruthy();
+    show("/saloon/mine");
+    expect(screen.getByText(/Nothing here yet/)).toBeTruthy();
   });
 });
