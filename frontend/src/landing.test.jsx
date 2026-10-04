@@ -44,6 +44,7 @@ describe("landing", () => {
     expect(text.match(BANNED)).toBeNull();
     expect(text).not.toMatch(/proprietary/i);
     expect(text).toContain("Know where the herd stands.");
+    expect(container.querySelector(".lp-saloon")).toBeNull(); // the Saloon section only with the Saloon on
     expect(container.querySelector(".foot").textContent).toContain("Cowboy is independent and built on Derive");
   });
 

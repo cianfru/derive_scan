@@ -433,6 +433,7 @@ Nothing in stage 1 calls a private endpoint, holds a key, or places an order.
 - **Payout identities:** Yes + No payout equals 1 at every settlement price, and the payout rule equals the legs' intrinsic sum at the recorded 2-3 October settlements.
 - **Parsing:** `1_35` parses as 1.35.
 - **Unusable prices:** a buy over $1 or a sell-back under $0 gives `no_quote`.
+- **Not worth offering (review, 4 October 2026):** a side whose buy is over 99c per $1 is published as `tail` (not offered), with its true price kept in the file. At most 1c is left to gain, and stage 2's RFQ ceiling is 99c, so a ticket could not be placed at that price anyway; the screen never shows such a price rounded down to 99c. The level's other side and the date gates are unchanged.
 - **The date list:** from the fixture chain at 14:00, the board's dates are exactly 5, 6, 7, 9, 16, 23 and 30 Oct, with labels "Mon 5 Oct", "Tue 6 Oct", "Wed 7 Oct", "This Friday · 9 Oct", "Fri 16 Oct", "Fri 23 Oct" and "End of Oct · Fri 30 Oct".
   - 4 Oct is out (18 hours).
   - 27 Nov and later are out.
@@ -785,7 +786,7 @@ What it needs:
 
 6. **Prices on the buttons.** Proposed: the executable buy price, rounded up to whole cents, with fees in the ticket. The clipped fair appears only as the unlabelled bar, on the chart and in (i). The alternative is to show fair, which cannot be had on the screen.
 
-7. **Credit twins in stage-1 tickets.** Proposed: always use the cheaper construction, even when it is a credit form with margin held, with the credit wording from F4. For No near the money it often is: in 2.2 the call twin costs 65.37c against 66.02c for the debit put spread. The alternative is debit forms only, for simpler wording, at the cost of a slightly higher No price (66.02c, shown 67c, in 2.2). That would also break the rule that the gap equals Yes + No - $1, and would change the 2.2 test values.
+7. **Credit twins in stage-1 tickets.** Decided 4 October 2026: debit forms only (retail UI review D5). On the 3 October 14:00 BTC fixture, the 53 credit sides move up a median 1.05c (at most 2.9c) and 9 of 108 open sides go over G; ETH's 5 Oct date no longer passes. Original proposal: Proposed: always use the cheaper construction, even when it is a credit form with margin held, with the credit wording from F4. For No near the money it often is: in 2.2 the call twin costs 65.37c against 66.02c for the debit put spread. The alternative is debit forms only, for simpler wording, at the cost of a slightly higher No price (66.02c, shown 67c, in 2.2). That would also break the rule that the gap equals Yes + No - $1, and would change the 2.2 test values.
 
 8. **My questions.** Browser-only storage with export and import, and no wallet matching in stage 1 (proposed).
 

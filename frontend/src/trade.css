@@ -1,0 +1,40 @@
+/* Saloon stage 2: the one-tap ticket and its setup steps. Calm like the rest of the Saloon: thin
+   borders, mono numbers, orange only on the primary button. Loaded only with VITE_SALOON_TRADE on. */
+.tr { gap: 14px; }
+.tr-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.tr-head h3 { min-width: 0; }
+.tr-tag { flex: none; font-size: 11px; line-height: 20px; color: var(--text-3); border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
+.tr-step, .tr-ticket { display: grid; gap: 12px; align-content: start; }
+.tr-lead { margin: 0; font: 600 15px/1.4 var(--font-sans); color: var(--text-1); }
+.tr-lead .info, .tr-note .info { vertical-align: -2px; margin-left: 4px; }
+.tr-note { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text-3); }
+.tr-msg { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-1); padding-left: 10px; border-left: 2px solid var(--border-strong); }
+.tr-done { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-1); padding-left: 10px; border-left: 2px solid var(--up); }
+.tr-done.warn { border-left-color: var(--down); }
+.tr-wait { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-2); min-height: 44px; }
+.tr-wait .spin { width: 14px; height: 14px; flex: none; }
+.tr-go { width: 100%; }
+.tr-go[disabled], .tr .btn[disabled] { opacity: .45; cursor: not-allowed; }
+.tr-check { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.5; color: var(--text-2); cursor: pointer; }
+.tr-check input { margin-top: 3px; accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
+.tr-amount { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.tr-figs { display: grid; gap: 6px; margin: 0; }
+.tr-figs > div { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.tr-figs dt { color: var(--text-2); font-size: 13px; }
+.tr-figs dd { margin: 0; font-size: 13px; text-align: right; display: inline-flex; gap: 10px; align-items: baseline; }
+.tr-addr { overflow-wrap: anywhere; }
+.tr-actions { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.tr-grant { list-style: none; margin: 0; padding: 12px 14px; display: grid; gap: 8px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--ground); font-size: 13px; line-height: 1.45; color: var(--text-2); }
+.tr-grant b { color: var(--text-1); font-weight: 600; }
+.tr-seat { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; font-size: 12px; color: var(--text-3); padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.tr-seat b { color: var(--text-1); font-weight: 500; }
+.tr-seat .text-control { margin-left: auto; padding: 0; font-size: 12px; }
+.tr-money .q-lose dd { font-size: 16px; }
+.tr-firm { color: var(--text-2); }
+.tr-switch { border-top: 1px solid var(--border); padding-top: 10px; }
+.tr-switch .text-control { padding: 0; font-size: 12px; }
+.tr-hand .q-ticket { border: 0; padding: 0; background: none; }
+@media (max-width: 1279px) {
+  .q-sheet .tr { border: 0; padding: 0; background: none; }
+  .q-sheet .tr-head { padding-right: 56px; } /* room for the sheet's Close */
+}

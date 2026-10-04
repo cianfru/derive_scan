@@ -6,7 +6,8 @@ recorder already read and keeps the state between runs.
 A question "COIN above K on DATE?" is a vertical spread over its zone [lo, hi] (K is the middle):
 Yes pays clip((S - lo) / w, 0, 1) per $1 at the settlement price S, No pays the rest. Each answer
 can be built two ways (a debit spread, or its put-call twin, a credit spread with Derive holding
-the width as margin); the cheaper one at the top of Derive's book is used. Fair is Derive's mark,
+the width as margin); only the debit spread is offered (owner, 4 October 2026: retail tickets show
+what is paid, never cash received and held), even where the twin is a little cheaper. Fair is Derive's mark,
 clipped into each leg's own bid and ask. Prices are per $1 of payout; nothing here is a chance.
 """
 from __future__ import annotations
@@ -43,6 +44,7 @@ QUESTION_GATES = {
     "stale_sec": 35 * 60, "paused_sec": 90 * 60,  # price age: amber, then paused
     "history_keep_days": 90,
 }
+SIDE_MAX_BUY = 0.99   # a side above this per $1 is published "tail" (not offered)
 DEFAULT_SPEC = {"tick": None, "min": None, "step": None, "taker": 0.0003, "base": 0.5, "cap": 0.125}
 
 
@@ -199,7 +201,8 @@ def _construct(legs: list[tuple[str, dict, str]], w: float, credit: bool) -> dic
 
 
 def price_level(ex: dict, lo: float, hi: float, index: float, spec: dict, payout: float | None = None) -> dict | None:
-    """Fair, and for Yes and No the cheaper construction with its all-in cost over fair at `payout`."""
+    """Fair, and for Yes and No the debit construction with its all-in cost over fair at `payout`.
+    The credit twins are priced too but never offered (retail tickets are debit only)."""
     payout = payout or QUESTION_GATES["gate_payout"]
     s = ex["strikes"]
     lo_, hi_ = s.get(_r(lo), {}), s.get(_r(hi), {})
@@ -224,18 +227,17 @@ def price_level(ex: dict, lo: float, hi: float, index: float, spec: dict, payout
     n = payout / w
 
     def pick(cands, fair_side):
-        c = [x for x in cands if x]
+        c = [x for x in cands if x and x["form"] == "debit"]
         if not c:
             return None
-        best = min(c, key=lambda x: (round(x["buy"], 12), x["form"] != "debit"))
+        best = c[0]
         fees = sum(leg_fee(index, p, n, spec) for _, _, p in best["legs"]) / payout
         best["over"] = best["buy"] + fees - fair_side if fair_side is not None else None
         return best
 
-    yes = min((x for x in yes_c if x), key=lambda x: (round(x["buy"], 12), x["form"] != "debit"), default=None)
+    yes = yes_c[0]
     if fair is not None and yes is not None:
-        # The cheaper construction can sit across put-call parity from the clipped calls; keep the
-        # order sell-back <= fair <= buy on the screen.
+        # Keep the order sell-back <= fair <= buy on the screen for the offered (debit) Yes.
         fair = min(max(fair, yes["sell"] if yes["sell"] is not None else fair), yes["buy"])
     return {"lo": lo, "hi": hi, "k": (lo + hi) / 2, "w": w, "fair": fair,
             "yes": pick(yes_c, fair), "no": pick(no_c, None if fair is None else 1 - fair)}
@@ -429,9 +431,15 @@ def _ladder(priced: dict, index: float, size: int) -> list[float]:
 
 
 def _side_out(side: dict | None, und: str) -> dict | None:
+    """A side as published. One that costs more than SIDE_MAX_BUY per $1 is "tail": not offered,
+    since at most 1c is left to gain and stage 2's RFQ ceiling is 99c (lib/trade/package.js); the
+    true price stays in the file, so the app never shows it rounded down to 99c."""
     if side is None:
         return {"state": "no_quote"}
-    return {"state": side_state(side, und), "buy": round(side["buy"], 4),
+    state = side_state(side, und)
+    if state == "open" and side["buy"] > SIDE_MAX_BUY:
+        state = "tail"
+    return {"state": state, "buy": round(side["buy"], 4),
             "sell": None if side["sell"] is None else round(side["sell"], 4),
             "size": round(side["size"], 2), "form": side["form"],
             "legs": [[n, s, p] for n, s, p in side["legs"]], "close": side.get("close")}

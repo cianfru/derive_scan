@@ -8,7 +8,7 @@ import { Plate, Loading, Failed, Info } from "../components/ui.jsx";
 import { WalletEmblem } from "../components/WalletTag.jsx";
 import LeanBar from "../components/LeanBar.jsx";
 import { Asset } from "../components/MarketVisuals.jsx";
-import HistoryStatus, { coverageReady } from "../components/HistoryStatus.jsx";
+import HistoryStatus, { coverageReady, GapNote } from "../components/HistoryStatus.jsx";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const short = (t) => { const d = new Date(t * 1000); return `${MONTHS[d.getUTCMonth()]} ${String(d.getUTCDate()).padStart(2, "0")}`; };
@@ -196,7 +196,7 @@ export default function Trader() {
       <Plate title="Recent activity" info="Options bought and sold per day over the last 45 rebuilt days, with the average price." bodyClass="flush">
         {data.recent?.length ? <Recent recent={data.recent} /> : <p className="status pad">—</p>}
       </Plate>
-      <p className="status">History to {data.through} UTC{data.valued_at ? <> · book valued {utc(data.valued_at)}{Date.now() / 1000 - data.valued_at > 1800 ? " · historical snapshot" : ""}</> : null}</p>
+      <p className="status">History to {data.through} UTC{data.valued_at ? <> · book valued {utc(data.valued_at)}{Date.now() / 1000 - data.valued_at > 1800 ? " · historical snapshot" : ""}</> : null}<GapNote data={data} /></p>
     </div>
   );
 }

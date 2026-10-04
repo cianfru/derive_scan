@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import { radarPoint, radarLabels, viewReading, traceGeometry } from "../lib/presentation.js";
+import { radarPoint, radarLabels, viewReading, traceGeometry, STATE_NAMES } from "../lib/presentation.js";
 import { price, usd, z, chg, clock, REGIME, DASH } from "../lib/format.js";
-import { Tabs, Loading, Failed, PageHead, PanelHead, Empty, Arrow } from "../components/ui.jsx";
+import { Tabs, Loading, Failed, PageHead, PanelHead, Empty, Arrow, Info } from "../components/ui.jsx";
 import { Asset } from "../components/MarketVisuals.jsx";
 import { useElementWidth } from "../lib/useElementWidth.js";
-import { radarFrames, frameAt, trailAt, closeLabel, nearest } from "../lib/radarHistory.js";
+import { radarFrames, frameAt, trailAt, closeLabel, nearest, walletAt, NO_IV_HELP } from "../lib/radarHistory.js";
 
 const TONE = { up: "var(--up)", defensive: "var(--down)", neutral: "var(--fg-2)" };
 const toneOf = (coin) => viewReading(coin.align, "30d", "engine").state;
@@ -16,7 +16,7 @@ const MS_PER_CLOSE = 450, REDUCED_MS = 700;
 const signedPct = (v) => (Number.isFinite(v) ? `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v * 100).toFixed(0)}%` : DASH);
 
 const RADAR_HELP = "Across: the 1D engine's price stretch, in standard deviations from its trend. Up: the Smart cohort's net option delta divided by its gross absolute option delta, from −100% to +100%, on expiries inside the selected window (7 or 30 days). Circle area: gross dollar delta exposure, relative to the largest shown; fill: the daily engine's reading. Markets without a current wallet reading sit on the strip above the axis at their price stretch. Exposure, not a count of traders; context side by side, not an entry score.";
-const RADAR_HISTORY_HELP = "History: each circle trails its last 7 daily closes, oldest faintest; Replay steps through the last 30, with circle sizes and the stretch axis on one scale across them. Past wallet readings are rebuilt from Derive's trade history with the Smart cohort as it stood on each day, so later results never choose the wallets. Hollow dot: delta modelled from trade prices; filled dot: delta from recorded option quotes. Dotted step: expiries left or entered the window at that close, so the move comes from the window, not from trading. Grey circle: no recorded engine reading for that close. Context, not a signal.";
+const RADAR_HISTORY_HELP = "History: each circle trails its last 7 daily closes, oldest faintest; Replay steps through the last 30, with circle sizes and the stretch axis on one scale across them. Past wallet readings are rebuilt from Derive's trade history with the Smart cohort as it stood on each day, so later results never choose the wallets. Hollow dot: delta modelled from trade prices; filled dot: delta from recorded option quotes. Dotted step: expiries left or entered the window at that close, so the move comes from the window, not from trading. Where no option quotes were recorded and a position had no recent traded implied volatility, the close is shown as unavailable rather than modelled. In Replay every figure beside the map is the selected close's; options readings are not kept per close. Grey circle: no recorded engine reading for that close. Context, not a signal.";
 
 /** Places strip labels in up to three rows so neighbours never overlap. */
 function stripRows(items, x) {
@@ -148,7 +148,7 @@ export function RadarMap({ points, strip = [], focus, onSelect, trails = null, s
             <line x1={L} x2={W - R} y1={stripY} y2={stripY} className="trace-grid" />
             {stripped.map((s) => (
               <g key={s.und} className={`radar-tick ${s.und === focus ? "selected" : ""}`} onClick={() => onSelect(s.und)} aria-hidden="true">
-                <title>{`${s.und}: price stretch ${z(s.x)}, ${past ? "no wallet reading at that close" : "no current wallet reading"}`}</title>
+                <title>{`${s.und}: price stretch ${z(s.x)}, ${past ? (s.unavailable ? "wallet reading unavailable at that close: no valid implied volatility" : "no wallet reading at that close") : "no current wallet reading"}`}</title>
                 <circle cx={s.cx} cy={stripY} r="4" fill="var(--plate)" stroke={s.und === focus ? "var(--orange)" : fill(s.state)} strokeWidth={s.und === focus ? 2 : 1.25} />
                 <text x={s.cx} y={stripY + 17 + s.row * 13} textAnchor="middle">{s.und}</text>
                 <rect x={s.cx - 16} y={stripY - 8} width="32" height={24 + s.row * 13} fill="transparent" />
@@ -267,8 +267,8 @@ function seriesAt(values, t) {
 }
 
 /** One reading over the replay window: thin where modelled, thick where recorded, with an orange
- * cursor at the playhead and the value now at the right edge. */
-function HistTrace({ label, values, t, lo, hi, fmt, last, plain = false }) {
+ * cursor at the playhead and, at the right edge, the value now (or, on a past close, that close's). */
+function HistTrace({ label, values, t, lo, hi, fmt, last, plain = false, past = false }) {
   const [box, width] = useElementWidth(240);
   const W = Math.max(120, width), H = 40, ROOM = 48;
   const X = (k) => 2 + (k / Math.max(1, last)) * (W - ROOM - 4);
@@ -279,7 +279,7 @@ function HistTrace({ label, values, t, lo, hi, fmt, last, plain = false }) {
     if (a && b && !b.brk) segs.push(<line key={k} x1={X(k)} y1={Y(a.v)} x2={X(k + 1)} y2={Y(b.v)} className={plain ? "rd-hist-plain" : a.thin || b.thin ? "rd-hist-thin" : "rd-hist-line"} />);
   }
   const head = seriesAt(values, t);
-  const end = values[last];
+  const end = past ? values[Math.round(t)] : values[last];
   return (
     <div className="rd-hist-row">
       <span>{label}</span>
@@ -389,7 +389,7 @@ export default function Radar() {
     ? coins.filter((c) => !plotted.has(c.und) && Number.isFinite(c.z_1d) && viewReading(c.align, "30d", "engine").state)
       .map((c) => ({ und: c.und, x: c.z_1d, state: toneOf(c) }))
     : coins.filter((c) => !plotted.has(c.und) && Number.isFinite(nearest(H.series.get(c.und)?.z, tt)))
-      .map((c) => ({ und: c.und, x: nearest(H.series.get(c.und).z, tt), state: nearest(H.series.get(c.und).engine, tt) }));
+      .map((c) => ({ und: c.und, x: nearest(H.series.get(c.und).z, tt), state: nearest(H.series.get(c.und).engine, tt), unavailable: Boolean(nearest(H.series.get(c.und).w, tt)?.unavailable) }));
   // Every close's strip, so the map keeps one height through Replay.
   const stripSets = H ? H.steps.map((_, s) => coins.filter((c) => !H.frames.get(c.und)?.[s] && Number.isFinite(H.series.get(c.und)?.z[s]))
     .map((c) => ({ und: c.und, x: H.series.get(c.und).z[s] }))) : null;
@@ -406,9 +406,26 @@ export default function Radar() {
   const zShown = atNow ? (engineOk ? selected.z_1d : null) : nearest(sel?.z, tt);
   const wShown = atNow ? selectedPoint : nearest(sel?.w, tt);
   const closeAt = !atNow && k < last ? H.steps[k] : null;
-  const closePrice = closeAt && selected?.spark_times_1d ? selected.spark_1d?.[selected.spark_times_1d.indexOf(closeAt)] : null;
+  const past = closeAt != null;  // Replay on a past close: every figure below comes from that close
+  const closeIdx = past && selected?.spark_times_1d ? selected.spark_times_1d.indexOf(closeAt) : -1;
+  const closePrice = closeIdx >= 0 ? selected.spark_1d?.[closeIdx] : null;
+  const traceValues = past ? (closeIdx >= 0 ? (selected.spark_1d || []).slice(0, closeIdx + 1) : []) : selected?.spark_1d;
+  const wUnavailable = Boolean(wShown?.unavailable);
+  const wValue = wShown && !wUnavailable ? wShown : null;
+  // The readings at a past close: the engine's saved reading, the wallets' balance then; options
+  // readings are not kept per close, so they stay unavailable.
+  const pastReading = (kind) => {
+    if (kind === "engine") {
+      const st = nearest(sel?.engine, tt);
+      return { state: st, label: st ? STATE_NAMES[st] : "No saved reading", sub: Number.isFinite(zShown) ? z(zShown) : null,
+        why: st ? null : "No engine reading was saved at this close." };
+    }
+    if (kind === "options") return { state: null, label: "Unavailable", sub: null, why: "Options readings are not kept per close, so none is shown for a past close." };
+    const r = walletAt(wShown);
+    return { ...r, sub: Number.isFinite(r.y) ? signedPct(r.y) : null, why: r.unavailable ? NO_IV_HELP : r.state ? null : "No Smart wallet reading at this close." };
+  };
   const zSeries = sel?.z.map((v, i) => (Number.isFinite(v) ? { v, brk: i === last && H.brk } : null));
-  const wSeries = sel?.w.map((p) => (p ? { v: p.y, thin: p.modelled, brk: p.brk } : null));
+  const wSeries = sel?.w.map((p) => (p && !p.unavailable ? { v: p.y, thin: p.modelled, brk: p.brk } : null));
   const hasHist = Boolean(sel) && (zSeries.filter(Boolean).length > 1 || wSeries.filter(Boolean).length > 1);
   const sBound = Math.max(2, xBound);
   const tabs = <Tabs label="Wallet expiry window" value={horizon} onChange={(v) => choose("window", v)} items={[["7d", "Within 7 days", "7 days"], ["30d", "Within 30 days", "30 days"]]} />;
@@ -434,22 +451,34 @@ export default function Radar() {
               <span className="rd-price">{atNow || k >= last ? `$${price(selected.price)}` : <><span className="rd-when">{closeLabel(closeAt)} close</span>{Number.isFinite(closePrice) && ` $${price(closePrice)}`}</>}</span>
             </div>
             <Link to={`/coin/${selected.und}`} className="rd-trace-link" aria-label={`Open ${selected.und} chart`}>
-              <RailTrace values={selected.spark_1d} label={`${selected.und} daily closes`} />
+              <RailTrace values={traceValues} label={past ? `${selected.und} daily closes to ${closeLabel(closeAt)}` : `${selected.und} daily closes`} />
             </Link>
             <div className="rd-figs">
               <div><span>1D stretch</span><b>{Number.isFinite(zShown) ? z(zShown) : <Empty />}</b></div>
-              <div><span>Delta balance</span><b>{wShown ? `${(wShown.y * 100).toFixed(0)}%` : <Empty />}</b></div>
-              <div><span>Gross delta</span><b>{wShown ? usd(wShown.gross) : <Empty />}</b></div>
+              <div><span>Delta balance{wUnavailable && <> <Info label="Why the wallet reading is unavailable">{NO_IV_HELP}</Info></>}</span>
+                <b>{wValue ? `${(wValue.y * 100).toFixed(0)}%` : wUnavailable ? "Unavailable" : <Empty />}</b></div>
+              <div><span>Gross delta</span><b>{wValue ? usd(wValue.gross) : wUnavailable ? "Unavailable" : <Empty />}</b></div>
             </div>
             {hasHist && (
               <div className="rd-hist" aria-label={`${selected.und}: balance and stretch over the last ${last} closes`}>
-                <HistTrace label="Balance" values={wSeries} t={tt} lo={-1} hi={1} fmt={signedPct} last={last} />
-                <HistTrace label="Stretch" values={zSeries} t={tt} lo={-sBound} hi={sBound} fmt={(v) => z(v)} last={last} plain />
+                <HistTrace label="Balance" values={wSeries} t={tt} lo={-1} hi={1} fmt={signedPct} last={last} past={past} />
+                <HistTrace label="Stretch" values={zSeries} t={tt} lo={-sBound} hi={sBound} fmt={(v) => z(v)} last={last} plain past={past} />
                 <HistAxis steps={H.steps} />
               </div>
             )}
             <div className="rd-readings">
               {KINDS.map(([kind, name]) => {
+                if (past) {
+                  const r = pastReading(kind);
+                  const shown = r.state || r.unavailable ? r.label : "—";
+                  return (
+                    <div key={kind}>
+                      <span>{name}</span>
+                      <b className={`tone-${r.state || "unknown"}`} title={r.why || undefined}>{shown}</b>
+                      {r.sub && <small>{r.sub}</small>}
+                    </div>
+                  );
+                }
                 const r = viewReading(selected.align, horizon, kind);
                 const sub = kind === "engine" && r.state && r.row?.regime ? REGIME[r.row.regime] : readingNumber(selected, kind, r);
                 return (

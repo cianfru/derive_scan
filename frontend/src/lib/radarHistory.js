@@ -7,12 +7,18 @@ export const TRAIL = 7;    // closes drawn behind each circle
 export const REPLAY = 30;  // closes the player spans
 export const FLAG_ROLL = 1;      // bit 0: expiries left or entered the window at that close
 export const FLAG_MODELLED = 2;  // bit 1: delta modelled from trade prices, not recorded quotes
+export const FLAG_NO_IV = 4;     // bit 2: unavailable, no valid implied volatility at that close
+// Why a past wallet reading is unavailable, for its (i).
+export const NO_IV_HELP = "Unavailable at this close: no option quotes were recorded then, and at least one position had no traded implied volatility recent enough to value it (its own trades within 21 days, or the coin's near-the-money trades within 7 days). Without that input the delta is not modelled, so no balance or exposure is shown.";
+// Wallet balance bands, as the live reading (lean.py DEFENSIVE, UP).
+const WALLET_STATE = (y) => (y <= -0.25 ? "defensive" : y >= 0.25 ? "up" : "neutral");
+export const WALLET_LABEL = { up: "Long delta", defensive: "Short delta", neutral: "Balanced delta" };
 const ENGINE = { u: "up", d: "defensive", n: "neutral" };
 const EPS = 1e-6;
 
 export function decodeFlags(flags) {
   const f = Number.isInteger(flags) ? flags : 0;
-  return { roll: (f & FLAG_ROLL) !== 0, modelled: (f & FLAG_MODELLED) !== 0 };
+  return { roll: (f & FLAG_ROLL) !== 0, modelled: (f & FLAG_MODELLED) !== 0, unavailable: (f & FLAG_NO_IV) !== 0 };
 }
 
 /** The engine's saved reading at close k of a radar.json coin: up, defensive, neutral, or null. */
@@ -21,7 +27,21 @@ export function engineAt(coin, k) {
 }
 
 const num = (v) => (Number.isFinite(v) ? v : null);
-const wallet = (v) => (Array.isArray(v) && Number.isFinite(v[0]) && Number.isFinite(v[1]) ? { y: v[0], gross: v[1], ...decodeFlags(v[2]) } : null);
+// A close's wallet reading: {y, gross, flags}, {unavailable: true} (no valid volatility), or null (a gap).
+const wallet = (v) => {
+  if (!Array.isArray(v)) return null;
+  const f = decodeFlags(v[2]);
+  if (f.unavailable) return f;
+  return Number.isFinite(v[0]) && Number.isFinite(v[1]) ? { y: v[0], gross: v[1], ...f } : null;
+};
+
+/** The wallet reading of one close for the detail panel: {state, label, y}, unavailable, or none. */
+export function walletAt(w) {
+  if (w?.unavailable) return { state: null, label: "Unavailable", unavailable: true };
+  if (!w || !Number.isFinite(w.y)) return { state: null, label: "No reading" };
+  const state = WALLET_STATE(w.y);
+  return { state, label: WALLET_LABEL[state], y: w.y };
+}
 
 /**
  * steps: the last REPLAY close times, then `now`. frames: und -> one map frame per step
@@ -49,14 +69,14 @@ export function radarFrames(hist, livePoints = [], horizon = "30d", now = Date.n
     for (let k = from; k < hist.closes.length; k++) {
       const zk = num(c.z?.[k]), wk = wallet(ws[k]), engine = engineAt(c, k);
       z.push(zk); w.push(wk); e.push(engine);
-      row.push(zk != null && wk ? { x: zk, y: wk.y, gross: wk.gross, roll: wk.roll, modelled: wk.modelled, engine } : null);
+      row.push(zk != null && wk && !wk.unavailable ? { x: zk, y: wk.y, gross: wk.gross, roll: wk.roll, modelled: wk.modelled, engine } : null);
     }
     const coin = byUnd.get(und), p = live.get(und);
     const engineNow = coin ? viewReading(coin.align, "30d", "engine", now).state || null : null;
     const wNow = p ? { y: p.y, gross: p.gross } : null;
     z.push(p ? p.x : engineNow && Number.isFinite(coin?.z_1d) ? coin.z_1d : null);
     e.push(engineNow);
-    w.push(wNow ? { y: wNow.y, gross: wNow.gross, roll: false, modelled: false, live: true, brk } : null);
+    w.push(wNow ? { y: wNow.y, gross: wNow.gross, roll: false, modelled: false, unavailable: false, live: true, brk } : null);
     row.push(p ? { x: p.x, y: p.y, gross: p.gross, positions: p.positions, roll: false, modelled: false, engine: engineNow, live: true, brk } : null);
     series.set(und, { z, w, engine: e });
     if (row.some(Boolean)) frames.set(und, row);

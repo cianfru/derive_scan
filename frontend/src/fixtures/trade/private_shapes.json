@@ -1,0 +1,194 @@
+{
+ "source": "Shapes from Derive's V3 openapi.json and API reference (4 Oct 2026). Not recorded: these are private calls and need an account. Numbers are illustrative.",
+ "private/get_subaccounts": {
+  "wallet": "0x4201c60c3c85e641c9837588429f59ca57e22be2",
+  "subaccount_ids": [
+   90211,
+   90212
+  ]
+ },
+ "private/get_subaccount": {
+  "90211": {
+   "subaccount_id": 90211,
+   "label": "",
+   "manager_id": 0,
+   "margin_type": "SM",
+   "risk_universe_id": 0,
+   "collaterals": [],
+   "positions": [],
+   "open_orders": [],
+   "subaccount_value": "0",
+   "initial_margin": "0",
+   "maintenance_margin": "0",
+   "is_under_liquidation": false,
+   "currency": [],
+   "failed_to_fetch": false
+  },
+  "90212": {
+   "subaccount_id": 90212,
+   "label": "Cowboy",
+   "manager_id": 1,
+   "margin_type": "SM",
+   "risk_universe_id": 1,
+   "collaterals": [
+    {
+     "asset_name": "USDC",
+     "asset_type": "erc20",
+     "currency": "USDC",
+     "amount": "240.5",
+     "mark_price": "1",
+     "mark_value": "240.5",
+     "initial_margin": "0",
+     "maintenance_margin": "0"
+    }
+   ],
+   "positions": [],
+   "open_orders": [],
+   "subaccount_value": "240.5",
+   "initial_margin": "240.5",
+   "maintenance_margin": "240.5",
+   "is_under_liquidation": false,
+   "currency": [
+    "USDC"
+   ],
+   "failed_to_fetch": false
+  }
+ },
+ "public/register_deposit_address": {
+  "wallet": "0x4201c60c3c85e641c9837588429f59ca57e22be2",
+  "deposit_address": "0x9a3c5be1b0e4d0f7c6d2a8e1f3b4c5d6e7f80912",
+  "subaccount_id": null,
+  "manager_id": 1
+ },
+ "public/get_pending_deposits": {
+  "wallet": "0x4201c60c3c85e641c9837588429f59ca57e22be2",
+  "pending_deposits": [
+   {
+    "action_type": "DepositToNewSubaccount",
+    "amount": "100",
+    "asset": "USDC",
+    "deposit_type": "standard",
+    "manager_id": 1,
+    "status": "pending",
+    "subaccount_id": 0,
+    "timestamp": 1791089000000,
+    "updated_at_ms": 1791089060000,
+    "tx_hash": "0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+   }
+  ]
+ },
+ "private/session_keys": {
+  "public_session_keys": [
+   {
+    "public_session_key": "0x2b5AD5c4795c026514f8317c7a215E218DcCD6cF",
+    "label": "Cowboy Saloon",
+    "protocol_scopes": [
+     "trade:rfq:option"
+    ],
+    "offchain_scopes": [],
+    "subaccount_ids": [
+     90212
+    ],
+    "expiry_sec": 1791694000,
+    "registered_sec": 1791089200,
+    "ip_whitelist": []
+   }
+  ]
+ },
+ "private/set_session_key": {
+  "public_session_key": "0x2b5AD5c4795c026514f8317c7a215E218DcCD6cF",
+  "protocol_scopes": [
+   "trade:rfq:option"
+  ],
+  "offchain_scopes": [],
+  "label": "Cowboy Saloon",
+  "ip_whitelist": [],
+  "expiry_sec": 1791694000,
+  "subaccount_ids": [
+   90212
+  ]
+ },
+ "private/send_rfq": {
+  "rfq_id": "0f1e2d3c-4b5a-4968-8776-a5b4c3d2e1f0",
+  "subaccount_id": 90212,
+  "wallet": "0x4201c60c3c85e641c9837588429f59ca57e22be2",
+  "status": "open",
+  "label": "BTC-20261009-A-82000-88000:yes",
+  "legs": [
+   {
+    "instrument_name": "BTC-20261009-82000-C",
+    "direction": "buy",
+    "amount": "0.03299"
+   },
+   {
+    "instrument_name": "BTC-20261009-88000-C",
+    "direction": "sell",
+    "amount": "0.03299"
+   }
+  ],
+  "max_total_cost": "103.95",
+  "min_total_cost": null,
+  "partial_fill_step": "1",
+  "filled_pct": "0",
+  "filled_direction": null,
+  "total_cost": null,
+  "ask_total_cost": null,
+  "bid_total_cost": null,
+  "mark_total_cost": "94.1",
+  "cancel_reason": "",
+  "counterparties": null,
+  "creation_timestamp": 1791089400000,
+  "last_update_timestamp": 1791089400000,
+  "valid_until": 1791091200000
+ },
+ "private/rfq_get_best_quote": {
+  "direction": "buy",
+  "is_valid": true,
+  "invalid_reason": null,
+  "estimated_total_cost": "96.9906",
+  "estimated_fee": "1.3395",
+  "suggested_max_fee": "1.95",
+  "estimated_realized_pnl": "0",
+  "estimated_realized_pnl_excl_fees": "0",
+  "filled_pct": "0",
+  "orderbook_total_cost": "99.4",
+  "pre_initial_margin": "240.5",
+  "post_initial_margin": "240.5",
+  "post_liquidation_price": null,
+  "down_liquidation_price": null,
+  "up_liquidation_price": null,
+  "best_quote": {
+   "quote_id": "7e6d5c4b-3a29-4817-9605-f4e3d2c1b0a9",
+   "rfq_id": "0f1e2d3c-4b5a-4968-8776-a5b4c3d2e1f0",
+   "subaccount_id": 70001,
+   "wallet": "0x000000000000000000000000000000000000beef",
+   "direction": "sell",
+   "legs": [
+    {
+     "instrument_name": "BTC-20261009-82000-C",
+     "direction": "buy",
+     "amount": "0.03299",
+     "price": "3180"
+    },
+    {
+     "instrument_name": "BTC-20261009-88000-C",
+     "direction": "sell",
+     "amount": "0.03299",
+     "price": "240"
+    }
+   ],
+   "legs_hash": "0x1111111111111111111111111111111111111111111111111111111111111111",
+   "status": "open",
+   "fill_pct": "0",
+   "liquidity_role": "maker",
+   "cancel_reason": "",
+   "creation_timestamp": 1791089401000,
+   "last_update_timestamp": 1791089401000
+  }
+ },
+ "private/cancel_rfq": "ok",
+ "public/login": [
+  90211,
+  90212
+ ]
+}

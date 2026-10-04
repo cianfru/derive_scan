@@ -47,9 +47,12 @@ def test_btc_above_86000_worked_example(chain14):
     y, n = p["yes"], p["no"]
     assert y["form"] == "debit" and round(y["buy"], 4) == 0.3782 and cents_up(y["buy"]) == 38
     assert round(y["sell"], 4) == 0.3463 and cents_down(y["sell"]) == 34
-    assert n["form"] == "credit" and round(n["buy"], 4) == 0.6537 and cents_up(n["buy"]) == 66
+    # Debit only (owner, 4 October 2026): No is the put spread at 66.02c, shown 67c (the call twin,
+    # 65.37c, shown 66c, is no longer offered).
+    assert n["form"] == "debit" and round(n["buy"], 4) == 0.6602 and cents_up(n["buy"]) == 67
+    assert n["legs"] == [["BTC-20261009-89000-P", "buy", 4412.0], ["BTC-20261009-83000-P", "sell", 451.0]]
     assert cents_up(y["buy"]) - cents_down(y["sell"]) == 4 and round(y["buy"] - y["sell"], 4) == 0.0318
-    assert round(y["size"]) == 26496 and round(n["size"]) == 720
+    assert round(y["size"]) == 26496 and round(n["size"]) == 21221
     assert y["legs"] == [["BTC-20261009-83000-C", "buy", 2431.0], ["BTC-20261009-89000-C", "sell", 162.0]]
     assert y["close"] == [["BTC-20261009-89000-C", "buy", 190.0], ["BTC-20261009-83000-C", "sell", 2268.0]]
     t = Q.ticket(y, 6000, idx, BTC_SPEC, dollars=100)
@@ -57,7 +60,7 @@ def test_btc_above_86000_worked_example(chain14):
     assert f"{t['payout']:.2f}" == "264.42" and f"{t['at_k']:.2f}" == "132.21" and t["net"] == 2269
     m = Q.ticket(y, 6000, idx, BTC_SPEC, contracts=0.01)
     assert f"{m['payout']:.0f}" == "60" and f"{m['premium']:.2f}" == "22.69" and f"{m['fees']:.2f}" == "1.46"
-    assert round(y["over"] * 100, 2) == 3.66 and round(n["over"] * 100, 2) == 1.30
+    assert round(y["over"] * 100, 2) == 3.66 and round(n["over"] * 100, 2) == 1.98
     assert Q.passes(p, "BTC")
 
 
@@ -137,8 +140,9 @@ def test_zone_rule_headline_and_gates(chain14):
             d9 = next(d for d in board["dates"] if d["expiry"] == "20261009")
             assert d9["headline"] == "BTC-20261009-A-82000-88000"
         else:
-            # S = $50 per side (owner, 3 October 2026): 5, 6, 7 Oct pass, 9 Oct still fails on size ($40).
-            assert {"20261005", "20261006", "20261007"} <= set(passing) and "20261009" not in passing
+            # S = $50 per side (owner, 3 October 2026): 6 and 7 Oct pass, 9 Oct still fails on size ($40).
+            # 5 Oct passed with the credit twin; debit only (4 October 2026), its headline is over G.
+            assert {"20261006", "20261007"} <= set(passing) and not {"20261005", "20261009"} & set(passing)
     assert zones["BTC"] == {"20261005": 6000, "20261006": 6000, "20261007": 6000, "20261009": 6000,
                             "20261016": 8000, "20261023": 8000, "20261030": 8000}
     assert set(zones["ETH"].values()) == {200}
@@ -322,3 +326,13 @@ def test_history_is_in_time_order(tmp_path, snaps):
     assert h["ts"] == sorted(h["ts"]) and len(h["ts"]) == 2
     for col in h["rows"].values():
         assert col["i"] == sorted(col["i"])
+
+
+def test_a_side_above_99c_is_not_offered():
+    # Review: 16 published sides cost over 99c and showed as 99c. A side above 99c per $1 leaves
+    # at most 1c to gain and sits above stage 2's 99c ceiling: it is published as "tail", not open.
+    side = {"buy": 0.9953, "sell": 0.98, "size": 500.0, "over": 0.01, "form": "debit", "legs": [], "close": []}
+    out = Q._side_out(side, "BTC")
+    assert out["state"] == "tail" and out["buy"] == 0.9953  # the true price stays in the file
+    assert Q._side_out({**side, "buy": 0.99}, "BTC")["state"] == "open"
+    assert Q.side_state(side, "BTC") == "open"  # the date gates are unchanged

@@ -237,6 +237,24 @@ const EntryButton = () => (QUESTIONS_ON
   ? <Link className="btn primary lg" to="/saloon">Enter the Saloon</Link>
   : <Link className="btn primary lg" to="/markets">Open the markets</Link>);
 
+/** With the Saloon on, the primary button goes there: say what it is, in plain words, with no prices. */
+function SaloonIntro() {
+  return (
+    <section className="wrap lp-layer lp-saloon" aria-labelledby="lp-saloon">
+      <div className="lp-copy">
+        <p className="lp-eyebrow">The Saloon</p>
+        <h2 id="lp-saloon">Pick higher or lower. Know your cost first.</h2>
+        <p className="lp-body">Choose a coin, a date and a price level, then whether the coin settles higher or lower than it. Before you place anything you see what you pay, the most it pays, the most you can lose and where you break even. Each answer is two Derive options; you place them on Derive yourself.</p>
+        <ul className="lp-proof">
+          <li><b>Defined cost</b><span>The most you can lose is what you pay, fees included.</span></li>
+          <li><b>Pays in part</b><span>Inside a zone around the level, each answer pays part of its payout.</span></li>
+          <li><b>Settles on Derive</b><span>At 08:00 UTC on the date, in USDC, with no action from you.</span></li>
+        </ul>
+      </div>
+    </section>
+  );
+}
+
 export default function Landing() {
   return (
     <div className="landing cowboy-landing">
@@ -257,6 +275,8 @@ export default function Landing() {
           <div className="lp-facts" aria-label="What Cowboy records">{FACTS.map(([v, l]) => <div key={l}><b>{v}</b><span>{l}</span></div>)}</div>
         </div>
       </section>
+
+      {QUESTIONS_ON && <SaloonIntro />}
 
       <section id="how" className="wrap lp-how" aria-labelledby="lp-how">
         <div className="lp-how-head">

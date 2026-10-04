@@ -67,6 +67,22 @@ describe("missing values", () => {
     expect(missingGlyphs(traders.container)).toEqual([]);
   });
 
+  it("Traders shows unresolved history gaps in its status, with an (i)", () => {
+    const base = {
+      ready: true, status: "ready", through: "2026-10-02", generated_at: now, ranked_total: 1, cohorts: { pnl: [], size: [] },
+      traders: [{ address: wallet, rank: 1, class: "directional", option_pnl: 1000, win_rate: null, premium_traded: 5000, last: "2026-10-02", lean: null }],
+    };
+    docs.current = { "traders.json": { ...base, gaps: 1, gap_days: ["2026-04-08"] } };
+    const a = render(<MemoryRouter><Traders /></MemoryRouter>);
+    const status = [...a.container.querySelectorAll("p.status")].at(-1);
+    expect(status.textContent).toContain("1 day with a gap");
+    expect(status.querySelector("button[aria-label='About gaps in the wallet history']")).toBeTruthy();
+    cleanup();
+    docs.current = { "traders.json": { ...base, gaps: 0, gap_days: [] } };
+    const b = render(<MemoryRouter><Traders /></MemoryRouter>);
+    expect(b.container.textContent).not.toMatch(/with a gap|with gaps/);
+  });
+
   it("no source file writes another dash glyph as a missing value", () => {
     const files = import.meta.glob(["./**/*.jsx", "./**/*.js", "!./**/*.test.*"], { query: "?raw", import: "default", eager: true });
     const hits = [];

@@ -154,3 +154,48 @@ def test_repairs_run_in_order():
     assert history_once.next_repair({}) == "fractional_strikes"
     assert history_once.next_repair({"repaired": "fractional_strikes"}) == "paging"
     assert history_once.next_repair({"repaired": "paging"}) is None
+
+
+# -- an anomalous day is retried, and its gap is published until resolved (review item 4) -------
+
+def test_an_unreconciled_day_is_queued_retried_and_published_as_a_gap(tmp_path):
+    import publish_site
+    full = legs_for(1603)
+    history.save_state(tmp_path, {"done_through": "2026-04-07", "repaired": history_once.REPAIR})
+    asyncio.run(history_once.run(tmp_path, budget=60, now=NOW, client=Feed(full, always=True)))
+    p = tmp_path / "history" / "days" / "2026-04-08.csv.gz"
+    state = history.load_state(tmp_path)
+    assert state["done_through"] == "2026-04-08"
+    assert [item[:2] for item in state["retry"]] == [["2026-04-08", "perp"]]
+    legs_then = sum(int(r["maker_legs"]) + int(r["taker_legs"]) for r in history.read_day(p))
+    assert legs_then == 3205  # one leg short
+    traders = json.loads((tmp_path / "history" / "traders.json").read_text())
+    assert traders["gaps"] == 1 and traders["gap_days"] == ["2026-04-08"]
+    cov = publish_site.history_coverage(traders, NOW)
+    assert cov["gaps"] == 1 and cov["gap_days"] == ["2026-04-08"]
+    # Retried no sooner than its backoff; the job is due for it then.
+    assert state["retry"][0][3] == NOW + history_once.RETRY_EVERY
+    later = NOW + history_once.RETRY_EVERY + 1
+    assert history_once.is_due(tmp_path, later)
+    # A later run reads the day again; this time it reconciles, so the day is complete and the gap closes.
+    asyncio.run(history_once.run(tmp_path, budget=60, now=later, client=Feed(full)))
+    state = history.load_state(tmp_path)
+    assert not state.get("retry")
+    rows = history.read_day(p)
+    assert sum(int(r["maker_legs"]) + int(r["taker_legs"]) for r in rows) == 3206
+    traders = json.loads((tmp_path / "history" / "traders.json").read_text())
+    assert traders["gaps"] == 0 and publish_site.history_coverage(traders, later)["gaps"] == 0
+
+
+def test_a_retry_that_still_fails_keeps_the_file_and_the_gap(tmp_path):
+    full = legs_for(1603)
+    history.save_state(tmp_path, {"done_through": "2026-04-07", "repaired": history_once.REPAIR})
+    asyncio.run(history_once.run(tmp_path, budget=60, now=NOW, client=Feed(full, always=True)))
+    p = tmp_path / "history" / "days" / "2026-04-08.csv.gz"
+    before = p.read_bytes()
+    later = NOW + history_once.RETRY_EVERY + 1
+    asyncio.run(history_once.run(tmp_path, budget=60, now=later, client=Feed(full, always=True)))
+    assert p.read_bytes() == before
+    item = history.load_state(tmp_path)["retry"][0]
+    assert item[:3] == ["2026-04-08", "perp", 2] and item[3] > later
+    assert json.loads((tmp_path / "history" / "traders.json").read_text())["gaps"] == 1

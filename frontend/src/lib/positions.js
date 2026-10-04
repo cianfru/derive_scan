@@ -1,4 +1,6 @@
-// My questions: what the user says they placed on Derive, kept in this browser only. Nothing is sent
+import { sameLegs } from "./questions.js";
+
+// Positions: what the user says they placed on Derive, kept in this browser only. Nothing is sent
 // anywhere. Storage can be blocked or cleared, so every read and write falls back to memory.
 
 const KEY = "cowboy-questions";
@@ -43,7 +45,9 @@ function valid(p) {
   return p && typeof p.id === "string" && (p.side === "yes" || p.side === "no") && Number.isFinite(p.contracts) && p.contracts > 0;
 }
 
-/** Saved from "I placed it": the question, the side, contracts, the cash paid and the time. */
+/** Saved from "I placed it": the question, the side, contracts, what the user says they paid (fees
+ * included), how it was placed (`exec`: "hand_both", or "hand_partial" when only the first option
+ * filled; older entries have none and count as both) and the exact instruments held (`legs`). */
 export function addPosition(p) {
   const list = loadPositions();
   const row = { key: `${p.id}:${p.side}:${Date.now()}`, at: Math.floor(Date.now() / 1000), ...p };
@@ -52,6 +56,15 @@ export function addPosition(p) {
   savePositions(list);
   return list;
 }
+
+/** Sold back by hand: what came back after fees closes the position. */
+export function closePosition(key, proceeds, now = Date.now() / 1000) {
+  const list = loadPositions().map((p) => (p.key === key ? { ...p, closed_at: Math.floor(now), proceeds } : p));
+  savePositions(list);
+  return list;
+}
+
+export const partial = (p) => p.exec === "hand_partial";
 
 export function removePosition(key) {
   const list = loadPositions().filter((p) => p.key !== key);
@@ -77,9 +90,13 @@ export function importPositions(text) {
   return list;
 }
 
-/** What a position is worth now at the published sell-back price, or what it was paid at settlement. */
-export function valuePosition(p, found, settlePrice = null) {
+/** What a position is worth now at the published sell-back price after Derive's exit fees, what it
+ * paid at settlement, or what the user got selling back. A position with only its first option
+ * filled has no value here: Cowboy prices the full answer only. */
+export function valuePosition(p, found, settlePrice = null, exitFees = null) {
   const w = p.hi - p.lo;
+  if (p.closed_at) return { settled: true, closed: true, got: p.proceeds };
+  if (partial(p)) return { settled: settlePrice != null, partial: true, now: null };
   if (settlePrice != null) {
     const y = Math.min(1, Math.max(0, (settlePrice - p.lo) / w));
     const per = p.side === "yes" ? y : 1 - y;
@@ -87,7 +104,9 @@ export function valuePosition(p, found, settlePrice = null) {
   }
   const side = found?.level?.[p.side];
   if (!side || side.sell == null || found?.level?.state === "settling") return { settled: false, now: null };
-  return { settled: false, now: side.sell * w * p.contracts, mark: found.level.fair == null ? null
+  if (p.legs && !sameLegs(p.legs, side.legs)) return { settled: false, now: null, otherLegs: true };
+  const gross = side.sell * w * p.contracts;
+  return { settled: false, gross, fees: exitFees, now: exitFees == null ? null : gross - exitFees, mark: found.level.fair == null ? null
     : (p.side === "yes" ? found.level.fair : 1 - found.level.fair) * w * p.contracts };
 }
 

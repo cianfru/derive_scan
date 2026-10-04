@@ -1,0 +1,279 @@
+{
+ "recorded": "2026-10-04T04:50:44.857374Z",
+ "network": "testnet",
+ "url": "wss://testnet.api.derive.xyz/v3/ws",
+ "frames": [
+  {
+   "method": "public/get_time",
+   "params": {},
+   "frame": {
+    "id": 1,
+    "result": 1791089443364
+   }
+  },
+  {
+   "method": "public/get_live_incidents",
+   "params": {},
+   "frame": {
+    "id": 2,
+    "result": {
+     "incidents": []
+    }
+   }
+  },
+  {
+   "method": "public/get_instrument",
+   "params": {
+    "instrument_name": "BTC-20261009-82000-C"
+   },
+   "frame": {
+    "id": 3,
+    "result": {
+     "instrument_type": "option",
+     "instrument_name": "BTC-20261009-82000-C",
+     "scheduled_activation": 1789718400,
+     "scheduled_deactivation": 1791532740,
+     "is_active": true,
+     "tick_size": "1",
+     "minimum_amount": "0.01",
+     "maximum_amount": "1000",
+     "amount_step": "0.00001",
+     "mark_price_fee_rate_cap": "0.125",
+     "maker_fee_rate": "0.0001",
+     "taker_fee_rate": "0.0003",
+     "base_fee": "0.5",
+     "base_currency": "BTC",
+     "quote_currency": "USDC",
+     "option_details": {
+      "index": "BTC-USD",
+      "expiry": 1791532800,
+      "strike": "82000",
+      "option_type": "C",
+      "settlement_price": null
+     },
+     "perp_details": null,
+     "erc20_details": null,
+     "base_asset_address": "0xd0711b9eBE84b778483709CDe62BacFDBAE13623",
+     "base_asset_sub_id": "39614116475863995998563507968",
+     "pro_rata_fraction": "0.8",
+     "fifo_min_allocation": "1",
+     "pro_rata_amount_step": "0.001"
+    }
+   }
+  },
+  {
+   "method": "public/get_instrument",
+   "params": {
+    "instrument_name": "BTC-20261009-88000-C"
+   },
+   "frame": {
+    "id": 4,
+    "result": {
+     "instrument_type": "option",
+     "instrument_name": "BTC-20261009-88000-C",
+     "scheduled_activation": 1789718400,
+     "scheduled_deactivation": 1791532740,
+     "is_active": true,
+     "tick_size": "1",
+     "minimum_amount": "0.01",
+     "maximum_amount": "1000",
+     "amount_step": "0.00001",
+     "mark_price_fee_rate_cap": "0.125",
+     "maker_fee_rate": "0.0001",
+     "taker_fee_rate": "0.0003",
+     "base_fee": "0.5",
+     "base_currency": "BTC",
+     "quote_currency": "USDC",
+     "option_details": {
+      "index": "BTC-USD",
+      "expiry": 1791532800,
+      "strike": "88000",
+      "option_type": "C",
+      "settlement_price": null
+     },
+     "perp_details": null,
+     "erc20_details": null,
+     "base_asset_address": "0xd0711b9eBE84b778483709CDe62BacFDBAE13623",
+     "base_asset_sub_id": "39614119052844373598563507968",
+     "pro_rata_fraction": "0.8",
+     "fifo_min_allocation": "1",
+     "pro_rata_amount_step": "0.001"
+    }
+   }
+  },
+  {
+   "method": "public/get_instrument",
+   "params": {
+    "instrument_name": "BTC-20261009-82000-P"
+   },
+   "frame": {
+    "id": 5,
+    "result": {
+     "instrument_type": "option",
+     "instrument_name": "BTC-20261009-82000-P",
+     "scheduled_activation": 1789718400,
+     "scheduled_deactivation": 1791532740,
+     "is_active": true,
+     "tick_size": "1",
+     "minimum_amount": "0.01",
+     "maximum_amount": "1000",
+     "amount_step": "0.00001",
+     "mark_price_fee_rate_cap": "0.125",
+     "maker_fee_rate": "0.0001",
+     "taker_fee_rate": "0.0003",
+     "base_fee": "0.5",
+     "base_currency": "BTC",
+     "quote_currency": "USDC",
+     "option_details": {
+      "index": "BTC-USD",
+      "expiry": 1791532800,
+      "strike": "82000",
+      "option_type": "P",
+      "settlement_price": null
+     },
+     "perp_details": null,
+     "erc20_details": null,
+     "base_asset_address": "0xd0711b9eBE84b778483709CDe62BacFDBAE13623",
+     "base_asset_sub_id": "35218731827201791532800",
+     "pro_rata_fraction": "0.8",
+     "fifo_min_allocation": "1",
+     "pro_rata_amount_step": "0.001"
+    }
+   }
+  },
+  {
+   "method": "public/get_instrument",
+   "params": {
+    "instrument_name": "BTC-20261009-88000-P"
+   },
+   "frame": {
+    "id": 6,
+    "result": {
+     "instrument_type": "option",
+     "instrument_name": "BTC-20261009-88000-P",
+     "scheduled_activation": 1789718400,
+     "scheduled_deactivation": 1791532740,
+     "is_active": true,
+     "tick_size": "1",
+     "minimum_amount": "0.01",
+     "maximum_amount": "1000",
+     "amount_step": "0.00001",
+     "mark_price_fee_rate_cap": "0.125",
+     "maker_fee_rate": "0.0001",
+     "taker_fee_rate": "0.0003",
+     "base_fee": "0.5",
+     "base_currency": "BTC",
+     "quote_currency": "USDC",
+     "option_details": {
+      "index": "BTC-USD",
+      "expiry": 1791532800,
+      "strike": "88000",
+      "option_type": "P",
+      "settlement_price": null
+     },
+     "perp_details": null,
+     "erc20_details": null,
+     "base_asset_address": "0xd0711b9eBE84b778483709CDe62BacFDBAE13623",
+     "base_asset_sub_id": "37795712204801791532800",
+     "pro_rata_fraction": "0.8",
+     "fifo_min_allocation": "1",
+     "pro_rata_amount_step": "0.001"
+    }
+   }
+  },
+  {
+   "method": "public/get_instrument",
+   "params": {
+    "instrument_name": "BTC-20261009-83000-C"
+   },
+   "frame": {
+    "jsonrpc": "2.0",
+    "error": {
+     "code": 12001,
+     "message": "Instrument not found",
+     "data": "Instrument not found"
+    },
+    "id": 7
+   }
+  },
+  {
+   "method": "public/get_pending_deposits",
+   "params": {
+    "wallet": "0x0000000000000000000000000000000000000000"
+   },
+   "frame": {
+    "id": 8,
+    "result": {
+     "wallet": "0x0000000000000000000000000000000000000000",
+     "pending_deposits": []
+    }
+   }
+  },
+  {
+   "method": "public/get_risk_universes",
+   "params": {},
+   "frame": {
+    "id": 9,
+    "result": [
+     {
+      "risk_universe_id": 1,
+      "name": "PRIME",
+      "managers": [
+       {
+        "manager_id": 1,
+        "margin_type": "SM",
+        "instruments": [
+         "BTC-OPTION",
+         "BTC-PERP",
+         "ETH-OPTION",
+         "ETH-PERP"
+        ],
+        "collaterals": [
+         {
+          "name": "USDC",
+          "address": "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
+          "erc20": {
+           "decimals": 6,
+           "underlying_erc20": "0x73Efab09362052D26FB93A730Be4F8a5EdC833af"
+          },
+          "min_deposit_usd": "5",
+          "im_discount": "1",
+          "mm_discount": "1"
+         }
+        ]
+       },
+       {
+        "manager_id": 5,
+        "margin_type": "PM2",
+        "instruments": [
+         "BTC-OPTION",
+         "BTC-PERP",
+         "ETH-OPTION",
+         "ETH-PERP"
+        ],
+        "collaterals": [
+         {
+          "name": "USDC",
+          "address": "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
+          "erc20": {
+           "decimals": 6,
+           "underlying_erc20": "0x73Efab09362052D26FB93A730Be4F8a5EdC833af"
+          },
+          "min_deposit_usd": "5",
+          "im_discount": "0",
+          "mm_discount": "0"
+         }
+        ]
+       }
+      ],
+      "security_module": {
+       "subaccount_id": 71797,
+       "cash_asset": "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
+       "cash_currency": "USDC"
+      }
+     }
+    ]
+   }
+  }
+ ]
+}

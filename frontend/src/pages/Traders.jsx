@@ -7,7 +7,7 @@ import { Plate, Tabs, Loading, Failed, PageHead } from "../components/ui.jsx";
 import WalletTag from "../components/WalletTag.jsx";
 import LeanBar from "../components/LeanBar.jsx";
 import CohortExplorer from "../components/CohortExplorer.jsx";
-import HistoryStatus, { coverageReady } from "../components/HistoryStatus.jsx";
+import HistoryStatus, { coverageReady, GapNote } from "../components/HistoryStatus.jsx";
 
 const PAGE_HELP = `Options traders on Derive, ranked by gross results on expired options, before fees. Market makers are left out. ${TYPE_INFO}`;
 const BOARD_HELP = "Gross options PnL counts expired options: premium received minus premium paid plus settlement value, before fees, across the collected history. Win rate: share of expired instruments with positive gross PnL; it ignores win and loss size. Premium traded: option premium bought and sold, before netting; it sets the size cohort. Book: net dollar delta of reconstructed unexpired options, valued on the newest chain; long delta gains from a small price rise, short delta from a fall; perp hedges excluded. Up to 200 wallets are published.";
@@ -79,7 +79,7 @@ export default function Traders() {
         {list.length > shown.length && <button className="btn lb-more" onClick={() => setAll(true)}>Show all {list.length}</button>}
       </Plate>
       <CohortExplorer cohorts={data.cohorts} through={data.through} valuedAt={data.generated_at} />
-      <p className="status">History to {data.through} UTC · positions valued on the newest options chain</p>
+      <p className="status">History to {data.through} UTC · positions valued on the newest options chain<GapNote data={data} /></p>
     </div>
   );
 }

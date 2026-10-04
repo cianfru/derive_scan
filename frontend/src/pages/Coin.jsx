@@ -105,7 +105,7 @@ export function SaloonCta({ und, live }) {
   return (
     <Link className="saloon-cta" to={`/saloon/${und}`}>
       <HatMark size={22} />
-      <span><b>{und} in the Saloon</b><small>Yes or no on {und}'s price, priced from Derive options</small></span>
+      <span><b>{und} in the Saloon</b><small>Higher or lower on {und}'s price, priced from Derive options</small></span>
       <span className="saloon-cta-go" aria-hidden="true">→</span>
     </Link>
   );
