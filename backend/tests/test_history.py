@@ -148,10 +148,14 @@ def test_history_repair_rereads_days_with_fractional_strikes(tmp_path):
             return httpx.Response(200, json={"result": {"expiries": []}})
         day = datetime.fromtimestamp(p["from_timestamp"] / 1000, timezone.utc).date().isoformat()
         calls.append(day)
-        got = legs.get(day, []) if p["instrument_type"] == "option" else []
+        if "instrument_name" in p:  # the paging repair reads one instrument
+            got = [t for t in legs.get(day, []) if t["instrument_name"] == p["instrument_name"]]
+        else:
+            got = legs.get(day, []) if p["instrument_type"] == "option" else []
         return httpx.Response(200, json={"result": {"trades": got, "pagination": {"num_pages": 1, "count": len(got)}}})
 
-    _write(tmp_path, date(2024, 6, 1), [{"wallet": "0xB", "instrument": "BTC-PERP", "buy_contracts": 1}])
+    _write(tmp_path, date(2024, 6, 1), [{"wallet": "0xB", "instrument": "BTC-PERP", "buy_contracts": 1},
+                                        {"wallet": "0xC", "instrument": "BTC-PERP", "sell_contracts": 1}])
     _write(tmp_path, date(2024, 6, 2), [{"wallet": "0xA", "instrument": "XRP-20240628-1_35-P", "buy_contracts": 10,
                                          "buy_value_usd": 0.5, "taker_legs": 1, "delta_usd": -999999}])
     history.save_state(tmp_path, {"done_through": "2024-06-02"})
