@@ -87,6 +87,7 @@ export default function Markets() {
               <input className="search" placeholder="Find" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Find a market" />
             </label>
           </div>
+          {overview && rows.length > 0 && <div className="board-mini-key"><ChainLegend /></div>}
           {overview && rows.length > 0 && <div className="board-mini-head" aria-hidden="true"><span /><span>7D</span><span>30D</span></div>}
           <div className={overview ? "board-rows" : "table-wrap"}>
             <table className={`grid market-grid${overview ? " overview" : ""}`}>

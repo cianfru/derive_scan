@@ -217,10 +217,10 @@ function Layer({ kind, n, name, head, body, proof, info, Figure }, i) {
 }
 
 const FACTS = [
-  ["4H · 1D", "engine run at every close"],
-  ["Dec 2023", "every options trade since, rebuilt"],
-  ["15 min", "every option chain read"],
-  ["0", "market makers shown"],
+  ["4H · 1D", "engine runs at every close"],
+  ["Dec 2023", "every options trade since, by wallet"],
+  ["15 min", "option chains and flow read"],
+  ["Excluded", "market makers, in every view"],
 ];
 
 const FAQ = [
