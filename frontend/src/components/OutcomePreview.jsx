@@ -1,5 +1,9 @@
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import PayZone from "./PayZone.jsx";
+import { ExposureChart, amount, breakevenText } from "./Exposure.jsx";
+import "../journal.css";
+import { loadPositions } from "../lib/positions.js";
+import { exposureGroups, proposalLegs, withTrade } from "../lib/exposure.js";
 import { Info } from "./ui.jsx";
 import { breakeven, countdown, dayLabel, fullPay, money, outcome, payAt, signed, sliderStep } from "../lib/questions.js";
 
@@ -85,6 +89,32 @@ function Examples({ und, level, side, t }) {
   );
 }
 
+/** When the user already holds positions on this coin and date: the held result at settlement
+ * (dashed) with this trade drawn on top, and the combined figures before and with it. */
+export function WithHeld({ und, level, side, t, expiry, index, positions = null }) {
+  const group = useMemo(() => exposureGroups(positions ?? loadPositions()).find((g) => g.und === und && g.expiry === expiry) || null,
+    [positions, und, expiry]);
+  const w = group ? withTrade(group, proposalLegs(level, side, t)) : null;
+  if (!w) return null;
+  const n = group.items.length;
+  return (
+    <section className="op-held" aria-label="With what you hold">
+      <h3>With what you hold on {dayLabel(expiry)}<Info label="About this view">
+        Your {n} open {n === 1 ? "position" : "positions"} on {und} settling {dayLabel(expiry)} at 08:00 UTC, from Positions in this browser, combined with this trade. Both lines are the result at settlement for each price, after what was paid. Selling back early is valued differently.</Info></h3>
+      <ExposureChart und={und} index={index} curves={[{ combo: w.held, label: "Now", kind: "held" }, { combo: w.after, label: "With this trade", kind: "with" }]} />
+      <p className="op-held-key"><span className="op-key held">Now</span><span className="op-key with">With this trade</span></p>
+      <table className="op-ex op-held-t">
+        <thead><tr><th scope="col"><span className="sr-only">Figure</span></th><th scope="col">Now</th><th scope="col">With this trade</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Most you can lose</th><td className="mono">{amount(w.held.mostLose)}</td><td className="mono">{amount(w.after.mostLose)}</td></tr>
+          <tr><th scope="row">Most it pays</th><td className="mono">{amount(w.held.mostPays)}</td><td className="mono">{amount(w.after.mostPays)}</td></tr>
+          <tr><th scope="row">Breakeven</th><td className="mono">{breakevenText(w.held)}</td><td className="mono">{breakevenText(w.after)}</td></tr>
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 /**
  * The outcome preview shared by the question page and every ticket. `summary` keeps the figures
  * only (a ticket beside the full preview); the full one adds the slider, the dollar examples and
@@ -99,6 +129,7 @@ export default function OutcomePreview({ und, level, side, t, expiry, settleTs, 
         <>
           <Slider und={und} level={level} side={side} t={t} index={index} />
           <Examples und={und} level={level} side={side} t={t} />
+          <WithHeld und={und} level={level} side={side} t={t} expiry={expiry} index={index} />
           <p className="op-note">Selling back before 08:00 UTC is valued at Derive's sell-back price then, not by this chart.
             <Info label="About selling back early">Until a minute before 08:00 UTC you can sell back on Derive. You then get what Derive's screen bids for the two options at that moment, which follows the coin's price and the time left, so it differs from this chart, and fees apply again. Holding to 08:00 UTC pays as this chart shows.</Info>
           </p>

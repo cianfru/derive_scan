@@ -349,9 +349,9 @@ describe("Positions", () => {
     wordcheck(await allText(container));
     await user.click(screen.getByRole("button", { name: "I sold it back" }));
     await user.click(screen.getByRole("checkbox", { name: "Both orders filled" }));
-    const got = screen.getByRole("textbox", { name: "What you got back, after fees" });
-    await user.clear(got);
-    await user.type(got, "90");
+    await user.click(screen.getByRole("checkbox", { name: "I don't know when" }));
+    await user.type(screen.getByRole("textbox", { name: "What the options brought, before fees" }), "91.50");
+    await user.type(screen.getByRole("textbox", { name: "Derive's fees to sell back" }), "1.50");
     await user.click(screen.getByRole("button", { name: "Close the position" }));
     expect(container.querySelectorAll(".q-card")).toHaveLength(0);
     await user.click(screen.getByRole("tab", { name: "Closed" }));

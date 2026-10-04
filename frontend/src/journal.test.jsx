@@ -111,7 +111,7 @@ describe("journal J1: recording a manual trade", () => {
 
     // Export, clear, import: identical; importing twice adds nothing.
     const file = exportPositions();
-    expect(JSON.parse(file)).toMatchObject({ kind: "cowboy-journal", version: 2 });
+    expect(JSON.parse(file)).toMatchObject({ kind: "cowboy-journal", version: 3 });
     localStorage.clear(); _resetMemory();
     expect(loadPositions()).toHaveLength(0);
     importPositions(file);
@@ -203,7 +203,7 @@ describe("journal J1: Positions", () => {
     localStorage.clear(); _resetMemory();
     importPositions(JSON.stringify({ kind: "cowboy-questions", version: 1, positions: [legacy] }));
     importPositions(JSON.stringify([legacy]));
-    expect(loadPositions()).toEqual([{ ...legacy, network: "mainnet" }]);
+    expect(loadPositions()).toEqual([{ ...legacy, network: "mainnet", exits: [] }]);
     expect(() => importPositions(JSON.stringify({ kind: "cowboy-journal", version: 9, networks: {} }))).toThrow("newer");
   });
 
