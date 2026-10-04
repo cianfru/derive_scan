@@ -19,6 +19,7 @@ const Trader = lazy(() => import("./pages/Trader.jsx"));
 // Questions stay out of the build's routes until VITE_QUESTIONS=1 (the owner's off switch).
 const Questions = QUESTIONS_ON ? lazy(() => import("./pages/Questions.jsx")) : null;
 const MyQuestions = QUESTIONS_ON ? lazy(() => import("./pages/MyQuestions.jsx")) : null;
+const Board = QUESTIONS_ON ? lazy(() => import("./pages/Board.jsx")) : null;
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
@@ -35,6 +36,7 @@ createRoot(document.getElementById("root")).render(
           <Route path="flow" element={<Flow />} />
           {QUESTIONS_ON && <Route path="saloon" element={<Questions />} />}
           {QUESTIONS_ON && <Route path="saloon/mine" element={<MyQuestions />} />}
+          {QUESTIONS_ON && <Route path="saloon/browse" element={<Board />} />}
           {QUESTIONS_ON && <Route path="saloon/:und" element={<Questions />} />}
           {QUESTIONS_ON && <Route path="q/:id" element={<Questions />} />}
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -9,6 +9,9 @@ import PayZone from "../components/PayZone.jsx";
 import QuestionChart from "../components/QuestionChart.jsx";
 import QuestionTicket from "../components/QuestionTicket.jsx";
 import OutcomePreview from "../components/OutcomePreview.jsx";
+import SaloonHead from "../components/SaloonNotices.jsx";
+import { FollowButton, FollowLevel } from "../components/Follow.jsx";
+import { loadBudget } from "../lib/follows.js";
 import {
   ANSWER, buyCents, cents, centsDown, countdown, dayLabel, findLevel, fullPay, gap, live, money, noPriceReason, parseId, priceAge,
   questionText, settlingNow, ticket, payAt,
@@ -196,11 +199,12 @@ const scrollTo = (el) => el?.scrollIntoView?.({ block: "start", behavior: typeof
 /** The guided flow from step 3: Higher or Lower (never picked for the user), then the amount, then
  * what it pays, then the orders for Derive. One primary action per step. The full ladder of levels
  * sits under "Other levels". */
-function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, ladder, ladderOpen, onLadder, initialStep }) {
+function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, ladder, ladderOpen, onLadder, initialStep, initialDollars }) {
   const { date, level } = found;
   const question = questionText(und, level, date.expiry);
   const paused = age.state === "paused" || board.paused;
-  const [dollars, setDollars] = useState(100);
+  // The first amount: the board's budget when opened from it, else the budget kept in this browser.
+  const [dollars, setDollars] = useState(() => (Number.isFinite(initialDollars) && initialDollars > 0 ? initialDollars : loadBudget()));
   const [sheet, setSheet] = useState(false);
   const [step, setStep] = useState(() => (sideKey ? initialStep || "preview" : "pick"));
   const t = sideKey && live(level, sideKey, paused) ? ticket(level, sideKey, dollars, board) : null;
@@ -255,6 +259,12 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
               </div>
             )}
             {!settling && !sideKey && <p className="status q-hint">Pick Higher or Lower. Nothing is picked for you.</p>}
+            {sideKey && (
+              <p className="q-follow">
+                <FollowButton id={level.id} side={sideKey} k={level.k} board={board} />
+                <FollowLevel id={level.id} side={sideKey} />
+              </p>
+            )}
           </article>
           <ZoneNote und={und} date={date} index={board.index} />
           <button className="text-control q-other" aria-expanded={ladderOpen} onClick={onLadder}>{ladderOpen ? "Hide other levels" : "Other levels"}</button>
@@ -356,7 +366,7 @@ export default function Questions() {
   if (!index || (und && !board && !error)) return <div className="wrap page"><Loading /></div>;
   const coins = index.coins || [];
   if (!und || (error && !board)) {
-    return <div className="wrap page q-page"><header className="q-head"><h1>Saloon <span className="q-sub">Price outcomes</span></h1></header><p className="status">No questions with a price on Derive's screen right now.</p></div>;
+    return <div className="wrap page q-page"><SaloonHead view="guided" /><p className="status">No questions with a price on Derive's screen right now.</p></div>;
   }
   const age = priceAge(board.prices_ts, Date.now() / 1000, board.paused || index.paused);
   const paused = age.state === "paused";
@@ -409,12 +419,11 @@ export default function Questions() {
   );
   return (
     <div className="wrap page q-page">
-      <header className="q-head">
-        <h1>Saloon <span className="q-sub">Price outcomes</span></h1>
-      </header>
+      <SaloonHead view="guided" />
       {found && !found.settled ? (
         <QuestionView key={found.level.id} und={und} board={board} found={found} sideKey={sideKey} setSide={setSide} age={age} theme={theme}
-          lead={lead} ladder={ladderEl} ladderOpen={ladder} onLadder={() => setLadder((o) => !o)} initialStep={location.state?.step} />
+          lead={lead} ladder={ladderEl} ladderOpen={ladder} onLadder={() => setLadder((o) => !o)} initialStep={location.state?.step}
+          initialDollars={location.state?.dollars} />
       ) : (
         <div className="q-layout">
           <div className="q-flow">
