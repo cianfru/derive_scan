@@ -96,7 +96,7 @@ describe("one tap through Derive (testnet, dry run)", () => {
     setup();
     const user = userEvent.setup();
     show(`/q/${ID}?side=yes`);
-    const panel = await screen.findByRole("region", { name: "Up through Derive" });
+    const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     expect(within(panel).getByText("Testnet · dry run")).toBeTruthy();
     await wordcheck(user, panel);
 
@@ -146,7 +146,7 @@ describe("one tap through Derive (testnet, dry run)", () => {
     localStorage.setItem("cowboy-saloon-terms:testnet", JSON.stringify({ at: 1 }));
     const user = userEvent.setup();
     show(`/q/${ID}?side=yes`);
-    const panel = await screen.findByRole("region", { name: "Up through Derive" });
+    const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     await user.click(within(panel).getByRole("button", { name: "Connect wallet" }));
     await within(panel).findByText("Add USDC to your Saloon account");
     expect(fake.calls("public/register_deposit_address")[0].params).toEqual({ wallet: wallet.address, subaccount_id: 90212 });
@@ -164,7 +164,7 @@ describe("one tap through Derive (testnet, dry run)", () => {
     setup();
     const user = userEvent.setup();
     show(`/q/${ID}?side=yes`);
-    const panel = await screen.findByRole("region", { name: "Up through Derive" });
+    const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     await user.click(within(panel).getByRole("button", { name: "Place by hand" }));
     expect(within(panel).getByText("Place these two orders on Derive, in this order.")).toBeTruthy();
     cleanup();
