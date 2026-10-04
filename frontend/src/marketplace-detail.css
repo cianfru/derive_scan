@@ -39,7 +39,7 @@
 .md-other { padding-top: 20px; border-top: 1px solid var(--border); display: grid; gap: 15px; }
 .md-other .q-other { justify-self: start; }
 .md-selection { grid-area: selection; position: sticky; top: 104px; min-width: 0; }
-.md-selection-inner { padding: 20px; border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface-1); display: grid; gap: 14px; }
+.md-selection-inner { padding: 20px; border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--elev-fill); box-shadow: var(--elev-1); display: grid; gap: 14px; }
 .md-selection-title { display: grid; gap: 5px; }
 .md-selection-title h2 { font-size: 18px; letter-spacing: -.025em; font-weight: 650; }
 .md-selection-title > span { display: inline-flex; align-items: center; font-size: 12px; color: var(--text-3); }

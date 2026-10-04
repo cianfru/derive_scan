@@ -67,7 +67,7 @@ export default function CandleChart({ candles, signals, tf, theme, implied = nul
     const chart = createChart(box.current, {
       autoSize: true,
       localization: { priceFormatter: price },
-      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: c("--muted"), fontFamily: "IBM Plex Mono, monospace", fontSize: 11, attributionLogo: false },
+      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: c("--muted"), fontFamily: "Chivo Mono, monospace", fontSize: 11, attributionLogo: false },
       grid: { vertLines: { color: c("--seam") + "66" }, horzLines: { color: c("--seam") + "66" } },
       rightPriceScale: { borderColor: c("--seam") },
       timeScale: { borderColor: c("--seam"), timeVisible: tf === "4h", rightOffset: 4 },
