@@ -433,6 +433,7 @@ Nothing in stage 1 calls a private endpoint, holds a key, or places an order.
 - **Payout identities:** Yes + No payout equals 1 at every settlement price, and the payout rule equals the legs' intrinsic sum at the recorded 2-3 October settlements.
 - **Parsing:** `1_35` parses as 1.35.
 - **Unusable prices:** a buy over $1 or a sell-back under $0 gives `no_quote`.
+- **Not worth offering (review, 4 October 2026):** a side whose buy is over 99c per $1 is published as `tail` (not offered), with its true price kept in the file. At most 1c is left to gain, and stage 2's RFQ ceiling is 99c, so a ticket could not be placed at that price anyway; the screen never shows such a price rounded down to 99c. The level's other side and the date gates are unchanged.
 - **The date list:** from the fixture chain at 14:00, the board's dates are exactly 5, 6, 7, 9, 16, 23 and 30 Oct, with labels "Mon 5 Oct", "Tue 6 Oct", "Wed 7 Oct", "This Friday · 9 Oct", "Fri 16 Oct", "Fri 23 Oct" and "End of Oct · Fri 30 Oct".
   - 4 Oct is out (18 hours).
   - 27 Nov and later are out.

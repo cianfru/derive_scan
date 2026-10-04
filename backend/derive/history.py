@@ -14,7 +14,8 @@ history/wallets.json             each wallet's class and tier from all days so f
 history/positions.json           open option contracts per instrument held by each tier's wallets
 history/traders.json             leaderboard, open positions, recent activity, cohorts (derive/traders.py)
 history/state.json               days done
-history/anomalies.json           days kept although their pages did not reconcile (fetch_day)
+history/anomalies.json           days kept although their pages did not reconcile (fetch_day); each is
+                                 also queued in state.json "retry" and read again (history_once.py)
 
 Positions are not stored: a wallet's open contracts in an instrument are the running sum of its
 daily buys minus sells, and an option held to expiry settles at the settlement price.
@@ -173,15 +174,20 @@ async def fetch_day(client, day: date, anomalies: list | None = None) -> list[di
     listed count reconciled, time slices when offset paging does not add up). When the slicing
     bound is reached the deduplicated legs are kept and the day is noted in `anomalies`, so the
     history never stalls on one day."""
-    from .flow import read_exact
-    a, b = _day_window(day)
     out, calls = [], {}
     for kind in ("option", "perp"):
-        legs, exact = await read_exact(client, {"instrument_type": kind}, a, b, calls=calls)
-        if not exact and anomalies is not None:
-            anomalies.append({"day": day.isoformat(), "query": kind, "legs": len(legs), "reason": "not_reconciled"})
-        out.extend(legs)
+        out.extend(await fetch_kind_day(client, day, kind, anomalies, calls=calls))
     return out
+
+
+async def fetch_kind_day(client, day: date, kind: str, anomalies: list | None = None, calls: dict | None = None) -> list[dict]:
+    """Every leg of one instrument type ("option" or "perp") on one UTC day, read exactly (as fetch_day)."""
+    from .flow import read_exact
+    a, b = _day_window(day)
+    legs, exact = await read_exact(client, {"instrument_type": kind}, a, b, calls={} if calls is None else calls)
+    if not exact and anomalies is not None:
+        anomalies.append({"day": day.isoformat(), "query": kind, "legs": len(legs), "reason": "not_reconciled"})
+    return legs
 
 
 async def fetch_instrument_day(client, day: date, instrument: str, anomalies: list | None = None) -> list[dict]:
@@ -230,8 +236,19 @@ def imbalanced_pairs(root: Path) -> list[tuple[str, str]]:
 def replace_instrument(root: Path, day: date, instrument: str, rows: list[list]) -> Path:
     """Rewrites one day file with `instrument`'s rows replaced by `rows` (day_rows output); every
     other row is written back unchanged."""
+    return _replace_rows(root, day, lambda name: name == instrument, rows)
+
+
+def replace_kind(root: Path, day: date, kind: str, rows: list[list]) -> Path:
+    """Rewrites one day file with the rows of every instrument of `kind` ("option" or "perp")
+    replaced by `rows`; the other kind's rows are written back unchanged."""
+    from .flow import kind_of
+    return _replace_rows(root, day, lambda name: kind_of(name) == kind, rows)
+
+
+def _replace_rows(root: Path, day: date, drop, rows: list[list]) -> Path:
     p = root / "history" / "days" / f"{day.isoformat()}.csv.gz"
-    kept = [[r.get(k, "") for k in FIELDS] for r in read_day(p) if r["instrument"] != instrument] if p.exists() else []
+    kept = [[r.get(k, "") for k in FIELDS] for r in read_day(p) if not drop(r["instrument"])] if p.exists() else []
     merged = sorted(kept + [[str(v) if not isinstance(v, str) else v for v in r] for r in rows],
                     key=lambda r: (r[0], r[1]))
     return write_day(root, day, merged)

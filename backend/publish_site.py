@@ -443,10 +443,15 @@ RADAR_CLOSES = 30
 
 def radar_point(reading: list | None) -> list | None:
     """[score, gross, flags] of a history/balance.json reading [score, net, gross, positions, flags]
-    when it passes the live gates (complete, gross >= $10k, >= 3 positions); otherwise None."""
+    when it passes the live gates (complete, gross >= $10k, >= 3 positions); [None, None, flags]
+    when the close is unavailable (flag bit 2: no valid implied volatility), so the app can say
+    why; otherwise None."""
+    from derive.balance_history import FLAG_NO_IV
     if not reading:
         return None
     score, net, gross, positions, flags = reading
+    if flags & FLAG_NO_IV:
+        return [None, None, flags]
     if score is None or net is None or gross is None or gross < WALLET_MIN_USD or positions < WALLET_MIN_POSITIONS:
         return None
     return [score, gross, flags]
@@ -469,7 +474,8 @@ def radar_block(data: Path, engine_1d: dict[str, list], unds: list[str], now: fl
 
     z: the engine's daily z-score from the rows of coins/{UND}.json history.engine["1d"] (saved
     closes, filled or replayed), null unless its metric status is ready. w: per horizon, the Smart
-    balance [score, gross USD delta, flags] (flags: bit 0 roll, bit 1 modelled) or null below the
+    balance [score, gross USD delta, flags] (flags: bit 0 roll, bit 1 modelled), [null, null,
+    flags] when unavailable (bit 2: no valid implied volatility at that close), or null below the
     live gates. e: the engine's saved reading per close (recorded_metrics rows, radar_engine) as
     one string, so the Radar colours a past circle only where a final signal exists. None when
     history/balance.json is missing or holds no close.
@@ -588,13 +594,17 @@ def _lean(book: list[dict]) -> dict:
 
 
 def history_coverage(doc: dict, now: float) -> dict:
-    """Readiness is about source coverage, never the publish timestamp."""
+    """Readiness is about source coverage, never the publish timestamp. gaps / gap_days: readings
+    kept although they did not reconcile, still queued for a retry (history_once.py)."""
     expected = last_complete_day(now).isoformat()
     through = doc.get("through")
     caught_up = bool(through and through >= expected)
     ready = caught_up and doc.get("schema_version", 0) >= 2
     status = "ready" if ready else "updating" if caught_up else "backfilling"
-    return {"ready": ready, "status": status, "through": through, "expected_through": expected}
+    # Readings that never reconciled stay ready (one leg in thousands) but are counted, so the app
+    # can say so (history_once.py retries them).
+    return {"ready": ready, "status": status, "through": through, "expected_through": expected,
+            "gaps": int(doc.get("gaps") or 0), "gap_days": list(doc.get("gap_days") or [])}
 
 
 def cohort_lean(insts: dict, chains: dict, now: float, max_days=None, min_days=0) -> dict:

@@ -14,7 +14,18 @@ that close's information only (history.classify_stats, history.rank_tiers): a wa
 cohort on the close it qualifies, never before. With them it keeps each wallet's open contracts per
 instrument. Each close is valued with its recorded chain where one exists, otherwise modelled:
 Black-76 delta (history.option_delta) at the daily index close, with the instrument's last traded
-implied volatility (at most 21 days old), else the coin's last near-the-money traded volatility.
+implied volatility (at most IV_MAX_AGE = 21 days old), else the coin's last near-the-money traded
+volatility (at most ATM_MAX_AGE = 7 days old).
+
+Freshness bounds (measured 4 October 2026 on the last 400 day files, all coins): the median
+relative change of an instrument's traded IV is 8.9% after 21 days (90th percentile 28%); the
+coin's near-the-money IV moves as much within 7 days (median 8.5%, 90th percentile 26%), so both
+bounds carry about the same error. BTC, ETH and HYPE trade near the money every day; the thin
+coins skip days, and their gaps beyond 7 days are where a close becomes unavailable.
+
+No volatility, no exposure: when any position in a horizon has neither bound met, that coin and
+horizon is published as unavailable (score, net and gross null, flag bit 2), never valued at an
+intrinsic delta (which would read a no-information book as 100% long or short).
 
 Roll share: (gross of the expiries that left the window since the previous close + gross of the
 expiries newly inside it) / max(gross then, gross now). From 0.25 the close is flagged: most of
@@ -28,7 +39,9 @@ history/balance.json
                 live gates (gross >= $10k, >= 3 positions) or when a delta was missing (a modelled
                 close keeps its score and sets bit 1);
                 net and gross (USD delta) are null when a quote is missing. flags: bit 0 roll,
-                bit 1 modelled. A coin or horizon without a Smart position is left out.
+                bit 1 modelled, bit 2 unavailable: a modelled close without valid implied
+                volatility for every position (score, net and gross null). A coin or horizon
+                without a Smart position is left out.
   expiry_gross  {close_ts: {UND: {expiry_ts: gross}}} for the two newest closes (the next roll)
 """
 from __future__ import annotations
@@ -44,14 +57,15 @@ from . import history as H
 from .lean import HORIZONS, WALLET_MIN_POSITIONS, WALLET_MIN_USD, WALLET_TIER, wallets_reading
 from .valuation import delta_at
 
-SCHEMA = 1
+SCHEMA = 2              # 2: no intrinsic-delta fallback; unavailable closes carry bit 2
 CLOSES = 90             # closes rebuilt by a backfill
 SOURCE = "v2_mainnet"
 DAY = 86400
 YEAR = 365 * DAY
 ROLL_FLAG = 0.25        # roll share from which a close is flagged
-FLAG_ROLL, FLAG_MODELLED = 1, 2
+FLAG_ROLL, FLAG_MODELLED, FLAG_NO_IV = 1, 2, 4
 IV_MAX_AGE = 21         # days an instrument's traded IV is carried forward
+ATM_MAX_AGE = 7         # days the coin's near-the-money traded IV is carried forward
 ATM_BAND = 0.10         # |log(strike / index)| of a near-the-money trade
 ATM_DAYS = (3, 60)      # days to expiry of a near-the-money trade
 IV_LOOKBACK = 60        # days read for the IVs of a modelled append
@@ -176,11 +190,16 @@ class TradeIVs:
         self.add(day, trades, closes)
 
     def iv_for(self, name: str, und: str, day: str) -> float | None:
+        """The instrument's traded IV at most IV_MAX_AGE days old, else the coin's near-the-money
+        traded IV at most ATM_MAX_AGE days old, else None (no valid volatility)."""
+        d = date.fromisoformat(day)
         got = self.inst.get(name)
-        if got and (date.fromisoformat(day) - date.fromisoformat(got[0])).days <= IV_MAX_AGE:
+        if got and got[1] > 0 and 0 <= (d - date.fromisoformat(got[0])).days <= IV_MAX_AGE:
             return got[1]
         got = self.und.get(und)
-        return got[1] if got else None
+        if got and got[1] > 0 and 0 <= (d - date.fromisoformat(got[0])).days <= ATM_MAX_AGE:
+            return got[1]
+        return None
 
 
 def recent_ivs(root: Path, day: str, closes: dict, lookback: int = IV_LOOKBACK) -> TradeIVs:
@@ -200,8 +219,9 @@ def value(positions: dict, und: str, as_of: int, index: float | None, horizon: s
 
     positions: {instrument: {tier: [net, wallets, gross]}} (history.tier_positions for the coin).
     With a chain ({ts, index, expiries}) it is lean.wallets_reading at that chain, as the live
-    reading; otherwise Black-76 at `index` with traded IVs (modelled). prev = (prev_ts,
-    {expiry: gross}) of the previous close gives the roll share.
+    reading; otherwise Black-76 at `index` with traded IVs (modelled). A modelled reading in which
+    any position lacks a valid IV (TradeIVs.iv_for) is unavailable: score, net and gross None,
+    "unavailable" set. prev = (prev_ts, {expiry: gross}) of the previous close gives the roll share.
     """
     days = HORIZONS[horizon]
     by_expiry: dict[int, float] = defaultdict(float)
@@ -220,22 +240,29 @@ def value(positions: dict, und: str, as_of: int, index: float | None, horizon: s
     else:
         net = gross = 0.0
         held = 0
+        unavailable = False
         for name, cells in positions.items():
             o = H.parse_option(name)
             cell = (cells or {}).get(tier)
             if not o or not cell or not as_of < o[1] <= as_of + days * DAY:
                 continue
             iv = ivs.iv_for(name, und, day) if ivs is not None and day else None
+            held += cell[1]
+            if not iv:
+                unavailable = True
+                continue
             d = H.option_delta(index, o[2], (o[1] - as_of) / YEAR, iv, o[3]) * index
             net += cell[0] * d
             gross += cell[2] * abs(d)
-            held += cell[1]
             by_expiry[o[1]] += cell[2] * abs(d)
         score = round(net / gross, 3) if gross >= WALLET_MIN_USD and held >= WALLET_MIN_POSITIONS else None
         modelled = True
+        if unavailable:
+            return {"score": None, "net": None, "gross": None, "positions": held, "roll": None, "modelled": True,
+                    "unavailable": "no_iv", "expiry_gross": {}}
     roll = roll_share(prev[0], prev[1], as_of, by_expiry, days) if prev and prev[1] is not None else None
     return {"score": score, "net": None if net is None else round(net), "gross": None if gross is None else round(gross),
-            "positions": held, "roll": roll, "modelled": modelled, "expiry_gross": dict(by_expiry)}
+            "positions": held, "roll": roll, "modelled": modelled, "unavailable": None, "expiry_gross": dict(by_expiry)}
 
 
 def close_readings(positions: dict, as_of: int, day: str, indexes: dict, chains: dict, ivs: TradeIVs | None,
@@ -253,11 +280,12 @@ def close_readings(positions: dict, as_of: int, day: str, indexes: dict, chains:
         row = {}
         for h in HORIZONS:
             v = value(positions[und], und, as_of, index, h, chain=chain, ivs=ivs, day=day, prev=before)
-            if h == longest:
+            if h == longest and not v["unavailable"]:  # an unavailable close gives no roll base
                 expiry_gross[und] = {str(e): round(g) for e, g in sorted(v["expiry_gross"].items())}
             if not v["positions"]:
                 continue
-            flags = (FLAG_ROLL if (v["roll"] or 0) >= ROLL_FLAG else 0) | (FLAG_MODELLED if v["modelled"] else 0)
+            flags = (FLAG_ROLL if (v["roll"] or 0) >= ROLL_FLAG else 0) | (FLAG_MODELLED if v["modelled"] else 0) \
+                | (FLAG_NO_IV if v["unavailable"] else 0)
             row[h] = [v["score"], v["net"], v["gross"], v["positions"], flags]
         if row:
             out[und] = row

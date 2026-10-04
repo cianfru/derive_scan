@@ -19,6 +19,13 @@ balance per coin, from the positions just rebuilt, valued with the chain recorde
 (derive/balance_history.py). The last BALANCE_CLOSES closes are rebuilt once (point-in-time
 tiers) by a backfill, and again when a catch-up skipped a close. The backfill never shares a run
 with a new day or the surface rebuild, and waits for BALANCE_MIN_BUDGET seconds of budget.
+
+A reading that does not reconcile (history.fetch_day keeps the deduplicated legs and notes it in
+history/anomalies.json) is also queued in state["retry"] as [day, query, attempts, next_try]
+(query "option", "perp" or an instrument). Later runs read it again, at most RETRY_PER_RUN per run
+within the budget and each no sooner than RETRY_EVERY after its last try; only an exact reading
+replaces the day's rows, then the wallet files are rebuilt and the balance closes backfilled again.
+The wallet files carry the unresolved count ("gaps") and days ("gap_days") until the queue is empty.
 """
 from __future__ import annotations
 
@@ -47,9 +54,11 @@ SCHEMA_VERSION = 3
 # Definitions of history/surface (derive/surface_history.py); a new version rebuilds every row.
 SURFACE_VERSION = 1
 # Definitions of history/balance.json (derive/balance_history.py); a new version rebuilds its closes.
-BALANCE_VERSION = 1
+BALANCE_VERSION = 2
 BALANCE_CLOSES = 90
 BALANCE_MIN_BUDGET = 100  # seconds of budget left for a backfill to start
+RETRY_PER_RUN = 4          # unreconciled readings read again per run
+RETRY_EVERY = 6 * 3600     # seconds between two tries of one reading
 
 
 def is_due(out: Path, now: float) -> bool:
@@ -59,9 +68,60 @@ def is_due(out: Path, now: float) -> bool:
     state = json.loads(p.read_text()) if p.exists() else {}
     done = state.get("done_through")
     last = (datetime.fromtimestamp(now - 3600, timezone.utc) - timedelta(days=1)).date()
-    return done is None or date.fromisoformat(done) < last or (bool(done) and (
+    retry_due = any(item[3] <= now for item in state.get("retry") or ())
+    return done is None or date.fromisoformat(done) < last or retry_due or (bool(done) and (
         state.get("repaired") != REPAIR or state.get("surface") != SURFACE_VERSION or state.get("surface_through") != done
         or (state.get("balance") != BALANCE_VERSION and (out / "history" / "wallets.json").exists())))
+
+
+def queue_retries(state: dict, anomalies: list[dict], now: float) -> None:
+    """Adds each unreconciled reading to state["retry"] once: [day, query, attempts, next_try]."""
+    queue = state.setdefault("retry", [])
+    held = {(item[0], item[1]) for item in queue}
+    for a in anomalies:
+        if a.get("reason") == "not_reconciled" and (a["day"], a["query"]) not in held:
+            queue.append([a["day"], a["query"], 1, now + RETRY_EVERY])
+            held.add((a["day"], a["query"]))
+
+
+def gaps(state: dict) -> dict:
+    """The unresolved readings, as published with the wallet files."""
+    queue = state.get("retry") or []
+    return {"gaps": len(queue), "gap_days": sorted({item[0] for item in queue})}
+
+
+async def retry_step(out: Path, state: dict, client, now: float, keep_going) -> list[str]:
+    """Reads due items of state["retry"] again (RETRY_PER_RUN at most); an exact reading replaces
+    the day's rows for that query and leaves the queue, one that still does not reconcile leaves the
+    file as it was and waits RETRY_EVERY. Returns the days resolved."""
+    from derive import history
+
+    resolved = []
+    due = [item for item in state.get("retry") or () if item[3] <= now][:RETRY_PER_RUN]
+    for item in due:
+        if not keep_going():
+            break
+        day, query, anomalies = date.fromisoformat(item[0]), item[1], []
+        if query in ("option", "perp"):
+            legs = await history.fetch_kind_day(client, day, query, anomalies)
+            if not anomalies:
+                history.replace_kind(out, day, query, history.day_rows(legs))
+        else:
+            legs = await history.fetch_instrument_day(client, day, query, anomalies)
+            if not anomalies:
+                history.replace_instrument(out, day, query, history.day_rows(
+                    [t for t in legs if t.get("instrument_name") == query]))
+        if anomalies:
+            item[2] += 1
+            item[3] = now + RETRY_EVERY
+        else:
+            state["retry"].remove(item)
+            resolved.append(item[0])
+        history.save_state(out, state)
+    if not state.get("retry"):
+        state.pop("retry", None)
+        history.save_state(out, state)
+    return resolved
 
 
 def next_repair(state: dict) -> str | None:
@@ -189,6 +249,7 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
             rows = history.day_rows(await history.fetch_day(client, day, anomalies))
             history.write_day(out, day, rows)
             history.record_anomalies(out, anomalies)
+            queue_retries(state, anomalies, now)
             state["done_through"] = day.isoformat()
             history.save_state(out, state)
             added.append(day.isoformat())
@@ -214,6 +275,7 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
                     history.replace_instrument(out, fix, instrument, history.day_rows(
                         [t for t in legs if t.get("instrument_name") == instrument]))
                 history.record_anomalies(out, anomalies)
+                queue_retries(state, anomalies, now)
                 state["repair_pending"].pop(0)
                 history.save_state(out, state)
             if state["repair_pending"]:
@@ -226,11 +288,16 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
                     state.pop(key, None)
             history.save_state(out, state)
             repaired_now = True
+        retried = await retry_step(out, state, client, now, lambda: time.monotonic() - t0 < budget) \
+            if state.get("done_through") else []
+        if retried and state.pop("balance", None):  # the balance closes rebuild from the completed days
+            history.save_state(out, state)
         snapshots = [out / "history" / f"{name}.json" for name in ("wallets", "positions", "traders")]
-        needs_rebuild = False
+        needs_rebuild = bool(retried)
         for p in snapshots:
             doc = json.loads(p.read_text()) if p.exists() else {}
-            if doc.get("schema_version") != SCHEMA_VERSION or doc.get("through") != state.get("done_through"):
+            if doc.get("schema_version") != SCHEMA_VERSION or doc.get("through") != state.get("done_through") \
+                    or doc.get("gaps", 0) != gaps(state)["gaps"]:
                 needs_rebuild = True
         if state.get("done_through") and (added or needs_rebuild or repaired_now):
             uni = out / "universe.json"
@@ -240,7 +307,7 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
             as_of = min(now, datetime.fromisoformat(state["done_through"]).replace(tzinfo=timezone.utc).timestamp() + 86400)
             scan = history.scan_days(out, as_of)
             classes = history.classify(out, settlements, as_of, held, scan=scan)
-            meta = {"as_of": int(as_of), "through": state["done_through"], "schema_version": SCHEMA_VERSION}
+            meta = {"as_of": int(as_of), "through": state["done_through"], "schema_version": SCHEMA_VERSION, **gaps(state)}
             positions = history.tier_positions(held, classes)
             (out / "history" / "wallets.json").write_text(json.dumps({**meta, "wallets": classes}, separators=(",", ":")))
             (out / "history" / "positions.json").write_text(json.dumps({**meta, "positions": positions}, separators=(",", ":")))
@@ -262,6 +329,8 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
         out_doc["repair_pending"] = len(state["repair_pending"])
     if state.get("surface_pending"):
         out_doc["surface_pending"] = len(state["surface_pending"])
+    if state.get("retry"):
+        out_doc["retry_pending"] = len(state["retry"])
     if backfilled is not None:
         out_doc["balance_closes"] = backfilled
     return out_doc

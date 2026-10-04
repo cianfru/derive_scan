@@ -44,6 +44,7 @@ QUESTION_GATES = {
     "stale_sec": 35 * 60, "paused_sec": 90 * 60,  # price age: amber, then paused
     "history_keep_days": 90,
 }
+SIDE_MAX_BUY = 0.99   # a side above this per $1 is published "tail" (not offered)
 DEFAULT_SPEC = {"tick": None, "min": None, "step": None, "taker": 0.0003, "base": 0.5, "cap": 0.125}
 
 
@@ -430,9 +431,15 @@ def _ladder(priced: dict, index: float, size: int) -> list[float]:
 
 
 def _side_out(side: dict | None, und: str) -> dict | None:
+    """A side as published. One that costs more than SIDE_MAX_BUY per $1 is "tail": not offered,
+    since at most 1c is left to gain and stage 2's RFQ ceiling is 99c (lib/trade/package.js); the
+    true price stays in the file, so the app never shows it rounded down to 99c."""
     if side is None:
         return {"state": "no_quote"}
-    return {"state": side_state(side, und), "buy": round(side["buy"], 4),
+    state = side_state(side, und)
+    if state == "open" and side["buy"] > SIDE_MAX_BUY:
+        state = "tail"
+    return {"state": state, "buy": round(side["buy"], 4),
             "sell": None if side["sell"] is None else round(side["sell"], 4),
             "size": round(side["size"], 2), "form": side["form"],
             "legs": [[n, s, p] for n, s, p in side["legs"]], "close": side.get("close")}

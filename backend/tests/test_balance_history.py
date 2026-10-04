@@ -298,3 +298,50 @@ def test_history_job_backfills_once_after_the_surface_rebuild(tmp_path, monkeypa
 
 def test_the_job_and_the_module_share_one_version():
     assert history_once.BALANCE_VERSION == B.SCHEMA
+
+
+# -- no exposure without valid volatility (review item 3) ---------------------------------------
+
+def _modelled(ivs, day="2024-06-03", positions=None):
+    as_of = B.close_ts(day)
+    positions = positions or {"ETH-20240628-3000-C": {"smart": [20.0, 4, 20.0]}}
+    return B.value(positions, "ETH", as_of, 3500.0, "30d", ivs=ivs, day=day)
+
+
+def test_a_modelled_close_without_iv_evidence_is_unavailable_not_intrinsic():
+    # Before: no IV fell through to an intrinsic delta, publishing 100% long and $70,000 gross.
+    v = _modelled(B.TradeIVs())
+    assert v["score"] is None and v["net"] is None and v["gross"] is None
+    assert v["unavailable"] == "no_iv" and v["positions"] == 4
+    rows, eg = B.close_readings({"ETH": {"ETH-20240628-3000-C": {"smart": [20.0, 4, 20.0]}}}, B.close_ts("2024-06-03"),
+                                "2024-06-03", {"ETH": 3500.0}, {"ETH": None}, B.TradeIVs(), None)
+    assert rows["ETH"]["30d"] == [None, None, None, 4, B.FLAG_MODELLED | B.FLAG_NO_IV]
+    assert "ETH" not in eg  # no roll base from an unavailable close
+
+
+def test_iv_freshness_bounds():
+    ivs = B.TradeIVs()
+    ivs.inst["ETH-20240628-3000-C"] = ("2024-05-10", 0.6)   # 24 days before: too old
+    ivs.und["ETH"] = ("2024-05-25", 0.55)                    # 9 days before: too old
+    assert ivs.iv_for("ETH-20240628-3000-C", "ETH", "2024-06-03") is None
+    assert _modelled(ivs)["unavailable"] == "no_iv"
+    ivs.und["ETH"] = ("2024-05-27", 0.55)                    # 7 days: valid
+    assert ivs.iv_for("ETH-20240628-3000-C", "ETH", "2024-06-03") == 0.55
+    ivs.inst["ETH-20240628-3000-C"] = ("2024-05-13", 0.6)   # 21 days: the instrument's own IV first
+    assert ivs.iv_for("ETH-20240628-3000-C", "ETH", "2024-06-03") == 0.6
+    v = _modelled(ivs)
+    assert v["unavailable"] is None and v["score"] == 1.0 and 0 < v["gross"] < 20 * 3500
+
+
+def test_one_position_without_iv_makes_the_whole_horizon_unavailable():
+    ivs = B.TradeIVs()
+    ivs.inst["ETH-20240628-3000-C"] = ("2024-06-01", 0.6)
+    v = _modelled(ivs, positions={"ETH-20240628-3000-C": {"smart": [20.0, 4, 20.0]},
+                                  "ETH-20240628-2000-P": {"smart": [-5.0, 1, 5.0]}})
+    assert v["score"] is None and v["gross"] is None and v["unavailable"] == "no_iv"
+
+
+def test_radar_publishes_unavailable_with_its_reason_flag():
+    assert publish_site.radar_point([None, None, None, 4, B.FLAG_MODELLED | B.FLAG_NO_IV]) == \
+        [None, None, B.FLAG_MODELLED | B.FLAG_NO_IV]
+    assert publish_site.radar_point([None, 100.0, 100.0, 1, 0]) is None  # below the gates: a gap

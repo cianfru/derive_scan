@@ -326,3 +326,13 @@ def test_history_is_in_time_order(tmp_path, snaps):
     assert h["ts"] == sorted(h["ts"]) and len(h["ts"]) == 2
     for col in h["rows"].values():
         assert col["i"] == sorted(col["i"])
+
+
+def test_a_side_above_99c_is_not_offered():
+    # Review: 16 published sides cost over 99c and showed as 99c. A side above 99c per $1 leaves
+    # at most 1c to gain and sits above stage 2's 99c ceiling: it is published as "tail", not open.
+    side = {"buy": 0.9953, "sell": 0.98, "size": 500.0, "over": 0.01, "form": "debit", "legs": [], "close": []}
+    out = Q._side_out(side, "BTC")
+    assert out["state"] == "tail" and out["buy"] == 0.9953  # the true price stays in the file
+    assert Q._side_out({**side, "buy": 0.99}, "BTC")["state"] == "open"
+    assert Q.side_state(side, "BTC") == "open"  # the date gates are unchanged

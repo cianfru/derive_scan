@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { radarFrames, frameAt, trailAt, closeLabel, decodeFlags, engineAt, nearest, TRAIL, REPLAY } from "./radarHistory.js";
+import { radarFrames, frameAt, trailAt, closeLabel, decodeFlags, engineAt, nearest, walletAt, TRAIL, REPLAY } from "./radarHistory.js";
 import { radarPoint } from "./presentation.js";
 
 const DAY = 86400;
@@ -35,14 +35,24 @@ describe("radar history frames", () => {
   });
 
   it("decodes the flags: bit 0 roll, bit 1 modelled", () => {
-    expect(decodeFlags(0)).toEqual({ roll: false, modelled: false });
-    expect(decodeFlags(1)).toEqual({ roll: true, modelled: false });
-    expect(decodeFlags(2)).toEqual({ roll: false, modelled: true });
-    expect(decodeFlags(3)).toEqual({ roll: true, modelled: true });
-    expect(decodeFlags(undefined)).toEqual({ roll: false, modelled: false });
+    expect(decodeFlags(0)).toEqual({ roll: false, modelled: false, unavailable: false });
+    expect(decodeFlags(1)).toEqual({ roll: true, modelled: false, unavailable: false });
+    expect(decodeFlags(2)).toEqual({ roll: false, modelled: true, unavailable: false });
+    expect(decodeFlags(6)).toEqual({ roll: false, modelled: true, unavailable: true });
+    expect(decodeFlags(3)).toEqual({ roll: true, modelled: true, unavailable: false });
+    expect(decodeFlags(undefined)).toEqual({ roll: false, modelled: false, unavailable: false });
     const H = radarFrames(hist({ ETH: { z: series(() => 1), w: { "30d": series((k) => [0.2, 5e5, k % 4]) }, e: "" } }), [], "30d", now);
     const row = H.frames.get("ETH");
     expect(row.slice(0, 4).map((f) => [f.roll, f.modelled])).toEqual([[false, false], [true, false], [false, true], [true, true]]);
+  });
+
+  it("keeps an unavailable close (no valid volatility) off the map and marked in the series", () => {
+    const H = radarFrames(hist({ ETH: { z: series(() => 1), w: { "30d": series((k) => (k === 3 ? [null, null, 6] : [0.2, 5e5, 2])) }, e: "" } }), [], "30d", now);
+    expect(H.frames.get("ETH")[3]).toBeNull();
+    expect(H.series.get("ETH").w[3]).toMatchObject({ unavailable: true });
+    expect(walletAt(H.series.get("ETH").w[3])).toMatchObject({ state: null, label: "Unavailable", unavailable: true });
+    expect(walletAt(H.series.get("ETH").w[2])).toMatchObject({ state: "neutral", label: "Balanced delta", y: 0.2 });
+    expect(walletAt(null).label).toBe("No reading");
   });
 
   it("reads the engine's saved reading per close", () => {

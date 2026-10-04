@@ -122,6 +122,50 @@ describe("radar replay", () => {
   });
 });
 
+describe("radar replay detail (review items 3 and 5)", () => {
+  const rd = () => document.querySelector(".radar-detail");
+  const reading = (name) => [...rd().querySelectorAll(".rd-readings > div")].find((d) => d.querySelector("span").textContent === name);
+  const unavailable = { ...radar, coins: { ...radar.coins, ETH: { ...radar.coins.ETH, w: { ...radar.coins.ETH.w, "30d": closes.map((_, i) => (i === 1 ? [null, null, 6] : [0.4, 5e6, 2])) } } } };
+
+  it("every reading in the detail panel comes from the selected close, not from now", () => {
+    docs.current = { "markets.json": markets, "radar.json": radar };
+    show();
+    // Now: today's readings.
+    expect(reading("Wallets").querySelector("b").textContent).toBe("Long delta");
+    fireEvent.click(screen.getByRole("button", { name: "Replay" }));
+    fireEvent.keyDown(slider(), { key: "Home" });
+    fireEvent.keyDown(slider(), { key: "ArrowRight" });  // close 1: BTC balance +11%, no saved engine reading
+    const wallets = reading("Wallets");
+    expect(wallets.querySelector("b").textContent).toBe("Balanced delta");
+    expect(wallets.querySelector("small").textContent).toBe("+11%");
+    expect(reading("Engine").querySelector("b").textContent).not.toBe("Leaning up");
+    expect(reading("Engine").querySelector("small")?.textContent).toBe("1.01σ");  // the stretch at that close
+    expect(reading("Options").querySelector("b").textContent).toBe("—");
+    expect(rd().textContent).not.toMatch(/\+29%|Trending up|Leaning up/);
+    // The price trace stops at that close.
+    expect(rd().querySelector(".rd-trace svg").getAttribute("aria-label")).toBe(`BTC daily closes to ${closeLabel(closes[1])}: +1.1%`);
+    fireEvent.keyDown(slider(), { key: "End" });
+    expect(reading("Wallets").querySelector("b").textContent).toBe("Long delta");
+  });
+
+  it("a close without valid implied volatility shows as unavailable, with why", () => {
+    docs.current = { "markets.json": markets, "radar.json": unavailable };
+    render(<MemoryRouter initialEntries={["/radar?focus=ETH"]}><Radar /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "Replay" }));
+    fireEvent.keyDown(slider(), { key: "Home" });
+    fireEvent.keyDown(slider(), { key: "ArrowRight" });
+    expect(rd().getAttribute("aria-label")).toBe("ETH radar detail");
+    const figs = [...rd().querySelectorAll(".rd-figs > div")];
+    expect(figs[1].querySelector("b").textContent).toBe("Unavailable");
+    expect(figs[2].querySelector("b").textContent).toBe("Unavailable");
+    fireEvent.click(screen.getByRole("button", { name: "Why the wallet reading is unavailable" }));
+    expect(screen.getByRole("dialog").textContent).toMatch(/implied volatility/);
+    expect(reading("Wallets").querySelector("b").textContent).toBe("Unavailable");
+    // Not on the map at that close; on the strip with its stretch.
+    expect([...document.querySelectorAll(".radar-strip text")].map((t) => t.textContent)).toContain("ETH");
+  });
+});
+
 describe("radar labels", () => {
   it("keep the side they were given at the last whole close", () => {
     const c = (und) => ({ und });
