@@ -149,7 +149,7 @@ export default function Board() {
   const [coin, setCoin] = useState("all");
   const [range, setRange] = useState("all");
   const [side, setSide] = useState("all");
-  const [sort, setSort] = useState("mark");
+  const [sort, setSort] = useState("near");
   const [shown, setShown] = useState(PAGE);
   const now = Date.now() / 1000;
   const boards = coins.map((u) => files[`questions/${u}.json`]).filter(Boolean);

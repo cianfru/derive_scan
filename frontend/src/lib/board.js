@@ -7,8 +7,8 @@ import { centsUp, live, money, noPriceReason, ticket } from "./questions.js";
 
 export const DEFAULT_BUDGET = 100;
 export const SORTS = [
-  ["mark", "Lowest cost over mark"],
   ["near", "Closest to today's price"],
+  ["mark", "Lowest cost over mark"],
   ["soon", "Soonest settlement"],
   ["size", "Largest size"],
 ];
@@ -110,7 +110,7 @@ const COMPARE = {
 const tie = (a, b) => byNum(a.settleTs, b.settleTs) || byNum(a.distance, b.distance) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
 
 /** The user's sort, on price facts only (a copy; the input is not changed). */
-export function sortRows(rows, sort = "mark") {
+export function sortRows(rows, sort = "near") {
   const cmp = COMPARE[sort] || COMPARE.mark;
   return [...rows].sort((a, b) => cmp(a, b) || tie(a, b));
 }
