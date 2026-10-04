@@ -11,7 +11,7 @@ import QuestionTicket from "../components/QuestionTicket.jsx";
 import OutcomePreview from "../components/OutcomePreview.jsx";
 import {
   ANSWER, buyCents, cents, centsDown, countdown, dayLabel, findLevel, fullPay, gap, live, money, noPriceReason, parseId, priceAge,
-  questionText, ticket, payAt,
+  questionText, settlingNow, ticket, payAt,
 } from "../lib/questions.js";
 import { loadPositions } from "../lib/positions.js";
 import "../questions.css";
@@ -152,7 +152,7 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, onBack 
   const { data: hist } = useData(`questions/history/${und}-${date.expiry}.json`, 15 * 60_000);
   const t = sideKey && live(level, sideKey, paused) ? ticket(level, sideKey, dollars, board) : null;
   const side = sideKey ? level[sideKey] : null;
-  const settling = level.state === "settling";
+  const settling = settlingNow(level); // by the clock now, from 07:30 UTC
   const days = (date.settle_ts - Date.now() / 1000) / 86400;
   const sz = side?.size;
   const ready = t && !t.belowMin;

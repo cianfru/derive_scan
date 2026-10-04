@@ -29,25 +29,44 @@ export const centsUp = (x) => (ok(x) ? Math.min(99, Math.max(1, Math.ceil(Math.r
 export const centsDown = (x) => (ok(x) ? Math.min(99, Math.max(0, Math.floor(Math.round(x * 1e6) / 1e4))) : null);
 export const cents = (c) => (c == null ? DASH : `${c}c`);
 
-/** A side can be bought when its level and the side are open and the prices are not paused. Only
- * debit packages are offered (owner, 4 October 2026); a credit side left in an older file is not. */
-export function live(level, side, paused = false) {
+// Settling starts 30 minutes before the 08:00 UTC expiry (questions.py settling_sec), by the
+// clock now, never by the time of the last quote: a 07:15 file is not offered at 07:45.
+export const SETTLING_SEC = 1800;
+// A side above 99c per $1 is not offered (questions.py SIDE_MAX_BUY): it is never shown as 99c.
+export const MAX_BUY = 0.99;
+/** The 08:00 UTC settlement of a question id's date, in seconds, or null. */
+export function settleOf(level) {
+  const e = parseId(level?.id)?.expiry;
+  return e ? Date.UTC(+e.slice(0, 4), +e.slice(4, 6) - 1, +e.slice(6, 8), 8) / 1000 : null;
+}
+/** True from 07:30 UTC on the level's date, by the clock now. */
+export function settlingNow(level, now = Date.now() / 1000) {
+  const s = settleOf(level);
+  return level?.state === "settling" || (s != null && now >= s - SETTLING_SEC);
+}
+
+/** A side can be bought when its level and the side are open, the prices are not paused, the
+ * date is not settling by the clock now and the price is at most 99c. Only debit packages are
+ * offered (owner, 4 October 2026); a credit side left in an older file is not. */
+export function live(level, side, paused = false, now = Date.now() / 1000) {
   const s = level?.[side];
-  return !paused && level?.state === "open" && s?.state === "open" && ok(s?.buy) && s?.form !== "credit";
+  return !paused && level?.state === "open" && s?.state === "open" && ok(s?.buy) && s.buy <= MAX_BUY
+    && s?.form !== "credit" && !settlingNow(level, now);
 }
 
 /** Why a side has no price now, in plain words for the (i) beside "No price now". */
 export function noPriceReason(level, side, paused = false) {
   const s = level?.[side];
   if (paused) return "Prices are paused: Cowboy has had no fresh read of Derive's screen for over 90 minutes.";
-  if (level?.state === "settling") return "This date is settling: Derive averages the index from 07:30 to 08:00 UTC.";
+  if (settlingNow(level)) return "This date is settling: Derive averages the index from 07:30 to 08:00 UTC.";
   if (level?.state === "tail") return "This level is far from the price now, so Cowboy does not offer it.";
   if (level?.state === "retired") return "This level is off the board; it stays only for those who hold it.";
   if (s?.form === "credit") return "Cowboy offers each answer only as two options bought and sold for a net payment, and Derive's screen has no such price here right now.";
+  if (s?.state === "tail" || (s?.state === "open" && ok(s?.buy) && s.buy > MAX_BUY)) return "This answer would cost more than 99c per $1 of payout, so Cowboy does not offer it.";
   if (s?.state === "screen_wide") return "Derive's screen is too wide here: buying now costs more over Derive's mark than Cowboy's check allows.";
   return "Derive's screen has no price on both options with enough size right now.";
 }
-export const buyCents = (level, side, paused = false) => (live(level, side, paused) ? centsUp(level[side].buy) : null);
+export const buyCents = (level, side, paused = false, now = Date.now() / 1000) => (live(level, side, paused, now) ? centsUp(level[side].buy) : null);
 
 /** The gap: shown buy minus shown sell-back, per $1. */
 export function gap(side) {

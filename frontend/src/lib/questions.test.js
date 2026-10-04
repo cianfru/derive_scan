@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import btc from "../fixtures/questions/BTC.json";
 import {
   centsUp, centsDown, gap, priceAge, ticket, parseId, copyText, orderedLegs, findLevel, deriveLink, closeTicket, payAt,
-  outcome, breakeven, sliderStep, questionText, answerNames, handRisk, live, legFee,
+  outcome, breakeven, sliderStep, questionText, answerNames, handRisk, live, legFee, buyCents, noPriceReason, settleOf,
 } from "./questions.js";
 import { loadPositions, savePositions, addPosition, _resetMemory, valuePosition, closePosition } from "./positions.js";
 
@@ -191,5 +191,28 @@ describe("Positions storage", () => {
     const p = { id: lv.id, side: "yes", contracts: 0.01, lo: 83000, hi: 89000, paid: 30, exec: "hand_partial" };
     expect(valuePosition(p, { level: lv }, null, 1).now).toBeNull();
     expect(valuePosition(p, null, 86000).got).toBeUndefined();
+  });
+});
+
+
+describe("review: clock cutoff and prices above 99c", () => {
+  const T = (h, m) => Date.UTC(2026, 9, 9, h, m) / 1000;  // 9 Oct 2026
+  const level = { id: "BTC-20261009-A-83000-89000", state: "open", lo: 83000, hi: 89000, k: 86000,
+    yes: { state: "open", buy: 0.5, form: "debit" }, no: { state: "open", buy: 0.9953, form: "debit" } };
+
+  it("enforces the 07:30 UTC cutoff by the clock now, not by the quote's time", () => {
+    // The file was written at 07:15 (level still open); at 07:29 it can be placed, at 07:30 and 07:45 not.
+    expect(live(level, "yes", false, T(7, 29))).toBe(true);
+    expect(live(level, "yes", false, T(7, 30))).toBe(false);
+    expect(live(level, "yes", false, T(7, 45))).toBe(false);
+    expect(buyCents(level, "yes", false, T(7, 45))).toBeNull();
+    expect(settleOf(level)).toBe(T(8, 0));
+  });
+
+  it("never shows a price above 99c as 99c: that side is not offered", () => {
+    expect(live(level, "no", false, T(1, 0))).toBe(false);
+    expect(buyCents(level, "no", false, T(1, 0))).toBeNull();
+    expect(noPriceReason({ ...level, no: { ...level.no, state: "tail" } }, "no")).toMatch(/more than 99c/);
+    expect(live({ ...level, no: { ...level.no, buy: 0.99 } }, "no", false, T(1, 0))).toBe(true);
   });
 });

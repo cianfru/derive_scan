@@ -275,6 +275,17 @@ describe("the question page", () => {
     expect(document.activeElement).toBe(open);
   });
 
+  it("stops offering a date from 07:30 UTC by the clock, whatever the file says", () => {
+    const b = structuredClone(btc);
+    b.prices_ts = Date.UTC(2026, 9, 9, 7, 15) / 1000; // a fresh 07:15 file, its level still "open"
+    docs.current["questions/BTC.json"] = b;
+    vi.setSystemTime(Date.UTC(2026, 9, 9, 7, 45));
+    const { container } = show(`${Q86}?side=yes`);
+    expect(container.textContent).toContain("Settling · average from 07:30 to 08:00 UTC");
+    expect(screen.queryByRole("button", { name: "Place on Derive" })).toBeNull();
+    expect(container.querySelector(".q-ticket")).toBeNull();
+  });
+
   it("opens an old settled link at its settled view", () => {
     const { container } = show("/q/BTC-20261003-A-80000-86000");
     expect(container.textContent).toContain("Settled $84,594");
