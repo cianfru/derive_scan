@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { Info, Loading, Failed, Tabs } from "../components/ui.jsx";
 import { Asset } from "../components/MarketVisuals.jsx";
@@ -13,7 +13,6 @@ import {
   ANSWER, buyCents, cents, centsDown, countdown, dayLabel, findLevel, fullPay, gap, live, money, noPriceReason, parseId, priceAge,
   questionText, settlingNow, ticket, payAt,
 } from "../lib/questions.js";
-import { loadPositions } from "../lib/positions.js";
 import "../questions.css";
 
 const clock = (t) => `${new Date(t * 1000).toISOString().slice(11, 16)} UTC`;
@@ -42,7 +41,6 @@ function ZoneNote({ und, date, index }) {
   const share = ((date.zone / index) * 100).toFixed(1);
   return (
     <p className="q-foot">
-      Settles {dayLabel(date.expiry)}, 08:00 UTC{countdown(date.settle_ts) && <> · {countdown(date.settle_ts)}</>}
       <span className="q-foot-zone">Pays in part within {money(half)} either side
         <Info label="About the pay zone">Each level pays in part within {money(half)} either side: a zone of {money(date.zone)}, {share}% of {und}'s price. Above the zone Higher pays $1 and Lower nothing; below it, the reverse; in between each pays part of it, in a straight line. A wider zone costs less on Derive's screen; a narrower one is closer to all or nothing.</Info>
       </span>
@@ -141,15 +139,70 @@ export function NoPrice({ level, side, paused, text = "No price now" }) {
   );
 }
 
-/** The question: the two answers (none picked until the user picks), then for the picked one the
- * amount, the outcome preview and the action; the ticket only once an answer is picked. */
-function QuestionView({ und, board, found, sideKey, setSide, age, theme, onBack }) {
+function Step({ n, title, children, className = "", stepRef }) {
+  return (
+    <section ref={stepRef} className={`q-step ${className}`} aria-label={title}>
+      <h2 className="q-step-head"><span className="q-step-n mono" aria-hidden="true">{n}</span>{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+/** The step's one primary action, with the chosen answer, amount and most you can lose beside it.
+ * In the page on wide screens; a bar fixed to the bottom of the screen on phones. */
+function ActionBar({ und, level, sideKey, date, t, label, onGo, disabled, hidden, goRef }) {
+  return (
+    <div className={`q-actbar${hidden ? " hide" : ""}`} aria-label="Your answer">
+      <span className="q-actbar-sum">
+        <b>{ANSWER[sideKey]} · {money(level.k)}<span className="q-actbar-date"> · {date.label}</span></b>
+        <small className="mono">{t ? <><span className="q-actbar-amt">{money(t.premium, { cents: true })} · </span>most you can lose {money(t.mostLose, { cents: true })}</> : "No price now"}</small>
+      </span>
+      <button ref={goRef} className="btn primary lg q-get" onClick={onGo} disabled={disabled}>{label}</button>
+    </div>
+  );
+}
+
+/** Wide screens, before the ticket: what is picked so far. */
+function Summary({ und, level, sideKey, date, t }) {
+  return (
+    <section className="q-summary" aria-label="Your trade">
+      <h3 className="label">Your trade</h3>
+      {sideKey ? (
+        <dl className="q-money">
+          <div><dt>Answer</dt><dd>{ANSWER[sideKey]} · {money(level.k)}</dd></div>
+          <div><dt>Pays in full</dt><dd>{fullPay(level, sideKey).replace("full $1 ", "")}</dd></div>
+          <div><dt>Settles</dt><dd className="mono">{dayLabel(date.expiry)}, 08:00 UTC</dd></div>
+          {t && <div className="q-lose"><dt>Most you can lose</dt><dd className="mono">{money(t.mostLose, { cents: true })}</dd></div>}
+        </dl>
+      ) : <p className="status">Pick Higher or Lower on {und} to see what you pay and what it pays.</p>}
+    </section>
+  );
+}
+
+/** The question's price history per $1, folded away: evidence, not a step of the trade. */
+function History({ und, date, level, sideKey, theme }) {
+  const [open, setOpen] = useState(false);
+  const { data: hist } = useData(open ? `questions/history/${und}-${date.expiry}.json` : null, 15 * 60_000);
+  return (
+    <details className="q-history" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>Price history</summary>
+      {open && <QuestionChart hist={hist} id={level.id} side={sideKey || "yes"} level={level} und={und} theme={theme} />}
+    </details>
+  );
+}
+
+const scrollTo = (el) => el?.scrollIntoView?.({ block: "start", behavior: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+
+/** The guided flow from step 3: Higher or Lower (never picked for the user), then the amount, then
+ * what it pays, then the orders for Derive. One primary action per step. The full ladder of levels
+ * sits under "Other levels". */
+function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, ladder, ladderOpen, onLadder, initialStep }) {
   const { date, level } = found;
   const question = questionText(und, level, date.expiry);
   const paused = age.state === "paused" || board.paused;
   const [dollars, setDollars] = useState(100);
   const [sheet, setSheet] = useState(false);
-  const { data: hist } = useData(`questions/history/${und}-${date.expiry}.json`, 15 * 60_000);
+  const [step, setStep] = useState(() => (sideKey ? initialStep || "preview" : "pick"));
   const t = sideKey && live(level, sideKey, paused) ? ticket(level, sideKey, dollars, board) : null;
   const side = sideKey ? level[sideKey] : null;
   const settling = settlingNow(level); // by the clock now, from 07:30 UTC
@@ -158,71 +211,107 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, onBack 
   const ready = t && !t.belowMin;
   const sheetRef = useRef(null);
   const opener = useRef(null);
+  const amountRef = useRef(null);
+  const previewRef = useRef(null);
   useSheetFocus(sheet, sheetRef, opener, () => setSheet(false));
+  useEffect(() => { if (initialStep === "amount") scrollTo(amountRef.current); }, []);
+  const pick = (k) => { setSide(k); if (step === "pick") setStep("amount"); };
+  const preview = () => { setStep("preview"); requestAnimationFrame(() => scrollTo(previewRef.current)); };
+  const place = () => {
+    setSheet(true);
+    // Wide screens show the ticket beside the flow: move focus to it.
+    if (typeof matchMedia === "function" && !matchMedia("(max-width: 1279px)").matches) sheetRef.current?.querySelector("a, button")?.focus?.();
+  };
+  const showPreview = !settling && sideKey && step === "preview";
+  const bar = !settling && sideKey && (
+    <ActionBar und={und} level={level} sideKey={sideKey} date={date} t={t} hidden={sheet}
+      label={step === "preview" ? "Place on Derive" : "See what it pays"} goRef={step === "preview" ? opener : null}
+      onGo={step === "preview" ? place : preview} disabled={step === "preview" ? !ready : !t} />
+  );
   return (
-    <article className="q-view" aria-label={question}>
-      <button className="text-control q-back" onClick={onBack}>‹ {und} · {date.label}</button>
-      <h1 className="q-title">{question}</h1>
-      <p className="q-settles">Settles {dayLabel(date.expiry)}, 08:00 UTC{countdown(date.settle_ts) && <> · {countdown(date.settle_ts)}</>}
-        <Info label="About settlement">Derive settles on the average {und} index over the 30 minutes to 08:00 UTC. What the answer pays is then paid in USDC to your Derive account with no action from you.</Info>
-      </p>
-      {settling ? <p className="q-big">Settling · average from 07:30 to 08:00 UTC</p> : (
-        <div className="q-pick" role="radiogroup" aria-label="Answer">
-          {["yes", "no"].map((k) => {
-            const c = buyCents(level, k, paused);
-            return (
-              <button key={k} role="radio" aria-checked={sideKey === k} className={`q-pick-btn${sideKey === k ? " on" : ""}`}
-                aria-label={`${ANSWER[k]}, ${fullPay(level, k)}, ${c != null ? `${c} cents per $1` : "no price now"}`}
-                onClick={() => setSide(k)}>
-                <span className="q-pick-name"><i className={`q-arrow ${k}`} aria-hidden="true" />{ANSWER[k]}</span>
-                <span className="q-pick-zone"><PayZone lo={level.lo} hi={level.hi} side={k} index={board.index} compact /><small>{fullPay(level, k)}</small></span>
-                <b className="mono">{c != null ? cents(c) : <small>No price now</small>}</b>
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {!settling && !sideKey && <p className="status q-hint">Pick Higher or Lower to see what you pay, what it pays, and the orders for Derive.</p>}
-      {!settling && sideKey && (
-        <section className="q-amount" aria-label="Amount">
-          <div className="q-amount-in">
-            <label htmlFor="q-dollars" className="label">Amount</label>
-            <span className="q-dollar-field"><span>$</span>
-              <input id="q-dollars" inputMode="decimal" value={dollars} onChange={(e) => setDollars(Math.max(0, Number(e.target.value.replace(/[^\d.]/g, "")) || 0))} />
-            </span>
-            <span className="q-quick">{QUICK.map((v) => <button key={v} className="text-control" aria-pressed={dollars === v} onClick={() => setDollars(v)}>${v}</button>)}</span>
-          </div>
-          {t ? (
-            <>
-              {t.belowMin && <p className="q-note warn">Smallest amount for this question: {money(t.minCost, { cents: true })}.</p>}
-              {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
-              {t.premium > 0 && t.premium < 50 && <p className="q-note">Fees are a large share of small amounts.</p>}
+    <div className={`q-layout${sideKey && !settling ? " has-bar" : ""}`}>
+      <div className="q-flow">
+        {lead}
+        <Step n={3} title="Higher or lower" className="q-step-pick">
+          <article className="q-view" aria-label={question}>
+            <h1 className="q-title">{question}</h1>
+            <p className="q-settles">Settles {dayLabel(date.expiry)}, 08:00 UTC{countdown(date.settle_ts) && <> · {countdown(date.settle_ts)}</>}
+              <Info label="About settlement">Derive settles on the average {und} index over the 30 minutes to 08:00 UTC. What the answer pays is then paid in USDC to your Derive account with no action from you.</Info>
+            </p>
+            {settling ? <p className="q-big">Settling · average from 07:30 to 08:00 UTC</p> : (
+              <div className="q-pick" role="radiogroup" aria-label="Answer">
+                {["yes", "no"].map((k) => {
+                  const c = buyCents(level, k, paused);
+                  return (
+                    <button key={k} role="radio" aria-checked={sideKey === k} className={`q-pick-btn${sideKey === k ? " on" : ""}`}
+                      aria-label={`${ANSWER[k]}, ${fullPay(level, k)}, ${c != null ? `${c} cents per $1` : "no price now"}`}
+                      onClick={() => pick(k)}>
+                      <span className="q-pick-name"><i className={`q-arrow ${k}`} aria-hidden="true" />{ANSWER[k]}</span>
+                      <span className="q-pick-zone"><PayZone lo={level.lo} hi={level.hi} side={k} index={board.index} compact /><small>{fullPay(level, k)}</small></span>
+                      <b className="mono">{c != null ? cents(c) : <small>No price now</small>}</b>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {!settling && !sideKey && <p className="status q-hint">Pick Higher or Lower. Nothing is picked for you.</p>}
+          </article>
+          <ZoneNote und={und} date={date} index={board.index} />
+          <button className="text-control q-other" aria-expanded={ladderOpen} onClick={onLadder}>{ladderOpen ? "Hide other levels" : "Other levels"}</button>
+          {ladderOpen && ladder}
+        </Step>
+        {!settling && sideKey && (
+          <Step n={4} title="Amount" stepRef={amountRef} className="q-step-amount">
+            <div className="q-amount">
+              <div className="q-amount-in">
+                <label htmlFor="q-dollars" className="label">Amount</label>
+                <span className="q-dollar-field"><span>$</span>
+                  <input id="q-dollars" inputMode="decimal" value={dollars} onChange={(e) => setDollars(Math.max(0, Number(e.target.value.replace(/[^\d.]/g, "")) || 0))} />
+                </span>
+                <span className="q-quick">{QUICK.map((v) => <button key={v} className="text-control" aria-pressed={dollars === v} onClick={() => setDollars(v)}>${v}</button>)}</span>
+              </div>
+              {t ? (
+                <>
+                  {t.belowMin && <p className="q-note warn">Smallest amount for this question: {money(t.minCost, { cents: true })}.</p>}
+                  {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
+                  {t.premium > 0 && t.premium < 50 && <p className="q-note">Fees are a large share of small amounts.</p>}
+                </>
+              ) : (
+                <>
+                  <p className="status"><NoPrice level={level} side={sideKey} paused={paused} text={`No price now for ${ANSWER[sideKey]}`} /></p>
+                  <PayZone lo={level.lo} hi={level.hi} side={sideKey} index={board.index} />
+                </>
+              )}
+            </div>
+            {step !== "preview" && bar}
+          </Step>
+        )}
+        {showPreview && t && (
+          <Step n={5} title="What it pays" stepRef={previewRef} className="q-step-preview">
+            <section className="q-amount q-preview" aria-label="Outcome preview">
               <OutcomePreview und={und} level={level} side={sideKey} t={t} expiry={date.expiry} settleTs={date.settle_ts} index={board.index} />
-            </>
-          ) : (
-            <>
-              <p className="status"><NoPrice level={level} side={sideKey} paused={paused} text={`No price now for ${ANSWER[sideKey]}`} /></p>
-              <PayZone lo={level.lo} hi={level.hi} side={sideKey} index={board.index} />
-            </>
-          )}
-          {ready && <button ref={opener} className="btn primary lg q-get" onClick={() => setSheet(true)}>Place on Derive</button>}
-        </section>
-      )}
-      <QuestionChart hist={hist} id={level.id} side={sideKey || "yes"} level={level} und={und} theme={theme} />
-      <Context und={und} days={days} />
-      <p className="q-small mono">
-        <span>Rules<Rules und={und} /></span>
-        {sz != null && <span>Size at this price: up to {money(sz)}</span>}
-        {side && gap(side) != null && <span>Gap {gap(side)}c<Info label="About the gap">What buying and then selling straight back costs on Derive's screen right now: buy {cents(buyCents(level, sideKey, paused))}, sell back {cents(centsDown(side?.sell))}. It is why Higher and Lower add up to more than $1. Mark on Derive {cents(Math.round((sideKey === "yes" ? level.fair : 1 - level.fair) * 100))}.</Info></span>}
-      </p>
-      {ready && (
-        <div ref={sheetRef} className={`q-sheet${sheet ? " open" : ""}`} role={sheet ? "dialog" : undefined} aria-modal={sheet ? "true" : undefined} aria-label="Ticket">
-          <button className="text-control q-sheet-close" onClick={() => setSheet(false)}>Close</button>
-          <QuestionTicket und={und} question={question} answer={ANSWER[sideKey]} level={level} sideKey={sideKey} t={t} board={board}
-            pricesTs={board.prices_ts} settleTs={date.settle_ts} expiry={date.expiry} stale={age.state === "stale"} />
-        </div>
-      )}
-    </article>
+            </section>
+            {bar}
+          </Step>
+        )}
+        <Context und={und} days={days} />
+        <History und={und} date={date} level={level} sideKey={sideKey} theme={theme} />
+        <p className="q-small mono">
+          <span>Rules<Rules und={und} /></span>
+          {sz != null && <span>Size at this price: up to {money(sz)}</span>}
+          {side && gap(side) != null && <span>Gap {gap(side)}c<Info label="About the gap">What buying and then selling straight back costs on Derive's screen right now: buy {cents(buyCents(level, sideKey, paused))}, sell back {cents(centsDown(side?.sell))}. It is why Higher and Lower add up to more than $1. Mark on Derive {cents(Math.round((sideKey === "yes" ? level.fair : 1 - level.fair) * 100))}.</Info></span>}
+        </p>
+      </div>
+      <aside className="q-aside">
+        {showPreview && ready ? (
+          <div ref={sheetRef} className={`q-sheet${sheet ? " open" : ""}`} role={sheet ? "dialog" : undefined} aria-modal={sheet ? "true" : undefined} aria-label="Ticket">
+            <button className="text-control q-sheet-close" onClick={() => setSheet(false)}>Close</button>
+            <QuestionTicket und={und} question={question} answer={ANSWER[sideKey]} level={level} sideKey={sideKey} t={t} board={board}
+              pricesTs={board.prices_ts} settleTs={date.settle_ts} expiry={date.expiry} stale={age.state === "stale"} />
+          </div>
+        ) : !settling && <Summary und={und} level={level} sideKey={sideKey} date={date} t={t} />}
+      </aside>
+    </div>
   );
 }
 
@@ -256,17 +345,18 @@ export default function Questions() {
   const { data: board, error } = useData(und ? `questions/${und}.json` : null);
   const [pickedDate, setPickedDate] = useState(null);
   const [more, setMore] = useState(false);
+  const [ladder, setLadder] = useState(false);
+  const location = useLocation();
   const sideParam = search.get("side");
   const sideKey = sideParam === "no" || sideParam === "yes" ? sideParam : null; // never picked for the user
   const setSide = (k) => setSearch((s) => { const n = new URLSearchParams(s); n.set("side", k); return n; }, { replace: true });
-  const held = useMemo(() => loadPositions().length, []);
-  useEffect(() => { setPickedDate(null); setMore(false); }, [und]);
+  useEffect(() => { setPickedDate(null); setMore(false); setLadder(false); }, [und]);
 
   if (indexError && !index) return <div className="wrap page"><Failed error={indexError} /></div>;
   if (!index || (und && !board && !error)) return <div className="wrap page"><Loading /></div>;
   const coins = index.coins || [];
   if (!und || (error && !board)) {
-    return <div className="wrap page q-page"><h1>Saloon</h1><p className="status">No questions with a price on Derive's screen right now.</p></div>;
+    return <div className="wrap page q-page"><header className="q-head"><h1>Saloon <span className="q-sub">Price outcomes</span></h1></header><p className="status">No questions with a price on Derive's screen right now.</p></div>;
   }
   const age = priceAge(board.prices_ts, Date.now() / 1000, board.paused || index.paused);
   const paused = age.state === "paused";
@@ -279,59 +369,69 @@ export default function Questions() {
   const fallback = (dates.find(liveHead) || dates.find(anyLive) || dates[0])?.expiry;
   const expiry = chosen?.date?.expiry || pickedDate || fallback;
   const date = dates.find((d) => d.expiry === expiry) || dates[0];
-  // Wide screens show the date's headline question beside the board until a row is picked
-  // (phones show the board alone).
+  // The flow opens on the date's headline level; "Other levels" opens the full ladder.
   const found = chosen || (date?.headline ? findLevel(board, date.headline) : null);
   const coinItems = (coins.some((c) => c.und === und) ? coins : [...coins, { und }]).map((c) => [c.und, c.und]);
   const back = () => navigate(`/saloon/${und}`);
   const thin = board.thin;
-  return (
-    <div className={`wrap page q-page${id ? " has-q" : ""}`}>
-      <header className="q-head">
-        <div className="q-head-top">
-          <h1>Saloon <span className="q-sub">Price outcomes</span></h1>
-          <Link to="/saloon/mine" className="text-link">Positions{held ? ` (${held})` : ""}</Link>
-        </div>
+  // Picking a row in the ladder opens that level at the amount step, the ladder folded away.
+  const onPick = (e, lv, k) => {
+    e.preventDefault();
+    setLadder(false);
+    navigate(`/q/${lv.id}?side=${k}`, { state: { step: "amount" } });
+  };
+  const lead = (
+    <>
+      <Step n={1} title="Coin" className="q-step-coin">
         <Tabs label="Coin" value={und} onChange={(u) => navigate(`/saloon/${u}`)} items={coinItems} />
-      </header>
-      <div className="q-cols">
-        <section className="q-board" aria-label={`${und} questions`}>
-          <div className="q-coin">
-            <Asset und={und} compact />
-            <b className="mono q-index">{money(board.index)}</b>
-            {thin && <ThinNote und={und} />}
-            <PriceTime pricesTs={board.prices_ts} age={age} />
-          </div>
-          {dates.length ? (
-            <>
-              <div className="q-dates">
-                <Tabs label="Settlement date" value={date.expiry} onChange={(e) => { setPickedDate(e); if (id) navigate(`/saloon/${und}`); }}
-                  items={dates.map((d) => [d.expiry, d.label])} />
-              </div>
-              <QuestionLadder board={board} date={date} more={more} onMore={() => setMore((m) => !m)} paused={paused}
-                selectedId={found?.level?.id} selectedSide={sideKey} />
-              <ZoneNote und={und} date={date} index={board.index} />
-            </>
-          ) : <p className="status">No dates with a price on Derive's screen right now.</p>}
-          <Settled board={board} />
-        </section>
-        <div className="q-main">
-          {found && !found.settled ? (
-            <QuestionView key={found.level.id} und={und} board={board} found={found} sideKey={sideKey} setSide={setSide} age={age} theme={theme} onBack={back} />
-          ) : found?.settled ? (
-            <article className="q-view">
-              <button className="text-control q-back" onClick={back}>‹ {und}</button>
-              <h1 className="q-title">{questionText(und, found.level, found.date.expiry)}</h1>
-              {found.date.settle_price != null ? <SettledView und={und} level={found.level} price={found.date.settle_price} paid={found.level.paid} expiry={found.date.expiry} />
-                : <p className="q-big">Settling · average from 07:30 to 08:00 UTC</p>}
-            </article>
-          ) : id ? <OldQuestion id={id} onBack={back} /> : (
-            <div className="q-empty">
-              <p className="status">Pick a level to see what each answer pays.</p>
-            </div>
-          )}
+        <div className="q-coin">
+          <Asset und={und} compact />
+          <b className="mono q-index">{money(board.index)}</b>
+          {thin && <ThinNote und={und} />}
+          <PriceTime pricesTs={board.prices_ts} age={age} />
         </div>
-      </div>
+      </Step>
+      {dates.length > 0 && (
+        <Step n={2} title="Date" className="q-step-date">
+          <div className="q-dates">
+            <Tabs label="Settlement date" value={date.expiry} onChange={(e) => { setPickedDate(e); navigate(`/saloon/${und}`); }}
+              items={dates.map((d) => [d.expiry, d.label])} />
+          </div>
+        </Step>
+      )}
+    </>
+  );
+  const ladderEl = date && (
+    <div className="q-board" aria-label={`${und} levels`}>
+      <QuestionLadder board={board} date={date} more={more} onMore={() => setMore((m) => !m)} paused={paused}
+        selectedId={found?.level?.id} selectedSide={sideKey} onPick={onPick} />
+    </div>
+  );
+  return (
+    <div className="wrap page q-page">
+      <header className="q-head">
+        <h1>Saloon <span className="q-sub">Price outcomes</span></h1>
+      </header>
+      {found && !found.settled ? (
+        <QuestionView key={found.level.id} und={und} board={board} found={found} sideKey={sideKey} setSide={setSide} age={age} theme={theme}
+          lead={lead} ladder={ladderEl} ladderOpen={ladder} onLadder={() => setLadder((o) => !o)} initialStep={location.state?.step} />
+      ) : (
+        <div className="q-layout">
+          <div className="q-flow">
+            {lead}
+            {found?.settled ? (
+              <article className="q-view">
+                <h1 className="q-title">{questionText(und, found.level, found.date.expiry)}</h1>
+                {found.date.settle_price != null ? <SettledView und={und} level={found.level} price={found.date.settle_price} paid={found.level.paid} expiry={found.date.expiry} />
+                  : <p className="q-big">Settling · average from 07:30 to 08:00 UTC</p>}
+                <button className="text-control" onClick={back}>Back to {und}'s open dates</button>
+              </article>
+            ) : id ? <OldQuestion id={id} onBack={back} /> : dates.length ? ladderEl
+              : <p className="status">No dates with a price on Derive's screen right now.</p>}
+          </div>
+        </div>
+      )}
+      <Settled board={board} />
     </div>
   );
 }
