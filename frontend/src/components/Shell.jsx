@@ -84,7 +84,7 @@ export default function Shell() {
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <header className="hdr" ref={header}>
+      <header className={`hdr${QUESTIONS_ON && pathname === "/" ? " hdr-landing" : ""}`} ref={header}>
         <div className="wrap">
           <Link to="/" className="logo" aria-label="Cowboy home">
             <Lockup />
