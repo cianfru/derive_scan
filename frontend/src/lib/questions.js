@@ -1,4 +1,4 @@
-// Questions: plain yes/no price questions built from Derive option spreads (stage 1).
+// Questions: plain price outcomes built from Derive option spreads (stage 1), answered Higher or Lower.
 // Everything here works on the published files (questions/*.json); nothing is fetched per user.
 // Prices are cents per $1 of payout; nothing here is ever a chance.
 
@@ -29,10 +29,23 @@ export const centsUp = (x) => (ok(x) ? Math.min(99, Math.max(1, Math.ceil(Math.r
 export const centsDown = (x) => (ok(x) ? Math.min(99, Math.max(0, Math.floor(Math.round(x * 1e6) / 1e4))) : null);
 export const cents = (c) => (c == null ? DASH : `${c}c`);
 
-/** A side can be bought when its level and the side are open and the prices are not paused. */
+/** A side can be bought when its level and the side are open and the prices are not paused. Only
+ * debit packages are offered (owner, 4 October 2026); a credit side left in an older file is not. */
 export function live(level, side, paused = false) {
   const s = level?.[side];
-  return !paused && level?.state === "open" && s?.state === "open" && ok(s?.buy);
+  return !paused && level?.state === "open" && s?.state === "open" && ok(s?.buy) && s?.form !== "credit";
+}
+
+/** Why a side has no price now, in plain words for the (i) beside "No price now". */
+export function noPriceReason(level, side, paused = false) {
+  const s = level?.[side];
+  if (paused) return "Prices are paused: Cowboy has had no fresh read of Derive's screen for over 90 minutes.";
+  if (level?.state === "settling") return "This date is settling: Derive averages the index from 07:30 to 08:00 UTC.";
+  if (level?.state === "tail") return "This level is far from the price now, so Cowboy does not offer it.";
+  if (level?.state === "retired") return "This level is off the board; it stays only for those who hold it.";
+  if (s?.form === "credit") return "Cowboy offers each answer only as two options bought and sold for a net payment, and Derive's screen has no such price here right now.";
+  if (s?.state === "screen_wide") return "Derive's screen is too wide here: buying now costs more over Derive's mark than Cowboy's check allows.";
+  return "Derive's screen has no price on both options with enough size right now.";
 }
 export const buyCents = (level, side, paused = false) => (live(level, side, paused) ? centsUp(level[side].buy) : null);
 
@@ -73,18 +86,48 @@ export function parseId(id) {
   return { und: m[1], expiry: m[2], lo: n(m[3]), hi: n(m[4]), k: (n(m[3]) + n(m[4])) / 2 };
 }
 
-/** The question in one line: no verb, ends with "?". */
-export function questionText(und, level, expiry, headline = false) {
-  const k = money(level.k);
-  return headline ? `${und} up or down from ${k} by ${dayLabel(expiry)}?` : `${und} above ${k} on ${dayLabel(expiry)}?`;
+/** The question in one line, settling on the date at 08:00 UTC (never "by" a date). */
+export function questionText(und, level, expiry) {
+  return `${und} higher or lower than ${money(level.k)} on ${dayLabel(expiry)}, 08:00 UTC?`;
 }
-export const answerNames = (headline) => (headline ? { yes: "Up", no: "Down" } : { yes: "Yes", no: "No" });
+/** Higher pays from the top of the zone, Lower at or below its bottom; both pay part inside it. */
+export const answerNames = () => ({ yes: "Higher", no: "Lower" });
+export const ANSWER = { yes: "Higher", no: "Lower" };
+/** Where an answer pays in full: always shown beside the answer, since the payout ramps. */
+export const fullPay = (level, side) => (side === "yes" ? `full $1 from ${money(level.hi)}` : `full $1 at or below ${money(level.lo)}`);
 
 /** Where Yes pays: nothing below lo, $1 from hi, in part between (No is the mirror). */
 export function payAt(settle, lo, hi, side = "yes") {
   const y = Math.min(1, Math.max(0, (settle - lo) / (hi - lo)));
   return side === "yes" ? y : 1 - y;
 }
+
+/** What a ticket pays and makes if the coin settles at `settle`: the payout (total back) and the
+ * profit or loss after everything paid (premium and fees). */
+export function outcome(t, level, side, settle) {
+  const payout = payAt(settle, level.lo, level.hi, side) * t.payout;
+  return { settle, payout, pl: payout - t.mostLose };
+}
+
+/** The settlement price where the payout equals what was paid, or null when it never does. */
+export function breakeven(t, level, side) {
+  if (!t?.payout) return null;
+  const f = t.mostLose / t.payout;
+  if (!(f > 0) || f >= 1) return null;
+  const w = level.hi - level.lo;
+  return side === "yes" ? level.lo + f * w : level.hi - f * w;
+}
+
+/** A slider step for a zone width: about 1/60 of the zone, on a 1-2-5 scale. */
+export function sliderStep(w) {
+  const raw = w / 60;
+  const p = 10 ** Math.floor(Math.log10(raw));
+  const m = raw / p;
+  return Number(((m >= 5 ? 5 : m >= 2 ? 2 : 1) * p).toPrecision(6));
+}
+
+/** "+$21.19" / "-$101.75" / "$0.00": profit or loss in dollars. */
+export const signed = (v) => (ok(v) ? `${v > 0.004 ? "+" : v < -0.004 ? "-" : ""}${money(Math.abs(v), { cents: true })}` : DASH);
 
 export function countdown(settleTs, now = Date.now() / 1000) {
   const s = settleTs - now;
@@ -129,6 +172,16 @@ export function ticket(level, sideKey, dollars, board) {
     credit: side.form === "credit" ? -net * contracts : null, held: side.form === "credit" ? w * contracts : null,
     perDollar: payout ? (premium + fees) / payout : null,
   };
+}
+
+/** Placing by hand, the two orders fill separately: the cash line 1 needs on its own, what it can
+ * lose if line 2 never fills (its price and fee), and the completed spread's most you can lose. */
+export function handRisk(t, level, sideKey, board) {
+  const leg = level?.[sideKey]?.legs?.[0];
+  if (!t || !leg) return null;
+  const upfront = leg[2] * t.contracts;
+  const fee = legFee(board.index, leg[2], t.contracts, board.spec || {});
+  return { upfront, firstLose: upfront + fee, both: t.mostLose };
 }
 
 /** Contract amounts as Derive takes them (no trailing zeros). */
@@ -180,12 +233,22 @@ export function findLevel(board, id) {
 export const BANNED = /\b(will|expect\w*|likely|predict\w*|target\w*|probab\w*|odds|chance\w*|forecast\w*|bet(s|ting)?|edges?|wager\w*|gambl\w*|guarantee\w*|risk-free)\b/i;
 
 /** Selling back a held position: the legs reversed at the current prices, for its contracts. */
-export function closeTicket(level, sideKey, contracts, board) {
+export function closeTicket(level, sideKey, contracts, board, held = null) {
   const side = level?.[sideKey];
   const spec = board?.spec || {};
   if (!side?.close || !ok(side.sell)) return null;
+  // Only the instruments actually held can be sold back: when the board now builds this answer
+  // from other options (an older position), there is no sell-back price here.
+  if (held && !sameLegs(held, side.legs)) return null;
   const w = level.hi - level.lo;
   const net = side.close.reduce((a, [, s, p]) => a + (s === "sell" ? p : -p), 0); // received per contract
   const fees = side.close.reduce((a, [, , p]) => a + legFee(board.index, p, contracts, spec), 0);
-  return { contracts, net, premium: side.sell * w * contracts, fees, payout: contracts * w, capped: false };
+  const premium = side.sell * w * contracts;
+  return { contracts, net, premium, fees, proceeds: premium - fees, payout: contracts * w, capped: false };
+}
+
+/** True when a saved position's instruments are the ones the board prices now. */
+export function sameLegs(held, legs) {
+  const now = (legs || []).map(([n]) => n);
+  return Array.isArray(held) && held.length === now.length && held.every((n) => now.includes(n));
 }
