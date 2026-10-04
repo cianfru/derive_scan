@@ -487,12 +487,10 @@ table.grid.market-grid:not(.overview) { min-width: 980px; table-layout: auto; }
 
 /* Landing: the sign carries the character; everything below it is as calm as the app. No market data. */
 .cowboy-landing { overflow-x: clip; }
-/* The stage stays dark in both themes, so it carries its own dark tokens. */
-.hero-stage { --ground: #0e0d0b; --surface-1: #161412; --surface-2: #1e1b18; --border: #2f2a25; --border-strong: #48413a;
-  --text-1: #f2ede6; --text-2: #d9d2c8; --text-3: #b5ac9f; --accent: #ff5e00; --accent-hover: #ff7c30; --accent-text: #ff7a2b;
-  --on-accent: #140b05; --focus: #ff7c30;
-  position: relative; overflow: hidden; color: var(--text-2); background: radial-gradient(120% 70% at 50% 0%, #1a1714 0%, #0e0d0b 62%); }
-:root[data-theme="light"] .hero-stage { margin: 16px clamp(16px, 3vw, 40px) 0; border-radius: var(--r-lg); }
+/* The stage follows the theme (owner, 4 October 2026): charcoal with the lit sign in dark, the warm
+   off-white ground with the burnt-orange sign in light (neon.css). */
+.hero-stage { position: relative; overflow: hidden; color: var(--text-2); background: radial-gradient(120% 70% at 50% 0%, #1a1714 0%, #0e0d0b 62%); }
+:root[data-theme="light"] .hero-stage { background: radial-gradient(120% 75% at 50% 0%, rgb(255 253 248 / .85) 0%, rgb(255 253 248 / 0) 68%); }
 .hero-inner { max-width: 1200px; margin: 0 auto; padding: 48px clamp(16px, 3vw, 40px) 0; display: flex; flex-direction: column; align-items: center; gap: 28px; }
 .hero-eyebrow { margin: 0; font: 500 13px/1.4 var(--font-sans); color: var(--text-3); }
 .sign-wrap { width: min(760px, 100%); padding-inline: 2%; }

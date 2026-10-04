@@ -56,7 +56,7 @@ function MiniBar({ score }) {
   );
 }
 const Dagger = ({ on }) => (on ? <sup className="dagger" aria-label="complete quotes only">†</sup> : null);
-export default function CohortExplorer({ cohorts, through, valuedAt }) {
+export default function CohortExplorer({ cohorts, through, valuedAt, title = "Cohorts" }) {
   const [dim, setDim] = useState("pnl"),
     [chosen, setChosen] = useState("Money Printer"),
     [window, setWindow] = useState("all");
@@ -72,7 +72,7 @@ export default function CohortExplorer({ cohorts, through, valuedAt }) {
     <section className="cohort-explorer" aria-label="Trader cohort positioning">
       <div className="cohort-heading">
         <h2>
-          Cohorts
+          {title}
           <Info label="Explain trader cohorts">
             {BOUNDS[c?.name] ? `${c.name}: ${BOUNDS[c.name]}, before fees. ` : ""}
             Results cohorts use the full collected history of expired options; size cohorts use total premium traded.

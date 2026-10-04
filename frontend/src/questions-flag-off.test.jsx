@@ -20,6 +20,9 @@ it("keeps the Saloon out of the nav unless the build switches them on", () => {
   expect([...nav.querySelectorAll("a")].map((a) => a.textContent)).toEqual(["Markets", "Radar", "Options", "Traders", "Flow"]);
   expect(screen.queryByRole("link", { name: "Saloon" })).toBeNull();
   expect(container.querySelector(".nav-divider, .nav-research, .nav-primary")).toBeNull();
+  // No wallet in the header outside the testnet build.
+  expect(screen.queryByRole("button", { name: /Connect wallet|^Wallet 0x/ })).toBeNull();
+  expect(container.querySelector(".hw, .hdr-wallet, style")).toBeNull();
 });
 
 it("keeps the landing's primary button on the markets and no Saloon link on coin pages", () => {

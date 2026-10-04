@@ -1,5 +1,5 @@
 import { Fragment, Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { Info, Tabs } from "../components/ui.jsx";
 import { Asset } from "../components/MarketVisuals.jsx";
@@ -26,6 +26,8 @@ import "../marketplace-positions.css";
 const NET = TESTNET_FILLS ? "testnet" : "mainnet";
 const OneTap = TESTNET_FILLS ? lazy(() => import("../components/trade/TradePanel.jsx")) : null;
 const DeriveSync = TESTNET_FILLS ? lazy(() => import("../components/trade/TradePanel.jsx").then((m) => ({ default: m.DeriveSync }))) : null;
+// Following: the Saloon board limited to followed answers, as a tab here.
+const Board = lazy(() => import("./Board.jsx"));
 const AlsoOnDerive = TESTNET_FILLS ? lazy(() => import("../components/trade/TradePanel.jsx").then((m) => ({ default: m.AlsoOnDerive }))) : null;
 
 const usd = (v) => money(v, { cents: true });
@@ -388,7 +390,9 @@ export default function MyQuestions() {
   const setList = (l) => setListRaw(prune(l));
   const other = loadPositions(NET === "testnet" ? "mainnet" : "testnet").length;
   const [sync, setSync] = useState(null);
-  const [tab, setTab] = useState("open");
+  const [params, setParams] = useSearchParams();
+  const tab = ["open", "closed", "following"].includes(params.get("tab")) ? params.get("tab") : "open";
+  const setTab = (t) => setParams(t === "open" ? {} : { tab: t }, { replace: true });
   const [importError, setImportError] = useState(null);
   const file = useRef(null);
   const now = Date.now() / 1000;
@@ -439,22 +443,30 @@ export default function MyQuestions() {
             )}
           </p>
         )}
-        <Tabs label="Positions" value={tab} onChange={setTab} items={[["open", "Open"], ["closed", "Closed"]]} />
+        <Tabs label="Positions" value={tab} onChange={setTab} items={[["open", "Open"], ["closed", "Closed"], ["following", "Following"]]} />
       </header>
       {NET === "mainnet" && toSettle.map((p) => <SettleWatch key={p.key} p={p} onSettle={(k, price) => setList(settlePosition(k, price))} />)}
       {TESTNET_FILLS && <Suspense fallback={null}><DeriveSync onSynced={(r) => { setList(r.list); setSync(r); }} /></Suspense>}
+      {tab === "following" ? <Suspense fallback={null}><Board followingOnly embedded /></Suspense> : <>
       {tab === "open" && <Exposure groups={groups} />}
       {TESTNET_FILLS && tab === "open" && sync?.extra && <Suspense fallback={null}><AlsoOnDerive extra={sync.extra} /></Suspense>}
       {rows.length ? rows.map((p) => <Card key={p.key} p={p} sync={sync?.statuses?.[p.key] ?? null} onRemove={(k) => setList(removePosition(k, NET))}
         onClose={(k, got) => setList(closePosition(k, got, Date.now() / 1000, NET))} />)
-        : list.length ? <p className="status">Nothing {tab === "open" ? "open" : "closed"} yet.</p> : (
+        : list.length ? (
+          <section className="q-empty-card q-empty-tab" aria-label={tab === "open" ? "Nothing open" : "Nothing closed"}>
+            <h2>{tab === "open" ? "Nothing open right now" : "Nothing closed yet"}</h2>
+            <p>{tab === "open" ? "Your open trades show here with their cost, value now and settlement." : "Trades you sell back or that settle show here with their result."}</p>
+            <Link className="btn" to="/saloon">Browse the Saloon</Link>
+          </section>
+        ) : (
           <section className="q-empty-card" aria-label="No positions yet">
             <h2>No positions yet</h2>
             <p>Your trades, costs and settlement dates, in one place. Choose an outcome in the Saloon, place its orders on Derive, then record what filled.</p>
             <Link className="btn primary lg" to="/saloon">Open the Saloon</Link>
           </section>
         )}
-      <details className="q-saved">
+      </>}
+      {tab !== "following" && <details className="q-saved">
         <summary>Saved in this browser<Info label="Where these are kept">Saved from "I placed it", in this browser only. Nothing is sent anywhere, and clearing the browser's data removes them: export a copy to keep one. The export keeps closed trades, entry records and partial fills; importing a file twice adds nothing.</Info></summary>
         <div className="q-card-actions">
           <button className="text-control" onClick={download} disabled={!list.length}>Export</button>
@@ -463,7 +475,7 @@ export default function MyQuestions() {
         </div>
         {importError && <p className="q-note warn" role="alert">{importError}</p>}
         {other > 0 && <p className="q-note">{other} {NET === "testnet" ? "mainnet" : "testnet"} {other === 1 ? "record is" : "records are"} kept apart from these and included in Export.</p>}
-      </details>
+      </details>}
     </div>
   );
 }

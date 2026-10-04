@@ -83,3 +83,4 @@
   .marketplace-positions .q-exp-gh { grid-column: 1 / -1; }
   .marketplace-positions .ex-figs { grid-template-columns: 1fr 1fr; padding-top: 0; border-top: 0; gap: 18px 28px; }
 }
+.marketplace-positions .q-empty-card.q-empty-tab { min-height: 220px; }

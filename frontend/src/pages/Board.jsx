@@ -225,7 +225,7 @@ function Following() {
 
 /** Browse: every live answer across coins and dates, priced for the user's budget, in the order the
  * user picks. Ordered by facts about the price only; the three layers sit on each row as context. */
-export default function Board({ followingOnly = false }) {
+export default function Board({ followingOnly = false, embedded = false }) {
   const { data: index, error } = useData("questions/index.json");
   const { data: markets } = useData("markets.json");
   const doc = useFollowsDoc();
@@ -268,10 +268,18 @@ export default function Board({ followingOnly = false }) {
   const alignOf = Object.fromEntries((markets?.coins || []).map((c) => [c.und, c.align]));
   useEffect(() => { setShown(PAGE); }, [coin, range, side, sort, budget, search, followingOnly]);
 
-  if (error && !index) return <div className="wrap page"><Failed error={error} /></div>;
+  if (embedded && followingOnly && !doc.follows.length) return (
+    // Following, as a tab in Positions, before anything is followed: a short way in, no empty board.
+    <section className="q-empty-card q-empty-tab" aria-label="Nothing followed yet">
+      <h2>Keep an eye on an answer</h2>
+      <p>Use the bookmark beside Higher or Lower to follow an answer. Its cost, availability and settlement show here, and notices appear when you come back. Kept in this browser only.</p>
+      <Link className="btn" to="/saloon">Browse the Saloon</Link>
+    </section>
+  );
+  if (error && !index) return <div className={embedded ? "" : "wrap page"}><Failed error={error} /></div>;
   return (
-    <div className="wrap page q-page bd-page">
-      <SaloonHead view={followingOnly ? "following" : "browse"} />
+    <div className={embedded ? "bd-page bd-embedded" : "wrap page q-page bd-page"}>
+      {!embedded && <SaloonHead view={followingOnly ? "following" : "browse"} />}
       {feeds}
       <section className="bd-controls" aria-label="Budget, filters and order">
         <div className="bd-control-top"><Budget value={budget} /><label className="bd-search"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg><input type="search" aria-label="Search outcomes" placeholder="Search coin or price" value={search} onChange={(e) => setSearch(e.target.value)} /></label></div>

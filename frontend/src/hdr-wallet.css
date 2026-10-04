@@ -1,0 +1,63 @@
+/* Testnet builds only: the wallet in the header (components/trade/WalletMenu.jsx). The Shell inlines
+   this file in those builds alone, so other builds carry none of it. */
+.hw { position: relative; display: flex; align-items: center; }
+.hdr .hw-btn { position: relative; height: 36px; padding: 0 14px; gap: 8px; font-size: 13px; color: var(--text-1); background: var(--surface-1); }
+.hdr .hw-btn::after { content: ""; position: absolute; inset: -4px 0; } /* a 44px tall hit area */
+.hdr .hw-btn[aria-disabled="true"] { cursor: progress; color: var(--text-2); }
+.hdr .hw-btn[aria-expanded="true"] { border-color: var(--text-3); background: var(--surface-2); }
+.hdr .hw-btn.hw-on { padding: 0 10px 0 8px; }
+.hdr .hw-btn .mono { font-size: 13px; font-weight: 500; letter-spacing: 0; }
+.hw-chev { flex: none; color: var(--text-3); transition: transform 120ms var(--ease); }
+.hw-btn[aria-expanded="true"] .hw-chev { transform: rotate(180deg); }
+.hw-short { display: none; }
+
+.hw-menu { position: absolute; top: calc(100% + 10px); right: 0; z-index: 30; width: 320px; display: grid; gap: 2px; padding: 8px;
+  background: var(--surface-1); border: 1px solid var(--border-strong); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); }
+.hw-menu.hw-say { padding: 12px 14px; }
+.hw-who { display: flex; align-items: center; gap: 10px; padding: 6px 8px 12px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.hw-addr { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.hw-addr b { font-size: 14px; font-weight: 500; color: var(--text-1); }
+.hw-addr small { font-size: 12px; color: var(--text-3); }
+.hw-who .text-control { min-height: 44px; padding-inline: 4px; }
+.hw-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; padding: 0 10px;
+  border: 0; border-radius: var(--r-sm); background: none; font: 500 14px/1.3 var(--font-sans); color: var(--text-1); text-align: left; cursor: pointer; }
+.hw-item:hover { background: var(--surface-2); }
+.hw-item[aria-disabled="true"] { cursor: progress; color: var(--text-2); }
+.hw-item:focus-visible { outline-offset: -2px; }
+.hw-status { display: inline-flex; align-items: baseline; gap: 8px; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.hw-status b { font-weight: 500; color: var(--text-1); }
+.hw-status.hw-fund, .hw-status.hw-approve, .hw-status.hw-terms { color: var(--accent-text); }
+.hw-note { margin: 0; padding: 0 10px 6px; font-size: 12px; line-height: 1.5; color: var(--text-3); }
+.hw-say .hw-note { padding: 0; }
+.hw-sep { height: 1px; margin: 4px 0; background: var(--border); }
+.hw-terms { padding: 4px 8px 8px; }
+.hw-terms .tr-lead { font-size: 14px; }
+.hw-msg { margin: 6px 10px 4px; }
+
+@media (max-width: 760px) {
+  /* The menu spans the screen under the whole header. */
+  .hdr .hw { position: static; }
+  .hw-menu { top: calc(100% + 6px); left: 12px; right: 12px; width: auto; max-height: calc(100svh - var(--header-h, 96px) - 24px); overflow-y: auto; }
+  .hdr .hw-btn { padding: 0 12px; }
+  /* With the wallet in row one, My space moves to the end of row two, beside Traders. */
+  .hdr.hdr-marketplace.hdr-wallet .wrap { grid-template-columns: 1fr auto auto; }
+  .hdr.hdr-marketplace.hdr-wallet .tools { display: contents; }
+  .hdr.hdr-marketplace.hdr-wallet .tools .hw { grid-column: 2; grid-row: 1; }
+  .hdr.hdr-marketplace.hdr-wallet .tools .icon-btn { grid-column: 3; grid-row: 1; align-self: center; margin-left: 4px; }
+  .hdr.hdr-marketplace.hdr-wallet .nav-myspace { grid-column: 2 / 4; grid-row: 2; justify-self: end; height: 44px; }
+}
+/* Narrow phones and small tablets: the short label, so the header keeps one line per row. */
+@media (min-width: 761px) and (max-width: 880px) {
+  .hw-long { display: none; }
+  .hw-short { display: inline; }
+  .hdr.hdr-wallet nav.nav-saloon { gap: 22px; }
+}
+@media (max-width: 384px) {
+  .hw-long { display: none; }
+  .hw-short { display: inline; }
+}
+@media (max-width: 340px) {
+  .hdr .hw-btn { padding: 0 10px; }
+  .hdr.hdr-wallet .tools { gap: 2px; }
+  .hdr.hdr-marketplace.hdr-wallet .logo svg { height: 20px; }
+}

@@ -17,6 +17,7 @@ const Options = lazy(() => import("./pages/Options.jsx"));
 const Flow = lazy(() => import("./pages/Flow.jsx"));
 const Traders = lazy(() => import("./pages/Traders.jsx"));
 const Trader = lazy(() => import("./pages/Trader.jsx"));
+const Cohorts = lazy(() => import("./pages/Cohorts.jsx"));
 // Questions stay out of the build's routes until VITE_QUESTIONS=1 (the owner's off switch).
 const Questions = QUESTIONS_ON ? lazy(() => import("./pages/Questions.jsx")) : null;
 const MyQuestions = QUESTIONS_ON ? lazy(() => import("./pages/MyQuestions.jsx")) : null;
@@ -33,11 +34,12 @@ createRoot(document.getElementById("root")).render(
           <Route path="coin/:und" element={<Coin />} />
           <Route path="options" element={<Options />} />
           <Route path="traders" element={<Traders />} />
+          <Route path="traders/cohorts" element={<Cohorts />} />
           <Route path="trader/:address" element={<Trader />} />
           <Route path="flow" element={<Flow />} />
           {QUESTIONS_ON && <Route path="saloon" element={<Board />} />}
           {QUESTIONS_ON && <Route path="saloon/guided" element={<Questions />} />}
-          {QUESTIONS_ON && <Route path="saloon/following" element={<Board followingOnly />} />}
+          {QUESTIONS_ON && <Route path="saloon/following" element={<Navigate to="/saloon/mine?tab=following" replace />} />}
           {QUESTIONS_ON && <Route path="saloon/mine" element={<MyQuestions />} />}
           {QUESTIONS_ON && <Route path="saloon/browse" element={<Board />} />}
           {QUESTIONS_ON && <Route path="saloon/:und" element={<Questions />} />}

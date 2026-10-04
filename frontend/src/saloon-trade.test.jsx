@@ -17,6 +17,7 @@ vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: true, TRADE_ON: true, TESTNET_F
 vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.current[path] ?? null : null, error: null }) }));
 vi.mock("./components/QuestionChart.jsx", () => ({ default: () => <div data-testid="chart" /> }));
 import Questions from "./pages/Questions.jsx";
+import Shell from "./components/Shell.jsx";
 import { BANNED, findLevel, ticket } from "./lib/questions.js";
 import { saveBudget } from "./lib/follows.js";
 import { _setSeatDeps } from "./lib/trade/seat.js";
@@ -188,4 +189,11 @@ describe("one tap through Derive (testnet, dry run)", () => {
     expect(await screen.findByRole("region", { name: "Place on Derive" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: /through Derive/ })).toBeNull();
   });
+});
+
+it("keeps the header's wallet to testnet builds: the dry run has none", () => {
+  window.scrollTo = () => {};
+  const { container } = render(<MemoryRouter><Shell /></MemoryRouter>);
+  expect(within(document.querySelector("header.hdr")).queryByRole("button", { name: /Connect wallet|^Wallet 0x/ })).toBeNull();
+  expect(container.querySelector(".hw, .hdr-wallet")).toBeNull();
 });

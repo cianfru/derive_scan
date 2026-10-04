@@ -61,9 +61,17 @@ export function loadPositions(network = "mainnet") {
   }
 }
 
+const changed = new Set();
+/** Called after every save (the header's Positions link listens). Returns an unsubscribe. */
+export function onPositionsChange(fn) {
+  changed.add(fn);
+  return () => changed.delete(fn);
+}
+
 export function savePositions(list, network = "mainnet") {
   const net = netOf(network);
   memory[net] = [...list];
+  queueMicrotask(() => changed.forEach((fn) => fn()));
   const s = storage();
   if (!s) { lastWriteOk = false; return false; }
   try {

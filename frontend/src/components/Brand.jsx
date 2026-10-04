@@ -39,11 +39,13 @@ export function HatMark({ size = 24, className = "hat-mark" }) {
   );
 }
 
-// The sign's lit layers, widest first: halo, glow, tube, core, hot (lockup units).
-const LIT = [["#ff5900", 20, 0.42, "n-halo"], ["#ff6500", 12, 0.85, "n-glow"], ["#ff740f", 10], ["#ffb54c", 6], ["#fff3ca", 2.5]];
+// The sign's lit layers, widest first: halo, glow, tube, core, hot (lockup units). These are the dark
+// artwork; in the light theme neon.css restyles each layer by its class to the owner's on-light artwork.
+const LIT = [["halo", "#ff5900", 20, 0.42, "n-halo"], ["glow", "#ff6500", 12, 0.85, "n-glow"], ["tube", "#ff740f", 10], ["core", "#ffb54c", 6], ["hot", "#fff3ca", 2.5]];
 
 /** The landing sign: unlit glass under five lit layers; switch-on, then an idle flicker (neon.css).
- * Steady under reduced motion; paused while scrolled out of view. */
+ * Steady under reduced motion; paused while scrolled out of view. Follows the theme: neon on charcoal in
+ * dark, the burnt-orange tube with a lighter core on the off-white ground in light. */
 export function NeonSign() {
   const ref = useRef(null);
   useEffect(() => {
@@ -60,8 +62,8 @@ export function NeonSign() {
       <svg className="neon-glass" viewBox={vb} aria-hidden="true" focusable="false">
         <defs>{TUBES.map(([k, t, d]) => <path key={k} id={`n-${k}`} d={d} transform={t} />)}</defs>
         <g fill="none" strokeLinecap="round" strokeLinejoin="round">
-          <g stroke="#3a2a20" strokeWidth="10">{TUBES.map(([k]) => <use key={k} href={`#n-${k}`} />)}</g>
-          <g stroke="#55402f" strokeWidth="2.5">{TUBES.map(([k]) => <use key={k} href={`#n-${k}`} />)}</g>
+          <g className="ng-body" stroke="#3a2a20" strokeWidth="10">{TUBES.map(([k]) => <use key={k} href={`#n-${k}`} />)}</g>
+          <g className="ng-edge" stroke="#55402f" strokeWidth="2.5">{TUBES.map(([k]) => <use key={k} href={`#n-${k}`} />)}</g>
         </g>
       </svg>
       <svg className="neon-lit" viewBox={vb} aria-hidden="true" focusable="false">
@@ -70,8 +72,8 @@ export function NeonSign() {
           <filter id="n-glow" x="-30%" y="-30%" width="160%" height="160%" colorInterpolationFilters="sRGB"><feGaussianBlur stdDeviation="3.5" /></filter>
         </defs>
         <g fill="none" strokeLinecap="round" strokeLinejoin="round">
-          {LIT.map(([c, w, o, f]) => (
-            <g key={c} stroke={c} strokeWidth={w} opacity={o}>
+          {LIT.map(([layer, c, w, o, f]) => (
+            <g key={layer} className={`nl-${layer}`} stroke={c} strokeWidth={w} opacity={o}>
               {TUBES.map(([k]) => <use key={k} href={`#n-${k}`} className={`nt-${k}`} filter={f ? `url(#${f})` : undefined} />)}
             </g>))}
         </g>

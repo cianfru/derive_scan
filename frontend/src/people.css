@@ -246,3 +246,11 @@ table.grid.flow-table { min-width: 0; }
   .flow-legend { gap: 6px 14px; }
   .flow-market-row { grid-template-columns: 84px minmax(0, 1fr) 72px; gap: 12px; padding: 12px 16px; }
 }
+/* Traders: the way to the cohorts page, under the leaderboard. */
+.cohorts-link { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; padding: 14px 18px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); color: var(--text-1); transition: border-color 120ms var(--ease); }
+.cohorts-link:hover { border-color: var(--border-strong); }
+.cohorts-link > span:first-child { display: grid; gap: 4px; }
+.cohorts-link b { font-weight: 600; font-size: 15px; }
+.cohorts-link small { font-size: 13px; color: var(--text-3); }
+.cohorts-link > span:last-child { color: var(--accent-text); font-size: 18px; }
+.people-page .page-meta a { color: var(--accent-text); }
