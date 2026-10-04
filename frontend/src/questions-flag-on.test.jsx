@@ -123,17 +123,23 @@ it("keeps every reachable landing illustration free of quotes, results and forec
       fireEvent.click(info); read(); fireEvent.click(info);
     }
   }
+  // Outside the worked example the landing shows no prices at all; the example's made-up dollar
+  // figures live only inside its region, stamped Illustration.
   const demo = screen.getByRole("region", { name: "See what it pays" });
+  const outside = document.body.cloneNode(true);
+  outside.querySelector(".saloon-demo").remove();
+  expect(outside.textContent).not.toMatch(/\$\s?\d|\d\s?%|\bper ?cent\b/i);
+  expect(within(demo).getByText("Illustration")).not.toBeNull();
   const slider = within(demo).getByRole("slider");
   for (const direction of ["Higher", "Lower"]) {
     fireEvent.click(within(demo).getByRole("button", { name: direction }));
-    for (const value of [0, 40, 50, 60, 100]) {
+    for (const value of [79000, 82000, 85000, 87000, 91000]) {
       fireEvent.change(slider, { target: { value: String(value) } });
       read();
     }
   }
   const text = copy.join("\n");
-  expect(text).not.toMatch(/\$\s?\d|\d\s?%|\bper ?cent\b/i);
+  expect(text).not.toMatch(/\d\s?%|\bper ?cent\b/i);
   expect(text).not.toMatch(/\b(will|expect\w*|likely|predict\w*|target\w*|probabilit\w*|odds|forecast\w*|reflex|larsson|torq|edge|alpha|proven)\b/i);
   expect(text).not.toMatch(/\b(ETH|SOL|HYPE|XRP|ADA|ZEC|XAUT|Bitcoin|Ethereum|Solana)\b/);
   expect(text).toContain("Both orders need to fill for its defined cost to apply.");

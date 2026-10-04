@@ -324,9 +324,6 @@ svg.viz { width: 100%; height: auto; display: block; overflow: visible; }svg.viz
 .coin-heading h1,.asset small { letter-spacing: normal; }.coin-heading h1 .asset small { line-height: 1.5; }.coin-heading .asset { vertical-align: middle; }
 
 
-/* One decorative point-cloud scene. */
-.wave-stage { position: relative; aspect-ratio: 560 / 500; isolation: isolate; }
-.wave-stage canvas { display: block; width: 100%; height: 100%; }
 
 /* Research leads: one plain takeaway from the data, then what limits it. */
 .lead { display: grid; gap: 4px; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); max-width: 980px; }
