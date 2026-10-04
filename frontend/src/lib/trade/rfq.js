@@ -13,7 +13,7 @@ import {
 } from "./config.js";
 import { TRADE_LIMITS, checkQuote, packageCost } from "./package.js";
 import { buildExecute, debugMatches, randomNonce } from "./sign.js";
-import { CANCEL_PLAIN, EXECUTE, MAINNET_GUARD, SOCKET_CLOSED, TIMEOUT, checkIncidents, plainError } from "./derive.js";
+import { CANCEL_PLAIN, EXECUTE, MAINNET_GUARD, SOCKET_CLOSED, TIMEOUT, checkIncidents, errorDetail, failure, plainError } from "./derive.js";
 import { fillFromExecute, fillFromTrades, tradesOf, userSide } from "./fills.js";
 import { TRADING_NOTICE, addSpent, capGate, capMessage, tradingAllows } from "./limits.js";
 
@@ -61,6 +61,7 @@ export function createTicket({
   const planned = Object.fromEntries(legs.map((l) => [l.instrument_name, Number(l.amount)]));
   const set = (patch) => { state = { ...state, ...patch }; onChange(state); };
   const stop = () => { if (timer) unschedule(timer); timer = null; };
+  const tapStep = direction === "buy" ? "buy" : "sell";
 
   async function cancel() {
     const id = rfq?.rfq_id;
@@ -85,15 +86,15 @@ export function createTicket({
     await cancel();
     rfq = null;
     filled = false;
-    set({ phase: "asking", quote: null, check: null, message: null, debug: null, firmUntil: null, fill: null, cap: null });
+    set({ phase: "asking", quote: null, check: null, message: null, detail: null, debug: null, firmUntil: null, fill: null, cap: null });
     const blocked = gate(estimate);
     if (blocked) return set(blocked);
     if (await checkIncidents(client) === "down") return set({ phase: "down", message: plainError({ code: 9002 }) });
     try {
       const facts = await Promise.all(legs.map((l) => getInstrument(l.instrument_name)));
       instruments = Object.fromEntries(facts.map((f) => [f.instrument_name, f]));
-    } catch {
-      return set({ phase: "no_quote", message: "No price from Derive right now." });
+    } catch (e) {
+      return set({ phase: "no_quote", message: "No price from Derive right now.", detail: failure(e, "price").detail });
     }
     if (closed) return;
     if (direction === "sell" && floor == null) {
@@ -105,7 +106,7 @@ export function createTicket({
         if (!Number.isFinite(mark) || !(payout > 0)) throw new Error("no mark");
         floor = Math.ceil(Math.max(mark - tolerance * payout, TRADE_LIMITS.minPerDollar * payout) * 100) / 100;
       } catch (e) {
-        return set({ phase: "no_quote", message: "No price from Derive right now." });
+        return set({ phase: "no_quote", message: "No price from Derive right now.", detail: failure(e, "price").detail });
       }
       if (closed) return;
     }
@@ -117,7 +118,7 @@ export function createTicket({
     try {
       rfq = await client.call("private/send_rfq", params);
     } catch (e) {
-      return set({ phase: "error", message: plainError(e) });
+      return set({ phase: "error", ...failure(e, "price") });
     }
     if (closed) return cancel();
     started = now();
@@ -134,7 +135,7 @@ export function createTicket({
       if (closed) return;
       stop();
       await cancel();
-      return set({ phase: "error", message: plainError(e) });
+      return set({ phase: "error", ...failure(e, "price") });
     }
     if (closed || !["asking", "quoted"].includes(state.phase)) return;
     const t = now();
@@ -191,7 +192,7 @@ export function createTicket({
       const match = debugMatches(built.local, remote);
       set({ phase: "checked", debug: { ...match, legsTotal: packageCost(state.quote.legs) } });
     } catch (e) {
-      set({ phase: "error", message: plainError(e) });
+      set({ phase: "error", ...failure(e, tapStep) });
     } finally {
       await cancel();
     }
@@ -201,7 +202,7 @@ export function createTicket({
     // The mainnet guard: nothing is signed or sent unless this is a testnet build on the testnet.
     if (!fillsAllowed(network, mode)) {
       await cancel();
-      return set({ phase: "error", message: plainError({ code: MAINNET_GUARD }) });
+      return set({ phase: "error", ...failure({ code: MAINNET_GUARD, source: "Cowboy" }, tapStep) });
     }
     const blocked = gate(direction === "buy" ? state.check.mostLose : null);
     if (blocked) { await cancel(); return set(blocked); }
@@ -214,9 +215,10 @@ export function createTicket({
     } catch (e) {
       if (UNKNOWN_CODES.has(e?.code)) return settle(sentAt);
       await cancel();
-      if (EXPIRED_CODES.has(e?.code)) return set({ phase: "expired", message: OUTCOME.expired });
-      if (BUSY_CODES.has(e?.code)) return set({ phase: "busy", message: OUTCOME.busy });
-      return set({ phase: "rejected", message: plainError(e) });
+      const f = failure(e, tapStep);
+      if (EXPIRED_CODES.has(e?.code)) return set({ phase: "expired", message: OUTCOME.expired, detail: f.detail });
+      if (BUSY_CODES.has(e?.code)) return set({ phase: "busy", message: OUTCOME.busy, detail: f.detail });
+      return set({ phase: "rejected", ...f });
     }
     return outcome(res, sentAt);
   }
@@ -226,7 +228,10 @@ export function createTicket({
     const pct = Number(res?.rfq_filled_pct ?? res?.fill_pct);
     if (res?.status === "filled" || pct > 0) return record(res, sentAt, Number.isFinite(pct) ? pct : 1);
     await cancel();
-    if (res?.status === "cancelled") return set({ phase: "rejected", message: CANCEL_PLAIN[res.cancel_reason] || plainError(null) });
+    if (res?.status === "cancelled") {
+      return set({ phase: "rejected", message: CANCEL_PLAIN[res.cancel_reason] || plainError(null),
+        detail: { ...errorDetail(res.cancel_reason || "cancelled", tapStep), message: "execute_quote answered cancelled" } });
+    }
     if (res?.status === "expired") return set({ phase: "expired", message: OUTCOME.expired });
     return settle(sentAt);
   }

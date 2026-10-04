@@ -5,7 +5,7 @@ import { money } from "../../lib/questions.js";
 import { addPosition, closePosition, loadPositions, settlePosition } from "../../lib/positions.js";
 import { remainingQty } from "../../lib/realized.js";
 import { MODE } from "../../lib/trade/config.js";
-import { plainError } from "../../lib/trade/derive.js";
+import { failure } from "../../lib/trade/derive.js";
 import { TRADING_NOTICE, tradingState } from "../../lib/trade/limits.js";
 import { buyRecord, exitFromFill, knownRfqs } from "../../lib/trade/record.js";
 import { canTrade, connect, useSeat } from "../../lib/trade/seat.js";
@@ -13,6 +13,7 @@ import { fillsByRfq, legStatus, readSaloon, recoverFills, settlementPrice, unexp
 import { ConnectStep, FundStep, TermsStep } from "./SeatSetup.jsx";
 import ApproveCowboy, { SeatLine } from "./ApproveCowboy.jsx";
 import TradeTicket, { sellPlan, ticketPlan } from "./TradeTicket.jsx";
+import ErrorDetail from "./ErrorDetail.jsx";
 import "../../trade.css";
 
 /** The header's wallet (testnet builds), exported here so all trading code stays in this one lazy chunk. */
@@ -130,7 +131,7 @@ export function DeriveSync({ onSynced }) {
       onSynced?.({ list, statuses, extra, at: now, added: added.length });
       setSt({ phase: "done", at: now, added: added.length });
     } catch (e) {
-      setSt({ phase: "error", message: plainError(e) });
+      setSt({ phase: "error", ...failure(e, "sync") });
     }
   }
   useEffect(() => { if (canRead) run(); }, [canRead, seat.saloon?.id]);
@@ -152,12 +153,12 @@ export function DeriveSync({ onSynced }) {
         <div className="tr-actions">
           <span className="tr-note">Connect your wallet to check these against your Saloon account.</span>
           <button className="btn" onClick={connect} disabled={seat.busy}>{seat.busy ? "Connecting…" : "Connect wallet"}</button>
-          {seat.message && <span className="tr-msg">{seat.message}</span>}
+          {seat.message && <span className="tr-msg">{seat.message}<ErrorDetail detail={seat.detail} /></span>}
         </div>
       )) : (
         <div className="tr-actions">
           {st.phase === "reading" ? <span className="tr-wait"><span className="spin" aria-hidden="true" />Reading Derive…</span>
-            : <span className="tr-note">{st.phase === "done" ? <>Checked with Derive at {at}{st.added ? ` · ${st.added} added from Derive's records` : ""}</> : st.phase === "error" ? st.message : "Not checked yet"}</span>}
+            : <span className="tr-note">{st.phase === "done" ? <>Checked with Derive at {at}{st.added ? ` · ${st.added} added from Derive's records` : ""}</> : st.phase === "error" ? <>{st.message}<ErrorDetail detail={st.detail} /></> : "Not checked yet"}</span>}
           <span className="tr-note">Saloon account <b className="mono">{money(seat.saloon?.usdc, { cents: true })}</b> USDC</span>
           <button className="text-control" onClick={run} disabled={st.phase === "reading"}>Check again</button>
         </div>

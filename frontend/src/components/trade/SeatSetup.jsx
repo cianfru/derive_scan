@@ -4,6 +4,7 @@ import { money } from "../../lib/questions.js";
 import { DEPOSIT_SUGGESTED, NETWORK } from "../../lib/trade/config.js";
 import { depositCheck } from "../../lib/trade/account.js";
 import { acceptTerms, connect, deposit, depositGasUsd, refreshFunding, useSeat } from "../../lib/trade/seat.js";
+import ErrorDetail from "./ErrorDetail.jsx";
 
 export const DERIVE_TERMS_URL = "https://www.derive.xyz/terms-of-use";
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "");
@@ -33,7 +34,7 @@ export function ConnectStep() {
         <Info label="How one tap works">Your wallet owns the account; Cowboy never holds your money or your keys. Derive fills both options of the answer at once, at one firm price you see first. This build runs on Derive's testnet with test USDC.</Info>
       </p>
       <button className="btn primary lg" onClick={connect} disabled={seat.busy}>{seat.busy ? "Connecting…" : "Connect wallet"}</button>
-      {seat.message && <p className="tr-msg">{seat.message}</p>}
+      {seat.message && <p className="tr-msg">{seat.message}<ErrorDetail detail={seat.detail} /></p>}
     </div>
   );
 }
@@ -52,7 +53,7 @@ export function TermsStep() {
       </label>
       <button className="btn primary lg" onClick={acceptTerms} disabled={!ok || seat.busy}>{seat.busy ? "Signing in…" : "Continue"}</button>
       <p className="tr-note">Continuing asks your wallet to sign a sign-in message. It costs nothing.</p>
-      {seat.message && <p className="tr-msg">{seat.message}</p>}
+      {seat.message && <p className="tr-msg">{seat.message}<ErrorDetail detail={seat.detail} /></p>}
     </div>
   );
 }
@@ -74,6 +75,7 @@ export function FundStep({ ethUsd }) {
       <p className="tr-lead">{isNew ? "Add USDC to start your Saloon account" : "Add USDC to your Saloon account"}
         <Info label="About the Saloon account">A separate account on Derive, owned by your wallet and labelled Cowboy, for Saloon answers only. It keeps Saloon money apart from anything else you hold on Derive. Withdraw any time on Derive.</Info>
       </p>
+      {seat.newAccount && <p className="tr-note">Your first deposit opens your Derive account.</p>}
       <div className="tr-amount">
         <span className="q-dollar-field"><span>$</span>
           <input aria-label="Deposit amount" inputMode="decimal" value={dollars} onChange={(e) => setDollars(Math.max(0, Number(e.target.value.replace(/[^\d.]/g, "")) || 0))} />
@@ -96,7 +98,7 @@ export function FundStep({ ethUsd }) {
         <a className="text-link" href={NETWORK.appUrl} target="_blank" rel="noreferrer">Test USDC: Mint on Derive's testnet app ↗</a>
       </div>
       <p className="tr-note">From another chain, use Derive's own deposit screen.</p>
-      {seat.message && <p className="tr-msg">{seat.message}</p>}
+      {seat.message && <p className="tr-msg">{seat.message}<ErrorDetail detail={seat.detail} /></p>}
     </div>
   );
 }

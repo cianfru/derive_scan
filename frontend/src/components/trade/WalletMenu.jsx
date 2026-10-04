@@ -7,6 +7,7 @@ import { connect, disconnect, seatState, switchOff, useSeat } from "../../lib/tr
 import { WalletEmblem } from "../WalletTag.jsx";
 import { Copy, TermsStep } from "./SeatSetup.jsx";
 import { until } from "./ApproveCowboy.jsx";
+import ErrorDetail from "./ErrorDetail.jsx";
 
 /** Stages in which the wallet is connected (signed in or about to be). */
 const CONNECTED = new Set(["terms", "fund", "approve", "ready"]);
@@ -21,7 +22,9 @@ export function accountStatus(seat) {
     case "ready": return { key: "ready", label: "Ready", usdc, note: seat.key ? `Cowboy approved until ${until(seat.key.expiry_sec)}` : null };
     case "approve": return { key: "approve", label: "Approval needed", usdc, note: "Approve Cowboy from the ticket of any answer." };
     case "fund": return { key: "fund", label: "Funding needed", usdc: seat.saloon ? usdc : null,
-      note: seat.saloon ? "Add USDC from the ticket of any answer." : "It starts with your first deposit, from the ticket of any answer." };
+      note: seat.saloon ? "Add USDC from the ticket of any answer."
+        : seat.newAccount ? "Your first deposit opens your Derive account. Add USDC from the ticket of any answer."
+          : "It starts with your first deposit, from the ticket of any answer." };
     default: return { key: "terms", label: "Sign-in needed", usdc: null, note: null };
   }
 }
@@ -95,7 +98,7 @@ export default function WalletMenu({ early = null }) {
           <div id={id} ref={panel} className="hw-menu hw-say" role="status">
             {seat.stage === "no_wallet"
               ? <p className="hw-note">Connecting needs a browser wallet such as MetaMask or Rabby. On a phone, open Cowboy in your wallet's own browser.</p>
-              : <p className="tr-msg">{seat.message}</p>}
+              : <p className="tr-msg">{seat.message}<ErrorDetail detail={seat.detail} /></p>}
           </div>
         )}
       </div>
@@ -134,7 +137,7 @@ export default function WalletMenu({ early = null }) {
             </button>
           )}
           <button type="button" className="hw-item" onClick={leave}>Disconnect</button>
-          {seat.message && seat.stage !== "terms" && <p className="tr-msg hw-msg" role="status">{seat.message}</p>}
+          {seat.message && seat.stage !== "terms" && <p className="tr-msg hw-msg" role="status">{seat.message}<ErrorDetail detail={seat.detail} /></p>}
         </div>
       )}
     </div>

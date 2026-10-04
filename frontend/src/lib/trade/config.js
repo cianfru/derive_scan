@@ -15,6 +15,11 @@ export const NETWORKS = {
     wsUrl: TESTNET_WS,
     chainId: TESTNET_CHAIN, // Ethereum Sepolia: the testnet's settlement chain and signing domain
     chainName: "Sepolia",
+    // For wallet_addEthereumChain when the wallet lacks Sepolia (MetaMask docs, "Add a network").
+    // symbol kept to 6 characters or fewer: some MetaMask versions refuse longer ones.
+    nativeCurrency: { name: "SepoliaETH", symbol: "ETH", decimals: 18 },
+    rpcUrls: ["https://ethereum-sepolia-rpc.publicnode.com"],
+    explorerUrls: ["https://sepolia.etherscan.io"],
     appUrl: "https://testnet.app.derive.xyz/",
     usdc: "0x73Efab09362052D26FB93A730Be4F8a5EdC833af", // testnet USDC (mintable in Derive's testnet app)
     usdcDecimals: 6,
