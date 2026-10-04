@@ -32,6 +32,9 @@ export const OUTCOME = {
   not_filled: "Derive did not fill it. Nothing was bought or sold.",
   unknown: "Derive has not confirmed this trade yet, and Cowboy never sends it twice. Check Positions in a minute.",
 };
+/** A leg the network does not list (Derive's 12001 "Instrument not found"). */
+export const NOT_FOUND = 12001;
+export const NOT_LISTED = "Derive's testnet doesn't list this level. Pick another level.";
 const EXPIRED_CODES = new Set([11104, 11102, 11011]);
 const BUSY_CODES = new Set([-32000, 9002, -32100]);
 const UNKNOWN_CODES = new Set([TIMEOUT, SOCKET_CLOSED, 9000, 9001]);
@@ -90,12 +93,18 @@ export function createTicket({
     const blocked = gate(estimate);
     if (blocked) return set(blocked);
     if (await checkIncidents(client) === "down") return set({ phase: "down", message: plainError({ code: 9002 }) });
-    try {
-      const facts = await Promise.all(legs.map((l) => getInstrument(l.instrument_name)));
-      instruments = Object.fromEntries(facts.map((f) => [f.instrument_name, f]));
-    } catch (e) {
-      return set({ phase: "no_quote", message: "No price from Derive right now.", detail: failure(e, "price").detail });
+    const facts = await Promise.allSettled(legs.map((l) => getInstrument(l.instrument_name)));
+    const missing = legs.filter((l, i) => facts[i].status === "rejected" && facts[i].reason?.code === NOT_FOUND).map((l) => l.instrument_name);
+    if (missing.length) {
+      // The board comes from mainnet chains; the testnet lists other strikes. Asking again cannot help.
+      if (closed) return;
+      const e = facts.find((f) => f.status === "rejected").reason;
+      return set({ phase: "not_listed", message: NOT_LISTED, missing,
+        detail: { ...failure(e, "price").detail, message: `Not listed on testnet: ${missing.join(", ")}` } });
     }
+    const bad = facts.find((f) => f.status === "rejected");
+    if (bad) return set({ phase: "no_quote", message: "No price from Derive right now.", detail: failure(bad.reason, "price").detail });
+    instruments = Object.fromEntries(facts.map((f) => [f.value.instrument_name, f.value]));
     if (closed) return;
     if (direction === "sell" && floor == null) {
       // No board price to sell against: the floor comes from Derive's mark for the package, so getting
@@ -144,7 +153,8 @@ export function createTicket({
       if (state.phase === "quoted") return lapse(); // the quote was pulled
       if (t - started >= QUOTE_WAIT_MS) {
         await cancel();
-        return set({ phase: "no_quote", message: "No price from Derive right now." });
+        return set({ phase: "no_quote", message: "No price from Derive right now.",
+          detail: mode === "testnet" ? { step: "price", source: "Derive", code: "", message: `no market maker quoted within ${Math.round(QUOTE_WAIT_MS / 1000)} s`, data: "" } : null });
       }
       timer = schedule(poll, POLL_MS);
       return;

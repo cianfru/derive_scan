@@ -92,7 +92,7 @@ function Filled({ fill, buy }) {
  * The stage 2 ticket: a firm RFQ price for the whole package. In a dry-run build the fill is signed
  * and checked by Derive, nothing fills; in a testnet build the user's tap fills it on Derive's testnet.
  */
-export default function TradeTicket({ plan, onByHand, onFill, trading = "on", mode = MODE }) {
+export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE }) {
   const seat = useSeat();
   const [st, setSt] = useState({ phase: "idle" });
   const run = useRef(null);
@@ -180,9 +180,10 @@ export default function TradeTicket({ plan, onByHand, onFill, trading = "on", mo
       {st.phase === "no_quote" && (
         <>
           <p className="tr-msg">No price from Derive right now.<ErrorDetail detail={st.detail} /></p>
-          <div className="tr-actions">{allowed && <button className="btn lg" onClick={ask}>Try again</button>}{onByHand && <button className="text-control" onClick={onByHand}>Place by hand</button>}</div>
+          {allowed && <div className="tr-actions"><button className="btn lg" onClick={ask}>Try again</button></div>}
         </>
       )}
+      {st.phase === "not_listed" && <p className="tr-msg" role="status">{st.message}<ErrorDetail detail={st.detail} /></p>}
       {st.phase === "down" && <p className="tr-msg">Derive isn't taking orders right now.</p>}
       {(st.phase === "paused" || st.phase === "capped") && <p className="tr-msg" role="status">{st.message}</p>}
       {st.phase === "checked" && (

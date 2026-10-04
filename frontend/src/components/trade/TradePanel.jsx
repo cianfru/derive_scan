@@ -14,7 +14,17 @@ import { ConnectStep, FundStep, TermsStep } from "./SeatSetup.jsx";
 import ApproveCowboy, { SeatLine } from "./ApproveCowboy.jsx";
 import TradeTicket, { sellPlan, ticketPlan } from "./TradeTicket.jsx";
 import ErrorDetail from "./ErrorDetail.jsx";
+import { NOT_LISTED } from "../../lib/trade/rfq.js";
+import { missingLegs, useTestnetListing } from "../../lib/testnetLevels.js";
 import "../../trade.css";
+
+/** The testnet's instrument list per coin, read once per page (lib/testnetLevels.js loads it from here). */
+export { testnetListing } from "../../lib/trade/listing.js";
+
+/** A level whose options the testnet does not list: said plainly, the names in the (i). */
+function NotListed({ missing }) {
+  return <p className="tr-msg" role="status">{NOT_LISTED}<ErrorDetail detail={{ step: "listing", source: "Derive", code: "", message: `Not listed on testnet: ${missing.join(", ")}`, data: "" }} /></p>;
+}
 
 /** The header's wallet (testnet builds), exported here so all trading code stays in this one lazy chunk. */
 export { default as WalletMenu } from "./WalletMenu.jsx";
@@ -47,6 +57,7 @@ function useStep(ticket) {
 export default function TradePanel({ und, question, answer, level, sideKey, board, t, pricesTs, closing = false, fallback = null, sell = null }) {
   const seat = useSeat();
   const [byHand, setByHand] = useState(false);
+  const listed = useTestnetListing(MODE === "testnet" && !sell ? und : null);
   const { data: index } = useData("questions/index.json");
   const { data: markets } = useData("markets.json");
   const trading = tradingState(index);
@@ -70,7 +81,9 @@ export default function TradePanel({ und, question, answer, level, sideKey, boar
     if (rec) addPosition(rec, savedTs * 1000);
   };
 
-  const ticket = <TradeTicket plan={plan} trading={trading} onFill={onFill} onByHand={sell ? null : () => setByHand(true)} />;
+  // Testnet builds: a level the testnet does not list never opens the one-tap ticket.
+  const missing = MODE === "testnet" && !sell && level ? missingLegs(level.id, sideKey, listed) : [];
+  const ticket = <TradeTicket plan={plan} trading={trading} onFill={onFill} />;
   const step = useStep(ticket);
   if ((closing && !sell) || !canTrade(und)) return fallback;
   return (
@@ -80,8 +93,8 @@ export default function TradePanel({ und, question, answer, level, sideKey, boar
         <TestnetTag />
       </header>
       {trading !== "on" && trading !== "loading" && <p className="tr-msg" role="status">{TRADING_NOTICE[trading]}</p>}
-      {!byHand && seat.stage === "ready" && <SeatLine />}
-      {byHand ? <div className="tr-hand">{fallback}</div> : step}
+      {!byHand && !missing.length && seat.stage === "ready" && <SeatLine />}
+      {byHand ? <div className="tr-hand">{fallback}</div> : missing.length ? <NotListed missing={missing} /> : step}
       {!sell && fallback && (
         <div className="tr-switch">
           <button className="text-control" onClick={() => setByHand((b) => !b)} aria-pressed={byHand}>{byHand ? "Back to one tap" : "Place by hand"}</button>

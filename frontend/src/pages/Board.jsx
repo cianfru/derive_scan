@@ -10,6 +10,8 @@ import SaloonHead from "../components/SaloonNotices.jsx";
 import { FollowButton, FollowLevel } from "../components/Follow.jsx";
 import { DEFAULT_SORT, RANGES, SIDES, SORTS, boardRows, cleanBudget, contextHorizon, dateRows, filterRows, sortRows } from "../lib/board.js";
 import { exportFollows, importFollows, saveBudget, unfollow, useFollowsDoc } from "../lib/follows.js";
+import { TESTNET_FILLS } from "../lib/flags.js";
+import { NOT_ON_TESTNET, NOT_ON_TESTNET_WHY, missingLegs, useTestnetListing } from "../lib/testnetLevels.js";
 import { ANSWER, countdown, dayLabel, fullPay, money, noPriceReason, priceAge, signed } from "../lib/questions.js";
 import "../questions.css";
 import "../board.css";
@@ -43,11 +45,14 @@ function NotYet({ label, why }) {
 }
 
 function AnswerChoice({ r, budget }) {
-  const available = !r.reason;
+  const listed = useTestnetListing(TESTNET_FILLS && !r.reason ? r.und : null);
+  const offTestnet = TESTNET_FILLS && missingLegs(r.id, r.side, listed).length > 0;
+  const available = !r.reason && !offTestnet;
   const name = `${r.und} ${ANSWER[r.side]} than ${money(r.k)} on ${dayLabel(r.expiry)}`;
   return (
     <div className={`bd-answer ${r.side}`}>
-      {available ? <Link to={`/q/${r.id}?side=${r.side}`} state={{ step: "preview", dollars: budget }} className={`bd-choice ${r.side}`} aria-label={`${name}: see what it pays`}>
+      {offTestnet ? <div className="bd-choice off"><span>{ANSWER[r.side]}</span><span className="q-noprice">{NOT_ON_TESTNET}<Info label={`Why ${name} is not on testnet`}>{NOT_ON_TESTNET_WHY}</Info></span></div>
+        : available ? <Link to={`/q/${r.id}?side=${r.side}`} state={{ step: "preview", dollars: budget }} className={`bd-choice ${r.side}`} aria-label={`${name}: see what it pays`}>
         <span><i className={`q-arrow ${r.side}`} aria-hidden="true" />{ANSWER[r.side]}</span><b className="mono">{r.buyCents}<small>¢</small></b>
       </Link> : <div className="bd-choice off"><span>{ANSWER[r.side]}</span><span className="q-noprice">No price now<Info label={`Why ${name} has no price`}>{r.reason}</Info></span></div>}
       <div className="bd-choice-note"><span>{fullPay(r.level, r.side)}</span><FollowButton id={r.id} side={r.side} k={r.k} board={r.board} compact /></div>

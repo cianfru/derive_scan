@@ -5,7 +5,7 @@ import frames from "../../fixtures/trade/public_frames.json";
 import debugFixture from "../../fixtures/trade/execute_quote_debug.json";
 import { createClient, instrumentCache } from "./derive.js";
 import { fakeDerive, deriveError } from "./fakeSocket.js";
-import { createDryRun, executeExpiry } from "./rfq.js";
+import { createDryRun, createTicket, executeExpiry } from "./rfq.js";
 import { keyFromSecret } from "./sign.js";
 
 const key = keyFromSecret(keccak256(toUtf8Bytes("cowboy test session key")));
@@ -58,7 +58,7 @@ describe("the dry run", () => {
     await vi.advanceTimersByTimeAsync(9_000);
     expect(dry.state.phase).toBe("asking");
     await vi.advanceTimersByTimeAsync(2_000);
-    expect(dry.state).toMatchObject({ phase: "no_quote", message: "No price from Derive right now." });
+    expect(dry.state).toMatchObject({ phase: "no_quote", message: "No price from Derive right now.", detail: null });
     expect(fake.calls("private/cancel_rfq")).toHaveLength(1);
   });
 
@@ -144,11 +144,34 @@ describe("the dry run", () => {
     expect(fake.calls("private/send_rfq")).toHaveLength(0);
   });
 
-  it("shows no price when a leg is not listed on testnet", async () => {
+  it("says the testnet does not list the level when a leg answers 12001, naming it, and asks nothing", async () => {
     const { fake, dry } = run({ quotes: best, legs: [{ instrument_name: "BTC-20261009-83000-C", direction: "buy", amount: "0.01" }, LEGS[1]] });
     await dry.start();
-    expect(dry.state.phase).toBe("no_quote");
+    expect(dry.state).toMatchObject({ phase: "not_listed", message: "Derive's testnet doesn't list this level. Pick another level.", missing: ["BTC-20261009-83000-C"] });
+    expect(dry.state.detail).toMatchObject({ step: "price", source: "Derive", code: 12001 });
+    expect(dry.state.detail.message).toContain("BTC-20261009-83000-C");
+    expect(dry.state.detail.message).not.toContain(LEGS[1].instrument_name);
     expect(fake.calls("private/send_rfq")).toHaveLength(0);
+  });
+
+  it("keeps no price for other instrument errors", async () => {
+    const { fake, dry } = run({ quotes: best, handlers: { "public/get_instrument": deriveError(9002, "backend unavailable") } });
+    await dry.start();
+    expect(dry.state).toMatchObject({ phase: "no_quote", message: "No price from Derive right now." });
+    expect(fake.calls("private/send_rfq")).toHaveLength(0);
+  });
+
+  it("explains a quote that never came in a testnet build", async () => {
+    const fake = fakeDerive({ recorded: frames.frames, handlers: { "private/send_rfq": shapes["private/send_rfq"], "private/rfq_get_best_quote": { ...best, best_quote: null }, "private/cancel_rfq": "ok" } });
+    const client = createClient({ url: "wss://fake", WebSocketImpl: fake.WebSocketImpl, sleep: async () => {} });
+    const dry = createTicket({
+      client, getInstrument: instrumentCache(client), subaccountId: 90212, owner: "0x4201C60C3c85e641c9837588429F59CA57e22bE2", key,
+      legs: LEGS, direction: "buy", limit: 103.95, payout: 197.94, feeEstimate: 1.34, label: "x", mode: "testnet",
+    });
+    await dry.start();
+    await vi.advanceTimersByTimeAsync(11_000);
+    expect(dry.state).toMatchObject({ phase: "no_quote", message: "No price from Derive right now.",
+      detail: { step: "price", source: "Derive", message: "no market maker quoted within 10 s" } });
   });
 });
 

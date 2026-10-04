@@ -12,6 +12,8 @@ import OutcomePreview, { OutcomeFigures, OutcomePayoffStudy } from "../component
 import SaloonHead from "../components/SaloonNotices.jsx";
 import { FollowButton, FollowLevel } from "../components/Follow.jsx";
 import { loadBudget } from "../lib/follows.js";
+import { TESTNET_FILLS } from "../lib/flags.js";
+import { NOT_ON_TESTNET, NOT_ON_TESTNET_WHY, missingLegs, useTestnetListing } from "../lib/testnetLevels.js";
 import {
   ANSWER, buyCents, cents, centsDown, countdown, dayLabel, findLevel, fullPay, gap, live, money, noPriceReason, parseId, priceAge,
   budgetTicket, questionText, settlingNow, payAt,
@@ -209,6 +211,9 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
   const { data: hist, error: historyError } = useData(`questions/history/${und}-${date.expiry}.json`, 15 * 60_000);
   const t = !settling && sideKey && live(level, sideKey, paused) ? budgetTicket(level, sideKey, dollars, board) : null;
   const ready = t && !t.belowMin;
+  // Testnet builds: one tap needs the level's options listed on Derive's testnet (by hand stays open).
+  const listed = useTestnetListing(TESTNET_FILLS && sideKey ? und : null);
+  const offTestnet = TESTNET_FILLS && !!sideKey && missingLegs(level.id, sideKey, listed).length > 0;
   const sheetRef = useRef(null);
   const opener = useRef(null);
   useSheetFocus(sheet && ready, sheetRef, opener, () => setSheet(false));
@@ -274,6 +279,7 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
                   <section className="md-preview" aria-label="What it pays"><OutcomeFigures und={und} level={level} side={sideKey} t={t} expiry={date.expiry} settleTs={date.settle_ts} summary compact /><p className="md-loss-note">Your cost is the most you can lose once both orders fill.</p></section>
                 </> : <p className="status"><NoPrice level={level} side={sideKey} paused={paused} text={`No price now for ${ANSWER[sideKey]}`} /></p>}
                 {age.state === "stale" && <p className="q-note warn">Prices are {age.minutes} min old. Check Derive's screen before placing orders.</p>}
+                {offTestnet && <p className="q-note"><span className="q-noprice">{NOT_ON_TESTNET}<Info label={`Why ${ANSWER[sideKey]} at ${money(level.k)} is not on testnet`}>{NOT_ON_TESTNET_WHY}</Info></span></p>}
                 <div className="md-review-action"><button ref={opener} className="btn primary lg" disabled={!ready} onClick={place}>Review orders</button><small>Two orders, placed by you on Derive.</small></div>
               </section>
               {sheet && ready && <div ref={sheetRef} className="q-sheet open md-ticket" role="dialog" aria-modal={typeof matchMedia !== "function" || matchMedia("(max-width: 1279px)").matches ? "true" : undefined} aria-label="Ticket">

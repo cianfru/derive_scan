@@ -25,8 +25,17 @@ export function useSeat() {
   return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => state, () => state);
 }
 /** Tests and local previews swap the wallet and the socket here. */
-export function _setSeatDeps(d) { deps = { ...deps, ...d }; state = initial(); listeners.forEach((l) => l()); }
+export function _setSeatDeps(d) { deps = { ...deps, ...d }; state = initial(); pub?.close(); pub = null; listeners.forEach((l) => l()); }
 export function _setSeatState(s) { state = { ...initial(), ...s }; listeners.forEach((l) => l()); }
+
+/** A connection for public reads (the testnet's instrument list): the seat's own when it has one,
+ * else one shared, never logged in. */
+let pub = null;
+export function publicClient() {
+  if (state.client) return state.client;
+  pub = pub || deps.createClient({ url: NETWORK.wsUrl });
+  return pub;
+}
 
 export const canTrade = (und) => TRADE_COINS.includes(und);
 export const termsAccepted = () => !!read(KEYS.terms());
