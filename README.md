@@ -105,6 +105,8 @@ A second Vercel project serves the complete testnet app from the same repo; prod
 
 The header and every trade screen carry a "Testnet" badge. The board shows Derive mainnet prices recorded every 15 minutes; one-tap trades go to Derive's V3 testnet, whose firm price can differ, as the badge's (i) says.
 
+The header also carries the wallet (testnet builds only): "Connect wallet" runs the same connect and sign-in as a ticket's first step; once connected it shows the short address with a menu: Saloon account (ready, funding needed or approval needed; opens Positions), Switch off Cowboy (when approved) and Disconnect. It is the same connection as every ticket and Positions (one store, `lib/trade/seat.js`), so connecting in either shows in both. Its code is the trade chunk's (`components/trade/WalletMenu.jsx`, exported from `TradePanel.jsx`, loaded after the first paint), its styles (`src/hdr-wallet.css`) are inlined by the Shell in testnet builds only; on phones the header takes two rows on every page, the landing included. Other builds carry none of it (`bundle.test.js`).
+
 ## Tracking values over time
 
 Coin pages include **Market history**: dated engine metrics, funding and open interest. Inspect exact samples by pointer, touch or keyboard; select daily or four-hour readings. Missing intervals remain gaps. Details: `docs/history-tracking.md`.

@@ -8,7 +8,7 @@ import { acceptTerms, connect, deposit, depositGasUsd, refreshFunding, useSeat }
 export const DERIVE_TERMS_URL = "https://www.derive.xyz/terms-of-use";
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "");
 
-function Copy({ text }) {
+export function Copy({ text }) {
   const [done, setDone] = useState(false);
   const go = async () => {
     try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1000); } catch { /* the address stays selectable */ }

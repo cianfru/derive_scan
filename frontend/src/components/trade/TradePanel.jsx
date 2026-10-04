@@ -15,6 +15,9 @@ import ApproveCowboy, { SeatLine } from "./ApproveCowboy.jsx";
 import TradeTicket, { sellPlan, ticketPlan } from "./TradeTicket.jsx";
 import "../../trade.css";
 
+/** The header's wallet (testnet builds), exported here so all trading code stays in this one lazy chunk. */
+export { default as WalletMenu } from "./WalletMenu.jsx";
+
 const NETWORK_NOTE = "Prices on the Saloon board come from Derive's live market, recorded every 15 minutes. One-tap trades in this build go to Derive's testnet with test USDC, so the firm price you are offered comes from the testnet and can differ from the board.";
 
 /** The "Testnet" badge every trade screen carries, with what it means in an (i). */

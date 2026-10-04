@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, Suspense } from "react";
+import { Component, lazy, useEffect, useRef, useState, Suspense } from "react";
 import { NavLink, Link, Outlet, useLocation } from "react-router-dom";
 import { Loading } from "./ui.jsx";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import { Lockup, HatMark } from "./Brand.jsx";
 import { QUESTIONS_ON, TESTNET_FILLS } from "../lib/flags.js";
 import "../marketplace.css";
+import walletCss from "../hdr-wallet.css?inline";
 
 function useTheme() {
   const [theme, setTheme] = useState(
@@ -60,6 +61,36 @@ function ResearchMenu({ active }) {
   );
 }
 
+// Testnet builds only: the wallet in the header. Its code is the trade chunk's (loaded lazily, so other
+// builds carry none of it) and its styles are inlined here, so the header keeps its shape while that
+// chunk loads. Every piece sits behind TESTNET_FILLS, which drops it from other builds.
+const WalletMenu = TESTNET_FILLS ? lazy(() => import("./trade/TradePanel.jsx").then((m) => ({ default: m.WalletMenu }))) : null;
+const QuietBoundary = TESTNET_FILLS ? class extends Component {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() { return this.state.failed ? null : this.props.children; }
+} : null;
+
+/** "Connect wallet" until the trade chunk arrives; a tap before then connects once it has. */
+function HeaderWallet() {
+  const early = useRef(false);
+  const [waiting, setWaiting] = useState(false);
+  const slot = (
+    <div className="hw">
+      <button type="button" className="btn hw-btn" aria-label={waiting ? "Connecting" : "Connect wallet"} aria-disabled={waiting || undefined}
+        onClick={() => { early.current = true; setWaiting(true); }}>
+        {waiting ? "Connecting…" : <><span className="hw-long">Connect wallet</span><span className="hw-short" aria-hidden="true">Connect</span></>}
+      </button>
+    </div>
+  );
+  return (
+    <>
+      <style>{walletCss}</style>
+      <QuietBoundary><Suspense fallback={slot}><WalletMenu early={early} /></Suspense></QuietBoundary>
+    </>
+  );
+}
+
 export default function Shell() {
   const [theme, toggle] = useTheme();
   const { pathname, hash } = useLocation();
@@ -86,7 +117,7 @@ export default function Shell() {
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <header className={`hdr${QUESTIONS_ON ? " hdr-marketplace" : ""}${QUESTIONS_ON && pathname === "/" ? " hdr-landing" : ""}`} ref={header}>
+      <header className={`hdr${QUESTIONS_ON ? " hdr-marketplace" : ""}${QUESTIONS_ON && pathname === "/" ? " hdr-landing" : ""}${TESTNET_FILLS ? " hdr-wallet" : ""}`} ref={header}>
         <div className="wrap">
           {TESTNET_FILLS ? (
             // Testnet builds only: one-tap trades go to Derive's testnet. Styled inline, and written as a
@@ -119,6 +150,7 @@ export default function Shell() {
             </nav>
           )}
           <div className="tools">
+            {TESTNET_FILLS && <HeaderWallet />}
             <button
               className="icon-btn"
               onClick={toggle}

@@ -36,6 +36,12 @@ it("puts outcomes, follows and positions before the research menu", () => {
   expect(within(nav).getByRole("button", { name: "Research" }).getAttribute("aria-expanded")).toBe("false");
 });
 
+it("keeps the wallet out of the header without testnet fills", () => {
+  const { container } = shellAt("/saloon");
+  expect(screen.queryByRole("button", { name: /Connect wallet|^Wallet 0x/ })).toBeNull();
+  expect(container.querySelector(".hw, .hdr-wallet, style")).toBeNull();
+});
+
 it("opens Research as a menu; Escape closes it and returns focus", async () => {
   const user = userEvent.setup();
   shellAt("/markets");

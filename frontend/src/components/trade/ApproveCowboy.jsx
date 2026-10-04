@@ -3,7 +3,8 @@ import { money } from "../../lib/questions.js";
 import { KEY_DAYS } from "../../lib/trade/config.js";
 import { approve, switchOff, useSeat } from "../../lib/trade/seat.js";
 
-const until = (sec) => {
+/** The approval's end, in UTC: "Sat 10 Oct, 14:00 UTC". */
+export const until = (sec) => {
   const d = new Date(sec * 1000);
   return `${d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" })}, ${d.toISOString().slice(11, 16)} UTC`;
 };
