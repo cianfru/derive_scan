@@ -77,7 +77,8 @@ describe("limits on price", () => {
   it("never let the ceiling exceed 99c per $1", () => {
     expect(maxTotalCost(1000, 0.98, 0.02)).toBe(990);
     expect(maxTotalCost(1000, 0.995, 0.03)).toBe(990);
-    expect(maxTotalCost(264.42, 0.3782, toleranceFor(false))).toBeCloseTo(105.29, 2);
+    expect(maxTotalCost(264.42, 0.3782, toleranceFor(false))).toBe(105.29); // 105.2920, rounded down to the cent
+    expect(minTotalCost(264.42, 0.3463, 0.02)).toBe(86.29); // 86.2802, rounded up to the cent
   });
   it("never let the floor drop below 1c per $1", () => {
     expect(minTotalCost(1000, 0.02, 0.03)).toBe(10);

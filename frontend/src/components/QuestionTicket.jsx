@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { Info } from "./ui.jsx";
+import { TRADE_ON } from "../lib/flags.js";
 import { amountText, copyText, deriveLink, limitText, money, orderedLegs } from "../lib/questions.js";
 import { addPosition } from "../lib/positions.js";
 
@@ -19,9 +20,19 @@ function Copy({ text, label }) {
   return <button className="text-control q-copy" onClick={go} aria-label={label}>{done ? "Copied" : "Copy"}</button>;
 }
 
+// Stage 2 (one tap through Derive RFQ) only in builds with VITE_SALOON_TRADE on; otherwise this is
+// stage 1 alone and the build carries no trading code.
+const TradePanel = TRADE_ON ? lazy(() => import("./trade/TradePanel.jsx")) : null;
+
+function WithTrade(props) {
+  const hand = <QuestionTicket {...props} />;
+  return <Suspense fallback={hand}><TradePanel {...props} fallback={hand} /></Suspense>;
+}
+export default TRADE_ON ? WithTrade : QuestionTicket;
+
 /** Stage 1: the legs to place on Derive by hand, the bought leg first (or, selling back, the short
  * leg bought back first), per-leg limits on the tick, and what both fills mean in dollars. */
-export default function QuestionTicket({ und, question, answer, level, sideKey, t, board, pricesTs, settleTs, stale, closing = false, onPlaced }) {
+function QuestionTicket({ und, question, answer, level, sideKey, t, board, pricesTs, settleTs, stale, closing = false, onPlaced }) {
   const [saved, setSaved] = useState(false);
   const side = level?.[sideKey];
   const legs = orderedLegs(side, closing);

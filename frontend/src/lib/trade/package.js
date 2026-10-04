@@ -112,12 +112,12 @@ export const toleranceFor = (thin) => (thin ? TRADE_LIMITS.tolerance.thin : TRAD
 /** The hard ceiling a buy RFQ carries: payout x min(board buy + T, 99c). */
 export function maxTotalCost(payout, boardBuy, T) {
   if (!ok(payout) || !ok(boardBuy)) return null;
-  return round(payout * Math.min(boardBuy + T, TRADE_LIMITS.maxPerDollar), 2);
+  return Math.floor(round(payout * Math.min(boardBuy + T, TRADE_LIMITS.maxPerDollar) * 100, 6)) / 100; // down to the cent
 }
 /** The floor a sell RFQ carries: payout x max(board sell-back - T, 1c). */
 export function minTotalCost(payout, boardSell, T) {
   if (!ok(payout) || !ok(boardSell)) return null;
-  return round(payout * Math.max(boardSell - T, TRADE_LIMITS.minPerDollar), 2);
+  return Math.ceil(round(payout * Math.max(boardSell - T, TRADE_LIMITS.minPerDollar) * 100, 6)) / 100; // up to the cent
 }
 
 /**
