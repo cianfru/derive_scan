@@ -210,7 +210,7 @@ p { max-width: 76ch; }
 .page-head .tabs { align-self: end; }
 @media (max-width: 600px) { .page-head .tabs { order: 3; width: 100%; } .page-head .page-meta { margin-left: 0; width: 100%; order: 2; } }
 .empty-dash { color: var(--faint); font-weight: 400; }
-.info { display: inline-grid; place-items: center; vertical-align: middle; flex: none; padding: 0; width: 16px; height: 16px; border: 1px solid var(--border-strong); border-radius: 50%; background: none; font: 700 12px/1 var(--font-sans); color: var(--text-3); margin-left: 4px; transition: color 120ms var(--ease), border-color 120ms var(--ease); }
+.info { display: inline-grid; place-items: center; vertical-align: middle; flex: none; padding: 0; width: 18px; height: 18px; border: 1px solid var(--border-strong); border-radius: 50%; background: none; font: 700 12px/1 var(--font-sans); color: var(--text-3); margin-left: 4px; transition: color 120ms var(--ease), border-color 120ms var(--ease); }
 .info:hover, .info:focus-visible, .info[aria-expanded="true"] { color: var(--text-1); border-color: var(--accent); }
 .pop { position: fixed; z-index: 50; width: min(300px, 82vw); white-space: normal; max-height: calc(100dvh - 24px); overflow-y: auto; background: var(--surface-3); border: 1px solid var(--border-strong); border-radius: var(--r-md); color: var(--text-1); padding: 16px; font: 400 13px/1.6 var(--font-sans); box-shadow: var(--shadow-pop); }
 .search { border: 1px solid var(--border); border-radius: var(--r-md); outline-offset: 2px; font-size: 13px; padding: 10px 12px; width: min(240px, 60vw); background: var(--plate); color: var(--fg); }
@@ -336,7 +336,8 @@ svg.viz { width: 100%; height: auto; display: block; overflow: visible; }svg.viz
 
 /* Touch and focus (P3): 44px hit areas on touch screens without moving the layout; focus always visible. */
 @media (max-width: 900px), (pointer: coarse) {
-  .info::before { inset: -14px; }
+  .info::before { inset: -13px; }
+  .info { width: 20px; height: 20px; font-size: 13px; }
   .tabs button { min-height: 44px; }
   .q-page .text-control, .q-quick .text-control { min-height: 44px; min-width: 44px; }
   .q-details > summary, .q-history summary, .q-saved summary, .q-settled summary { min-height: 44px; }

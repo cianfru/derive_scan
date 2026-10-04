@@ -302,6 +302,7 @@ function Card({ p, onRemove, onClose }) {
               value={usdOr(f.valueNow)} missing={half ? na(partWhy, "Why no value") : noPrice} />
             <Fig label="Profit / loss now" sub="if sold back now" value={pl(f.plNow)} className="q-pl"
               missing={half ? na("With only one option filled there is no result for the answer.", "Why no result") : na("There is a result once Derive shows a sell-back price, or at settlement.", "Why no result")} />
+            <Fig label="Most it pays" sub="at settlement" value={usdOr(f.maxPayout)} missing={na(partWhy, "Why no payout")} />
           </>
         )}
         <Fig label={f.closed ? "Sold back" : f.settled ? "Settled" : "Settles"}
@@ -316,7 +317,6 @@ function Card({ p, onRemove, onClose }) {
           <summary>Position details<span aria-hidden="true">+</span></summary>
           <div className="q-position-expanded">
             {!f.closed && !f.settled && !p.closed_at && !(after && settleExit) && <dl className="q-figs grid q-position-extra">
-              <Fig label="Most it pays" sub={q ? fullPay(q, p.side) : null} value={usdOr(f.maxPayout)} missing={na(partWhy, "Why no payout")} />
               <Fig label="At 08:00 UTC, today's price" sub={f.expiryNow != null ? `pays ${usd(f.expiryNow)}` : null} value={pl(f.plExpiryNow)}
                 info={<Info label="About the payout at today's price">What the answer pays if {q?.und} settles at today's price, {money(board?.index)}, and the profit or loss after what you paid. Not a view of where it settles.</Info>}
                 missing={na(half ? partWhy : "Cowboy needs today's price from the board to show this.", "Why no payout at today's price")} />
