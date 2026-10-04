@@ -3,6 +3,7 @@ import { NavLink, Link, Outlet, useLocation } from "react-router-dom";
 import { Loading } from "./ui.jsx";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import { Lockup } from "./Brand.jsx";
+import { QUESTIONS_ON } from "../lib/flags.js";
 
 function useTheme() {
   const [theme, setTheme] = useState(
@@ -51,6 +52,7 @@ export default function Shell() {
           </Link>
           <nav aria-label="Main navigation">
             <NavLink to="/markets">Markets</NavLink>
+            {QUESTIONS_ON && <NavLink to="/saloon" className={({ isActive }) => (isActive || (pathname.startsWith("/q/") || pathname.startsWith("/saloon")) ? "active" : "")}>Saloon</NavLink>}
             <NavLink to="/radar">Radar</NavLink>
             <NavLink to="/options">Options</NavLink>
             <NavLink to="/traders">Traders</NavLink>

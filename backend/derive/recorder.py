@@ -14,6 +14,7 @@ from pathlib import Path
 from .client import DeriveClient, DeriveRPCError
 from .config import SOURCES, Settings
 from .features import OptionQuote, expiry_slice, quote_from_ticker, surface_features
+from .questions import spec_from_instruments
 from .instruments import expiry_date, fetch_options, live_expiries, parse_option_name, perp_name
 from .store import Store
 
@@ -62,6 +63,9 @@ class Recorder:
         self.status: dict[str, dict] = {}
         # Per-strike view of the newest chain, per source:underlying (published for the app, not stored).
         self.strikes: dict[str, dict] = {}
+        # The newest tickers per source:underlying, kept in memory for Questions (nothing new is fetched).
+        self.chains: dict[str, dict] = {}
+        self.specs: dict[str, dict] = {}
         self._lock_file = None
 
     # -- one snapshot -------------------------------------------------------
@@ -111,6 +115,8 @@ class Recorder:
             index = float(perp["I"])
         feats = surface_features(slices, index, perp)
         self.strikes[f"{source}:{underlying}"] = {"ts": ts, "index": index, "expiries": strikes}
+        self.chains[f"{source}:{underlying}"] = {"options": chain, "perp": perp, "ts": ts}
+        self.specs[f"{source}:{underlying}"] = spec_from_instruments(inst)
         chain_doc = {"options": chain, "perp": perp} if keep_chain else None
         if keep_slices:
             self.store.write_snapshot(ts, source, underlying, feats, slices, chain=chain_doc)

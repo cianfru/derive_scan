@@ -60,6 +60,7 @@ async def record(settings: Settings, store: FileStore, slot: int, keys: set[str]
     rec = Recorder(settings, store)
     try:
         await rec.run_once(slot, only=keys)
+        await questions(settings, rec, slot, site)
     finally:
         await rec.close()
     store.record_runs(slot, rec.status)
@@ -71,6 +72,34 @@ async def record(settings: Settings, store: FileStore, slot: int, keys: set[str]
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text(json.dumps(doc, separators=(",", ":")))
     return rec.status
+
+
+async def questions(settings: Settings, rec, slot: int, site: Path | None) -> None:
+    """Questions from the tickers just read (no added reads, besides one settlement-price call per
+    coin after an expiry it holds questions on). The data branch keeps the state and hourly history
+    always; the app files are written only when QUESTIONS_PUBLISH is on."""
+    from derive import question_job as qj
+
+    source = settings.sources[0]
+    root = Path(settings.data_dir)
+    chains = {k.split(":")[1]: v for k, v in rec.chains.items() if k.startswith(source + ":")}
+    specs = {k.split(":")[1]: v for k, v in rec.specs.items() if k.startswith(source + ":")}
+    if not chains:
+        return
+    try:
+        state = qj.load_state(root)
+        for und in qj.pending_settlements(state, root, time.time()) if state else []:
+            state["settle_try"][und] = int(time.time())
+            try:
+                res = await rec.clients[source].public("get_option_settlement_prices", {"currency": und})
+                qj.save_settlements(root, und, res)
+            except Exception as e:  # the next run tries again
+                logging.warning("settlement prices for %s: %s", und, e)
+        if state:
+            qj.save_state(root, state)
+        qj.run(root, source, chains, specs, slot, site=site)
+    except Exception:  # Questions must never stop the recording
+        logging.exception("questions failed")
 
 
 def main() -> int:

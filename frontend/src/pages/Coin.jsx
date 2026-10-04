@@ -13,6 +13,8 @@ import MetricHistory from "../components/MetricHistory.jsx";
 import { currentEngine } from "../lib/research.js";
 import { SIGNAL_HELP } from "../lib/explain.js";
 import { RegimeHeader, Readings, Checks } from "../components/RegimePanel.jsx";
+import { Link } from "react-router-dom";
+import { QUESTIONS_ON } from "../lib/flags.js";
 
 // The chart shows the priced range for the next 30 days only, so candles keep most of the width.
 const CONE_DAYS = 30;
@@ -159,6 +161,7 @@ export default function Coin() {
           </Step>
           <Step id="options" n={3} kind="options" title="Options"
             right={<span className="step-stamp mono">{dayTime(data.options.ts)}</span>}>
+            {QUESTIONS_ON && data.questions === true && <Link className="text-link q-coin-link" to={`/saloon/${und}`}>{und} in the Saloon</Link>}
             <OptionsWorkspace key={und} opts={data.options} und={und} flow={data.taker_flow} hasSurface={data.has_surface === true} embedded />
           </Step>
         </>
