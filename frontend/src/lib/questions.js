@@ -187,10 +187,34 @@ export function ticket(level, sideKey, dollars, board) {
   return {
     contracts, net, premium, fees, payout, capped, belowMin, cap, capPayout: cap * w,
     minPayout: minimum * w, minCost: minimum * perContract,
+    // The smallest total, Derive's fees included: the smallest budget that buys anything here.
+    minTotal: minimum * perContract + side.legs.reduce((a, [, , p]) => a + legFee(board.index, p, minimum, spec), 0),
     mostLose: premium + fees, atK: pay(level.k),
     credit: side.form === "credit" ? -net * contracts : null, held: side.form === "credit" ? w * contracts : null,
     perDollar: payout ? (premium + fees) / payout : null,
   };
+}
+
+/**
+ * The budget convention (owner, 4 October 2026): an amount the user types is the total spend,
+ * Derive's fees included. Fees are a fixed base per option plus an amount per contract, so the
+ * premium is what remains after them; contracts round down to the amount step and stop at the size
+ * at this price. Every place an amount is entered (the board, the guided flow, the ticket) sizes
+ * through this, so the same amount shows the same figures everywhere.
+ */
+export function budgetTicket(level, side, budget, board) {
+  const s = level?.[side];
+  const spec = board?.spec || {};
+  if (!s?.legs || !ok(s?.buy)) return null;
+  const amount = ok(budget) ? Math.max(0, budget) : 0;
+  const net = s.legs.reduce((a, [, act, p]) => a + (act === "buy" ? p : -p), 0);
+  if (!(net > 0)) return null;
+  const base = s.legs.length * (spec.base || 0);
+  const perFee = s.legs.reduce((a, [, , p]) => a + Math.min((spec.taker || 0) * (board.index || 0), (spec.cap || 0) * p), 0);
+  const premium = Math.max(0, amount - base) * net / (net + perFee);
+  // A hair under, so floating point never rounds the contracts up past the budget.
+  const t = ticket(level, side, premium * (1 - 1e-9), board);
+  return t && { ...t, budget: amount };
 }
 
 /** Placing by hand, the two orders fill separately: the cash line 1 needs on its own, what it can

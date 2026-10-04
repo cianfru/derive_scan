@@ -181,18 +181,20 @@ describe("the question page", () => {
   it("shows pay, fees, total, most it pays, most you can make, breakeven and settlement, the worst case before any action", async () => {
     const { container } = show(`${Q86}?side=yes`);
     const figs = container.querySelector(".q-amount .op-figs").textContent;
-    expect(figs).toContain("You pay$99.99");
-    expect(figs).toContain("Derive fees, abouti$3.01");
-    expect(figs).toContain("Total, the most you can lose$103.01");
-    expect(figs).toContain("Most it paystotal back, full $1 from $89,000$264.42");
-    expect(figs).toContain("Most you can makeafter what you pay+$161.41");
-    expect(figs).toContain("BreakeveniBTC at $85,337");
+    // The budget convention: $100 typed is the total, Derive's fees included. 0.04277 contracts:
+    // $97.05 for the two options + $2.95 fees = $100.00 (was $99.99 + $3.01 = $103.01 before fees).
+    expect(figs).toContain("The two options$97.05");
+    expect(figs).toContain("Derive fees, abouti$2.95");
+    expect(figs).toContain("You pay, the most you can losefees included, within your $100.00$100.00");
+    expect(figs).toContain("Most it paystotal back, full $1 from $89,000$256.62");
+    expect(figs).toContain("Most you can makeafter what you pay+$156.62");
+    expect(figs).toContain("BreakeveniBTC at $85,338");
     expect(figs).toContain("SettlesFri 9 Oct, 08:00 UTC");
-    const lose = screen.getAllByText("Total, the most you can lose")[0];
+    const lose = screen.getAllByText(/^You pay, the most you can lose/)[0];
     const get = screen.getByRole("button", { name: "Place on Derive" });
     expect(lose.compareDocumentPosition(get) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const ex = [...container.querySelectorAll(".q-amount .op-ex tbody tr")].map((r) => r.textContent);
-    expect(ex).toEqual(["$83,000 or lower$0.00-$103.01", "$86,000$132.21+$29.20", "$89,000 or higher$264.42+$161.41"]);
+    expect(ex).toEqual(["$83,000 or lower$0.00-$100.00", "$86,000$128.31+$28.31", "$89,000 or higher$256.62+$156.62"]);
     expect(container.textContent).toContain("Selling back before 08:00 UTC is valued at Derive's sell-back price then, not by this chart.");
     expect(container.textContent).not.toMatch(/\b(agrees?|matches)\b/i);
     const texts = await allText(container);
@@ -204,12 +206,12 @@ describe("the question page", () => {
   it("moves the settlement slider by keyboard value and shows the same payout as the ramp", () => {
     const { container } = show(`${Q86}?side=yes`);
     const range = screen.getByRole("slider", { name: "BTC price at settlement" });
-    expect(range.getAttribute("aria-valuetext")).toBe("BTC at $84,800: pays 30c per $1, you get $79.33, loss $23.68");
+    expect(range.getAttribute("aria-valuetext")).toBe("BTC at $84,800: pays 30c per $1, you get $76.99, loss $23.01");
     const at = (v) => { fireEvent.change(range, { target: { value: String(v) } }); return range.getAttribute("aria-valuetext"); };
-    expect(at(83000)).toBe("BTC at $83,000: pays 0c per $1, you get $0.00, loss $103.01");
-    expect(at(86000)).toBe("BTC at $86,000: pays 50c per $1, you get $132.21, profit $29.20");
-    expect(at(89000)).toBe("BTC at $89,000: pays 100c per $1, you get $264.42, profit $161.41");
-    expect(container.querySelector(".op-read").textContent).toContain("If BTC settles at $89,000, this pays 100c per $1: you get $264.42");
+    expect(at(83000)).toBe("BTC at $83,000: pays 0c per $1, you get $0.00, loss $100.00");
+    expect(at(86000)).toBe("BTC at $86,000: pays 50c per $1, you get $128.31, profit $28.31");
+    expect(at(89000)).toBe("BTC at $89,000: pays 100c per $1, you get $256.62, profit $156.62");
+    expect(container.querySelector(".op-read").textContent).toContain("If BTC settles at $89,000, this pays 100c per $1: you get $256.62");
     wordcheck([container.textContent]);
   });
 
@@ -230,8 +232,8 @@ describe("the question page", () => {
     const outside = [...ticket.childNodes].filter((n) => n !== details).map((n) => n.textContent).join(" ");
     expect(outside).not.toMatch(/BTC-20261009-\d+-[CP]/);
     const legs = [...details.querySelectorAll(".q-legs li")].map((li) => li.textContent);
-    expect(legs[0]).toMatch(/^1BuyBTC-20261009-83000-CAmount0.04407Limit2431$/);
-    expect(legs[1]).toMatch(/^2SellBTC-20261009-89000-CAmount0.04407Limit162$/);
+    expect(legs[0]).toMatch(/^1BuyBTC-20261009-83000-CAmount0.04277Limit2431$/);
+    expect(legs[1]).toMatch(/^2SellBTC-20261009-89000-CAmount0.04277Limit162$/);
     expect(details.textContent).toContain("Place line 2 only after line 1 has filled.");
     expect(container.textContent).not.toMatch(/guarantee/i);
   });
@@ -239,10 +241,10 @@ describe("the question page", () => {
   it("shows what the first order needs on its own, and what it can lose if line 2 never fills", () => {
     const { container } = show(`${Q86}?side=yes`);
     const hand = container.querySelector(".q-hand").textContent;
-    // Line 1 buys the 83,000 call alone: 0.04407 x 2,431 = $107.13, plus its fee.
-    expect(hand).toContain("Cash needed for line 1$107.13");
-    expect(hand).toMatch(/If only line 1 fills, most you can lose\$108\.\d\d/);
-    expect(hand).toContain("Once both fill, most you can lose$103.01");
+    // Line 1 buys the 83,000 call alone: 0.04277 x 2,431 = $103.97, plus its fee.
+    expect(hand).toContain("Cash needed for line 1$103.97");
+    expect(hand).toMatch(/If only line 1 fills, most you can lose\$105\.56/);
+    expect(hand).toContain("Once both fill, most you can lose$100.00");
   });
 
   it("words the Lower ticket as a payment, never cash received", () => {
@@ -262,16 +264,19 @@ describe("the question page", () => {
     expect(within(ticket).getByText(/Nothing saved/)).toBeTruthy();
     expect(within(ticket).queryByRole("button", { name: "Save to Positions" })).toBeNull();
     await user.click(within(ticket).getByRole("radio", { name: "Only the first" }));
-    const paid = within(ticket).getByRole("textbox", { name: "What you paid in total" });
-    expect(paid.value).toBe("103.01");
-    await user.clear(paid);
-    await user.type(paid, "108.50");
+    // The board's estimate is never filled in as the user's fill (journal J1).
+    const premium = within(ticket).getByRole("textbox", { name: "Premium paid, before fees" });
+    expect(premium.value).toBe("");
+    fireEvent.change(within(ticket).getByLabelText("When it filled, UTC"), { target: { value: "2026-10-03T14:05" } });
+    await user.type(premium, "107.10");
+    await user.type(within(ticket).getByRole("textbox", { name: "Derive's fees" }), "1.40");
     await user.click(within(ticket).getByRole("button", { name: "Save to Positions" }));
     const saved = JSON.parse(localStorage.getItem("cowboy-questions"));
     expect(saved).toHaveLength(1);
-    expect(saved[0].estimate).toBeCloseTo(103.01, 2);
-    expect(saved[0]).toMatchObject({ exec: "hand_partial", paid: 108.5, side: "yes",
+    expect(saved[0].estimate).toBeCloseTo(100.00, 2); // the $100 typed, fees included
+    expect(saved[0]).toMatchObject({ exec: "hand_partial", paid: 108.5, side: "yes", network: "mainnet",
       legs: ["BTC-20261009-83000-C", "BTC-20261009-89000-C"] });
+    expect(saved[0].journal.fill).toMatchObject({ complete: false, premium: 107.1, fees: 1.4, limitation: "package_total" });
     localStorage.clear();
   });
 

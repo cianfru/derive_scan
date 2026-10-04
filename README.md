@@ -66,6 +66,8 @@ The `data` branch always keeps (a few KB, plus about 300 KB a day of hourly CSV 
 
 The app files exist only when the Action runs with `QUESTIONS_PUBLISH=on` (`record.yml`, `"off"` today); while it is off `publish_site.py` removes any `questions/` folder, and the app shows Questions only in a build with `VITE_QUESTIONS=1` (routes, the Saloon leading the nav with the research pages after it, the landing's "Enter the Saloon" button and the coin page's Saloon card). `VITE_DERIVE_REFERRAL` adds a referral code from Derive's API Broker programme to the ticket's "Open Derive" link (`VITE_DERIVE_REFERRAL_PARAM`, default `ref`; `VITE_DERIVE_OPTIONS_URL` for the page).
 
+The Saloon also keeps, in the viewer's browser only, `cowboy-follows` (version 1: `{version, budget, follows: [{id, side, level, at, seen}], research: {UND: {regime, signal, lean7, lean30}}, notices, dismissed}`): the board budget (`/saloon/browse`), followed answers and the notices shown on return; export and import as `{kind: "cowboy-follows", version, budget, follows}`. No published file changes.
+
 | Path (`site-data`) | Content |
 |---|---|
 | `questions/index.json` | `{schema, prices_ts, generated_at, paused?, coins: [{und, thin, index, questions, dates}]}`: coins with at least one live answer, BTC and ETH first |

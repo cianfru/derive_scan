@@ -17,7 +17,8 @@ vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: true, TRADE_ON: true, tradeMode
 vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.current[path] ?? null : null, error: null }) }));
 vi.mock("./components/QuestionChart.jsx", () => ({ default: () => <div data-testid="chart" /> }));
 import Questions from "./pages/Questions.jsx";
-import { BANNED } from "./lib/questions.js";
+import { BANNED, findLevel, ticket } from "./lib/questions.js";
+import { saveBudget } from "./lib/follows.js";
 import { _setSeatDeps } from "./lib/trade/seat.js";
 import { createClient } from "./lib/trade/derive.js";
 import { fakeDerive } from "./lib/trade/fakeSocket.js";
@@ -94,6 +95,10 @@ afterEach(() => { cleanup(); vi.useRealTimers(); });
 describe("one tap through Derive (testnet, dry run)", () => {
   it("walks connect, terms, approval and a dry run, and fills nothing", async () => {
     setup();
+    // The recorded testnet quote is for 0.03299 contracts, what $100 bought before fees. Amounts are
+    // the total with fees now, so the budget here is that ticket's total, rounded up to the cent.
+    const level = findLevel(btc, ID).level;
+    saveBudget(Math.ceil(ticket(level, "yes", 100, btc).mostLose * 100) / 100);
     const user = userEvent.setup();
     show(`/q/${ID}?side=yes`);
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });

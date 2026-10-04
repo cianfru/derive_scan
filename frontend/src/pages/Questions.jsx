@@ -9,9 +9,12 @@ import PayZone from "../components/PayZone.jsx";
 import QuestionChart from "../components/QuestionChart.jsx";
 import QuestionTicket from "../components/QuestionTicket.jsx";
 import OutcomePreview from "../components/OutcomePreview.jsx";
+import SaloonHead from "../components/SaloonNotices.jsx";
+import { FollowButton, FollowLevel } from "../components/Follow.jsx";
+import { loadBudget } from "../lib/follows.js";
 import {
   ANSWER, buyCents, cents, centsDown, countdown, dayLabel, findLevel, fullPay, gap, live, money, noPriceReason, parseId, priceAge,
-  questionText, settlingNow, ticket, payAt,
+  budgetTicket, questionText, settlingNow, payAt,
 } from "../lib/questions.js";
 import "../questions.css";
 
@@ -155,7 +158,7 @@ function ActionBar({ und, level, sideKey, date, t, label, onGo, disabled, hidden
     <div className={`q-actbar${hidden ? " hide" : ""}`} aria-label="Your answer">
       <span className="q-actbar-sum">
         <b>{ANSWER[sideKey]} · {money(level.k)}<span className="q-actbar-date"> · {date.label}</span></b>
-        <small className="mono">{t ? <><span className="q-actbar-amt">{money(t.premium, { cents: true })} · </span>most you can lose {money(t.mostLose, { cents: true })}</> : "No price now"}</small>
+        <small className="mono">{t ? <>most you can lose {money(t.mostLose, { cents: true })}<span className="q-actbar-amt"> · fees included</span></> : "No price now"}</small>
       </span>
       <button ref={goRef} className="btn primary lg q-get" onClick={onGo} disabled={disabled}>{label}</button>
     </div>
@@ -196,14 +199,16 @@ const scrollTo = (el) => el?.scrollIntoView?.({ block: "start", behavior: typeof
 /** The guided flow from step 3: Higher or Lower (never picked for the user), then the amount, then
  * what it pays, then the orders for Derive. One primary action per step. The full ladder of levels
  * sits under "Other levels". */
-function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, ladder, ladderOpen, onLadder, initialStep }) {
+function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, ladder, ladderOpen, onLadder, initialStep, initialDollars }) {
   const { date, level } = found;
   const question = questionText(und, level, date.expiry);
   const paused = age.state === "paused" || board.paused;
-  const [dollars, setDollars] = useState(100);
+  // The first amount: the board's budget when opened from it, else the budget kept in this browser.
+  // An amount is the total spend, Derive's fees included (budgetTicket), as on the board.
+  const [dollars, setDollars] = useState(() => (Number.isFinite(initialDollars) && initialDollars > 0 ? initialDollars : loadBudget()));
   const [sheet, setSheet] = useState(false);
   const [step, setStep] = useState(() => (sideKey ? initialStep || "preview" : "pick"));
-  const t = sideKey && live(level, sideKey, paused) ? ticket(level, sideKey, dollars, board) : null;
+  const t = sideKey && live(level, sideKey, paused) ? budgetTicket(level, sideKey, dollars, board) : null;
   const side = sideKey ? level[sideKey] : null;
   const settling = settlingNow(level); // by the clock now, from 07:30 UTC
   const days = (date.settle_ts - Date.now() / 1000) / 86400;
@@ -255,6 +260,12 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
               </div>
             )}
             {!settling && !sideKey && <p className="status q-hint">Pick Higher or Lower. Nothing is picked for you.</p>}
+            {sideKey && (
+              <p className="q-follow">
+                <FollowButton id={level.id} side={sideKey} k={level.k} board={board} />
+                <FollowLevel id={level.id} side={sideKey} />
+              </p>
+            )}
           </article>
           <ZoneNote und={und} date={date} index={board.index} />
           <button className="text-control q-other" aria-expanded={ladderOpen} onClick={onLadder}>{ladderOpen ? "Hide other levels" : "Other levels"}</button>
@@ -264,7 +275,9 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
           <Step n={4} title="Amount" stepRef={amountRef} className="q-step-amount">
             <div className="q-amount">
               <div className="q-amount-in">
-                <label htmlFor="q-dollars" className="label">Amount</label>
+                <label htmlFor="q-dollars" className="label">Amount, fees included
+                  <Info label="About the amount">The total you spend, Derive's fees included. Cowboy sizes the two options so their price plus Derive's fees fit this amount; what is left over from rounding stays with you.</Info>
+                </label>
                 <span className="q-dollar-field"><span>$</span>
                   <input id="q-dollars" inputMode="decimal" value={dollars} onChange={(e) => setDollars(Math.max(0, Number(e.target.value.replace(/[^\d.]/g, "")) || 0))} />
                 </span>
@@ -272,9 +285,9 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
               </div>
               {t ? (
                 <>
-                  {t.belowMin && <p className="q-note warn">Smallest amount for this question: {money(t.minCost, { cents: true })}.</p>}
+                  {t.belowMin && <p className="q-note warn">Smallest amount for this question: {money(t.minTotal, { cents: true })} with Derive's fees.</p>}
                   {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
-                  {t.premium > 0 && t.premium < 50 && <p className="q-note">Fees are a large share of small amounts.</p>}
+                  {t.mostLose > 0 && t.mostLose < 50 && <p className="q-note">Fees are a large share of small amounts.</p>}
                 </>
               ) : (
                 <>
@@ -356,7 +369,7 @@ export default function Questions() {
   if (!index || (und && !board && !error)) return <div className="wrap page"><Loading /></div>;
   const coins = index.coins || [];
   if (!und || (error && !board)) {
-    return <div className="wrap page q-page"><header className="q-head"><h1>Saloon <span className="q-sub">Price outcomes</span></h1></header><p className="status">No questions with a price on Derive's screen right now.</p></div>;
+    return <div className="wrap page q-page"><SaloonHead view="guided" /><p className="status">No questions with a price on Derive's screen right now.</p></div>;
   }
   const age = priceAge(board.prices_ts, Date.now() / 1000, board.paused || index.paused);
   const paused = age.state === "paused";
@@ -409,12 +422,11 @@ export default function Questions() {
   );
   return (
     <div className="wrap page q-page">
-      <header className="q-head">
-        <h1>Saloon <span className="q-sub">Price outcomes</span></h1>
-      </header>
+      <SaloonHead view="guided" />
       {found && !found.settled ? (
         <QuestionView key={found.level.id} und={und} board={board} found={found} sideKey={sideKey} setSide={setSide} age={age} theme={theme}
-          lead={lead} ladder={ladderEl} ladderOpen={ladder} onLadder={() => setLadder((o) => !o)} initialStep={location.state?.step} />
+          lead={lead} ladder={ladderEl} ladderOpen={ladder} onLadder={() => setLadder((o) => !o)} initialStep={location.state?.step}
+          initialDollars={location.state?.dollars} />
       ) : (
         <div className="q-layout">
           <div className="q-flow">
