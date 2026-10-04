@@ -65,8 +65,8 @@
   "pending_deposits": [
    {
     "action_type": "DepositToNewSubaccount",
-    "amount": "100",
-    "asset": "USDC",
+    "amount": "100000000",
+    "asset": "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
     "deposit_type": "standard",
     "manager_id": 1,
     "status": "pending",

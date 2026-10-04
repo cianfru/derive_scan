@@ -3,7 +3,7 @@ import { Info } from "../ui.jsx";
 import { money } from "../../lib/questions.js";
 import { DEPOSIT_SUGGESTED, NETWORK } from "../../lib/trade/config.js";
 import { depositCheck } from "../../lib/trade/account.js";
-import { acceptTerms, connect, deposit, depositGasUsd, refreshFunding, useSeat } from "../../lib/trade/seat.js";
+import { acceptTerms, connect, deposit, depositGasUsd, holdSend, refreshFunding, useSeat } from "../../lib/trade/seat.js";
 import ErrorDetail from "./ErrorDetail.jsx";
 
 export const DERIVE_TERMS_URL = "https://www.derive.xyz/terms-of-use";
@@ -70,6 +70,26 @@ export function FundStep({ ethUsd }) {
   }, [dollars, ethUsd, seat.depositAddress]);
   const chk = depositCheck(dollars, gasUsd);
   const isNew = !seat.saloon;
+  const onWay = seat.arriving || seat.sentAmount || 0;
+  if (holdSend(seat)) {
+    // One deposit to the new-account address opens the account; a second would open another.
+    return (
+      <div className="tr-step">
+        <p className="tr-lead">Your deposit is on its way
+          <Info label="Why you can't send again yet">Your first deposit opens your Saloon account on Derive. Sending again before it lands would open a second account, so add more once this one is ready.</Info>
+        </p>
+        <dl className="tr-figs">
+          <div><dt>Arriving</dt><dd className="mono">{onWay > 0 ? money(onWay, { cents: true }) : "Not available yet"}</dd></div>
+        </dl>
+        <p className="tr-note">Derive credits a deposit after about 2 minutes of confirmations.</p>
+        <button className="btn primary lg" disabled>Send USDC</button>
+        <div className="tr-actions">
+          <button className="text-control" onClick={refreshFunding} disabled={seat.busy}>{seat.busy ? "Checking…" : "Check again"}</button>
+        </div>
+        {seat.message && <p className="tr-msg">{seat.message}<ErrorDetail detail={seat.detail} /></p>}
+      </div>
+    );
+  }
   return (
     <div className="tr-step">
       <p className="tr-lead">{isNew ? "Add USDC to start your Saloon account" : "Add USDC to your Saloon account"}

@@ -8,7 +8,8 @@ import { fakeDerive, deriveError } from "./fakeSocket.js";
 import { fakeWallet } from "./fakeWallet.js";
 import { TESTNET_WS } from "./config.js";
 import { KEYS, read } from "./store.js";
-import { _setSeatDeps, connect, refreshFunding, seatState } from "./seat.js";
+import { _setSeatDeps, connect, deposit, holdSend, refreshFunding, seatState } from "./seat.js";
+import { _resetAssets } from "./account.js";
 
 const ADDR = "0x9a3c5be1b0e4d0f7c6d2a8e1f3b4c5d6e7f80912";
 const NEW_SUB = 120001, FALLBACK_SUB = 120000;
@@ -35,7 +36,12 @@ const sub = (id, manager, usdc, label = "") => {
   return { ...s, subaccount_id: id, manager_id: manager, label, collaterals: usdc ? s.collaterals.map((c) => ({ ...c, amount: String(usdc) })) : [] };
 };
 
-beforeEach(() => { localStorage.clear(); localStorage.setItem(KEYS.terms(), JSON.stringify({ at: 1 })); });
+beforeEach(() => { localStorage.clear(); _resetAssets(); localStorage.setItem(KEYS.terms(), JSON.stringify({ at: 1 })); });
+
+const USDC_ASSET = "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b";
+const row = (status, extra = {}) => ({ action_id: 563, action_type: "DepositToNewSubaccount", asset: USDC_ASSET, amount: "10000000", subaccount_id: 0,
+  manager_id: 1, tx_hash: `0x${"b7".repeat(32)}`, status, deposit_type: "standard", timestamp: Date.now() - 60_000, updated_at_ms: Date.now() - 30_000, ...extra });
+const sends = (wallet) => wallet.calls.filter((c) => c.method === "eth_sendTransaction").length;
 
 describe("a wallet with no Derive account", () => {
   it("goes to funding with a deposit address from public calls, then finds the account the deposit opened", async () => {
@@ -50,7 +56,7 @@ describe("a wallet with no Derive account", () => {
     expect(read(KEYS.known(wallet.address))).toEqual([]);
 
     // The deposit is on its way: public pending deposits show it, without a wallet prompt.
-    derive.pending = [{ ...shapes["public/get_pending_deposits"].pending_deposits[0], amount: "50", status: "pending" }];
+    derive.pending = [{ ...shapes["public/get_pending_deposits"].pending_deposits[0], amount: "50000000", status: "pending" }];
     const signs = () => wallet.calls.filter((c) => c.method === "personal_sign").length;
     const before = signs();
     await refreshFunding();
@@ -94,6 +100,62 @@ describe("a wallet with no Derive account", () => {
     expect(s.detail).toMatchObject({ step: "sign in", source: "Derive", code: 14014, message: "invalid_signature" });
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
+  });
+});
+
+describe("one deposit opens one account", () => {
+  it("does not offer a second send to the new-account address while one is on its way", async () => {
+    const { wallet, derive } = setup();
+    derive.pending = [row("pending")];
+    await connect();
+    expect(seatState()).toMatchObject({ stage: "fund", arriving: 10, opening: 1 });
+    expect(holdSend(seatState())).toBe(true);
+    await deposit(10);
+    expect(sends(wallet)).toBe(0);
+  });
+
+  it("holds back a second send right after one from this browser, before Derive lists it", async () => {
+    const { wallet } = setup();
+    await connect();
+    expect(holdSend(seatState())).toBe(false);
+    await deposit(10);
+    expect(sends(wallet)).toBe(1);
+    expect(holdSend(seatState())).toBe(true);
+    await deposit(10);
+    expect(sends(wallet)).toBe(1);
+    // a reload remembers it
+    await connect();
+    expect(seatState()).toMatchObject({ stage: "fund", sentAmount: 10 });
+    expect(holdSend(seatState())).toBe(true);
+  });
+
+  it("moves a confirmed deposit on to sign-in, and finds the account it opened", async () => {
+    const { fake, derive } = setup();
+    await connect();
+    // Confirmed but not yet applied: Derive still answers 14000, and it still counts as arriving.
+    derive.pending = [row("confirmed")];
+    await refreshFunding();
+    expect(fake.calls("public/login").length).toBeGreaterThan(1);
+    expect(seatState()).toMatchObject({ stage: "fund", arriving: 10, opening: 1, message: null });
+    // Applied (the row stays listed as confirmed): sign-in finds and labels the account.
+    derive.account = true;
+    derive.subs = { [FALLBACK_SUB]: sub(FALLBACK_SUB, 0, 0), [NEW_SUB]: sub(NEW_SUB, 1, 10) };
+    await refreshFunding();
+    const s = seatState();
+    expect(s).toMatchObject({ stage: "approve", saloon: { id: NEW_SUB, label: "Cowboy", usdc: 10 } });
+    expect(holdSend(s)).toBe(false);
+  });
+
+  it("after two deposits opened two accounts, uses the lowest funded one and notes the other", async () => {
+    const { fake, derive } = setup();
+    await connect();
+    derive.pending = [row("confirmed"), row("confirmed", { action_id: 562 })];
+    derive.account = true;
+    derive.subs = { [FALLBACK_SUB]: sub(FALLBACK_SUB, 0, 0), [NEW_SUB]: sub(NEW_SUB, 1, 10), [NEW_SUB + 2]: sub(NEW_SUB + 2, 1, 10) };
+    await refreshFunding();
+    const s = seatState();
+    expect(s).toMatchObject({ stage: "approve", saloon: { id: NEW_SUB, label: "Cowboy" }, others: { count: 1, usdc: 10 } });
+    expect(fake.calls("private/change_subaccount_label").map((m) => m.params)).toEqual([{ subaccount_id: NEW_SUB, label: "Cowboy" }]);
   });
 });
 

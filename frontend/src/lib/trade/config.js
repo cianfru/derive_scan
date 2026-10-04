@@ -23,6 +23,10 @@ export const NETWORKS = {
     appUrl: "https://testnet.app.derive.xyz/",
     usdc: "0x73Efab09362052D26FB93A730Be4F8a5EdC833af", // testnet USDC (mintable in Derive's testnet app)
     usdcDecimals: 6,
+    // Derive's own USDC asset on the testnet (public/get_risk_universes, PRIME collaterals, "USDC"
+    // address; its erc20.underlying_erc20 is `usdc` above). Pending deposits name this address.
+    // A fallback only: the page reads the collateral list itself.
+    usdcAsset: "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
   },
   // Needs V3 mainnet to be live and the owner's written approval (design section 7, P8).
   mainnet: { name: "mainnet", enabled: false },
@@ -85,6 +89,13 @@ export const PARTIAL_FILL_STEP = "1";
 export const DEPOSIT_MIN = 10;
 export const DEPOSIT_SUGGESTED = 50;
 export const GAS_WARN_SHARE = 0.05;
+/** A deposit Derive lists as "confirmed" is past its L1 confirmations and waits only for the
+ * sequencer, which applies it within minutes; the row can stay listed after that. Past this age a
+ * confirmed row no longer holds back a new deposit. */
+export const CONFIRMED_STALE_MS = 30 * 60_000;
+/** A deposit sent from this browser holds back another send to the new-account address this long,
+ * until Derive lists it. */
+export const SENT_HOLD_MS = 30 * 60_000;
 
 /** Cowboy's public referral code from Derive's API Broker programme (empty until it exists). */
 export const REFERRAL = import.meta.env?.VITE_DERIVE_REFERRAL || "";

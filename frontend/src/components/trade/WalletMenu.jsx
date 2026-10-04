@@ -29,6 +29,15 @@ export function accountStatus(seat) {
   }
 }
 
+/** Another new Derive account holding USDC beside the Saloon account (Cowboy moves no funds). */
+export function otherNote(seat) {
+  const o = seat.saloon && seat.others;
+  if (!o || !(o.usdc > 0)) return null;
+  const amt = money(o.usdc, { cents: true });
+  return o.count > 1 ? `You have ${o.count} other Derive accounts with ${amt}; Cowboy uses this one.`
+    : `You have another Derive account with ${amt}; Cowboy uses this one.`;
+}
+
 const Chevron = () => (
   <svg className="hw-chev" width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" /></svg>
 );
@@ -128,6 +137,7 @@ export default function WalletMenu({ early = null }) {
                 <span className={`hw-status hw-${st.key}`}>{st.label}{st.usdc && <b className="mono">{st.usdc}</b>}</span>
               </Link>
               {st.note && <p className="hw-note">{st.note}</p>}
+              {otherNote(seat) && <p className="hw-note">{otherNote(seat)}</p>}
             </>
           )}
           <div className="hw-sep" role="presentation" />

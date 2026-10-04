@@ -1,12 +1,12 @@
 // Saloon stage 2: the user's seat at Derive for this page visit: the wallet, one Derive connection,
 // the Saloon account and Cowboy's approval. One store per page, shared by every ticket.
 import { useSyncExternalStore } from "react";
-import { NETWORK, TRADE_COINS } from "./config.js";
+import { NETWORK, SENT_HOLD_MS, TRADE_COINS } from "./config.js";
 import { NO_ACCOUNT, at, createClient, failure } from "./derive.js";
 import { arriving, depositAddress, findSaloon, knownIds, rememberKnown, summarise } from "./account.js";
 import { connectWallet, findProvider, gasEth, personalSign, sendTransaction, usdcTransfer } from "./wallet.js";
 import { approveCowboy, keySigner, switchOff as retireKey, usableKey } from "./sessionKey.js";
-import { KEYS, read, write } from "./store.js";
+import { KEYS, read, remove, write } from "./store.js";
 
 let deps = { findProvider, createClient, newKey: undefined };
 const initial = () => ({ stage: deps.findProvider() ? "disconnected" : "no_wallet", busy: false, message: null });
@@ -30,6 +30,32 @@ export function _setSeatState(s) { state = { ...initial(), ...s }; listeners.for
 
 export const canTrade = (und) => TRADE_COINS.includes(und);
 export const termsAccepted = () => !!read(KEYS.terms());
+
+/**
+ * What the fund step shows from Derive's deposit list. Before the Saloon account exists, freshly
+ * confirmed deposits still count as arriving, and a deposit to the new-account address holds back
+ * another send there (each one opens an account of its own).
+ */
+const funding = (arr, saloon) => ({
+  arriving: saloon ? arr.amount : arr.amount + arr.landing,
+  opening: saloon ? 0 : arr.openingCount,
+});
+
+/** A deposit this browser sent to the new-account address, kept for SENT_HOLD_MS (reloads too). */
+function sentNew(wallet, now = Date.now()) {
+  const s = read(KEYS.sent(wallet));
+  return s && now - s.at < SENT_HOLD_MS ? s : null;
+}
+const sentPatch = (wallet) => {
+  const s = sentNew(wallet);
+  return s ? { sentTx: s.tx, sentAmount: s.amount, sentAt: s.at } : {};
+};
+
+/** True while another send to the new-account address would open a second account. */
+export function holdSend(seat, now = Date.now()) {
+  if (seat.saloon) return false;
+  return (seat.opening || 0) > 0 || (!!seat.sentTx && now - (seat.sentAt || 0) < SENT_HOLD_MS);
+}
 
 const ownerSign = (provider, wallet) => (ts) => personalSign(provider, wallet, ts);
 const keySign = (stored) => (ts) => keySigner(stored).signMessage(ts);
@@ -89,39 +115,49 @@ async function load() {
     rememberKnown(wallet, []);
     return toFund(null);
   }
-  const { saloon, subs } = await at("find account", findSaloon(client, wallet));
+  const { saloon, subs, others } = await at("find account", findSaloon(client, wallet));
   if (!saloon && !knownIds(wallet).length) rememberKnown(wallet, subs);
+  set({ others });
   if (!saloon || !(saloon.usdc > 0)) return toFund(saloon);
+  remove(KEYS.sent(wallet));
   set({ saloon, key: null, stage: "approve", busy: false });
 }
 
 async function toFund(saloon) {
   const { client, wallet } = state;
   const [address, arr] = await at("deposit address", Promise.all([depositAddress(client, wallet, saloon?.id || null), arriving(client, wallet)]));
-  set({ saloon, depositAddress: address, arriving: arr.amount, stage: "fund", busy: false });
+  set({ saloon, depositAddress: address, ...funding(arr, saloon), ...(saloon ? {} : sentPatch(wallet)), stage: "fund", busy: false });
 }
 
 /**
  * Re-read pending deposits and the Saloon account; move on once USDC has landed. A wallet with no
- * Derive account yet is read from public pending deposits while a deposit is on its way (no wallet
- * prompt); once none is pending it signs in, and the account the deposit opened is found and labelled.
+ * Derive account yet is read from public pending deposits while a deposit is still in flight (no
+ * wallet prompt); once none is (a "confirmed" one waits only for Derive's sequencer) it signs in, and
+ * the account the deposit opened is found and labelled.
  */
 export async function refreshFunding() {
   const { client, wallet } = state;
   set({ busy: true, message: null });
   try {
+    let arr = null;
     if (state.newAccount) {
-      const arr = await at("find account", arriving(client, wallet));
-      if (arr.count > 0) return set({ arriving: arr.amount, busy: false });
+      arr = await at("find account", arriving(client, wallet));
+      if (arr.count > 0) return set({ ...funding(arr, null), ...sentPatch(wallet), busy: false });
     }
-    if (state.loggedAs !== "owner" && !(await ownerLogin())) return set({ saloon: null, arriving: 0, busy: false });
+    if (state.loggedAs !== "owner" && !(await ownerLogin())) {
+      arr = arr || await at("find account", arriving(client, wallet));
+      return set({ saloon: null, ...funding(arr, null), ...sentPatch(wallet), busy: false });
+    }
     const had = state.saloon;
-    const { saloon } = await at("find account", findSaloon(client, wallet));
-    if (saloon && saloon.usdc > 0) return set({ saloon, stage: state.key ? "ready" : "approve", busy: false });
+    const { saloon, others } = await at("find account", findSaloon(client, wallet));
+    if (saloon && saloon.usdc > 0) {
+      remove(KEYS.sent(wallet));
+      return set({ saloon, others, opening: 0, sentTx: null, sentAmount: null, sentAt: null, stage: state.key ? "ready" : "approve", busy: false });
+    }
     // A new Saloon account takes its own deposit address from now on (the old one opens another account).
     const address = saloon && !had ? await at("deposit address", depositAddress(client, wallet, saloon.id)) : state.depositAddress;
-    const arr = await at("find account", arriving(client, wallet));
-    set({ saloon, depositAddress: address, arriving: arr.amount, busy: false });
+    arr = await at("find account", arriving(client, wallet));
+    set({ saloon, others, depositAddress: address, ...funding(arr, saloon), ...(saloon ? {} : sentPatch(wallet)), busy: false });
   } catch (e) { fail(e, "find account"); }
 }
 
@@ -133,11 +169,14 @@ export async function depositGasUsd(dollars, ethUsd) {
 }
 
 export async function deposit(dollars) {
-  const { provider, wallet, depositAddress: to } = state;
+  const { provider, wallet, depositAddress: to, saloon } = state;
+  if (holdSend(state)) return; // one deposit opens the account; a second would open another
   set({ busy: true, message: null });
   try {
     const tx = await sendTransaction(provider, usdcTransfer(wallet, to, dollars));
-    set({ busy: false, sentTx: tx, sentAmount: dollars });
+    const sentAt = Date.now();
+    if (!saloon) write(KEYS.sent(wallet), { tx, amount: dollars, to, at: sentAt });
+    set({ busy: false, sentTx: tx, sentAmount: dollars, sentAt });
   } catch (e) { fail(e, "deposit"); }
 }
 
