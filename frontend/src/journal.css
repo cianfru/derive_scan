@@ -51,3 +51,46 @@
 @media (pointer: coarse) {
   .q-entry summary { min-height: 44px; }
 }
+
+/* Combined exposure at settlement (Positions) and the held overlay in the outcome preview */
+.q-exp { display: grid; gap: 12px; margin: 0 0 18px; }
+.q-exp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px 16px; flex-wrap: wrap; }
+.q-exp-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.q-exp-total { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0 6px; font-size: 13px; color: var(--text-2); }
+.q-exp-total b { color: var(--text-1); font-weight: 600; font-size: 15px; }
+.q-exp-g { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); min-width: 0; }
+.q-exp-gh { display: flex; justify-content: space-between; align-items: center; gap: 4px 12px; flex-wrap: wrap; }
+.q-exp-gh h3 { margin: 0; font-size: 14px; font-weight: 600; }
+.q-exp-n { display: inline-flex; align-items: center; font-size: 12px; color: var(--text-3); }
+.ex-figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 22px; margin: 0; padding-top: 10px; border-top: 1px solid var(--border); }
+.ex-figs > div { display: grid; gap: 3px; align-content: start; }
+.ex-figs dt { display: flex; align-items: center; flex-wrap: wrap; gap: 0 4px; color: var(--text-2); font-size: 13px; }
+.ex-figs dt small { flex-basis: 100%; color: var(--text-3); font-size: 12px; }
+.ex-figs dd { margin: 0; font-size: 14px; }
+.ex-figs dd small { display: inline-flex; align-items: center; flex-wrap: wrap; color: var(--text-3); font-size: 12px; }
+.ex-figs .q-lose dt, .ex-figs .q-lose dd { color: var(--text-1); font-weight: 600; }
+.ex-chart { max-width: 480px; }
+.pz-line.ex-held { stroke: var(--text-3); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.op-held { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+.op-held h3 { margin: 0; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; flex-wrap: wrap; }
+.op-held-key { display: flex; gap: 16px; margin: 0; font-size: 12px; color: var(--text-3); }
+.op-key::before { content: ""; display: inline-block; width: 18px; margin-right: 6px; vertical-align: middle; border-top: 2px solid var(--text-1); }
+.op-key.held::before { border-top: 1.5px dashed var(--text-3); }
+.op-held-t td { overflow-wrap: anywhere; }
+
+/* Realized P/L (J2) */
+.q-real { display: grid; gap: 6px; }
+.q-real summary { cursor: pointer; display: inline-flex; align-items: center; min-height: 40px; color: var(--text-2); font-size: 13px; font-weight: 600; }
+.q-real-p { display: grid; gap: 4px; padding: 6px 0 10px; border-top: 1px solid var(--border); }
+.q-real-p h4 { margin: 4px 0 2px; font-size: 13px; font-weight: 600; color: var(--text-2); display: flex; flex-wrap: wrap; gap: 0 6px; }
+.q-real-p .q-figs dt { flex-wrap: wrap; gap: 0 6px; }
+.q-real-p .q-figs dt small { color: var(--text-3); font-size: 12px; }
+.q-real-total dt, .q-real-total dd { font-weight: 600; color: var(--text-1) !important; }
+.q-real-miss { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-2); }
+.q-realized-sum { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 14px; margin: 0; font-size: 13px; color: var(--text-2); }
+.q-realized-sum b { font-size: 16px; font-weight: 600; }
+.q-realized-sum b.up { color: var(--up); } .q-realized-sum b.down { color: var(--down); }
+@media (max-width: 560px) {
+  .q-real-p .q-figs > div { flex-direction: column; gap: 2px; }
+  .q-real-p .q-figs dd { text-align: left; }
+}

@@ -2,7 +2,7 @@ import React from "react";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import btc from "./fixtures/questions/BTC.json";
 import hype from "./fixtures/questions/HYPE.json";
 import index from "./fixtures/questions/index.json";
@@ -34,11 +34,17 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
+function QuestionProbe() {
+  const location = useLocation();
+  return <p>question page {location.search || "no side"} budget {location.state?.dollars}</p>;
+}
+
 const show = (path = "/saloon/browse") => render(
   <MemoryRouter initialEntries={[path]}>
     <Routes>
       <Route path="/saloon/browse" element={<Board />} />
-      <Route path="/q/:id" element={<p>question page</p>} />
+      <Route path="/saloon/following" element={<Board followingOnly />} />
+      <Route path="/q/:id" element={<QuestionProbe />} />
     </Routes>
   </MemoryRouter>,
 );
@@ -173,64 +179,110 @@ describe("filters and order", () => {
 });
 
 describe("the board page", () => {
-  const order = () => screen.getAllByRole("link", { name: /see what it pays/ }).map((a) => a.getAttribute("aria-label"));
-  it("lists answers priced for the budget, with the same order whatever the layers read", () => {
-    show();
+  const order = () => screen.getAllByRole("link", { name: /view outcome/ }).map((a) => a.getAttribute("href"));
+  it("groups a coin, level and date without letting research alter its order", () => {
+    const { container } = show();
     const first = order();
-    expect(first.length).toBe(24);
+    const want = [...new Set(sortRows(boardRows([btc, hype], 100, { now: NOW }).rows).map((r) => `/q/${r.id}`))].slice(0, 24);
+    expect(first).toEqual(want);
     expect(screen.getByText(/answers for/).textContent).toMatch(/\$100\.00/);
+    const card = [...container.querySelectorAll(".bd-card")].find((c) => c.querySelectorAll("a.bd-choice").length === 2);
+    const href = card.querySelector(".bd-question").getAttribute("href");
+    expect(within(card).getAllByRole("link", { name: /see what it pays/ }).map((a) => a.getAttribute("href"))).toEqual([`${href}?side=yes`, `${href}?side=no`]);
+    expect(card.textContent).toMatch(/Pays in part\$[\d,]+–\$[\d,]+/);
+    expect(card.textContent).toMatch(/Cost per \$1 of maximum payout · before fees/);
     cleanup();
-    docs.current = { ...docs.current, "markets.json": markets("defensive") };
-    show();
-    expect(order()).toEqual(first);
+    docs.current = { ...docs.current, "markets.json": markets("defensive") }; show(); expect(order()).toEqual(first);
     cleanup();
-    docs.current = { ...docs.current, "markets.json": null };
-    show();
-    expect(order()).toEqual(first);
+    docs.current = { ...docs.current, "markets.json": null }; show(); expect(order()).toEqual(first);
   });
-  it("orders by lowest cost over mark by default, shows fees and exit cost apart, and Not available yet when the mark is stale", () => {
+  it("keeps comparisons behind details and missing-mark reasons available", async () => {
+    const u = userEvent.setup({ advanceTimers: () => {} });
     const { container } = show();
     expect(screen.getByRole("combobox", { name: "Order" }).value).toBe("mark");
-    const want = sortRows(boardRows([btc, hype], 100, { now: NOW }).rows, "mark").slice(0, 24).map((r) => r.key);
-    const got = [...container.querySelectorAll(".bd-link")].map((a) => { const u = new URL(a.href, "http://x"); return `${u.pathname.slice(3)}:${u.searchParams.get("side")}`; });
-    expect(got).toEqual(want);
-    const head = container.querySelector(".bd-head").textContent;
-    expect(head).toMatch(/Fees.*Cost over mark.*Exit cost now/);
-    // Fresh prices: the first rows all have a cost over mark (rows without one go last).
-    expect(container.querySelectorAll(".bd-over .bd-notyet")).toHaveLength(0);
+    const comparison = container.querySelector(".bd-comparison");
+    expect(comparison.open).toBe(false);
+    await u.click(comparison.querySelector("summary"));
+    await within(comparison).findAllByText("Derive fees included");
+    expect(comparison.textContent).toMatch(/Derive fees included.*Cost over mark.*Exit cost now/);
     cleanup();
-    vi.setSystemTime((btc.prices_ts + 40 * 60) * 1000); // prices 40 minutes old: stale, not paused
+    vi.setSystemTime((btc.prices_ts + 40 * 60) * 1000);
     const stale = show().container;
-    expect(stale.querySelectorAll(".bd-row").length).toBeGreaterThan(0);
-    expect(stale.querySelectorAll(".bd-over .bd-notyet").length).toBe(stale.querySelectorAll(".bd-row").length);
+    expect(stale.querySelectorAll("a.bd-choice").length).toBeGreaterThan(0);
+    const staleCard = stale.querySelector(".bd-card");
+    await u.click(staleCard.querySelector("summary"));
+    await within(staleCard).findAllByText("Not available yet");
+    expect(staleCard.querySelectorAll(".bd-over .bd-notyet").length).toBe(staleCard.querySelectorAll("a.bd-choice").length);
     expect(stale.textContent).not.toMatch(BANNED);
   });
-  it("keeps the budget, filters by coin and answer, and passes the word check", async () => {
+  it("keeps budget and side filtering, and searches coin names or unformatted prices", async () => {
     const u = userEvent.setup({ advanceTimers: () => {} });
     const { container } = show();
     await u.click(screen.getByRole("button", { name: "$500" }));
     expect(loadBudget()).toBe(500);
     expect(screen.getByText(/answers for/).textContent).toMatch(/\$500\.00/);
     await u.click(screen.getByRole("tab", { name: "HYPE" }));
-    expect(order().every((n) => n.startsWith("HYPE"))).toBe(true);
+    expect(order().every((n) => n.startsWith("/q/HYPE"))).toBe(true);
     expect(container.textContent).toMatch(/Thin book/);
     await u.selectOptions(screen.getByRole("combobox", { name: "Answer" }), "no");
-    expect(order().every((n) => / Lower /.test(n))).toBe(true);
+    expect(screen.getAllByRole("link", { name: /see what it pays/ }).every((a) => a.getAttribute("href").endsWith("side=no"))).toBe(true);
+    await u.click(screen.getByRole("tab", { name: "All coins" }));
+    await u.type(screen.getByRole("searchbox", { name: "Search outcomes" }), "bitcoin");
+    expect(order().every((n) => n.startsWith("/q/BTC"))).toBe(true);
+    await u.clear(screen.getByRole("searchbox")); await u.type(screen.getByRole("searchbox"), "85000");
+    expect(screen.getAllByRole("link", { name: /view outcome/ }).every((a) => a.getAttribute("aria-label").includes("$85,000"))).toBe(true);
     expect(container.textContent).not.toMatch(BANNED);
     expect(container.textContent).not.toMatch(/\b(hot|trending|best|top pick)\b/i);
   });
-  it("follows an answer from a row and sets its level", async () => {
+  it("opens a question with no side, and passes a side and budget only on an explicit choice", async () => {
+    const u = userEvent.setup({ advanceTimers: () => {} }); show();
+    await u.click(screen.getByRole("button", { name: "$500" }));
+    await u.click(screen.getAllByRole("link", { name: /view outcome/ })[0]);
+    expect(screen.getByText("question page no side budget 500")).toBeTruthy();
+    cleanup(); show();
+    await u.click(screen.getAllByRole("link", { name: / Lower .*see what it pays/ })[0]);
+    expect(screen.getByText("question page ?side=no budget 500")).toBeTruthy();
+  });
+  it("collapses phone filters without clearing their values, and marks nondefault settings", async () => {
+    const u = userEvent.setup({ advanceTimers: () => {} }); show();
+    const toggle = screen.getByRole("button", { name: "Filters" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    await u.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    await u.selectOptions(screen.getByRole("combobox", { name: "Answer" }), "no");
+    await u.selectOptions(screen.getByRole("combobox", { name: "Order" }), "soon");
+    expect(toggle.textContent).toBe("Filters2");
+    await u.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.getByRole("combobox", { name: "Answer" }).value).toBe("no");
+    expect(screen.getByRole("combobox", { name: "Order" }).value).toBe("soon");
+    expect(screen.getAllByRole("link", { name: /see what it pays/ }).every((a) => a.getAttribute("href").endsWith("side=no"))).toBe(true);
+  });
+  it("shows an unavailable opposite answer with its gate reason instead of implying it is missing", async () => {
     const u = userEvent.setup({ advanceTimers: () => {} });
-    show();
-    const btn = screen.getAllByRole("button", { name: /^Follow / })[0];
-    await u.click(btn);
-    const doc = loadDoc();
-    expect(doc.follows).toHaveLength(1);
-    expect(doc.follows[0].seen.init).toBe(true);
-    const f = doc.follows[0];
-    const input = screen.getByRole("textbox", { name: "Notice at" });
-    await u.type(input, "40{Enter}");
+    const date = btc.dates[1];
+    const level = date.levels.find((l) => l.id === H);
+    docs.current["questions/index.json"] = { ...idx, coins: [{ und: "BTC" }] };
+    docs.current["questions/BTC.json"] = { ...btc, dates: [{ ...date, levels: [{ ...level, ladder: 15, no: { ...level.no, state: "screen_wide" } }] }] };
+    const { container } = show();
+    expect(container.querySelector(".bd-choice.off").textContent).toContain("LowerNo price");
+    expect(screen.getAllByRole("link", { name: /see what it pays/ })).toHaveLength(1);
+    await u.click(screen.getByRole("button", { name: /Why BTC Lower .* has no price/ }));
+    expect(screen.getByRole("dialog").textContent).toMatch(/screen is too wide/);
+    await u.selectOptions(screen.getByRole("combobox", { name: "Answer" }), "yes");
+    expect(container.querySelector(".bd-choice.off")).toBeNull();
+  });
+  it("follows only the chosen answer and retains its editable notice level", async () => {
+    const u = userEvent.setup({ advanceTimers: () => {} }); show();
+    await u.click(screen.getAllByRole("button", { name: /^Follow Lower/ })[0]);
+    const doc = loadDoc(); expect(doc.follows).toHaveLength(1); expect(doc.follows[0].seen.init).toBe(true); expect(doc.follows[0].side).toBe("no");
+    const f = doc.follows[0]; cleanup(); show("/saloon/following");
+    expect(screen.getAllByRole("link", { name: /see what it pays/ }).map((a) => a.getAttribute("href"))).toEqual([`/q/${f.id}?side=no`]);
+    await u.click(screen.getByText("Saved answers & notices"));
+    await u.type(screen.getByRole("textbox", { name: "Notice at" }), "40{Enter}");
     expect(loadDoc().follows.find((x) => x.id === f.id).level).toBe(40);
+    await u.type(screen.getByRole("searchbox"), "85000");
+    expect(screen.queryAllByRole("link", { name: /see what it pays/ }).every((a) => a.getAttribute("href") === `/q/${f.id}?side=no`)).toBe(true);
   });
 });
 

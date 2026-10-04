@@ -1,0 +1,136 @@
+/* Outcome detail: the same spread maths, organised around a choice rather than a wizard. */
+.md-page { gap: 28px; }
+.md-detail { display: grid; grid-template-columns: minmax(0, 1fr) 400px; grid-template-areas: "heading selection" "evidence selection"; gap: 28px 48px; align-items: start; }
+.md-heading { grid-area: heading; display: grid; gap: 18px; min-width: 0; }
+.md-back { justify-self: start; color: var(--text-3); font-size: 13px; display: inline-flex; align-items: center; min-height: 32px; }
+.md-back:hover { color: var(--accent-text); }
+.md-subject { display: flex; gap: 12px; align-items: center; color: var(--text-3); font-size: 13px; }
+.md-subject .asset { color: var(--text-1); }
+.md-subject .asset-icon { width: 32px; height: 32px; }
+.md-subject > span:not(.asset) { border-left: 1px solid var(--border-strong); padding-left: 12px; }
+.md-heading .q-title { font-size: clamp(26px, 2.5vw, 34px); line-height: 1.28; letter-spacing: -.035em; font-weight: 650; max-width: 24ch; }
+.md-heading .q-settles { flex-wrap: wrap; font-size: 13px; line-height: 1.6; margin: 0; }
+.md-evidence { grid-area: evidence; display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; min-width: 0; }
+.md-history { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; padding-bottom: 26px; border-bottom: 1px solid var(--border); }
+.md-history > *, .md-history .q-chart > * { min-width: 0; }
+.md-section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.md-section-heading > div { display: grid; gap: 5px; }
+.md-section-heading strong { font-size: 26px; font-weight: 500; letter-spacing: -.04em; }
+.md-section-heading h2 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+.md-section-heading .q-time { font-size: 12px; }
+.md-history-key { display: flex; align-items: center; gap: 2px; color: var(--text-2); font-size: 13px; margin-top: 5px; }
+.md-history .q-chart-box { height: 250px; }
+.md-history .q-chart { grid-template-columns: minmax(0, 1fr); gap: 15px; }
+.md-history .q-chart .status { min-height: 160px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 30px; background: var(--surface-1); border-radius: var(--r-md); }
+.md-settlement { display: grid; gap: 15px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
+.md-settlement > p { font-size: 14px; line-height: 1.7; color: var(--text-2); margin: 0; }
+.md-settlement > p b { font-weight: 500; color: var(--text-1); }
+.md-boundaries { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-block: 8px; }
+.md-boundaries > div { display: grid; gap: 6px; padding-left: 12px; border-left: 2px solid var(--down); }
+.md-boundaries > div + div { border-color: var(--up); }
+.md-boundaries span { font-size: 12px; color: var(--text-3); }
+.md-boundaries b { font-size: 14px; font-weight: 500; }
+.md-evidence .q-context { gap: 14px; }
+.md-evidence .q-context .chain { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.md-evidence .q-context .chain-tile { padding: 12px; gap: 9px; }
+.md-evidence .q-context .chain-icon, .md-evidence .q-context .step-n { display: none; }
+.md-evidence .q-context .chain-text b { font-size: 13px; }
+.md-evidence .q-context > .text-link { justify-self: start; font-size: 13px; }
+.md-other { padding-top: 20px; border-top: 1px solid var(--border); display: grid; gap: 15px; }
+.md-other .q-other { justify-self: start; }
+.md-selection { grid-area: selection; position: sticky; top: 104px; min-width: 0; }
+.md-selection-inner { padding: 20px; border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface-1); display: grid; gap: 14px; }
+.md-selection-title { display: grid; gap: 5px; }
+.md-selection-title h2 { font-size: 18px; letter-spacing: -.025em; font-weight: 650; }
+.md-selection-title > span { display: inline-flex; align-items: center; font-size: 12px; color: var(--text-3); }
+.md-pick { gap: 10px; }
+.md-pick .q-pick-btn { padding: 12px; gap: 9px 8px; border-radius: var(--r-md); min-height: 76px; }
+.md-pick .q-pick-btn.yes { color: var(--up); background: color-mix(in srgb, var(--up) 6%, var(--surface-1)); border-color: color-mix(in srgb, var(--up) 26%, var(--border)); }
+.md-pick .q-pick-btn.no { color: var(--down); background: color-mix(in srgb, var(--down) 6%, var(--surface-1)); border-color: color-mix(in srgb, var(--down) 26%, var(--border)); }
+.md-pick .q-pick-btn.yes.on, .md-pick .q-pick-btn.yes:hover { border-color: var(--up); background: color-mix(in srgb, var(--up) 14%, var(--surface-1)); }
+.md-pick .q-pick-btn.no.on, .md-pick .q-pick-btn.no:hover { border-color: var(--down); background: color-mix(in srgb, var(--down) 14%, var(--surface-1)); }
+.md-pick .q-pick-name { font-size: 14px; }
+.md-pick .q-pick-btn b { font-size: 20px; }
+.md-pick .q-pick-zone small { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+.md-unpicked { padding-top: 12px; border-top: 1px solid var(--border); display: grid; gap: 8px; }
+.md-unpicked p { font-size: 14px; line-height: 1.6; color: var(--text-2); margin: 0; }
+.md-unpicked > small { color: var(--text-3); font-size: 12px; }
+.md-follow { display: flex; flex-wrap: wrap; gap: 12px; margin: -6px 0 0; }
+.md-amount { max-width: none; padding: 0; border: 0; border-radius: 0; background: none; gap: 14px; }
+.md-amount[hidden] { display: none; }
+.md-amount .q-amount-in { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.md-amount .q-amount-in > label { grid-column: 1 / -1; display: inline-flex; align-items: center; text-transform: none; font: 500 13px var(--font-sans); color: var(--text-2); }
+.md-amount .q-dollar-field { min-width: 0; height: 48px; padding: 0 14px; }
+.md-amount .q-dollar-field input { min-width: 0; width: 100%; font-size: 20px; }
+.md-amount .q-quick { gap: 12px; }
+.md-amount .q-quick .text-control { font-size: 12px; }
+.md-amount .q-quick .text-control[aria-pressed="true"] { color: var(--accent-text); }
+.md-preview { border-top: 1px solid var(--border); padding-top: 12px; }
+.md-preview .op { gap: 20px; }
+.md-preview .op-figs { gap: 9px; }
+.md-preview .op-figs dt { font-size: 12px; line-height: 1.5; }
+.md-preview .op-figs dd { flex-shrink: 0; font-size: 13px; }
+.md-preview .op-figs .op-total { padding-block: 0 10px; margin-bottom: 3px; }
+.md-preview .op-figs .op-total dd { font-size: 20px; letter-spacing: -.04em; }
+.md-preview .op-figs .op-total dt { max-width: 24ch; }
+.md-preview .op-figs .op-total .op-fees-line { display: block; margin-top: 2px; font: 400 12px/1.4 var(--font-mono); letter-spacing: 0; color: var(--text-3); text-align: right; }
+.md-loss-note { font-size: 12px; color: var(--text-3); line-height: 1.6; margin: 12px 0 0; }
+.md-payoff-study { display: grid; gap: 18px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
+.md-payoff-study h2 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+.md-payoff-study .op-sim, .md-payoff-study .op-ex { max-width: none; }
+.md-payoff-study .payzone { max-width: none; }
+.md-payoff-study .op-read { font-size: 14px; line-height: 1.7; }
+.md-payoff-study .op-ex { font-size: 13px; }
+.md-payoff-study .op-ex th, .md-payoff-study .op-ex td { padding-block: 10px; }
+.md-payoff-study .op-note { line-height: 1.6; }
+.md-review-action { display: grid; gap: 9px; text-align: center; }
+.md-review-action > .btn { width: 100%; min-height: 48px; }
+.md-review-action small { font-size: 12px; color: var(--text-3); }
+.md-ticket .q-ticket { border: 0; padding: 0; background: none; }
+.md-ticket .q-sheet-close { display: block; float: none; margin-bottom: 16px; padding: 0; color: var(--accent-text); }
+.md-ticket .q-ticket h3 { font-size: 13px; line-height: 1.7; }
+.md-ticket .q-hand { padding: 12px; }
+.md-ticket .q-hand .q-money > div { display: grid; gap: 4px; }
+.md-ticket .q-hand .q-money dd { text-align: left; }
+.md-ticket .q-legs li { grid-template-columns: 18px minmax(0, 1fr); grid-template-areas: "n act" "n name" "n a" "n l"; }
+@media (max-width: 1279px) and (min-width: 901px) {
+  .md-detail { grid-template-columns: minmax(0, 1fr) 370px; gap: 26px; }
+  .md-selection-inner { padding: 20px; }
+  .md-selection { position: static; }
+}
+@media (max-width: 900px) {
+  .md-detail { grid-template-columns: minmax(0, 1fr); grid-template-areas: "heading" "selection" "evidence"; gap: 28px; }
+  .md-selection { position: static; }
+  .md-selection-inner { padding: 22px; }
+  .md-heading .q-title { max-width: 28ch; }
+  .md-pick { max-width: none; }
+  .md-history .q-chart-box { height: 240px; }
+}
+@media (max-width: 520px) {
+  .md-detail { gap: 24px; }
+  .md-heading { gap: 14px; }
+  .md-heading .q-title { font-size: 25px; }
+  .md-heading .q-settles { font-size: 12px; }
+  .md-selection-inner { padding: 18px 16px; }
+  .md-selection-title h2 { font-size: 17px; }
+  .md-pick .q-pick-btn { padding: 12px 10px; }
+  .md-pick .q-pick-btn b { font-size: 18px; }
+  .md-amount .q-quick { gap: 10px; }
+  .md-preview .op-figs > div { gap: 12px; }
+  .md-boundaries { gap: 10px; }
+  .md-boundaries b { font-size: 12px; }
+  .md-evidence .q-context .chain { grid-template-columns: 1fr; }
+  .md-evidence .q-context .chain-tile { padding: 12px 14px; }
+  .md-evidence .q-context .chain-text { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .md-section-heading .q-time { max-width: 160px; margin-left: auto; width: auto; flex-wrap: wrap; justify-content: flex-end; text-align: right; }
+  .md-ticket .q-legs li { grid-template-columns: 22px auto minmax(0, 1fr); grid-template-areas: "n act name" "n a l"; }
+}
+
+/* Touch: 44px hit areas for the back link, Follow and the chart range tabs. */
+@media (max-width: 900px), (pointer: coarse) {
+  .md-detail .md-back { min-height: 44px; }
+  .md-detail .fl-btn { min-height: 44px; min-width: 44px; }
+  .md-detail .q-chart-head .tabs { gap: 0 4px; }
+  .md-detail .q-chart-head .tabs button { min-height: 44px; min-width: 44px; padding-inline: 10px; }
+  .md-detail .q-chart-head .tabs button[aria-selected="true"] { border-bottom-color: transparent; background: linear-gradient(var(--accent), var(--accent)) no-repeat 50% 100% / calc(100% - 20px) 2px; }
+}

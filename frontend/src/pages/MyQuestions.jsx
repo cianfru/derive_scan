@@ -1,20 +1,27 @@
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { Info, Tabs } from "../components/ui.jsx";
+import { Asset } from "../components/MarketVisuals.jsx";
 import PayZone from "../components/PayZone.jsx";
 import QuestionTicket from "../components/QuestionTicket.jsx";
+import Exposure from "../components/Exposure.jsx";
 import {
   ANSWER, cents, closeTicket, countdown, dayLabel, findLevel, fullPay, money, noPriceReason, parseId, priceAge, questionText, signed,
 } from "../lib/questions.js";
 import {
-  closePosition, exportPositions, importPositions, loadPositions, partial, persistent, positionFigures, positionStatus, prune, removePosition,
+  closePosition, exportPositions, importPositions, loadPositions, openPart, partial, persistent, positionFigures, positionStatus, prune, removePosition,
+  settlePosition,
 } from "../lib/positions.js";
+import { breakdownRows, closeEvent, realized, realizedSummary, remainingQty } from "../lib/realized.js";
+import { exposureGroups } from "../lib/exposure.js";
 import { compareReadings, hasJournal } from "../lib/journal.js";
 import "../questions.css";
 import "../journal.css";
+import "../marketplace-positions.css";
 
 const usd = (v) => money(v, { cents: true });
+const sumNets = (r) => (r.portions.every((x) => x.exit.net != null) ? r.portions.reduce((a, x) => a + x.exit.net, 0) : null);
 
 /** A value Cowboy cannot show, in words, with the reason in an (i). */
 function Missing({ text, why, label }) {
@@ -130,6 +137,95 @@ function EntryRecord({ p }) {
   );
 }
 
+const PART = {
+  value_change: ["Package value change", "Derive's mark for the package when you sold (or what it paid at settlement) minus its mark when you entered. The options' value moves with the coin's price, volatility and time left; Derive's mark is a benchmark, not an exact fair value, and nothing here says what caused it."],
+  entry_vs_mark: ["Entry cost versus mark", "What you paid before fees minus Derive's mark at entry, counted against you. It adds to the result when your fill was better than the mark."],
+  exit_vs_mark: ["Exit cost versus mark", "Derive's mark when you sold minus what the options brought before fees, counted against you. It adds to the result when your sale was better than the mark."],
+  fees: ["Derive's fees", "Entry and exit fees for these contracts, each counted once."],
+  rounding: ["Rounding", "The parts are rounded to the cent; this line makes them add up to the result."],
+};
+const MISS = {
+  split: "How what you paid splits into premium and fees: saved before Cowboy kept entry records.",
+  premium: "The premium you paid, before fees.",
+  entry_fees: "Derive's fees at entry: not entered and not estimable.",
+  entry_mark: "Derive's mark at entry: not saved with this position.",
+  entry_mark_far: "Derive's mark at entry: taken more than 35 minutes from your fill, or no fill time entered, so it is not a fair benchmark.",
+  mark_partial: "Derive's mark: it values the whole answer, not the one option that filled.",
+  exit_split: "What the options brought before fees: only the amount after fees was saved.",
+  exit_fees: "Derive's fees to sell back.",
+  exit_mark: "Derive's mark when you sold: no board price was available.",
+  exit_mark_far: "Derive's mark when you sold: more than 35 minutes from your sale time, or no sale time entered.",
+};
+const BASIS = { entered: "Entered by you", estimated: "Estimated", exact: "Exact", none: "None", included: "Included in what you paid", unknown: "Not entered" };
+
+/** One realized portion: the amounts, each with how it is known, then the breakdown against
+ * Derive's mark that adds up to the result, or what is missing for one. */
+function Portion({ x, und }) {
+  const head = x.kind === "settle"
+    ? <>Settled at {money(x.settle_price)}<small className="mono">{amountTextQ(x.qty)} contracts</small></>
+    : <>Sold back {amountTextQ(x.qty)} contracts<small className="mono">{when(x.ts) ? `${when(x.ts)} · entered by you` : "time not entered"}</small></>;
+  const rows = breakdownRows(x);
+  const row = (label, sub, v, cls = "") => (
+    <div className={cls}><dt>{label}{sub && <small>{sub}</small>}</dt><dd className="mono">{v}</dd></div>
+  );
+  const nr = <span className="q-noprice">Not entered</span>;
+  return (
+    <div className="q-real-p">
+      <h4>{head}</h4>
+      <dl className="q-figs">
+        {x.entry.premium != null
+          ? row("Premium paid", BASIS.entered, usd(x.entry.premium))
+          : row("Paid, fees included", BASIS.entered, x.entry.total != null ? usd(x.entry.total) : nr)}
+        {x.entry.premium != null && row("Entry fees", BASIS[x.basis.entry_fees] || "", x.entry.fees != null ? usd(x.entry.fees) : nr)}
+        {x.kind === "settle"
+          ? row("Settlement payout", `Exact, from Derive's settlement price for ${und}`, usd(x.exit.gross))
+          : x.exit.gross != null ? row("Sell-back proceeds, before fees", BASIS[x.basis.exit], usd(x.exit.gross))
+            : row("Got back, after fees", BASIS.entered, x.exit.net != null ? usd(x.exit.net) : nr)}
+        {x.kind === "settle" ? row("Exit fees", "Derive's fee schedule lists no settlement fee", usd(0))
+          : x.exit.gross != null && row("Exit fees", BASIS[x.basis.exit_fees], x.exit.fees != null ? usd(x.exit.fees) : nr)}
+        {row("Realized P/L", x.estimated ? "with estimated fees" : null, x.net != null ? <span className={tone(x.net)}>{signed(x.net)}</span> : <span className="q-noprice">Not available yet</span>, "q-real-total")}
+      </dl>
+      {rows ? (
+        <dl className="q-figs" aria-label="Where it came from">
+          {rows.map(([k, v]) => <Fragment key={k}>{row(<>{PART[k][0]}<Info label={PART[k][0]}>{PART[k][1]}</Info></>, null, <span className={tone(v)}>{signed(v)}</span>)}</Fragment>)}
+        </dl>
+      ) : (
+        <>
+          <p className="q-note">Not available yet: the split against Derive's mark needs<Info label="Why no breakdown">Cowboy does not invent the missing pieces; the result above uses only what is known.</Info></p>
+          <ul className="q-real-miss">{x.missing.map((k) => <li key={k}>{MISS[k]}</li>)}</ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+const amountTextQ = (v) => String(Number((v ?? 0).toFixed(8)));
+
+function Realized({ p, und }) {
+  const r = realized(p);
+  if (!r.portions.length) return null;
+  return (
+    <details className="q-real">
+      <summary>Where the result came from</summary>
+      {r.portions.map((x, i) => <Portion key={i} x={x} und={und} />)}
+      {r.open > 0 && <p className="q-note">{amountTextQ(r.open)} contracts are still open and not counted here.</p>}
+    </details>
+  );
+}
+
+/** Records the settlement of a position past its date once Derive's settlement price is published,
+ * whichever tab is open, so the realized summary counts it. Renders nothing. */
+function SettleWatch({ p, onSettle }) {
+  const q = parseId(p.id);
+  const { data: board } = useData(q ? `questions/${q.und}.json` : null);
+  const found = board ? findLevel(board, p.id) : null;
+  const fromBoard = found?.settled ? found.date.settle_price : null;
+  const { data: hist } = useData(fromBoard == null && q ? `questions/history/${q.und}-${q.expiry}.json` : null, 30 * 60_000);
+  const price = fromBoard ?? hist?.settle_price ?? null;
+  useEffect(() => { if (Number.isFinite(price)) onSettle(p.key, price); }, [price, p.key]);
+  return null;
+}
+
 function Card({ p, onRemove, onClose }) {
   const q = parseId(p.id);
   const { data: board } = useData(q ? `questions/${q.und}.json` : null);
@@ -145,9 +241,18 @@ function Card({ p, onRemove, onClose }) {
   const paused = board ? priceAge(board.prices_ts, now, board.paused).state === "paused" : true;
   const settling = (!after && now >= settleTs - 1800) || (after && settle == null);
   const half = partial(p);
+  const op = after || p.closed_at ? p : openPart(p);
   const t = found && !found.settled && !paused && !settling && !half && !p.closed_at
-    ? closeTicket(found.level, p.side, p.contracts, board, p.legs) : null;
-  const f = positionFigures(p, { found: paused ? null : found, settlePrice: settle, close: t, index: board?.index });
+    ? closeTicket(found.level, p.side, op.contracts, board, p.legs) : null;
+  const f = positionFigures(op, { found: paused ? null : found, settlePrice: settle, close: t, index: board?.index });
+  const real = realized(p);
+  const settleExit = real.portions.find((x) => x.kind === "settle");
+  const sold = (sale) => {
+    const lv = found?.level;
+    const fair = lv && Number.isFinite(lv.fair) ? (p.side === "yes" ? lv.fair : 1 - lv.fair) : null;
+    const mark = fair == null ? null : { value: fair * (lv.hi - lv.lo) * sale.qty, ts: board?.prices_ts ?? null };
+    onClose(p.key, closeEvent({ ...sale, savedTs: Math.floor(Date.now() / 1000), mark }));
+  };
   const status = positionStatus(p, { settled: f.settled, settling });
   const name = ANSWER[p.side];
   const question = q ? questionText(q.und, q, q.expiry) : p.question;
@@ -161,58 +266,78 @@ function Card({ p, onRemove, onClose }) {
   const na = (why, label) => <Missing text="Not available yet" label={label} why={why} />;
   const noPrice = <Missing text="No price now" label="Why no price" why={reason} />;
   return (
-    <article className={`q-card q-card-${status.key}`}>
-      <header>
-        <Link to={`/q/${p.id}?side=${p.side}`} className="q-card-title">{question}</Link>
-        <span className="q-card-side">{name}{q && <> · {fullPay(q, p.side)}</>}</span>
+    <article className={`q-card q-position q-card-${status.key}`}>
+      <header className="q-position-heading">
+        {q && <Asset und={q.und} compact />}
+        <div>
+          <Link to={`/q/${p.id}?side=${p.side}`} className="q-card-title">{question}</Link>
+          <span className={`q-card-side q-position-side ${p.side === "yes" ? "higher" : "lower"}`}>{name}{q && <> · {fullPay(q, p.side)}</>}</span>
+        </div>
       </header>
       <p className={`q-card-status${status.warn ? " warn" : ""}`}>
-        {status.key === "settled" ? <>Settled at {money(settle)} · got {usd(f.got)}</> : status.text}
+        {status.key === "settled" ? <>Settled at {money(settle)} · got {usd(settleExit?.exit.gross ?? f.got)}</> : status.text}
         <Info label="How this was placed">{half
           ? "You told Cowboy only the first of the two orders filled. You hold one option alone, which pays differently from the answer and can lose all it cost. Finish or undo it on Derive; Cowboy shows no value for it."
           : "You placed the orders on Derive yourself and told Cowboy what you paid. Cowboy cannot see your Derive account, so these figures are only as good as what you entered."}</Info>
       </p>
-      <dl className="q-figs grid">
-        <Fig label="You paid" sub={p.journal?.cost?.fees_basis === "estimated" ? "estimated fees included" : p.journal?.cost?.fees_basis === "unknown" ? "fees not entered" : "fees included"} value={usd(p.paid)} />
-        {f.closed ? (
+      <dl className="q-figs grid q-position-figures">
+        <Fig label="You paid" sub={p.journal?.cost?.fees_basis === "estimated" ? "estimated fees included" : p.journal?.cost?.fees_basis === "unknown" ? "fees not entered" : op !== p ? `fees included, for the ${amountTextQ(op.contracts)} still open` : "fees included"} value={usd(op.paid)} />
+        {f.closed || p.closed_at ? (
           <>
-            <Fig label="Got back" sub="after fees" value={usd(f.got)} />
-            <Fig label="Profit / loss" value={pl(f.pl)} className="q-pl" />
+            <Fig label="Got back" sub="after fees" value={usdOr(real.portions.length ? sumNets(real) : f.got)} missing={na("Only part of what came back was entered.", "Why no amount")} />
+            <Fig label="Realized P/L" value={pl(real.portions.length ? real.net : f.pl)} className="q-pl" missing={na("A part of the result was not entered; see Where the result came from.", "Why no result")} />
           </>
-        ) : f.settled ? (
+        ) : f.settled || (after && settleExit) ? (
           <>
-            <Fig label="Got" sub={`${cents(Math.round(f.per * 100))} per $1`} value={usd(f.got)} />
-            <Fig label="Profit / loss" value={pl(f.pl)} className="q-pl" />
+            {real.portions.some((x) => x.kind === "close")
+              ? <Fig label="Got back" sub="sold back in part, the rest settled, after fees" value={usdOr(sumNets(real))} missing={na("Only part of what came back was entered.", "Why no amount")} />
+              : <Fig label="Got" sub={f.per != null ? `${cents(Math.round(f.per * 100))} per $1` : "at settlement"}
+                value={usdOr(settleExit ? settleExit.exit.gross : f.got)} missing={na(partWhy, "Why no amount")} />}
+            <Fig label="Realized P/L" value={pl(settleExit ? real.net : f.pl)} className="q-pl" missing={na("A part of the result was not entered; see Where the result came from.", "Why no result")} />
           </>
         ) : (
           <>
-            <Fig label="Most it pays" sub={q ? fullPay(q, p.side) : null} value={usdOr(f.maxPayout)} missing={na(partWhy, "Why no payout")} />
             <Fig label="Value now" sub="sell-back, after fees"
               info={f.mark != null && f.valueNow != null && <Info label="At Derive's mark">At Derive's mark: {usd(f.mark)}. Value now is Derive's sell-back price on its screen minus Derive's fees to sell back, about {usd(f.fees)}.</Info>}
               value={usdOr(f.valueNow)} missing={half ? na(partWhy, "Why no value") : noPrice} />
             <Fig label="Profit / loss now" sub="if sold back now" value={pl(f.plNow)} className="q-pl"
               missing={half ? na("With only one option filled there is no result for the answer.", "Why no result") : na("There is a result once Derive shows a sell-back price, or at settlement.", "Why no result")} />
-            <Fig label="At 08:00 UTC, today's price" sub={f.expiryNow != null ? `pays ${usd(f.expiryNow)}` : null} value={pl(f.plExpiryNow)}
-              info={<Info label="About the payout at today's price">What the answer pays if {q?.und} settles at today's price, {money(board?.index)}, and the profit or loss after what you paid. Not a view of where it settles.</Info>}
-              missing={na(half ? partWhy : "Cowboy needs today's price from the board to show this.", "Why no payout at today's price")} />
           </>
         )}
         <Fig label={f.closed ? "Sold back" : f.settled ? "Settled" : "Settles"}
           value={f.closed ? new Date(p.closed_at * 1000).toISOString().slice(0, 10) : q ? `${dayLabel(q.expiry)}, 08:00 UTC` : null}
           sub={!f.closed && !f.settled && !settling ? countdown(settleTs, now) : settling && !f.settled ? "settling now" : null} missing={na("No date saved.", "Why no date")} />
       </dl>
-      {q && !half && <PayZone lo={q.lo} hi={q.hi} side={p.side} index={settle ?? board?.index} compact />}
-      <SinceStrip p={p} markets={markets} now={now} />
-      <EntryRecord p={p} />
-      <div className="q-card-actions">
-        {t && <button className="btn" onClick={() => setClosing((s) => !s)} aria-expanded={closing}>{closing ? "Keep it open" : "Close"}</button>}
-        <button className="text-control" onClick={() => onRemove(p.key)}>Remove</button>
+      {real.portions.length > 0 && real.open > 0 && !after && (
+        <p className="q-note q-position-realized">Realized so far: <b className={`mono ${tone(real.net ?? 0)}`}>{real.net != null ? signed(real.net) : "Not available yet"}</b> on {amountTextQ(p.contracts - real.open)} contracts sold back; the figures above are for the {amountTextQ(real.open)} still open.</p>
+      )}
+      <div className="q-position-tools">
+        <details className="q-position-details">
+          <summary>Position details<span aria-hidden="true">+</span></summary>
+          <div className="q-position-expanded">
+            {!f.closed && !f.settled && !p.closed_at && !(after && settleExit) && <dl className="q-figs grid q-position-extra">
+              <Fig label="Most it pays" sub={q ? fullPay(q, p.side) : null} value={usdOr(f.maxPayout)} missing={na(partWhy, "Why no payout")} />
+              <Fig label="At 08:00 UTC, today's price" sub={f.expiryNow != null ? `pays ${usd(f.expiryNow)}` : null} value={pl(f.plExpiryNow)}
+                info={<Info label="About the payout at today's price">What the answer pays if {q?.und} settles at today's price, {money(board?.index)}, and the profit or loss after what you paid. Not a view of where it settles.</Info>}
+                missing={na(half ? partWhy : "Cowboy needs today's price from the board to show this.", "Why no payout at today's price")} />
+            </dl>}
+            {q && !half && <PayZone lo={q.lo} hi={q.hi} side={p.side} index={settle ?? board?.index} compact />}
+            <SinceStrip p={p} markets={markets} now={now} />
+            <EntryRecord p={p} />
+            <Realized p={p} und={q?.und || p.und} />
+            <div className="q-card-actions">
+              <button className="text-control" onClick={() => onRemove(p.key)}>Remove</button>
+              <span className="q-position-remove-note">Removes this browser record only.</span>
+            </div>
+          </div>
+        </details>
+        {t && <button className="btn q-position-close" onClick={() => setClosing((s) => !s)} aria-expanded={closing}>{closing ? "Keep it open" : "Close"}</button>}
       </div>
       {closing && t && (
         <QuestionTicket und={q.und} question={question} answer={name} level={found.level} sideKey={p.side} t={t} board={board}
           pricesTs={board.prices_ts} settleTs={settleTs} stale={priceAge(board.prices_ts, now).state === "stale"} closing
-          paid={p.paid} holdPayout={f.expiryNow}
-          onSold={(got) => { setClosing(false); onClose(p.key, got); }} />
+          paid={op.paid} holdPayout={f.expiryNow}
+          onSold={(sale) => { setClosing(false); sold(sale); }} />
       )}
     </article>
   );
@@ -229,8 +354,13 @@ export default function MyQuestions() {
   const now = Date.now() / 1000;
   const settleOf = (p) => p.settle_ts || 0;
   const done = (p) => !!p.closed_at || now >= settleOf(p);
+  const openCount = list.filter((p) => !done(p)).length;
+  const incompleteCount = list.filter((p) => !p.closed_at && partial(p)).length;
   const rows = useMemo(() => list.filter((p) => (tab === "open" ? !done(p) : done(p)))
     .sort((a, b) => settleOf(a) - settleOf(b)), [list, tab, now]);
+  const groups = useMemo(() => exposureGroups(list, now), [list]);
+  const summary = realizedSummary(list);
+  const toSettle = list.filter((p) => !p.closed_at && settleOf(p) && now >= settleOf(p) && remainingQty(p) > 0 && !(p.exits || []).some((e) => e.kind === "settle"));
   const download = () => {
     const a = document.createElement("a");
     a.href = `data:application/json;charset=utf-8,${encodeURIComponent(exportPositions())}`;
@@ -246,20 +376,36 @@ export default function MyQuestions() {
     e.target.value = "";
   };
   return (
-    <div className="wrap page q-page q-mine">
+    <div className="wrap page q-page q-mine marketplace-positions">
       <header className="q-head">
         <div className="q-head-top">
           <h1>Positions</h1>
-          <Link to="/saloon" className="text-link">Back to the Saloon</Link>
+          <Link to="/saloon" className="btn">Browse the Saloon<span aria-hidden="true">↗</span></Link>
         </div>
+        <p className="q-position-intro">Your record of trades placed on Derive.<Info label="About Positions">These are records you entered, saved in this browser. Cowboy cannot see your Derive account. Values use the published sell-back price after exit fees when available; an unavailable value stays unknown.</Info></p>
         {!persistent() && <p className="q-note warn" role="status">This browser is not saving data: Positions last only for this visit. Export a copy to keep them.</p>}
+        {list.length > 0 && (
+          <p className="q-portfolio-line" aria-label="Your saved records">
+            <span><b className="mono">{openCount}</b> open</span>
+            <span><b className="mono">{list.length - openCount}</b> closed or settled</span>
+            {incompleteCount > 0 && <span className="q-incomplete-count"><b className="mono">{incompleteCount}</b> incomplete {incompleteCount === 1 ? "fill" : "fills"}<Info label="About incomplete fills">Records with only part of the package filled. These stay visible in the record and have no full-answer valuation, including after settlement. Check the individual options on Derive.</Info></span>}
+            {summary.count > 0 && (
+              <span className="q-realized-sum">Realized <b className={`mono ${tone(summary.total)}`}>{signed(summary.total)}</b>
+                <small>{summary.count} {summary.count === 1 ? "result" : "results"}: {summary.closes} sold back, {summary.settles} settled</small>
+                <Info label="About realized">The results of positions sold back or settled, after Derive's fees, from what you entered and Derive's settlement prices. {summary.wins} ended above what was paid, {summary.losses} below.{summary.partialCloses ? ` ${summary.partialCloses} ${summary.partialCloses === 1 ? "is a part" : "are parts"} of positions still open.` : ""}{summary.estimated ? ` ${summary.estimated} ${summary.estimated === 1 ? "uses" : "use"} estimated fees.` : ""}{summary.unknown ? ` ${summary.unknown} without a known result ${summary.unknown === 1 ? "is" : "are"} left out of the total.` : ""}</Info>
+              </span>
+            )}
+          </p>
+        )}
         <Tabs label="Positions" value={tab} onChange={setTab} items={[["open", "Open"], ["closed", "Closed"]]} />
       </header>
+      {toSettle.map((p) => <SettleWatch key={p.key} p={p} onSettle={(k, price) => setList(settlePosition(k, price))} />)}
+      {tab === "open" && <Exposure groups={groups} />}
       {rows.length ? rows.map((p) => <Card key={p.key} p={p} onRemove={(k) => setList(removePosition(k))} onClose={(k, got) => setList(closePosition(k, got))} />)
         : list.length ? <p className="status">Nothing {tab === "open" ? "open" : "closed"} yet.</p> : (
           <section className="q-empty-card" aria-label="No positions yet">
             <h2>No positions yet</h2>
-            <p>Pick higher or lower on a coin in the Saloon, place it on Derive, then tell Cowboy what filled. It shows here with what you paid, what it is worth and when it settles.</p>
+            <p>Your trades, costs and settlement dates, in one place. Choose an outcome in the Saloon, place its orders on Derive, then record what filled.</p>
             <Link className="btn primary lg" to="/saloon">Open the Saloon</Link>
           </section>
         )}

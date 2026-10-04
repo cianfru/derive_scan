@@ -1,15 +1,19 @@
 import { payAt, sameLegs } from "./questions.js";
+import { legacyExit, remainingQty, settleEvent } from "./realized.js";
+import { payoutAt, positionExposure } from "./exposure.js";
 
 // Positions and the trade journal: what the user says they placed on Derive, kept in this browser
 // only. Nothing is sent anywhere. Storage can be blocked or cleared, so every read and write falls
 // back to memory, and `persistent()` says when nothing survives a reload.
 //
-// Layout (journal version 2): mainnet records under the original key "cowboy-questions" (an array,
+// Layout (journal version 3): mainnet records under the original key "cowboy-questions" (an array,
 // as version 1 kept them), testnet records apart under "cowboy-questions:testnet". A record saved
 // with the journal carries `v: 2`, its `network` and a `journal` block (lib/journal.js); older
-// records have neither and stay visible with those fields unknown.
+// records have neither and stay visible with those fields unknown. Version 3 (J2) adds `exits`: each
+// sell-back or settlement as an event with its own contracts and amounts (lib/realized.js); a record
+// sold back before it gains one exit of every contract with only what came back after fees.
 
-export const JOURNAL_VERSION = 2;
+export const JOURNAL_VERSION = 3;
 export const NETWORKS = ["mainnet", "testnet"];
 const KEYS = { mainnet: "cowboy-questions", testnet: "cowboy-questions:testnet" };
 let memory = { mainnet: [], testnet: [] };
@@ -37,7 +41,9 @@ const netOf = (network) => (NETWORKS.includes(network) ? network : "mainnet");
 /** A record as this version keeps it: older ones gain only their network (stage 1 was mainnet). */
 export function migrateRecord(r, network = "mainnet") {
   if (!r || typeof r !== "object") return r;
-  return r.network ? r : { ...r, network: netOf(network) };
+  let m = r.network ? r : { ...r, network: netOf(network) };
+  if (!Array.isArray(m.exits)) m = { ...m, exits: m.closed_at ? [legacyExit(m)] : [] };
+  return m;
 }
 
 export function loadPositions(network = "mainnet") {
@@ -87,12 +93,50 @@ export function addPosition(p, now = Date.now()) {
   return list;
 }
 
-/** Sold back by hand: what came back after fees closes the position. */
-export function closePosition(key, proceeds, now = Date.now() / 1000, network = "mainnet") {
+/** Sold back by hand: an exit event (lib/realized.js closeEvent), or, as before J2, a number for what
+ * came back after fees for every contract still open. A partial close leaves the rest open; the
+ * position closes when nothing is left. */
+export function closePosition(key, exit, now = Date.now() / 1000, network = "mainnet") {
   const t = Math.floor(now);
-  const list = loadPositions(network).map((p) => (p.key === key ? { ...p, closed_at: t, proceeds, updated_at: t } : p));
+  const list = loadPositions(network).map((p) => {
+    if (p.key !== key) return p;
+    const left = remainingQty(p);
+    const e = typeof exit === "number"
+      ? { kind: "close", qty: left, ts: null, saved_ts: t, gross: null, gross_basis: "unknown", fees: null, fees_basis: "unknown", net: exit, mark: null }
+      : { ...exit, qty: Math.min(left, exit.qty ?? left), saved_ts: exit.saved_ts ?? t };
+    if (!(e.qty > 0)) return p;
+    const exits = [...(p.exits || []), e];
+    const q = { ...p, exits, updated_at: t };
+    if (remainingQty(q) > 0) return q;
+    const nets = exits.map((x) => x.net);
+    return { ...q, closed_at: t, proceeds: nets.every(Number.isFinite) ? nets.reduce((a, b) => a + b, 0) : null };
+  });
   savePositions(list, network);
   return list;
+}
+
+/** Settled: the contracts still open paid at Derive's settlement price, from the instruments held
+ * (only the legs that filled). Recorded once per position. */
+export function settlePosition(key, settlePrice, now = Date.now() / 1000, network = "mainnet") {
+  const t = Math.floor(now);
+  let changed = false;
+  const list = loadPositions(network).map((p) => {
+    if (p.key !== key || !Number.isFinite(settlePrice) || (p.exits || []).some((e) => e.kind === "settle")) return p;
+    const x = positionExposure(p);
+    if (!x) return p;
+    changed = true;
+    const e = settleEvent({ qty: remainingQty(p), settleTs: p.settle_ts ?? null, savedTs: t, settlePrice, payout: payoutAt(x.legs, settlePrice) });
+    return { ...p, exits: [...(p.exits || []), e], settled_at: t, updated_at: t };
+  });
+  if (changed) savePositions(list, network);
+  return list;
+}
+
+/** The part still open, as a position of its own: contracts left and their share of what was paid. */
+export function openPart(p) {
+  const left = remainingQty(p);
+  if (!(p.contracts > 0) || left === p.contracts) return p;
+  return { ...p, contracts: left, paid: Number.isFinite(p.paid) ? p.paid * (left / p.contracts) : p.paid };
 }
 
 /** Only part of the package filled (only the first option, or unequal amounts): never valued as the answer. */
@@ -115,7 +159,7 @@ export function exportPositions() {
 }
 
 /** The rows of an export, by network, from any version: a bare array or {positions} (version 1,
- * mainnet), or {networks} (version 2). A newer version than this one is refused. */
+ * mainnet), or {networks} (versions 2 and 3). A newer version than this one is refused. */
 export function importRows(doc) {
   if (Array.isArray(doc)) return { mainnet: doc, testnet: [] };
   if (!doc || typeof doc !== "object") throw new Error("Not a Positions file");
@@ -125,8 +169,10 @@ export function importRows(doc) {
   throw new Error("Not a Positions file");
 }
 
-// The more complete of two copies of one record: closed beats open, then the later update.
-const better = (a, b) => ((!!b.closed_at !== !!a.closed_at) ? (b.closed_at ? b : a) : ((b.updated_at || 0) > (a.updated_at || 0) ? b : a));
+// The more complete of two copies of one record: more exits, then closed beats open, then the later update.
+const nExits = (r) => (r.exits || []).length;
+const better = (a, b) => (nExits(a) !== nExits(b) ? (nExits(b) > nExits(a) ? b : a)
+  : (!!b.closed_at !== !!a.closed_at) ? (b.closed_at ? b : a) : ((b.updated_at || 0) > (a.updated_at || 0) ? b : a));
 
 /** Adds an export's records to this browser. A record is matched by its key, so importing the same
  * file twice adds nothing; a record placed under the wrong network goes to its own. Returns the

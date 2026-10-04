@@ -1,3 +1,4 @@
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import ResearchLayers from "../components/ResearchLayers.jsx";
 import { LayerIcon } from "../components/Chain.jsx";
@@ -6,6 +7,8 @@ import { Info } from "../components/ui.jsx";
 import { HatMark, NeonSign } from "../components/Brand.jsx";
 import { REGIME } from "../lib/format.js";
 import { QUESTIONS_ON } from "../lib/flags.js";
+import SaloonDemo from "../components/SaloonDemo.jsx";
+import "../landing.css";
 
 // The landing page shows what Cowboy does and never what it currently reads: no prices, no coins,
 // no counts, no results. Every figure is an illustration, labelled as one. The sign carries the
@@ -94,7 +97,7 @@ function WalletsFigure() {
   );
 }
 
-/* ---------- 03 Options: the priced range, walls and max pain ---------- */
+/* ---------- 03 Options: one idea first — the range embedded in prices ---------- */
 function OptionsFigure() {
   // A price path to "now", then the middle half of priced outcomes widening with time.
   const past = "M16,124 L40,118 L62,128 L84,112 L104,116 L126,100 L146,108 L168,96 L190,104 L212,92 L232,98 L252,90";
@@ -107,203 +110,169 @@ function OptionsFigure() {
   return (
     <figure className="lp-figure lp-fig-options">
       <Tag />
-      <svg viewBox="0 0 576 220" className="lp-cone" role="img" aria-label="Illustration: the range option prices imply, widening after today, with the call wall above, the put wall below and max pain between">
-        <line x1="16" x2="560" y1="26" y2="26" className="op-wall op-call" /><text x="560" y="20" textAnchor="end" className="op-label">Call wall</text>
-        <line x1="16" x2="560" y1="196" y2="196" className="op-wall op-put" /><text x="560" y="212" textAnchor="end" className="op-label">Put wall</text>
-        <line x1={nowX} x2="560" y1="104" y2="104" className="op-pain" /><text x="560" y="120" textAnchor="end" className="op-label">Max pain</text>
+      <div className="lp-cone-wrap">
+      <svg viewBox="0 0 576 220" className="lp-cone" role="img" aria-label="Illustration: price history up to today, followed by a widening range implied by option prices">
         <polygon points={[...upper, ...lower.reverse()].join(" ")} className="op-band" />
         <polyline points={ts.map((t) => `${X(t).toFixed(1)},${up(t).toFixed(1)}`).join(" ")} className="op-hi" />
         <polyline points={ts.map((t) => `${X(t).toFixed(1)},${down(t).toFixed(1)}`).join(" ")} className="op-lo" />
         <path d={past} className="op-price" />
         <line x1={nowX} x2={nowX} y1="34" y2="190" className="op-now" />
-        <text x={nowX - 6} y="46" textAnchor="end" className="op-label">Now</text>
-        <text x="440" y="76" textAnchor="middle" className="op-label op-mid">Middle half of priced outcomes</text>
       </svg>
+        <span className="lp-cone-now">Now</span>
+        <div className="lp-cone-axis"><span>Price history</span><span>Later expiries</span></div>
+      </div>
       <div className="lp-meter" aria-hidden="true">
         <span>Puts richer</span><span className="mt-track"><i /></span><span>Calls richer</span>
       </div>
-    </figure>
-  );
-}
-
-/* ---------- Together: three reads side by side ---------- */
-const ROWS = [
-  [["up", "up", "up"], ["up", "up", "up"], "Agree"],
-  [["up", "neutral", "defensive"], ["up", "up", "neutral"], "Mixed"],
-  [["defensive", "defensive", "defensive"], ["defensive", "neutral", "defensive"], "Agree on 7 days"],
-];
-function SampleChain({ states }) {
-  const agreed = states.every((s) => s === states[0]) && states[0] !== "neutral";
-  return (
-    <span className={`chain-mini${agreed ? ` agreed ${states[0]}` : ""}`}>
-      {["engine", "wallets", "options"].map((k, i) => (
-        <span key={k} className="chain-mini-cell">
-          {i > 0 && <i className="chain-link" />}
-          <b className={`chain-sq ${states[i]}`}><LayerIcon kind={k} size={15} /></b>
-        </span>))}
-    </span>
-  );
-}
-function TogetherFigure() {
-  return (
-    <figure className="lp-figure lp-fig-together">
-      <Tag />
-      <div className="lp-board" role="img" aria-label="Illustration: three example rows of the board, each with a regime, wallets and options reading for 7 and 30 days">
-        <div className="lb-head"><span /><span>7D</span><span>30D</span><span /></div>
-        {ROWS.map(([a, b, note], i) => (
-          <div key={i} className="lb-row">
-            <span className="lb-coin"><i /><i /></span>
-            <SampleChain states={a} /><SampleChain states={b} />
-            <span className="lb-note">{note}</span>
-          </div>))}
-        <div className="lb-legend">
-          <span><b className="chain-sq up" />Up</span><span><b className="chain-sq neutral" />Balanced</span><span><b className="chain-sq defensive" />Defensive</span>
-        </div>
-      </div>
+      <figcaption className="lp-figure-caption">The range comes from option prices. It is market pricing, not a view on where price goes next.</figcaption>
     </figure>
   );
 }
 
 const LAYERS = [
   {
-    kind: "engine", n: "01", name: "Regime", Figure: RegimeFigure,
-    head: "Our own engine names the regime.",
-    body: "Every coin is placed in one of six regimes, from building a base to trending down, after each 4-hour and daily close. Nine checks then score the case for an up-setup. One candle does not flip the label.",
-    proof: [
-      ["Every close", "Recomputed minutes after each 4-hour and daily close, on Derive's perps."],
-      ["Six regimes", "A new regime has to lead across closes before the label changes. One candle does not flip it."],
-      ["Nine checks", "Regime, market, z-score, BTC, heat, climax, funding, Fear & Greed and stablecoin supply."],
-    ],
-    info: "The engine reads each perp's own price history: how far price sits from its long-run trend, how fast it is moving and how volatile it is. Funding and open interest come from Derive; Fear & Greed, stablecoin supply and BTC dominance are market-wide. A new regime has to hold across closes before the label changes.",
+    kind: "engine", name: "Regime", Figure: RegimeFigure,
+    question: "What is price doing?", head: "Read the cycle, not one candle.",
+    body: "From building a base to trending down, the engine names each coin’s regime. Compare the daily structure with its 4-hour context.",
+    detail: "Nine checks behind every up-setup",
+    info: "The engine reads price history, distance from trend and volatility after each 4-hour and daily close. A new regime has to hold across closes before the label changes. The nine checks are shown in the illustration; they describe the setup, not a trade instruction.",
+    href: "/markets", link: "Explore the markets",
   },
   {
-    kind: "wallets", n: "02", name: "Wallets", Figure: WalletsFigure,
-    head: "Every trader rebuilt. The best kept.",
-    body: "Every options trade on Derive since December 2023, rebuilt wallet by wallet and scored on settled results. Market makers, income sellers and hedgers are set aside. You see what the top directional traders hold.",
-    proof: [
-      ["Since Dec 2023", "Every options trade on Derive, rebuilt per wallet and extended every day."],
-      ["Market makers out", "Classed by fixed rules from their own trades, and never shown."],
-      ["Settled results", "Premium paid and received plus what each option paid at expiry. Open trades count once they settle."],
-    ],
-    info: "Wallet classes follow rules fixed before any result. Market makers, income sellers and hedgers are set aside and never shown. Directional traders need at least 20 option trades over at least 90 days and are ranked on premium paid and received plus what each option paid at expiry. Each wallet appears under a made-up codename and brand.",
+    kind: "wallets", name: "Wallets", Figure: WalletsFigure,
+    question: "Who is positioned, and how?", head: "Follow positions with a track record.",
+    body: "Options trades rebuilt wallet by wallet. Directional traders ranked on settled results, with market makers, income sellers and hedgers set aside.",
+    detail: "Positioning is context",
+    info: "Wallet history is rebuilt from December 2023 and extended daily. Fixed rules separate trading styles before ranking. The study of whether these wallets lead price is still underway. Historical results and current positions are context, not a trade instruction. The names and brands here are made up.",
+    href: "/traders", link: "Meet the traders",
   },
   {
-    kind: "options", n: "03", name: "Options", Figure: OptionsFigure,
-    head: "Options positioning, made plain.",
-    body: "Every 15 minutes, each coin's option chain becomes a few pictures: the price range options imply, where open interest is stacked, and what traders pay for protection. Clear enough to act on, even if you have never traded an option. Always market pricing, never our view.",
-    proof: [
-      ["Every 15 minutes", "Every coin's option chain read, and its shape recorded: volatility, skew, open interest."],
-      ["The whole smile", "Priced ranges read from every quoted strike, not from one volatility number."],
-      ["Takers only", "Premium paid and received by takers, with market makers left out."],
-    ],
-    info: "Priced ranges come from option prices across every quoted strike for each expiry. Call wall, put wall and max pain are read from open interest over the next 30 days. Taker flow leaves market makers out. All of it describes what the market is paying for, not our view.",
+    kind: "options", name: "Options", Figure: OptionsFigure,
+    question: "What does the market price in?", head: "See the cost of uncertainty.",
+    body: "Read the range embedded in option prices, the cost of protection and where open positions sit. Choose an expiry to put each reading in context.",
+    detail: "Market pricing, explained",
+    info: "The illustrated band contains the middle half of outcomes priced by options. Puts richer means downside protection costs more in volatility terms than comparable calls. Neither the range nor the cost of protection is a view on the next price move.",
+    href: "/options", link: "Explore options",
   },
 ];
 
-function Layer({ kind, n, name, head, body, proof, info, Figure }, i) {
+function ResearchExplorer() {
+  const [selected, setSelected] = useState(0);
+  const tabs = useRef([]);
+  function selectWithKey(event, index) {
+    let next;
+    if (event.key === "ArrowRight") next = (index + 1) % LAYERS.length;
+    else if (event.key === "ArrowLeft") next = (index + LAYERS.length - 1) % LAYERS.length;
+    else if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = LAYERS.length - 1;
+    else return;
+    event.preventDefault();
+    setSelected(next);
+    tabs.current[next]?.focus();
+  }
   return (
-    <section key={kind} className={`wrap lp-layer${i % 2 ? " flip" : ""}`} aria-labelledby={`lp-${kind}`}>
-      <div className="lp-copy">
-        <p className="lp-eyebrow"><span>{n}</span>{name}</p>
-        <h2 id={`lp-${kind}`}>{head}</h2>
-        <p className="lp-body">{body}<Info label={`More about ${name}`}>{info}</Info></p>
-        <ul className="lp-proof">
-          {proof.map(([k, v]) => <li key={k}><b>{k}</b><span>{v}</span></li>)}
-        </ul>
+    <section id={QUESTIONS_ON ? "research" : "how"} className="wrap lp-research" aria-labelledby="lp-research-title">
+      <div className="lp-research-intro">
+        <div>
+          <p className="lp-kicker">The research behind the read</p>
+          <h2 id="lp-research-title">Three perspectives.<br />Keep the whole picture.</h2>
+          <p className="lp-body">Price, wallets and options tell different stories. Read them in order, side by side. Each keeps its own meaning.</p>
+          <p className="lp-research-principle">Independent readings. Never one blended score.</p>
+        </div>
+        <div className="lp-research-waves"><ResearchLayers /></div>
       </div>
-      <Figure />
+      <div className="lp-research-tabs" role="tablist" aria-label="Research layers">
+        {LAYERS.map((layer, i) => (
+          <button key={layer.kind} ref={(el) => { tabs.current[i] = el; }} role="tab"
+            id={`research-tab-${layer.kind}`} aria-controls={`research-panel-${layer.kind}`}
+            aria-selected={selected === i} tabIndex={selected === i ? 0 : -1}
+            onClick={() => setSelected(i)} onKeyDown={(event) => selectWithKey(event, i)}>
+            <span className="lp-tab-name"><LayerIcon kind={layer.kind} size={20} />{layer.name}</span>
+            <span className="lp-tab-question">{layer.question}</span>
+          </button>
+        ))}
+      </div>
+      {LAYERS.map(({ kind, head, body, detail, info, href, link, Figure }, i) => (
+        <div key={kind} role="tabpanel" id={`research-panel-${kind}`} aria-labelledby={`research-tab-${kind}`}
+          hidden={selected !== i} tabIndex={0} className="lp-research-panel">
+          <div className="lp-research-copy">
+            <h3>{head}</h3>
+            <p className="lp-body">{body}</p>
+            <p className="lp-detail">{detail}<Info label={`More about ${LAYERS[i].name}`}>{info}</Info></p>
+            <Link className="lp-text-link" to={href}>{link}<span aria-hidden="true">↗</span></Link>
+          </div>
+          <Figure />
+        </div>
+      ))}
     </section>
   );
 }
 
-const FACTS = [
-  ["4H · 1D", "engine runs at every close"],
-  ["Dec 2023", "every options trade since, by wallet"],
-  ["15 min", "option chains and flow read"],
-  ["Excluded", "market makers, in every view"],
-];
-
 const FAQ = [
-  ["What is Cowboy?", "Independent trader intelligence on Derive: a regime engine, a rebuilt record of every options trader, and the options market itself, read side by side for every coin with options on Derive."],
-  ["Do I need to trade options?", "No. Every options view is drawn as a picture with a plain label, and each term has an (i) beside it."],
-  ["Where does the data come from?", "Derive's public data: index prices, perps, option quotes and public trades. Fear & Greed, stablecoin supply and BTC dominance come from public sources."],
-  ["How often does it update?", "Option chains and trade flow every 15 minutes. The engine after every 4-hour and daily close. Trader history once a day."],
-  ["Does Cowboy trade for me?", "No. Cowboy reads the market; any trade is yours to place on Derive."],
-  ["Is this advice?", "No. Market data and positioning for research, not investment advice."],
+  ["What is Cowboy?", QUESTIONS_ON
+    ? "Cowboy makes Derive’s price outcomes easier to explore. The Saloon shows costs and settlement payouts, with separate research on price regimes, wallet positioning and options. You place any trade on Derive yourself."
+    : "Independent research on Derive: price regimes, wallet positioning and options, read side by side."],
+  [QUESTIONS_ON ? "Is a partial payout still a loss?" : "Do I need to trade options?", QUESTIONS_ON
+    ? "It can be. Payout is the total returned at settlement. Profit or loss is that payout minus your total cost, including fees. A payout below your cost is a loss. Closing before settlement is valued differently."
+    : "No. The research uses plain labels and diagrams, with explanations beside unfamiliar terms."],
+  ["Where does the data come from?", "Derive’s public prices, option quotes and trades. Wider market context comes from public sources. The examples on this page are illustrations, not current market readings."],
+  ["How often does it update?", "Options and flow every 15 minutes. The engine after each 4-hour and daily close. Wallet history once a day. Each research view shows its own time."],
+  ["Does Cowboy trade for me?", QUESTIONS_ON
+    ? "No. The Saloon shows the two option orders for you to place on Derive. The completed position’s defined cost applies after both orders fill. While only the first has filled, the cash needed and loss can be larger."
+    : "No. Cowboy reads public market data. Any trade is yours to place on Derive."],
+  ["Are the readings trade advice?", "No. The three research layers are context and stay separate. The study of whether wallet positioning leads price is still underway. Nothing here is investment advice."],
 ];
 
-/** The primary way in: the Saloon when it is switched on, the markets otherwise. */
 const EntryButton = () => (QUESTIONS_ON
   ? <Link className="btn primary lg" to="/saloon">Enter the Saloon</Link>
   : <Link className="btn primary lg" to="/markets">Open the markets</Link>);
 
-/** With the Saloon on, the primary button goes there: say what it is, in plain words, with no prices. */
 function SaloonIntro() {
   return (
-    <section className="wrap lp-layer lp-saloon" aria-labelledby="lp-saloon">
-      <div className="lp-copy">
-        <p className="lp-eyebrow">The Saloon</p>
-        <h2 id="lp-saloon">Pick higher or lower. Know your cost first.</h2>
-        <p className="lp-body">Choose a coin, a date and a price level, then whether the coin settles higher or lower than it. Before you place anything you see what you pay, the most it pays, the most you can lose and where you break even. Each answer is two Derive options; you place them on Derive yourself.</p>
-        <ul className="lp-proof">
-          <li><b>Defined cost</b><span>The most you can lose is what you pay, fees included.</span></li>
-          <li><b>Pays in part</b><span>Inside a zone around the level, each answer pays part of its payout.</span></li>
-          <li><b>Settles on Derive</b><span>At 08:00 UTC on the date, in USDC, with no action from you.</span></li>
-        </ul>
+    <section id="how" className="wrap lp-saloon-draft" aria-labelledby="lp-saloon">
+      <div className="lp-saloon-copy">
+        <p className="lp-kicker"><HatMark size={23} />The Saloon</p>
+        <h2 id="lp-saloon">Pick higher or lower.<br />Know your cost first.</h2>
+        <p className="lp-body">Choose a coin, a date and a price level. See the full cost and what the position pays at settlement before you place anything.</p>
+        <ol className="lp-saloon-steps">
+          <li><span>Choose your outcome</span><small>Higher or lower at settlement.</small></li>
+          <li><span>Understand the payout</span><small>Full, partial or none. Cost always counts.</small></li>
+          <li><span>Check the context</span><small>Regime, wallets and options alongside.</small></li>
+        </ol>
+        <p className="lp-execution-note">Two option orders, placed by you on Derive.<Info label="How the orders work">The demo describes a completed two-option position held to settlement. Both orders need to fill for its defined cost to apply. With only the first order filled, cash needed and loss can be larger. Closing early is valued differently.</Info></p>
       </div>
+      <SaloonDemo />
     </section>
   );
 }
 
 export default function Landing() {
   return (
-    <div className="landing cowboy-landing">
+    <div className="landing cowboy-landing cowboy-draft">
       <section className="hero-stage" aria-labelledby="lp-hero">
         <div className="hero-inner">
-          <p className="hero-eyebrow">Trader intelligence on Derive</p>
+          <p className="hero-eyebrow">{QUESTIONS_ON ? "Price outcomes. Trader intelligence. Built on Derive." : "Independent trader intelligence on Derive."}</p>
           <div className="sign-wrap"><NeonSign /></div>
           <div className="hero-row">
-            <h1 id="lp-hero">Know where the herd stands.</h1>
+            <h1 id="lp-hero">Know where<br />the herd stands.</h1>
             <div className="hero-side">
-              <p className="hero-description">Cowboy names each coin's regime, follows Derive's best options traders and turns option prices into pictures anyone can read.</p>
+              <p className="hero-description">{QUESTIONS_ON
+                ? "Explore higher-or-lower price outcomes, see the full cost, and check the research before placing a trade on Derive."
+                : "Understand the price cycle, follow wallet positioning and see what the options market prices in."}</p>
               <div className="hero-cta">
                 <EntryButton />
-                <a className="btn lg" href="#how">See how it works</a>
+                <a className="lp-hero-link" href="#how">See how it works<span aria-hidden="true">↓</span></a>
               </div>
             </div>
           </div>
-          <div className="lp-facts" aria-label="What Cowboy records">{FACTS.map(([v, l]) => <div key={l}><b>{v}</b><span>{l}</span></div>)}</div>
         </div>
       </section>
 
       {QUESTIONS_ON && <SaloonIntro />}
-
-      <section id="how" className="wrap lp-how" aria-labelledby="lp-how">
-        <div className="lp-how-head">
-          <p className="lp-eyebrow">How it works</p>
-          <h2 id="lp-how">One coin. Three layers, always in this order.</h2>
-        </div>
-        <div className="lp-how-stage"><span className="lp-illus" aria-hidden="true">Illustration</span><ResearchLayers /></div>
-      </section>
-
-      {LAYERS.map((l, i) => Layer(l, i))}
-
-      <section className="wrap lp-layer lp-together" aria-labelledby="lp-together">
-        <div className="lp-copy">
-          <p className="lp-eyebrow">Together</p>
-          <h2 id="lp-together">Three reads. One row per coin.</h2>
-          <p className="lp-body">One read on its own can mislead. Price, wallets and option prices come from different places, so Cowboy keeps them apart and lines them up per coin over 7 and 30 days. You see at a glance when all three tell the same story, and when they do not.</p>
-          <ul className="lp-proof">
-            <li><b>Independent</b><span>Price history, wallet history, option prices: three sources, three readings.</span></li>
-            <li><b>Never blended</b><span>No read is averaged into another. When all three agree, the row is framed.</span></li>
-            <li><b>Rules first</b><span>Whether wallets lead price is under study, with rules fixed before any result. Until it reports, positions are context.</span></li>
-          </ul>
-        </div>
-        <TogetherFigure />
-      </section>
+      <ResearchExplorer />
 
       <section className="wrap lp-faq" aria-labelledby="lp-faq">
-        <h2 id="lp-faq">Questions</h2>
+        <div className="lp-faq-heading"><h2 id="lp-faq">Before you saddle up.</h2><p>A few things worth knowing.</p></div>
         <div className="lp-faq-list">
           {FAQ.map(([q, a]) => (
             <details key={q}><summary>{q}<span aria-hidden="true">+</span></summary><p>{a}</p></details>))}
@@ -311,12 +280,8 @@ export default function Landing() {
       </section>
 
       <section className="wrap landing-close">
-        <HatMark size={52} className="close-hat" />
-        <h2>The whole range, in three reads.</h2>
-        <div className="hero-cta">
-          <EntryButton />
-          <Link className="btn lg" to="/traders">Meet the traders</Link>
-        </div>
+        <div><HatMark size={48} className="close-hat" /><h2>{QUESTIONS_ON ? "Find your seat in the Saloon." : "Get a read on the market."}</h2></div>
+        <EntryButton />
       </section>
     </div>
   );
