@@ -133,3 +133,4 @@ bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sel
 1791095400,HYPE,perp,0.0,1815.55,0.0,0.0,1
 1791095400,SOL,perp,4287.85,0.0,0.0,0.0,1
 1791096300,HYPE,perp,0.0,1380.46,0.0,0.0,1
+1791096300,HYPE,perp,1580.5,1582.89,0.0,0.0,2
