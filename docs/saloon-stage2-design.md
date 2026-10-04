@@ -35,6 +35,12 @@ Open points to confirm on testnet or with Derive are collected in 7.0.
 - The session key holds no off-chain scope (the SDK's default would add `account_info`).
 - Sell back is in the maths and the dry run but not on screen: it needs positions in the Saloon account, which come with P6.
 
+**P6 (4 October 2026, owner's approval: real fills on V3 testnet only).** Built as in the P6 section, with these notes:
+- `execute_quote`'s answer carries no trade ids; the fill is read from `private/get_trade_history` by the taker's own quote id (a taker's trade rows carry the taker's quote id, not the maker's, as V3 testnet's public trades show), else by RFQ id.
+- Settlement of testnet positions uses the testnet's own settlement price (`public/get_option_settlement_prices`), not the mainnet price the board publishes.
+- The caps on testnet are the mainnet ones the owner approved for P6 ($250 per answer, $1,000 a day), not the $1,000 per answer proposed in section 6.
+- My seat is "Positions"; its one-tap records live in the testnet journal (`cowboy-questions:testnet`), matched to Derive's positions by their legs.
+
 ---
 
 ## 1. The user's journey

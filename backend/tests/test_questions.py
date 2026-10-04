@@ -263,6 +263,27 @@ def test_settled_dates_show_what_was_paid(tmp_path, chain14):
     assert h["paid"]["BTC-20261005-A-83000-89000"] == lv["paid"]
 
 
+def test_kill_switch_in_the_index(tmp_path, chain14, monkeypatch):
+    """Saloon stage 2's kill switch: `trading` in questions/index.json, from QUESTIONS_TRADING,
+    on by default, unknown values off, and changed at the next publish without a new record."""
+    monkeypatch.delenv("QUESTIONS_TRADING", raising=False)
+    assert qj.trading_state() == "on"
+    for v, want in (("on", "on"), ("SELL_ONLY", "sell_only"), ("off", "off"), ("maybe", "off"), ("", "on")):
+        monkeypatch.setenv("QUESTIONS_TRADING", v)
+        assert qj.trading_state() == want
+    monkeypatch.setenv("QUESTIONS_TRADING", "on")
+    _, site, _ = _job(tmp_path, chain14, publish=True)
+    idx = site / "questions" / "index.json"
+    assert json.loads(idx.read_text())["trading"] == "on"
+    monkeypatch.setenv("QUESTIONS_TRADING", "sell_only")
+    qj.mark_paused(site, T14 + 60 * 60)
+    assert json.loads(idx.read_text())["trading"] == "sell_only"
+    monkeypatch.setenv("QUESTIONS_TRADING", "off")
+    qj.mark_paused(site, T14 + 91 * 60)
+    doc = json.loads(idx.read_text())
+    assert doc["trading"] == "off" and doc["paused"] is True
+
+
 def test_pending_settlements_and_merge(tmp_path, chain14):
     root, _, _ = _job(tmp_path, chain14, publish=False)
     state = qj.load_state(root)

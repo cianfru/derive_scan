@@ -76,14 +76,34 @@ The Saloon also keeps, in the viewer's browser only, `cowboy-follows` (version 1
 
 `prices_ts` is the 15-minute slot start. Prices over 35 minutes old show their age; over 90 minutes `publish_site.py` marks the files `paused` and the app shows em dashes.
 
-## Saloon stage 2 (testnet dry run, off by default)
+## Saloon stage 2 (testnet fills, off by default)
 
-One-tap answers through Derive RFQ (`docs/saloon-stage2-design.md`), built up to the dry run (passes P1 to P5) on Derive's V3 testnet only. The app shows it only in a build with both `VITE_QUESTIONS=1` and `VITE_SALOON_TRADE=1` (`dryrun` and `testnet` mean the same until testnet fills are built; any other value, including `mainnet`, leaves it off). With it off the build carries no trading code (`src/lib/trade/bundle.test.js`); with it on, the trading code is one lazy chunk loaded by the ticket.
+One-tap answers through Derive RFQ (`docs/saloon-stage2-design.md`), built through P6 on Derive's V3 testnet only (owner's approval for P6, 4 October 2026: real fills on testnet; mainnet stays forbidden). The app shows it only in a build with both `VITE_QUESTIONS=1` and `VITE_SALOON_TRADE` set: `1` or `dryrun` give the P5 dry run (nothing fills), `testnet` gives real fills on the testnet with test USDC; any other value, including `mainnet`, leaves it off. With it off the build carries no trading code (`src/lib/trade/bundle.test.js`); with it on, the trading code is one lazy chunk (`TradePanel-*.js`).
 
-- `frontend/src/lib/trade/`: `package.js` (debit packages, contracts, the RFQ ceiling and floor, Derive's RFQ fee groups, quote checks, caps in `TRADE_LIMITS`), `derive.js` (JSON-RPC over the browser's WebSocket, retries, plain messages), `sign.js` (Derive's action signing; data encoders from `@derivexyz/derive-ts/codecs`), `wallet.js` (an injected browser wallet), `account.js` (the Saloon account: a PRIME Standard subaccount labelled "Cowboy"), `sessionKey.js` (approving Cowboy: `trade:rfq:option`, one subaccount, 7 days; switch off), `rfq.js` (the dry run), `seat.js` (the page's wallet, connection and account), `config.js` (testnet endpoint and constants; mainnet listed as disabled).
-- `frontend/src/components/trade/`: `TradePanel.jsx` (beside stage 1's ticket, which stays one tap away as "Place by hand" and is the only ticket for coins other than BTC and ETH), `SeatSetup.jsx` (connect, Derive's terms, add USDC), `ApproveCowboy.jsx`, `TradeTicket.jsx`.
-- The dry run sends the RFQ, re-reads the best quote, signs the execution with the Saloon key and sends it only to `public/execute_quote_debug`, which fills nothing; the RFQ is always cancelled. Nothing in the app calls `private/execute_quote` yet.
-- Tests replay frames recorded from V3 testnet's public methods (`src/fixtures/trade/public_frames.json`) and one recorded `public/execute_quote_debug` answer that the browser's signing matches byte for byte (`execute_quote_debug.json`); private call shapes come from Derive's openapi (`private_shapes.json`).
+- `frontend/src/lib/trade/`: `package.js` (debit packages, contracts, the RFQ ceiling and floor, Derive's RFQ fee groups, quote checks, caps in `TRADE_LIMITS`), `derive.js` (JSON-RPC over the browser's WebSocket, retries, plain messages; refuses `private/execute_quote` on any endpoint but the testnet's), `sign.js` (Derive's action signing; data encoders from `@derivexyz/derive-ts/codecs`), `wallet.js`, `account.js` (the Saloon account: a PRIME Standard subaccount labelled "Cowboy"), `sessionKey.js` (approving Cowboy: `trade:rfq:option`, one subaccount, 7 days; switch off), `rfq.js` (one ticket: RFQ, firm quote, dry run or fill), `fills.js` (a fill from Derive's trade history, or from execute_quote's answer), `record.js` (exact journal records and exits), `sync.js` (Positions from Derive), `limits.js` (kill switch, caps), `seat.js`, `config.js` (testnet endpoint and constants, `fillsAllowed`; mainnet listed as disabled).
+- `frontend/src/components/trade/`: `TradePanel.jsx` (the ticket beside stage 1's, which stays one tap away as "Place by hand"; the sell back on Positions; `DeriveSync` and `AlsoOnDerive` for Positions), `SeatSetup.jsx`, `ApproveCowboy.jsx`, `TradeTicket.jsx`.
+- **Fills (P6).** After the firm quote passes the checks (ceiling or floor, margin unchanged, fee ceiling, caps, kill switch) the user taps "Buy for $X"; the Saloon key signs and `private/execute_quote` goes to the testnet with `enable_taker_protection`, the answer's label and the referral code (`VITE_DERIVE_REFERRAL`, empty by default; no builder fee). Outcomes: filled; part filled (recorded as filled for what filled, the rest of the RFQ cancelled, never retried); quote expired (11104); rejected (taker protection, Derive's cancel reasons); rate limited (-32000, nothing executed, the user taps again). A tap with no answer (timeout, dropped socket, 9000/9001) is never re-sent: the RFQ is re-read with `private/get_rfqs` until Derive says filled, cancelled or expired. Mainnet guard: `fillsAllowed` (testnet build, testnet network, Sepolia domain, testnet endpoint) in the ticket, and the client itself refuses the call on any other endpoint (`lib/trade/execute.test.js`).
+- **Exact journal.** A fill is read back from `private/get_trade_history` (by the taker's quote id, else by RFQ id): fill time, legs, prices, fees and trade ids, kept as exact under the testnet journal key `cowboy-questions:testnet` (`exec: "rfq"`, `journal.source: "derive"`); only when the history has not caught up, from execute_quote's own answer (no trade ids). A sell back is an exact J2 exit (`via: "rfq"`).
+- **Positions from Derive.** A testnet build's Positions reads the testnet journal and, over the user's own authenticated WebSocket, the Saloon account's `private/get_positions` and `private/get_trade_history`: fills this browser missed are added by their RFQ label (`{question id}:{yes|no}`, `:close` for a sell back), each card says whether Derive holds its legs, options no record explains are listed under "Also in your Saloon account", and settlement is recorded at the testnet's own price (`public/get_option_settlement_prices`). Close on a one-tap position sells it back through RFQ (floor from the board's sell-back price, or from Derive's mark when the board has none).
+- **Kill switch.** `trading` in `questions/index.json` (`on`, `sell_only`, `off`), from the repository variable `QUESTIONS_TRADING` (unset means `on`, unknown values `off`), rewritten at every publish. `sell_only` blocks buys and keeps sell backs; `off` blocks both; the ticket shows a plain notice. A redeploy with the flag off is the hard stop.
+- **Caps**, checked in the browser before any RFQ and again before the fill: $250 most-you-can-lose per answer and $1,000 bought per wallet per UTC day in this browser (`TRADE_LIMITS`, `limits.js`).
+- Tests replay frames recorded from V3 testnet's public methods (`public_frames.json`, a real RFQ execution's trade rows in `testnet_rfq_trades.json`) and one recorded `public/execute_quote_debug` answer; private call shapes come from Derive's openapi (`private_shapes.json`). `src/saloon-testnet.test.jsx` walks buy, Positions, sell back and the kill switch on screen.
+
+### A testnet site (second Vercel project)
+
+A second Vercel project serves the complete testnet app from the same repo; production (`torq`) is unchanged.
+
+| Setting | Value |
+|---|---|
+| Root directory | `frontend` |
+| Framework | Vite |
+| Production branch | `main` (or the branch under test) |
+| `VITE_QUESTIONS` | `1` |
+| `VITE_SALOON_TRADE` | `testnet` |
+| `VITE_DERIVE_REFERRAL` | leave unset (empty) until Cowboy has a code |
+| `VITE_DATA_URL` | leave unset: the board reads the same `site-data` files as production |
+
+The header and every trade screen carry a "Testnet" badge. The board shows Derive mainnet prices recorded every 15 minutes; one-tap trades go to Derive's V3 testnet, whose firm price can differ, as the badge's (i) says.
 
 ## Tracking values over time
 

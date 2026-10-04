@@ -4,7 +4,7 @@
 
 export const TRADE_LIMITS = {
   perAnswer: 250, // "Most you can lose" per answer at mainnet launch
-  perAnswerTestnet: 1000,
+  perAnswerTestnet: 250, // the owner's P6 approval (4 October 2026): the same $250 on testnet
   perDay: 1000, // answers bought per wallet per day, in this browser
   maxPerDollar: 0.99, // the ceiling never goes above 99c per $1
   minPerDollar: 0.01, // the sell-back floor never goes below 1c per $1

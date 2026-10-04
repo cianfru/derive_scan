@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { Info, Tabs } from "../components/ui.jsx";
@@ -16,9 +16,17 @@ import {
 import { breakdownRows, closeEvent, realized, realizedSummary, remainingQty } from "../lib/realized.js";
 import { exposureGroups } from "../lib/exposure.js";
 import { compareReadings, hasJournal } from "../lib/journal.js";
+import { TESTNET_FILLS } from "../lib/flags.js";
 import "../questions.css";
 import "../journal.css";
 import "../marketplace-positions.css";
+
+// Saloon stage 2 on testnet: Positions reads the testnet journal and the Saloon account on Derive,
+// and one-tap positions sell back through Derive. Other builds carry none of this code.
+const NET = TESTNET_FILLS ? "testnet" : "mainnet";
+const OneTap = TESTNET_FILLS ? lazy(() => import("../components/trade/TradePanel.jsx")) : null;
+const DeriveSync = TESTNET_FILLS ? lazy(() => import("../components/trade/TradePanel.jsx").then((m) => ({ default: m.DeriveSync }))) : null;
+const AlsoOnDerive = TESTNET_FILLS ? lazy(() => import("../components/trade/TradePanel.jsx").then((m) => ({ default: m.AlsoOnDerive }))) : null;
 
 const usd = (v) => money(v, { cents: true });
 const sumNets = (r) => (r.portions.every((x) => x.exit.net != null) ? r.portions.reduce((a, x) => a + x.exit.net, 0) : null);
@@ -49,6 +57,8 @@ function when(ts) {
 }
 
 const You = () => <small className="q-you">Entered by you</small>;
+/** Who a journal figure comes from: the user, or Derive's own records for a one-tap fill. */
+const By = ({ j }) => (TESTNET_FILLS && j?.source === "derive" ? <small className="q-you">From Derive</small> : <You />);
 
 function Cell({ c, label }) {
   if (!c.show) return <Missing text={c.text} label={label} why={c.why} />;
@@ -113,18 +123,19 @@ function EntryRecord({ p }) {
     <details className="q-entry">
       <summary>Entry record</summary>
       <dl className="q-figs">
-        <div><dt>Filled<You /></dt><dd className="mono">{when(f.ts) || nr}</dd></div>
+        <div><dt>Filled<By j={j} /></dt><dd className="mono">{when(f.ts) || nr}</dd></div>
         <div><dt>Saved by Cowboy</dt><dd className="mono">{when(j.saved_ts)}</dd></div>
         <div><dt>Where</dt><dd>{j.venue} · {j.network}</dd></div>
         <div className="q-entry-legs"><dt>Package<small>{j.package?.direction} · {j.package?.zone}</small></dt>
           <dd><ul>{(f.legs || []).map((l) => (
             <li key={l.name} className="mono">{l.signed_qty > 0 ? "+" : l.signed_qty < 0 ? "-" : ""}{Math.abs(l.signed_qty ?? 0)} {l.name}
               {l.qty < l.planned ? <small> of {l.planned}</small> : null}{l.price != null ? <small> at {usd(l.price)}</small> : null}</li>))}</ul></dd></div>
-        <div><dt>Filled amounts<You /></dt><dd>{f.complete ? "Whole package" : <span className="warn-text">Not fully filled</span>}</dd></div>
-        <div><dt>Premium, before fees<You />{f.limitation === "package_total" && <small>one total; leg prices not entered</small>}</dt><dd className="mono">{usd(c.premium)}</dd></div>
-        <div><dt>Derive's fees{c.fees_basis === "entered" ? <You /> : <small>{c.fees_basis === "estimated" ? "not entered · estimated" : "not entered"}</small>}</dt>
+        <div><dt>Filled amounts<By j={j} /></dt><dd>{f.complete ? (f.filled_pct != null && f.filled_pct < 1 ? `Whole package, ${Math.round(f.filled_pct * 100)}% of the size asked` : "Whole package") : <span className="warn-text">Not fully filled</span>}</dd></div>
+        {TESTNET_FILLS && f.trade_ids?.length > 0 && <div><dt>Derive trade ids</dt><dd className="mono q-trade-ids">{f.trade_ids.map((id) => <span key={id}>{id}</span>)}</dd></div>}
+        <div><dt>Premium, before fees<By j={j} />{f.limitation === "package_total" && <small>one total; leg prices not entered</small>}</dt><dd className="mono">{usd(c.premium)}</dd></div>
+        <div><dt>Derive's fees{c.fees_basis === "entered" ? <You /> : TESTNET_FILLS && c.fees_basis === "exact" ? <By j={j} /> : <small>{c.fees_basis === "estimated" ? "not entered · estimated" : "not entered"}</small>}</dt>
           <dd className="mono">{c.fees != null ? usd(c.fees) : nr}</dd></div>
-        <div className="q-lose"><dt>Total cost{c.fees_basis !== "entered" && <small>{c.fees_basis === "estimated" ? "with estimated fees" : "before fees"}</small>}</dt>
+        <div className="q-lose"><dt>Total cost{c.fees_basis !== "entered" && c.fees_basis !== "exact" && <small>{c.fees_basis === "estimated" ? "with estimated fees" : "before fees"}</small>}</dt>
           <dd className="mono">{usd(c.total ?? c.premium)} {f.currency && <small>{f.currency}</small>}</dd></div>
         <div><dt>Breakeven at settlement{c.breakeven_basis !== "exact" && c.breakeven != null && <small>estimated</small>}</dt>
           <dd className="mono">{c.breakeven != null ? money(c.breakeven) : <Missing text="Not available yet" label="Why no breakeven"
@@ -163,7 +174,7 @@ const BASIS = { entered: "Entered by you", estimated: "Estimated", exact: "Exact
 function Portion({ x, und }) {
   const head = x.kind === "settle"
     ? <>Settled at {money(x.settle_price)}<small className="mono">{amountTextQ(x.qty)} contracts</small></>
-    : <>Sold back {amountTextQ(x.qty)} contracts<small className="mono">{when(x.ts) ? `${when(x.ts)} · entered by you` : "time not entered"}</small></>;
+    : <>Sold back {amountTextQ(x.qty)} contracts<small className="mono">{when(x.ts) ? `${when(x.ts)} · ${TESTNET_FILLS && x.basis.exit === "exact" ? "from Derive" : "entered by you"}` : "time not entered"}</small></>;
   const rows = breakdownRows(x);
   const row = (label, sub, v, cls = "") => (
     <div className={cls}><dt>{label}{sub && <small>{sub}</small>}</dt><dd className="mono">{v}</dd></div>
@@ -174,7 +185,7 @@ function Portion({ x, und }) {
       <h4>{head}</h4>
       <dl className="q-figs">
         {x.entry.premium != null
-          ? row("Premium paid", BASIS.entered, usd(x.entry.premium))
+          ? row("Premium paid", TESTNET_FILLS && x.basis.entry_fees === "exact" ? "From Derive" : BASIS.entered, usd(x.entry.premium))
           : row("Paid, fees included", BASIS.entered, x.entry.total != null ? usd(x.entry.total) : nr)}
         {x.entry.premium != null && row("Entry fees", BASIS[x.basis.entry_fees] || "", x.entry.fees != null ? usd(x.entry.fees) : nr)}
         {x.kind === "settle"
@@ -226,7 +237,25 @@ function SettleWatch({ p, onSettle }) {
   return null;
 }
 
-function Card({ p, onRemove, onClose }) {
+const SYNC = {
+  matches: ["On Derive: held", "Derive's Saloon account holds the options of this answer, in the amounts recorded here."],
+  differs: ["Differs from Derive", null],
+  settled: ["Settled on Derive", "Past its settlement time; Derive pays the result into the Saloon account."],
+  closed: ["Closed on Derive", "Nothing of this answer is open any more."],
+  unknown: ["Not checked", "This record has no options to compare with Derive."],
+};
+/** How a one-tap record stands against Derive's own positions (testnet builds). */
+function SyncLine({ s }) {
+  const [text, why] = SYNC[s.state] || SYNC.unknown;
+  const diff = s.diff?.map((d) => `${d.name}: recorded ${d.expected}, Derive holds ${d.held}`).join("; ");
+  return (
+    <p className={`q-card-status q-sync${s.state === "differs" ? " warn" : ""}`}>{text}
+      <Info label="Compared with Derive">{why || `Derive's positions do not match what this browser recorded, for example after a trade on another device or on Derive itself. ${diff}. Derive's records are the reference.`}</Info>
+    </p>
+  );
+}
+
+function Card({ p, onRemove, onClose, sync = null }) {
   const q = parseId(p.id);
   const { data: board } = useData(q ? `questions/${q.und}.json` : null);
   const { data: markets } = useData("markets.json");
@@ -241,6 +270,7 @@ function Card({ p, onRemove, onClose }) {
   const paused = board ? priceAge(board.prices_ts, now, board.paused).state === "paused" : true;
   const settling = (!after && now >= settleTs - 1800) || (after && settle == null);
   const half = partial(p);
+  const oneTap = TESTNET_FILLS && p.exec === "rfq";
   const op = after || p.closed_at ? p : openPart(p);
   const t = found && !found.settled && !paused && !settling && !half && !p.closed_at
     ? closeTicket(found.level, p.side, op.contracts, board, p.legs) : null;
@@ -276,7 +306,9 @@ function Card({ p, onRemove, onClose }) {
       </header>
       <p className={`q-card-status${status.warn ? " warn" : ""}`}>
         {status.key === "settled" ? <>Settled at {money(settle)} · got {usd(settleExit?.exit.gross ?? f.got)}</> : status.text}
-        <Info label="How this was placed">{half
+        <Info label="How this was placed">{oneTap
+          ? "Bought through Derive's request for quote in one tap, on Derive's testnet with test USDC. The fill time, options, prices, fees and trade ids come from Derive's own records."
+          : half
           ? "You told Cowboy only the first of the two orders filled. You hold one option alone, which pays differently from the answer and can lose all it cost. Finish or undo it on Derive; Cowboy shows no value for it."
           : "You placed the orders on Derive yourself and told Cowboy what you paid. Cowboy cannot see your Derive account, so these figures are only as good as what you entered."}</Info>
       </p>
@@ -309,6 +341,7 @@ function Card({ p, onRemove, onClose }) {
           value={f.closed ? new Date(p.closed_at * 1000).toISOString().slice(0, 10) : q ? `${dayLabel(q.expiry)}, 08:00 UTC` : null}
           sub={!f.closed && !f.settled && !settling ? countdown(settleTs, now) : settling && !f.settled ? "settling now" : null} missing={na("No date saved.", "Why no date")} />
       </dl>
+      {oneTap && sync && <SyncLine s={sync} />}
       {real.portions.length > 0 && real.open > 0 && !after && (
         <p className="q-note q-position-realized">Realized so far: <b className={`mono ${tone(real.net ?? 0)}`}>{real.net != null ? signed(real.net) : "Not available yet"}</b> on {amountTextQ(p.contracts - real.open)} contracts sold back; the figures above are for the {amountTextQ(real.open)} still open.</p>
       )}
@@ -331,9 +364,15 @@ function Card({ p, onRemove, onClose }) {
             </div>
           </div>
         </details>
-        {t && <button className="btn q-position-close" onClick={() => setClosing((s) => !s)} aria-expanded={closing}>{closing ? "Keep it open" : "Close"}</button>}
+        {(oneTap ? !after && !settling && !p.closed_at && real.open > 0 : !!t) && <button className="btn q-position-close" onClick={() => setClosing((s) => !s)} aria-expanded={closing}>{closing ? "Keep it open" : "Close"}</button>}
       </div>
-      {closing && t && (
+      {closing && oneTap && (
+        <Suspense fallback={null}>
+          <OneTap und={q.und} question={question} answer={name} level={found?.level ?? null} sideKey={p.side} board={board}
+            sell={{ position: p, paused, onExit: (exit) => { setClosing(false); onClose(p.key, exit); } }} />
+        </Suspense>
+      )}
+      {closing && !oneTap && t && (
         <QuestionTicket und={q.und} question={question} answer={name} level={found.level} sideKey={p.side} t={t} board={board}
           pricesTs={board.prices_ts} settleTs={settleTs} stale={priceAge(board.prices_ts, now).state === "stale"} closing
           paid={op.paid} holdPayout={f.expiryNow}
@@ -345,9 +384,10 @@ function Card({ p, onRemove, onClose }) {
 
 /** Positions: kept in this browser only, with export and import under "Saved in this browser". */
 export default function MyQuestions() {
-  const [list, setListRaw] = useState(() => prune(loadPositions()));
+  const [list, setListRaw] = useState(() => prune(loadPositions(NET)));
   const setList = (l) => setListRaw(prune(l));
-  const testnet = loadPositions("testnet").length;
+  const other = loadPositions(NET === "testnet" ? "mainnet" : "testnet").length;
+  const [sync, setSync] = useState(null);
   const [tab, setTab] = useState("open");
   const [importError, setImportError] = useState(null);
   const file = useRef(null);
@@ -370,7 +410,7 @@ export default function MyQuestions() {
   const upload = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    try { setList(importPositions(await f.text())); setImportError(null); } catch (err) {
+    try { importPositions(await f.text()); setList(loadPositions(NET)); setImportError(null); } catch (err) {
       setImportError(err?.message === "Saved by a newer Cowboy" ? "This file was saved by a newer Cowboy; nothing was imported." : "That is not a Positions file; nothing was imported.");
     }
     e.target.value = "";
@@ -382,7 +422,9 @@ export default function MyQuestions() {
           <h1>Positions</h1>
           <Link to="/saloon" className="btn">Browse the Saloon<span aria-hidden="true">↗</span></Link>
         </div>
-        <p className="q-position-intro">Your record of trades placed on Derive.<Info label="About Positions">These are records you entered, saved in this browser. Cowboy cannot see your Derive account. Values use the published sell-back price after exit fees when available; an unavailable value stays unknown.</Info></p>
+        <p className="q-position-intro">Your record of trades placed on Derive.<Info label="About Positions">{TESTNET_FILLS
+          ? "One-tap trades are recorded from Derive's own records and checked against your Saloon account on Derive's testnet; trades placed by hand are records you entered. Everything is saved in this browser. Values use the published sell-back price after exit fees when available; an unavailable value stays unknown."
+          : "These are records you entered, saved in this browser. Cowboy cannot see your Derive account. Values use the published sell-back price after exit fees when available; an unavailable value stays unknown."}</Info></p>
         {!persistent() && <p className="q-note warn" role="status">This browser is not saving data: Positions last only for this visit. Export a copy to keep them.</p>}
         {list.length > 0 && (
           <p className="q-portfolio-line" aria-label="Your saved records">
@@ -399,9 +441,12 @@ export default function MyQuestions() {
         )}
         <Tabs label="Positions" value={tab} onChange={setTab} items={[["open", "Open"], ["closed", "Closed"]]} />
       </header>
-      {toSettle.map((p) => <SettleWatch key={p.key} p={p} onSettle={(k, price) => setList(settlePosition(k, price))} />)}
+      {NET === "mainnet" && toSettle.map((p) => <SettleWatch key={p.key} p={p} onSettle={(k, price) => setList(settlePosition(k, price))} />)}
+      {TESTNET_FILLS && <Suspense fallback={null}><DeriveSync onSynced={(r) => { setList(r.list); setSync(r); }} /></Suspense>}
       {tab === "open" && <Exposure groups={groups} />}
-      {rows.length ? rows.map((p) => <Card key={p.key} p={p} onRemove={(k) => setList(removePosition(k))} onClose={(k, got) => setList(closePosition(k, got))} />)
+      {TESTNET_FILLS && tab === "open" && sync?.extra && <Suspense fallback={null}><AlsoOnDerive extra={sync.extra} /></Suspense>}
+      {rows.length ? rows.map((p) => <Card key={p.key} p={p} sync={sync?.statuses?.[p.key] ?? null} onRemove={(k) => setList(removePosition(k, NET))}
+        onClose={(k, got) => setList(closePosition(k, got, Date.now() / 1000, NET))} />)
         : list.length ? <p className="status">Nothing {tab === "open" ? "open" : "closed"} yet.</p> : (
           <section className="q-empty-card" aria-label="No positions yet">
             <h2>No positions yet</h2>
@@ -417,7 +462,7 @@ export default function MyQuestions() {
           <input ref={file} type="file" accept="application/json" hidden onChange={upload} aria-label="Import a saved file" />
         </div>
         {importError && <p className="q-note warn" role="alert">{importError}</p>}
-        {testnet > 0 && <p className="q-note">{testnet} testnet {testnet === 1 ? "record is" : "records are"} kept apart from these and included in Export.</p>}
+        {other > 0 && <p className="q-note">{other} {NET === "testnet" ? "mainnet" : "testnet"} {other === 1 ? "record is" : "records are"} kept apart from these and included in Export.</p>}
       </details>
     </div>
   );
