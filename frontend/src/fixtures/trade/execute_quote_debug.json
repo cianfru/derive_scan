@@ -1,0 +1,87 @@
+{
+ "recorded": "2026-10-04T04:52:19.752Z",
+ "network": "testnet",
+ "method": "public/execute_quote_debug",
+ "args": {
+  "quote": {
+   "rfq_id": "5a4f3f3e-6c1e-4d3b-9b8e-1f2a3b4c5d6e",
+   "quote_id": "8c7b6a59-4e3d-4c2b-8a19-0f1e2d3c4b5a",
+   "direction": "sell",
+   "legs": [
+    {
+     "instrument_name": "BTC-20261009-82000-C",
+     "direction": "buy",
+     "amount": "0.04407",
+     "price": "3105.5"
+    },
+    {
+     "instrument_name": "BTC-20261009-88000-C",
+     "direction": "sell",
+     "amount": "0.04407",
+     "price": "980"
+    }
+   ]
+  },
+  "subaccountId": 86547,
+  "owner": "0x36A6C6326C190561B5C55eae20c81880C0eFA7b6",
+  "instruments": {
+   "BTC-20261009-82000-C": {
+    "instrument_name": "BTC-20261009-82000-C",
+    "base_asset_address": "0xd0711b9eBE84b778483709CDe62BacFDBAE13623",
+    "base_asset_sub_id": "39614116475863995998563507968",
+    "amount_step": "0.00001",
+    "minimum_amount": "0.01",
+    "tick_size": "1"
+   },
+   "BTC-20261009-88000-C": {
+    "instrument_name": "BTC-20261009-88000-C",
+    "base_asset_address": "0xd0711b9eBE84b778483709CDe62BacFDBAE13623",
+    "base_asset_sub_id": "39614119052844373598563507968",
+    "amount_step": "0.00001",
+    "minimum_amount": "0.01",
+    "tick_size": "1"
+   }
+  },
+  "maxFee": "2.43",
+  "chainId": 11155111,
+  "nonce": "1791089403460085266",
+  "expirySec": 1791091303,
+  "signer": "0xD5c07E54F115e1c1e0317c9CdE0E7480AA733a92"
+ },
+ "request": {
+  "subaccount_id": 86547,
+  "rfq_id": "5a4f3f3e-6c1e-4d3b-9b8e-1f2a3b4c5d6e",
+  "quote_id": "8c7b6a59-4e3d-4c2b-8a19-0f1e2d3c4b5a",
+  "direction": "buy",
+  "legs": [
+   {
+    "instrument_name": "BTC-20261009-82000-C",
+    "direction": "buy",
+    "amount": "0.04407",
+    "price": "3105.5"
+   },
+   {
+    "instrument_name": "BTC-20261009-88000-C",
+    "direction": "sell",
+    "amount": "0.04407",
+    "price": "980.0"
+   }
+  ],
+  "max_fee": "2.43",
+  "nonce": "1791089403460085266",
+  "signer": "0xD5c07E54F115e1c1e0317c9CdE0E7480AA733a92",
+  "signature": "0x8cf4d54748d12e13d766620299bbbee0f781db642a2bb6f142f6a44d936893e5776266a53058d1bb419cc7879c983041763028e9f516438dc9a27807a02787601b",
+  "signature_expiry_sec": 1791091303
+ },
+ "response": {
+  "id": "25669f58-99b5-40ec-926c-eed5ce10edf3",
+  "result": {
+   "encoded_data": "0xd4aa3df74818c08e7329eb0d60c52ac6f385faa74ddbee184ae3e7c964fd7bd300000000000000000000000000000000000000000000000021b9182014330000",
+   "encoded_data_hashed": "0x1065de2f9f12f4fbdab11e2fb7b4c9ef3ba9fb4e9e3122e510e04dc07151e3cd",
+   "action_hash": "0xc0aa6ca129f3a44a0eb1432c5a6c67dbe4df862a53036e65b92e896bcc4ea9f1",
+   "typed_data_hash": "0xe9bad7280310eb3d38a84640db17a65cce063b933d03e4bf687c2dc4160d4084",
+   "encoded_legs": "0x000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000021b918201433000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000002000000000000000000000000d0711b9ebe84b778483709cde62bacfdbae13623000000000000000000000000000000000000000080000775361650006ac89f000000000000000000000000000000000000000000000000a85978545b17960000ffffffffffffffffffffffffffffffffffffffffffffffffff636e9188bfa000000000000000000000000000d0711b9ebe84b778483709cde62bacfdbae13623000000000000000000000000000000000000000080000800e8dfc0006ac89f00000000000000000000000000000000000000000000000035203b67bccad00000000000000000000000000000000000000000000000000000009c916e77406000",
+   "legs_hash": "0xd4aa3df74818c08e7329eb0d60c52ac6f385faa74ddbee184ae3e7c964fd7bd3"
+  }
+ }
+}

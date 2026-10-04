@@ -58,4 +58,4 @@ export const DEPOSIT_SUGGESTED = 50;
 export const GAS_WARN_SHARE = 0.05;
 
 /** Cowboy's public referral code from Derive's API Broker programme (empty until it exists). */
-export const REFERRAL = import.meta.env.VITE_DERIVE_REFERRAL || "";
+export const REFERRAL = import.meta.env?.VITE_DERIVE_REFERRAL || "";
