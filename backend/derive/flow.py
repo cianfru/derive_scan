@@ -170,6 +170,8 @@ def summarise(trades: list[dict], run_ts: int) -> tuple[list[list], list[list]]:
             continue
         name = t.get("instrument_name", "")
         kind = kind_of(name)
+        if kind == "other":  # spot (erc20) legs: not perp or option flow
+            continue
         amount, price, index = _f(t.get("trade_amount")), _f(t.get("trade_price")), _f(t.get("index_price"))
         notional = amount * (price if kind == "perp" else index)
         premium = amount * price if kind == "option" else 0.0

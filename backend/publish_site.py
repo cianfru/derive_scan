@@ -61,8 +61,9 @@ CANDLES_KEEP = {"4h": 500, "1d": 400}
 SIGNAL_DAYS = 120
 IV_DAYS = 14
 METRIC_DAYS = 90
-FLOW_LARGE = 80
+FLOW_LARGE = {"option": 60, "perp": 40}  # large rows kept per kind, biggest notional first
 FLOW_WALLETS = 30
+MIXED_FIELDS = ("legs", "realized_pnl_usd", "fees_usd")  # per bucket, perp and option trades together
 RIBBON_CHAR = {"gold": "g", "blue": "b", "grey": "n"}  # "-": warm-up or no reading
 BREADTH_COLS = ("MARKUP", "BLOWOFF", "REACC", "ACCUM", "CAP", "MARKDOWN", "FLAT")
 # Price metrics a replay may supply for a saved close that was not ready; heat carries its phase.
@@ -513,26 +514,42 @@ def tier_positions(data: Path) -> dict:
 
 
 def flow_block(data: Path, now: float, sides: dict | None = None) -> dict:
-    """Large taker trades and the most active wallets, market makers left out."""
+    """Large taker trades and the most active wallets, market makers left out.
+
+    Until perp-only wallets are classed, a wallet without an options class (history/wallets.json)
+    shows no perp activity here: its perp rows, perp notional and the PnL, fees and legs of buckets
+    that held perp trades are left out (its option rows stay)."""
     from derive.flow import window_coverage
     coverage = window_coverage(data, now, 86400)
     since_ms = coverage["start"] * 1000
     classes = wallet_classes(data)
-    large = []
+    by_kind: dict = defaultdict(list)
     for day in _days(2, now):
         for r in _read_csv(data / "flow" / "large" / f"{day}.csv"):
-            if since_ms <= int(r["ts"]) < coverage["end"] * 1000 and classes.get(r["wallet"]) != "market_maker":
-                large.append({**r, "class": classes.get(r["wallet"])})
-    large.sort(key=lambda r: float(r["notional_usd"]), reverse=True)
-    large = sorted(large[:FLOW_LARGE], key=lambda r: int(r["ts"]), reverse=True)
+            cls = classes.get(r["wallet"])
+            if not since_ms <= int(r["ts"]) < coverage["end"] * 1000 or cls == "market_maker" \
+                    or r["kind"] not in FLOW_LARGE or (r["kind"] == "perp" and cls is None):
+                continue
+            by_kind[r["kind"]].append({**r, "class": cls})
+    large = []
+    for kind, cap in FLOW_LARGE.items():
+        large += sorted(by_kind[kind], key=lambda r: float(r["notional_usd"]), reverse=True)[:cap]
+    large.sort(key=lambda r: int(r["ts"]), reverse=True)
     wallets: dict = defaultdict(lambda: defaultdict(float))
     for day in _days(2, now):
         for r in _read_csv(data / "flow" / "wallets_v2" / f"{day}.csv"):
             if not coverage["start"] <= int(r["bucket_ts"]) < coverage["end"] or classes.get(r["wallet"]) == "market_maker":
                 continue
+            keys = ("legs", "perp_notional_usd", "option_notional_usd", "premium_bought_usd", "premium_sold_usd",
+                    "realized_pnl_usd", "fees_usd")
+            if r["wallet"] not in classes and float(r["perp_notional_usd"] or 0):
+                # The bucket's legs, PnL and fees mix perp and option trades: only option figures stay.
+                keys = ("option_notional_usd", "premium_bought_usd", "premium_sold_usd")
+                if not any(float(r[k] or 0) for k in keys):
+                    continue
+                wallets[r["wallet"]]["partial"] = 1.0
             w = wallets[r["wallet"]]
-            for k in ("legs", "perp_notional_usd", "option_notional_usd", "premium_bought_usd", "premium_sold_usd",
-                      "realized_pnl_usd", "fees_usd"):
+            for k in keys:
                 w[k] += float(r[k] or 0)
     top = sorted(wallets.items(), key=lambda kv: kv[1]["perp_notional_usd"] + kv[1]["option_notional_usd"],
                  reverse=True)[:FLOW_WALLETS]
@@ -542,7 +559,10 @@ def flow_block(data: Path, now: float, sides: dict | None = None) -> dict:
             "classes_ready": bool(classes),
             "large": [{k: (_num(v) if k not in ("instrument", "kind", "underlying", "direction", "wallet", "class") else v)
                        for k, v in r.items()} for r in large],
-            "wallets": [{"wallet": a, "class": classes.get(a), **{k: round(v, 2) for k, v in w.items()}} for a, w in top]}
+            "wallets": [{"wallet": a, "class": classes.get(a),
+                         **{k: None if w.get("partial") and k in MIXED_FIELDS else round(w.get(k, 0.0), 2)
+                            for k in ("legs", "perp_notional_usd", "option_notional_usd", "premium_bought_usd",
+                                      "premium_sold_usd", "realized_pnl_usd", "fees_usd")}} for a, w in top]}
 
 
 def _book(open_rows: list, chains: dict, now: float) -> list[dict]:
