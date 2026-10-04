@@ -209,3 +209,19 @@
 @media (pointer: coarse) {
   .bd-choice-note .fl-btn, .q-follow .fl-btn { min-width: 44px; min-height: 44px; }
 }
+
+/* Narrow cards (phones, large text): stack each price tile so the price never runs past its edge. */
+.bd-card { container-type: inline-size; }
+.bd-choice b { white-space: nowrap; }
+@container (max-width: 380px) {
+  .bd-choices { gap: 8px; }
+  .bd-choice { flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; padding: 8px 10px; }
+  .bd-choice b { font-size: 22px; line-height: 1.1; }
+  .bd-choice.off { align-items: flex-start; }
+  .bd-choice.off > span { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+  .bd-choice.off .q-noprice { white-space: normal; }
+  .bd-choice-note { align-items: flex-start; }
+  .bd-budget-preview { gap: 8px; }
+  .bd-budget-preview > div { display: grid; gap: 1px; }
+  .bd-budget-preview dd { font-size: 14px; }
+}
