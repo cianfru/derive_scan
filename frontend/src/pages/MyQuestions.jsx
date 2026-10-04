@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { Info, Tabs } from "../components/ui.jsx";
+import { Asset } from "../components/MarketVisuals.jsx";
 import PayZone from "../components/PayZone.jsx";
 import QuestionTicket from "../components/QuestionTicket.jsx";
 import Exposure from "../components/Exposure.jsx";
@@ -17,6 +18,7 @@ import { exposureGroups } from "../lib/exposure.js";
 import { compareReadings, hasJournal } from "../lib/journal.js";
 import "../questions.css";
 import "../journal.css";
+import "../marketplace-positions.css";
 
 const usd = (v) => money(v, { cents: true });
 const sumNets = (r) => (r.portions.every((x) => x.exit.net != null) ? r.portions.reduce((a, x) => a + x.exit.net, 0) : null);
@@ -185,7 +187,7 @@ function Portion({ x, und }) {
       </dl>
       {rows ? (
         <dl className="q-figs" aria-label="Where it came from">
-          {rows.map(([k, v]) => row(<>{PART[k][0]}<Info label={PART[k][0]}>{PART[k][1]}</Info></>, null, <span className={tone(v)}>{signed(v)}</span>))}
+          {rows.map(([k, v]) => <Fragment key={k}>{row(<>{PART[k][0]}<Info label={PART[k][0]}>{PART[k][1]}</Info></>, null, <span className={tone(v)}>{signed(v)}</span>)}</Fragment>)}
         </dl>
       ) : (
         <>
@@ -264,10 +266,13 @@ function Card({ p, onRemove, onClose }) {
   const na = (why, label) => <Missing text="Not available yet" label={label} why={why} />;
   const noPrice = <Missing text="No price now" label="Why no price" why={reason} />;
   return (
-    <article className={`q-card q-card-${status.key}`}>
-      <header>
-        <Link to={`/q/${p.id}?side=${p.side}`} className="q-card-title">{question}</Link>
-        <span className="q-card-side">{name}{q && <> · {fullPay(q, p.side)}</>}</span>
+    <article className={`q-card q-position q-card-${status.key}`}>
+      <header className="q-position-heading">
+        {q && <Asset und={q.und} compact />}
+        <div>
+          <Link to={`/q/${p.id}?side=${p.side}`} className="q-card-title">{question}</Link>
+          <span className={`q-card-side q-position-side ${p.side === "yes" ? "higher" : "lower"}`}>{name}{q && <> · {fullPay(q, p.side)}</>}</span>
+        </div>
       </header>
       <p className={`q-card-status${status.warn ? " warn" : ""}`}>
         {status.key === "settled" ? <>Settled at {money(settle)} · got {usd(settleExit?.exit.gross ?? f.got)}</> : status.text}
@@ -275,7 +280,7 @@ function Card({ p, onRemove, onClose }) {
           ? "You told Cowboy only the first of the two orders filled. You hold one option alone, which pays differently from the answer and can lose all it cost. Finish or undo it on Derive; Cowboy shows no value for it."
           : "You placed the orders on Derive yourself and told Cowboy what you paid. Cowboy cannot see your Derive account, so these figures are only as good as what you entered."}</Info>
       </p>
-      <dl className="q-figs grid">
+      <dl className="q-figs grid q-position-figures">
         <Fig label="You paid" sub={p.journal?.cost?.fees_basis === "estimated" ? "estimated fees included" : p.journal?.cost?.fees_basis === "unknown" ? "fees not entered" : op !== p ? `fees included, for the ${amountTextQ(op.contracts)} still open` : "fees included"} value={usd(op.paid)} />
         {f.closed || p.closed_at ? (
           <>
@@ -292,31 +297,41 @@ function Card({ p, onRemove, onClose }) {
           </>
         ) : (
           <>
-            <Fig label="Most it pays" sub={q ? fullPay(q, p.side) : null} value={usdOr(f.maxPayout)} missing={na(partWhy, "Why no payout")} />
             <Fig label="Value now" sub="sell-back, after fees"
               info={f.mark != null && f.valueNow != null && <Info label="At Derive's mark">At Derive's mark: {usd(f.mark)}. Value now is Derive's sell-back price on its screen minus Derive's fees to sell back, about {usd(f.fees)}.</Info>}
               value={usdOr(f.valueNow)} missing={half ? na(partWhy, "Why no value") : noPrice} />
             <Fig label="Profit / loss now" sub="if sold back now" value={pl(f.plNow)} className="q-pl"
               missing={half ? na("With only one option filled there is no result for the answer.", "Why no result") : na("There is a result once Derive shows a sell-back price, or at settlement.", "Why no result")} />
-            <Fig label="At 08:00 UTC, today's price" sub={f.expiryNow != null ? `pays ${usd(f.expiryNow)}` : null} value={pl(f.plExpiryNow)}
-              info={<Info label="About the payout at today's price">What the answer pays if {q?.und} settles at today's price, {money(board?.index)}, and the profit or loss after what you paid. Not a view of where it settles.</Info>}
-              missing={na(half ? partWhy : "Cowboy needs today's price from the board to show this.", "Why no payout at today's price")} />
           </>
         )}
         <Fig label={f.closed ? "Sold back" : f.settled ? "Settled" : "Settles"}
           value={f.closed ? new Date(p.closed_at * 1000).toISOString().slice(0, 10) : q ? `${dayLabel(q.expiry)}, 08:00 UTC` : null}
           sub={!f.closed && !f.settled && !settling ? countdown(settleTs, now) : settling && !f.settled ? "settling now" : null} missing={na("No date saved.", "Why no date")} />
       </dl>
-      {q && !half && <PayZone lo={q.lo} hi={q.hi} side={p.side} index={settle ?? board?.index} compact />}
       {real.portions.length > 0 && real.open > 0 && !after && (
-        <p className="q-note">Realized so far: <b className={`mono ${tone(real.net ?? 0)}`}>{real.net != null ? signed(real.net) : "Not available yet"}</b> on {amountTextQ(p.contracts - real.open)} contracts sold back; the figures above are for the {amountTextQ(real.open)} still open.</p>
+        <p className="q-note q-position-realized">Realized so far: <b className={`mono ${tone(real.net ?? 0)}`}>{real.net != null ? signed(real.net) : "Not available yet"}</b> on {amountTextQ(p.contracts - real.open)} contracts sold back; the figures above are for the {amountTextQ(real.open)} still open.</p>
       )}
-      <SinceStrip p={p} markets={markets} now={now} />
-      <EntryRecord p={p} />
-      <Realized p={p} und={q?.und || p.und} />
-      <div className="q-card-actions">
-        {t && <button className="btn" onClick={() => setClosing((s) => !s)} aria-expanded={closing}>{closing ? "Keep it open" : "Close"}</button>}
-        <button className="text-control" onClick={() => onRemove(p.key)}>Remove</button>
+      <div className="q-position-tools">
+        <details className="q-position-details">
+          <summary>Position details<span aria-hidden="true">+</span></summary>
+          <div className="q-position-expanded">
+            {!f.closed && !f.settled && !p.closed_at && !(after && settleExit) && <dl className="q-figs grid q-position-extra">
+              <Fig label="Most it pays" sub={q ? fullPay(q, p.side) : null} value={usdOr(f.maxPayout)} missing={na(partWhy, "Why no payout")} />
+              <Fig label="At 08:00 UTC, today's price" sub={f.expiryNow != null ? `pays ${usd(f.expiryNow)}` : null} value={pl(f.plExpiryNow)}
+                info={<Info label="About the payout at today's price">What the answer pays if {q?.und} settles at today's price, {money(board?.index)}, and the profit or loss after what you paid. Not a view of where it settles.</Info>}
+                missing={na(half ? partWhy : "Cowboy needs today's price from the board to show this.", "Why no payout at today's price")} />
+            </dl>}
+            {q && !half && <PayZone lo={q.lo} hi={q.hi} side={p.side} index={settle ?? board?.index} compact />}
+            <SinceStrip p={p} markets={markets} now={now} />
+            <EntryRecord p={p} />
+            <Realized p={p} und={q?.und || p.und} />
+            <div className="q-card-actions">
+              <button className="text-control" onClick={() => onRemove(p.key)}>Remove</button>
+              <span className="q-position-remove-note">Removes this browser record only.</span>
+            </div>
+          </div>
+        </details>
+        {t && <button className="btn q-position-close" onClick={() => setClosing((s) => !s)} aria-expanded={closing}>{closing ? "Keep it open" : "Close"}</button>}
       </div>
       {closing && t && (
         <QuestionTicket und={q.und} question={question} answer={name} level={found.level} sideKey={p.side} t={t} board={board}
@@ -339,6 +354,8 @@ export default function MyQuestions() {
   const now = Date.now() / 1000;
   const settleOf = (p) => p.settle_ts || 0;
   const done = (p) => !!p.closed_at || now >= settleOf(p);
+  const openCount = list.filter((p) => !done(p)).length;
+  const incompleteCount = list.filter((p) => !p.closed_at && partial(p)).length;
   const rows = useMemo(() => list.filter((p) => (tab === "open" ? !done(p) : done(p)))
     .sort((a, b) => settleOf(a) - settleOf(b)), [list, tab, now]);
   const groups = useMemo(() => exposureGroups(list, now), [list]);
@@ -359,19 +376,25 @@ export default function MyQuestions() {
     e.target.value = "";
   };
   return (
-    <div className="wrap page q-page q-mine">
+    <div className="wrap page q-page q-mine marketplace-positions">
       <header className="q-head">
         <div className="q-head-top">
           <h1>Positions</h1>
-          <Link to="/saloon" className="text-link">Back to the Saloon</Link>
+          <Link to="/saloon" className="btn">Browse the Saloon<span aria-hidden="true">↗</span></Link>
         </div>
+        <p className="q-position-intro">Your record of trades placed on Derive.<Info label="About Positions">These are records you entered, saved in this browser. Cowboy cannot see your Derive account. Values use the published sell-back price after exit fees when available; an unavailable value stays unknown.</Info></p>
         {!persistent() && <p className="q-note warn" role="status">This browser is not saving data: Positions last only for this visit. Export a copy to keep them.</p>}
-        {summary.count > 0 && (
-          <p className="q-realized-sum" aria-label="Realized">
-            <span>Realized</span>
-            <b className={`mono ${tone(summary.total)}`}>{signed(summary.total)}</b>
-            <span>{summary.count} {summary.count === 1 ? "result" : "results"}: {summary.closes} sold back, {summary.settles} settled
-              <Info label="About realized">The results of positions sold back or settled, after Derive's fees, from what you entered and Derive's settlement prices. {summary.wins} ended above what was paid, {summary.losses} below.{summary.partialCloses ? ` ${summary.partialCloses} ${summary.partialCloses === 1 ? "is a part" : "are parts"} of positions still open.` : ""}{summary.estimated ? ` ${summary.estimated} ${summary.estimated === 1 ? "uses" : "use"} estimated fees.` : ""}{summary.unknown ? ` ${summary.unknown} without a known result ${summary.unknown === 1 ? "is" : "are"} left out of the total.` : ""}</Info></span>
+        {list.length > 0 && (
+          <p className="q-portfolio-line" aria-label="Your saved records">
+            <span><b className="mono">{openCount}</b> open</span>
+            <span><b className="mono">{list.length - openCount}</b> closed or settled</span>
+            {incompleteCount > 0 && <span className="q-incomplete-count"><b className="mono">{incompleteCount}</b> incomplete {incompleteCount === 1 ? "fill" : "fills"}<Info label="About incomplete fills">Records with only part of the package filled. These stay visible in the record and have no full-answer valuation, including after settlement. Check the individual options on Derive.</Info></span>}
+            {summary.count > 0 && (
+              <span className="q-realized-sum">Realized <b className={`mono ${tone(summary.total)}`}>{signed(summary.total)}</b>
+                <small>{summary.count} {summary.count === 1 ? "result" : "results"}: {summary.closes} sold back, {summary.settles} settled</small>
+                <Info label="About realized">The results of positions sold back or settled, after Derive's fees, from what you entered and Derive's settlement prices. {summary.wins} ended above what was paid, {summary.losses} below.{summary.partialCloses ? ` ${summary.partialCloses} ${summary.partialCloses === 1 ? "is a part" : "are parts"} of positions still open.` : ""}{summary.estimated ? ` ${summary.estimated} ${summary.estimated === 1 ? "uses" : "use"} estimated fees.` : ""}{summary.unknown ? ` ${summary.unknown} without a known result ${summary.unknown === 1 ? "is" : "are"} left out of the total.` : ""}</Info>
+              </span>
+            )}
           </p>
         )}
         <Tabs label="Positions" value={tab} onChange={setTab} items={[["open", "Open"], ["closed", "Closed"]]} />
@@ -382,7 +405,7 @@ export default function MyQuestions() {
         : list.length ? <p className="status">Nothing {tab === "open" ? "open" : "closed"} yet.</p> : (
           <section className="q-empty-card" aria-label="No positions yet">
             <h2>No positions yet</h2>
-            <p>Pick higher or lower on a coin in the Saloon, place it on Derive, then tell Cowboy what filled. It shows here with what you paid, what it is worth and when it settles.</p>
+            <p>Your trades, costs and settlement dates, in one place. Choose an outcome in the Saloon, place its orders on Derive, then record what filled.</p>
             <Link className="btn primary lg" to="/saloon">Open the Saloon</Link>
           </section>
         )}

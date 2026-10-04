@@ -4,6 +4,7 @@ import { Loading } from "./ui.jsx";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import { Lockup, HatMark } from "./Brand.jsx";
 import { QUESTIONS_ON } from "../lib/flags.js";
+import "../marketplace.css";
 
 function useTheme() {
   const [theme, setTheme] = useState(
@@ -28,7 +29,7 @@ const RESEARCH = [["/markets", "Markets"], ["/radar", "Radar"], ["/options", "Op
 export const isResearch = (path) => RESEARCH.some(([to]) => path === to || path.startsWith(`${to}/`))
   || path.startsWith("/coin/") || path.startsWith("/trader/");
 
-/** Phones: Research as one menu button. Escape or a pick closes it and focus returns to the button. */
+/** Research as one menu button. Escape or a pick closes it and returns focus. */
 function ResearchMenu({ active }) {
   const [open, setOpen] = useState(false);
   const btn = useRef(null);
@@ -52,7 +53,7 @@ function ResearchMenu({ active }) {
       </button>
       {open && (
         <div id="research-menu" ref={menu} className="nav-menu" role="group" aria-label="Research pages">
-          {RESEARCH.map(([to, label]) => <NavLink key={to} to={to}>{label}</NavLink>)}
+          {RESEARCH.map(([to, label]) => <NavLink key={to} to={to} onClick={() => { setOpen(false); btn.current?.focus(); }}>{label}</NavLink>)}
         </div>
       )}
     </div>
@@ -64,7 +65,8 @@ export default function Shell() {
   const { pathname, hash } = useLocation();
   const header = useRef(null);
   const positionsActive = pathname === "/saloon/mine";
-  const saloonActive = !positionsActive && (pathname.startsWith("/saloon") || pathname.startsWith("/q/"));
+  const followingActive = pathname === "/saloon/following";
+  const saloonActive = !positionsActive && !followingActive && (pathname.startsWith("/saloon") || pathname.startsWith("/q/"));
   const researchActive = isResearch(pathname);
   useEffect(() => {
     if (!hash) window.scrollTo(0, 0);
@@ -84,23 +86,20 @@ export default function Shell() {
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <header className="hdr" ref={header}>
+      <header className={`hdr${QUESTIONS_ON ? " hdr-marketplace" : ""}${QUESTIONS_ON && pathname === "/" ? " hdr-landing" : ""}`} ref={header}>
         <div className="wrap">
           <Link to="/" className="logo" aria-label="Cowboy home">
             <Lockup />
           </Link>
           {QUESTIONS_ON ? (
-            // Trade, Positions, Research: the Saloon leads; the research pages sit inline after a
-            // divider on wide screens and in a Research menu on phones.
+            // Outcomes first; saved answers and records stay one click away. Research keeps its
+            // own destinations inside one menu, on every screen size.
             <nav aria-label="Main navigation" className="nav-saloon">
               <Link to="/saloon" className={`nav-primary${saloonActive ? " active" : ""}`} aria-current={saloonActive ? "page" : undefined}>
                 <HatMark size={18} />Saloon<span className="nav-sub">Price outcomes</span>
               </Link>
+              <Link to="/saloon/following" className={`nav-following${followingActive ? " active" : ""}`} aria-current={followingActive ? "page" : undefined}>Following</Link>
               <Link to="/saloon/mine" className={`nav-positions${positionsActive ? " active" : ""}`} aria-current={positionsActive ? "page" : undefined}>Positions</Link>
-              <span className="nav-divider" aria-hidden="true" />
-              <div className="nav-research" role="group" aria-label="Research">
-                {RESEARCH.map(([to, label]) => <NavLink key={to} to={to}>{label}</NavLink>)}
-              </div>
               <ResearchMenu active={researchActive} />
             </nav>
           ) : (

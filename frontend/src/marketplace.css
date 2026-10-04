@@ -1,0 +1,30 @@
+/* The Saloon's marketplace navigation. All styling is scoped to the enabled Saloon. */
+.hdr.hdr-marketplace .nav-more { display: flex; margin-left: 0; }
+.hdr.hdr-marketplace nav.nav-saloon { gap: 30px; }
+.hdr.hdr-marketplace .nav-following, .hdr.hdr-marketplace .nav-positions { color: var(--text-3); font-weight: 500; }
+.hdr.hdr-marketplace .nav-following.active, .hdr.hdr-marketplace .nav-positions.active { color: var(--accent-text); }
+.hdr.hdr-marketplace .nav-more-btn { font-size: 14px; }
+.hdr.hdr-marketplace .tools { margin-left: auto; }
+.hdr.hdr-marketplace.hdr-landing .nav-following { display: none; }
+.hdr.hdr-marketplace.hdr-landing nav.nav-saloon { flex: none; margin-left: auto; }
+.hdr.hdr-marketplace.hdr-landing .tools { margin-left: 0; }
+.saloon-heading h1 { font-size: 30px; letter-spacing: -.035em; font-weight: 650; }
+.saloon-heading p { margin: 7px 0 0; color: var(--text-3); font-size: 14px; }
+.saloon-view-link { display: inline-flex; gap: 14px; align-items: center; min-height: 44px; font-size: 13px; font-weight: 500; color: var(--text-2); }
+.saloon-view-link span { color: var(--accent-text); }
+.saloon-view-link:hover { color: var(--accent-text); }
+@media (max-width: 760px) {
+  .hdr.hdr-marketplace:not(.hdr-landing) .wrap { display: grid; grid-template-columns: 1fr auto; grid-template-rows: 52px 44px; height: auto; gap: 0; }
+  .hdr.hdr-marketplace:not(.hdr-landing) .logo { width: fit-content; }
+  .hdr.hdr-marketplace:not(.hdr-landing) .tools { grid-column: 2; grid-row: 1; }
+  .hdr.hdr-marketplace:not(.hdr-landing) nav.nav-saloon { grid-column: 1 / -1; grid-row: 2; display: flex; justify-content: space-between; gap: 14px; overflow: visible; }
+  .hdr.hdr-marketplace:not(.hdr-landing) .nav-sub { display: none; }
+  .hdr.hdr-marketplace nav.nav-saloon a, .hdr.hdr-marketplace .nav-more-btn { font-size: 13px; }
+  .hdr.hdr-marketplace:not(.hdr-landing) .nav-primary .hat-mark { display: none; }
+  .saloon-heading h1 { font-size: 27px; }
+  .saloon-heading p { font-size: 13px; }
+}
+@media (max-width: 360px) {
+  .sn-head-wrap .q-head-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  .saloon-view-link { font-size: 12px; gap: 6px; }
+}

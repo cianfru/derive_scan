@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useFeeds } from "./Feeds.jsx";
-import { Info, Tabs } from "./ui.jsx";
+import { Info } from "./ui.jsx";
 import { computeNotices, dismiss, dismissAll, loadDoc, saveDoc, useFollowsDoc } from "../lib/follows.js";
 import "../board.css";
 
@@ -65,15 +65,18 @@ export function SaloonNotices() {
   );
 }
 
-/** The Saloon's header: its name, the two ways in (Guided and Browse) and the notices. */
+/** Browsing is the default. Guided setup remains available without duplicating the main nav. */
 export default function SaloonHead({ view }) {
-  const navigate = useNavigate();
+  const following = view === "following";
+  const guided = view === "guided";
   return (
     <header className="q-head sn-head-wrap">
       <div className="q-head-top">
-        <h1>Saloon <span className="q-sub">Price outcomes</span></h1>
-        <Tabs label="Saloon view" value={view} onChange={(v) => navigate(v === "browse" ? "/saloon/browse" : "/saloon")}
-          items={[["guided", "Guided"], ["browse", "Browse"]]} />
+        <div className="saloon-heading">
+          <h1>{following ? "Following" : "Saloon"}</h1>
+          <p>{following ? "Your saved outcomes, kept in this browser." : guided ? "Choose a coin, a date and an outcome." : "Higher or lower. Find your outcome."}</p>
+        </div>
+        <Link className="saloon-view-link" to={guided ? "/saloon" : "/saloon/guided"}>{guided ? "Browse outcomes" : "Guided setup"}<span aria-hidden="true">↗</span></Link>
       </div>
       <SaloonNotices />
     </header>

@@ -8,7 +8,7 @@ import QuestionLadder from "../components/QuestionLadder.jsx";
 import PayZone from "../components/PayZone.jsx";
 import QuestionChart from "../components/QuestionChart.jsx";
 import QuestionTicket from "../components/QuestionTicket.jsx";
-import OutcomePreview from "../components/OutcomePreview.jsx";
+import OutcomePreview, { OutcomeFigures, OutcomePayoffStudy } from "../components/OutcomePreview.jsx";
 import SaloonHead from "../components/SaloonNotices.jsx";
 import { FollowButton, FollowLevel } from "../components/Follow.jsx";
 import { loadBudget } from "../lib/follows.js";
@@ -17,6 +17,7 @@ import {
   budgetTicket, questionText, settlingNow, payAt,
 } from "../lib/questions.js";
 import "../questions.css";
+import "../marketplace-detail.css";
 
 const clock = (t) => `${new Date(t * 1000).toISOString().slice(11, 16)} UTC`;
 const QUICK = [25, 100, 500];
@@ -195,6 +196,97 @@ function History({ und, date, level, sideKey, theme }) {
 }
 
 const scrollTo = (el) => el?.scrollIntoView?.({ block: "start", behavior: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+
+/** The board's detail page keeps the choice, amount and payout together. Only the final order
+ * review opens a ticket; prices, fees, available size and time gates use the same guided maths. */
+function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, renderLadder, ladderOpen, onLadder, initialDollars }) {
+  const { date, level } = found;
+  const question = questionText(und, level, date.expiry);
+  const paused = age.state === "paused" || board.paused;
+  const settling = settlingNow(level);
+  const [dollars, setDollars] = useState(() => Number.isFinite(initialDollars) && initialDollars > 0 ? initialDollars : loadBudget());
+  const [sheet, setSheet] = useState(false);
+  const { data: hist, error: historyError } = useData(`questions/history/${und}-${date.expiry}.json`, 15 * 60_000);
+  const t = !settling && sideKey && live(level, sideKey, paused) ? budgetTicket(level, sideKey, dollars, board) : null;
+  const ready = t && !t.belowMin;
+  const sheetRef = useRef(null);
+  const opener = useRef(null);
+  useSheetFocus(sheet && ready, sheetRef, opener, () => setSheet(false));
+  useEffect(() => { if (!ready) setSheet(false); }, [ready]);
+  const choose = (side) => { setSheet(false); setSide(side); };
+  const place = () => {
+    setSheet(true);
+    requestAnimationFrame(() => sheetRef.current?.querySelector("button, a")?.focus?.());
+  };
+  return (
+    <div className={`md-detail${sideKey && !settling ? " md-chosen" : ""}`}>
+      <header className="md-heading">
+        <Link className="md-back" to="/saloon">‹ All outcomes</Link>
+        <div className="md-subject"><Asset und={und} compact /><span>Price outcome</span>{board.thin && <ThinNote und={und} />}</div>
+        <h1 className="q-title">{question}</h1>
+        <p className="q-settles">Settles {dayLabel(date.expiry)}, 08:00 UTC{countdown(date.settle_ts) && <> · {countdown(date.settle_ts)}</>}
+          <Info label="About settlement">Derive settles on the average {und} index over the 30 minutes to 08:00 UTC. The two options pay in USDC to your Derive account with no action from you.</Info>
+        </p>
+        {sideKey && !settling && <div className="q-follow md-follow"><FollowButton id={level.id} side={sideKey} k={level.k} board={board} /><FollowLevel id={level.id} side={sideKey} /></div>}
+      </header>
+
+      <div className="md-evidence">
+        <section className="md-history" aria-label="Price history">
+          <div className="md-section-heading"><div><span className="label">{und} index now</span><strong className="mono">{money(board.index)}</strong></div><PriceTime pricesTs={board.prices_ts} age={age} /></div>
+          <div className="md-history-key"><span>Price history</span><Info label="About the price chart">Question shows Derive's mark, buy and sell-back prices in cents per $1 of maximum payout for {ANSWER[sideKey || "yes"]}. Select {und} to see the coin's index instead. These are prices, not a measure of how often an outcome happens.</Info></div>
+          {historyError && !hist ? <p className="status">Price history is unavailable right now.</p> : <QuestionChart hist={hist} id={level.id} side={sideKey || "yes"} level={level} und={und} theme={theme} />}
+        </section>
+        {t && <section className="md-payoff-study" aria-label="Settlement payout"><h2>What it pays at settlement</h2><OutcomePayoffStudy und={und} level={level} side={sideKey} t={t} index={board.index} expiry={date.expiry} /></section>}
+        <section className="md-settlement" aria-label="How settlement works">
+          <div className="md-section-heading"><h2>It can pay in part.</h2><Rules und={und} /></div>
+          <p>Between <b className="mono">{money(level.lo)}</b> and <b className="mono">{money(level.hi)}</b>, each answer pays a share of $1. The settlement price determines how much.</p>
+          <div className="md-boundaries"><div><span className="md-lower">Lower pays in full</span><b className="mono">{money(level.lo)} or below</b></div><div><span className="md-higher">Higher pays in full</span><b className="mono">{money(level.hi)} or above</b></div></div>
+          <ZoneNote und={und} date={date} index={board.index} />
+        </section>
+        <Context und={und} days={(date.settle_ts - Date.now() / 1000) / 86400} />
+        <section className="md-other"><button className="text-control q-other" aria-expanded={ladderOpen} onClick={onLadder}>{ladderOpen ? "Hide other levels" : "Other levels"}</button>{ladderOpen && renderLadder(dollars)}</section>
+      </div>
+
+      <aside className="md-selection" aria-label="Your outcome">
+        <div className="md-selection-inner">
+          <div className="md-selection-title"><h2>Choose your outcome</h2><span>Cost per $1 of max. payout<Info label="About the answer price">The amount shown buys up to $1 of payout at settlement, before Derive's fees. An answer can pay nothing, part of $1, or the full $1, depending on the settlement price.</Info></span></div>
+          {settling ? <p className="q-big">Settling · average from 07:30 to 08:00 UTC</p> : <>
+            <div className="q-pick md-pick" role="radiogroup" aria-label="Answer">
+              {["yes", "no"].map((side) => {
+                const c = buyCents(level, side, paused);
+                return <button key={side} role="radio" aria-checked={sideKey === side} className={`q-pick-btn ${side}${sideKey === side ? " on" : ""}`}
+                  aria-label={`${ANSWER[side]}, ${fullPay(level, side)}, ${c != null ? `${c} cents per $1` : "no price now"}`} onClick={() => choose(side)}>
+                  <span className="q-pick-name"><i className={`q-arrow ${side}`} aria-hidden="true" />{ANSWER[side]}</span><b className="mono">{c != null ? cents(c) : <small>No price now</small>}</b>
+                  <span className="q-pick-zone"><small>{fullPay(level, side)}</small></span>
+                </button>;
+              })}
+            </div>
+            {!sideKey ? <div className="md-unpicked"><p>Choose Higher or Lower to see your cost and payout.</p><small>Nothing is selected for you.</small></div> : <>
+              <section className="q-amount md-amount" aria-label="Amount" hidden={sheet}>
+                <div className="q-amount-in"><label htmlFor="q-dollars" className="label">Amount, fees included<Info label="About the amount">The total you spend, Derive's fees included. Cowboy sizes the two options so their price plus Derive's fees fit this amount; what is left over from rounding stays with you.</Info></label>
+                  <span className="q-dollar-field"><span>$</span><input id="q-dollars" inputMode="decimal" value={dollars} onChange={(e) => setDollars(Math.max(0, Number(e.target.value.replace(/[^\d.]/g, "")) || 0))} /></span>
+                  <span className="q-quick">{QUICK.map((v) => <button key={v} className="text-control" aria-pressed={dollars === v} onClick={() => setDollars(v)}>${v}</button>)}</span>
+                </div>
+                {t ? <>
+                  {t.belowMin && <p className="q-note warn">Smallest amount for this question: {money(t.minTotal, { cents: true })} with Derive's fees.</p>}
+                  {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
+                  {t.mostLose > 0 && t.mostLose < 50 && <p className="q-note">Fees are a large share of small amounts.</p>}
+                  <section className="md-preview" aria-label="What it pays"><OutcomeFigures und={und} level={level} side={sideKey} t={t} expiry={date.expiry} settleTs={date.settle_ts} summary compact /><p className="md-loss-note">Your cost is the most you can lose once both orders fill.</p></section>
+                </> : <p className="status"><NoPrice level={level} side={sideKey} paused={paused} text={`No price now for ${ANSWER[sideKey]}`} /></p>}
+                {age.state === "stale" && <p className="q-note warn">Prices are {age.minutes} min old. Check Derive's screen before placing orders.</p>}
+                <div className="md-review-action"><button ref={opener} className="btn primary lg" disabled={!ready} onClick={place}>Review orders</button><small>Two orders, placed by you on Derive.</small></div>
+              </section>
+              {sheet && ready && <div ref={sheetRef} className="q-sheet open md-ticket" role="dialog" aria-modal={typeof matchMedia !== "function" || matchMedia("(max-width: 1279px)").matches ? "true" : undefined} aria-label="Ticket">
+                <button className="text-control q-sheet-close" onClick={() => setSheet(false)}>Back to payout</button>
+                <QuestionTicket und={und} question={question} answer={ANSWER[sideKey]} level={level} sideKey={sideKey} t={t} board={board} pricesTs={board.prices_ts} settleTs={date.settle_ts} expiry={date.expiry} stale={age.state === "stale"} />
+              </div>}
+            </>}
+          </>}
+        </div>
+      </aside>
+    </div>
+  );
+}
 
 /** The guided flow from step 3: Higher or Lower (never picked for the user), then the amount, then
  * what it pays, then the orders for Derive. One primary action per step. The full ladder of levels
@@ -388,10 +480,10 @@ export default function Questions() {
   const back = () => navigate(`/saloon/${und}`);
   const thin = board.thin;
   // Picking a row in the ladder opens that level at the amount step, the ladder folded away.
-  const onPick = (e, lv, k) => {
+  const onPick = (e, lv, k, dollars) => {
     e.preventDefault();
     setLadder(false);
-    navigate(`/q/${lv.id}?side=${k}`, { state: { step: "amount" } });
+    navigate(`/q/${lv.id}?side=${k}`, { state: { step: "amount", ...(Number.isFinite(dollars) && dollars > 0 ? { dollars } : {}) } });
   };
   const lead = (
     <>
@@ -414,16 +506,19 @@ export default function Questions() {
       )}
     </>
   );
-  const ladderEl = date && (
+  const renderLadder = (dollars) => date && (
     <div className="q-board" aria-label={`${und} levels`}>
       <QuestionLadder board={board} date={date} more={more} onMore={() => setMore((m) => !m)} paused={paused}
-        selectedId={found?.level?.id} selectedSide={sideKey} onPick={onPick} />
+        selectedId={found?.level?.id} selectedSide={sideKey} onPick={(e, lv, k) => onPick(e, lv, k, dollars)} />
     </div>
   );
+  const ladderEl = renderLadder();
   return (
-    <div className="wrap page q-page">
-      <SaloonHead view="guided" />
+    <div className={`wrap page q-page${id ? " md-page" : ""}`}>
+      {!id && <SaloonHead view="guided" />}
       {found && !found.settled ? (
+        id ? <OutcomeDetail key={found.level.id} und={und} board={board} found={found} sideKey={sideKey} setSide={setSide} age={age} theme={theme}
+          renderLadder={renderLadder} ladderOpen={ladder} onLadder={() => setLadder((o) => !o)} initialDollars={location.state?.dollars} /> :
         <QuestionView key={found.level.id} und={und} board={board} found={found} sideKey={sideKey} setSide={setSide} age={age} theme={theme}
           lead={lead} ladder={ladderEl} ladderOpen={ladder} onLadder={() => setLadder((o) => !o)} initialStep={location.state?.step}
           initialDollars={location.state?.dollars} />

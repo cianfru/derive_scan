@@ -1,6 +1,6 @@
 import React from "react";
-import { it, expect, vi, afterEach } from "vitest";
-import { render, screen, cleanup, within } from "@testing-library/react";
+import { it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, cleanup, within, fireEvent } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 
@@ -9,6 +9,14 @@ import Shell from "./components/Shell.jsx";
 import Landing from "./pages/Landing.jsx";
 import { SaloonCta } from "./pages/Coin.jsx";
 
+let fetchSpy;
+beforeEach(() => {
+  vi.stubGlobal("scrollTo", () => {});
+  vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
+  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+  fetchSpy = vi.fn(() => Promise.reject(new Error("the landing reads no data")));
+  vi.stubGlobal("fetch", fetchSpy);
+});
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 const shell = (page = <p>home</p>) => render(
   <MemoryRouter><Routes><Route element={<Shell />}><Route index element={page} /></Route></Routes></MemoryRouter>);
@@ -16,23 +24,21 @@ const shell = (page = <p>home</p>) => render(
 const shellAt = (path) => render(
   <MemoryRouter initialEntries={[path]}><Routes><Route element={<Shell />}><Route path="*" element={<p>page</p>} /></Route></Routes></MemoryRouter>);
 
-it("leads the nav with Saloon, then Positions, then the research pages as a group", () => {
-  vi.stubGlobal("scrollTo", () => {});
-  shell();
+it("puts outcomes, follows and positions before the research menu", () => {
+  shellAt("/markets");
   const nav = screen.getByRole("navigation", { name: "Main navigation" });
   const links = [...nav.querySelectorAll("a")];
-  expect(links.map((a) => a.textContent)).toEqual(["SaloonPrice outcomes", "Positions", "Markets", "Radar", "Options", "Traders", "Flow"]);
+  expect(links.map((a) => a.textContent)).toEqual(["SaloonPrice outcomes", "Following", "Positions"]);
   expect(links[0].getAttribute("href")).toBe("/saloon");
   expect(links[0].classList.contains("nav-primary")).toBe(true);
-  expect(links[1].getAttribute("href")).toBe("/saloon/mine");
-  const research = within(nav).getByRole("group", { name: "Research" });
-  expect([...research.querySelectorAll("a")].map((a) => a.textContent)).toEqual(["Markets", "Radar", "Options", "Traders", "Flow"]);
+  expect(links[1].getAttribute("href")).toBe("/saloon/following");
+  expect(links[2].getAttribute("href")).toBe("/saloon/mine");
+  expect(within(nav).getByRole("button", { name: "Research" }).getAttribute("aria-expanded")).toBe("false");
 });
 
-it("opens Research as a menu on phones; Escape closes it and returns focus", async () => {
-  vi.stubGlobal("scrollTo", () => {});
+it("opens Research as a menu; Escape closes it and returns focus", async () => {
   const user = userEvent.setup();
-  shell();
+  shellAt("/markets");
   const btn = screen.getByRole("button", { name: "Research" });
   expect(btn.getAttribute("aria-expanded")).toBe("false");
   await user.click(btn);
@@ -43,9 +49,13 @@ it("opens Research as a menu on phones; Escape closes it and returns focus", asy
   await user.keyboard("{Escape}");
   expect(screen.queryByRole("group", { name: "Research pages" })).toBeNull();
   expect(document.activeElement).toBe(btn);
+  await user.click(btn);
+  await user.click(screen.getByRole("link", { name: "Markets", exact: true }));
+  expect(screen.queryByRole("group", { name: "Research pages" })).toBeNull();
+  expect(document.activeElement).toBe(btn);
 });
 
-it("marks the active destination: Saloon, Positions, or Research for its pages", () => {
+it("marks the active destination: Saloon, Following, Positions, or Research", () => {
   vi.stubGlobal("scrollTo", () => {});
   const active = () => [...document.querySelectorAll(".hdr .active")].map((a) => a.textContent);
   shellAt("/saloon/BTC");
@@ -57,6 +67,10 @@ it("marks the active destination: Saloon, Positions, or Research for its pages",
   shellAt("/saloon/mine");
   expect(active()).toEqual(["Positions"]);
   expect(screen.getByRole("link", { name: "Positions" }).getAttribute("aria-current")).toBe("page");
+  cleanup();
+  shellAt("/saloon/following");
+  expect(active()).toEqual(["Following"]);
+  expect(screen.getByRole("link", { name: "Following" }).getAttribute("aria-current")).toBe("page");
   for (const path of ["/markets", "/radar", "/options", "/traders", "/flow", "/coin/BTC", "/trader/0xabc"]) {
     cleanup();
     shellAt(path);
@@ -65,17 +79,66 @@ it("marks the active destination: Saloon, Positions, or Research for its pages",
   }
 });
 
-it("sends the landing's primary button into the Saloon", () => {
-  vi.stubGlobal("scrollTo", () => {});
-  vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
-  shell(<Landing />);
+it("uses the compact landing navigation and opens its Research menu", async () => {
+  const user = userEvent.setup();
+  const { container } = shell(<Landing />);
+  expect(container.querySelector("header").classList.contains("hdr-landing")).toBe(true);
+  const nav = screen.getByRole("navigation", { name: "Main navigation" });
+  const research = within(nav).getByRole("button", { name: "Research" });
+  expect(research.getAttribute("aria-expanded")).toBe("false");
+  expect(within(nav).queryByRole("group", { name: "Research pages" })).toBeNull();
+  await user.click(research);
+  const menu = within(nav).getByRole("group", { name: "Research pages" });
+  expect(within(menu).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual(["/markets", "/radar", "/options", "/traders", "/flow"]);
+  await user.keyboard("{Escape}");
+  expect(document.activeElement).toBe(research);
+  expect(within(nav).queryByRole("group", { name: "Research pages" })).toBeNull();
+});
+
+it("sends the landing into Saloon and anchors how-it-works to the non-executing payout demo", () => {
+  const { container } = shell(<Landing />);
   expect(screen.getAllByRole("link", { name: "Enter the Saloon" }).map((a) => a.getAttribute("href"))).toEqual(["/saloon", "/saloon"]);
-  expect(screen.getByRole("link", { name: "See how it works" }).getAttribute("href")).toBe("#how");
+  expect(screen.getByRole("link", { name: /See how it works/ }).getAttribute("href")).toBe("#how");
   expect(screen.queryByRole("link", { name: "Open the markets" })).toBeNull();
-  // The page explains the Saloon it leads into, in plain words and with no prices.
-  const intro = screen.getByRole("region", { name: "Pick higher or lower. Know your cost first." });
-  expect(intro.textContent).not.toMatch(/\$\d|%|\b(will|expect\w*|likely|predict\w*|probab\w*|odds|chance\w*)\b/i);
+  const intro = screen.getByRole("region", { name: /Pick higher or lower\.\s*Know your cost first\./ });
+  expect(intro.id).toBe("how");
+  const demo = within(intro).getByRole("region", { name: "See what it pays" });
+  expect(within(demo).getByText("Illustration")).not.toBeNull();
+  expect(within(demo).getByRole("slider").disabled).toBe(true);
+  expect(within(demo).getAllByRole("button", { name: /^(Higher|Lower)$/ }).every((button) => button.getAttribute("aria-pressed") === "false")).toBe(true);
+  expect(within(demo).queryByRole("link")).toBeNull();
+  expect(container.querySelector("#research [role=tablist]")).not.toBeNull();
+});
+
+it("keeps every reachable landing illustration free of quotes, results and forecast language", () => {
+  shell(<Landing />);
+  document.querySelectorAll("details").forEach((detail) => { detail.open = true; });
+  const copy = [];
+  const read = () => copy.push(document.body.textContent,
+    ...[...document.querySelectorAll("[aria-label], [aria-valuetext]")].map((el) => `${el.getAttribute("aria-label") || ""} ${el.getAttribute("aria-valuetext") || ""}`));
+  for (const tab of screen.getAllByRole("tab")) {
+    fireEvent.click(tab);
+    read();
+    for (const info of screen.getAllByRole("button").filter((button) => button.classList.contains("info"))) {
+      fireEvent.click(info); read(); fireEvent.click(info);
+    }
+  }
+  const demo = screen.getByRole("region", { name: "See what it pays" });
+  const slider = within(demo).getByRole("slider");
+  for (const direction of ["Higher", "Lower"]) {
+    fireEvent.click(within(demo).getByRole("button", { name: direction }));
+    for (const value of [0, 40, 50, 60, 100]) {
+      fireEvent.change(slider, { target: { value: String(value) } });
+      read();
+    }
+  }
+  const text = copy.join("\n");
+  expect(text).not.toMatch(/\$\s?\d|\d\s?%|\bper ?cent\b/i);
+  expect(text).not.toMatch(/\b(will|expect\w*|likely|predict\w*|target\w*|probabilit\w*|odds|forecast\w*|reflex|larsson|torq|edge|alpha|proven)\b/i);
+  expect(text).not.toMatch(/\b(ETH|SOL|HYPE|XRP|ADA|ZEC|XAUT|Bitcoin|Ethereum|Solana)\b/);
+  expect(text).toContain("Both orders need to fill for its defined cost to apply.");
+  expect(text).toContain("A payout below your cost is a loss.");
+  expect(fetchSpy).not.toHaveBeenCalled();
 });
 
 it("shows the coin page's Saloon link only for a coin with live questions", () => {

@@ -1,0 +1,74 @@
+/* A compact journal, with unknown values kept explicit and the full record one step away. */
+.marketplace-positions.q-mine { max-width: 1320px; gap: 12px; }
+.marketplace-positions .q-head { gap: 12px; padding-bottom: 8px; }
+.marketplace-positions .q-head-top { align-items: center; }
+.marketplace-positions .q-head h1 { font-size: 30px; letter-spacing: -.035em; }
+.q-position-intro { display: flex; align-items: center; gap: 2px; margin: 0; color: var(--text-3); font-size: 14px; }
+.q-portfolio-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 20px; margin: 4px 0 0; padding: 10px 0; border-block: 1px solid var(--border); color: var(--text-3); font-size: 13px; }
+.q-portfolio-line > span { display: inline-flex; align-items: baseline; gap: 6px; }
+.q-portfolio-line b { color: var(--text-1); font-size: 15px; font-weight: 500; }
+.q-portfolio-line .q-incomplete-count b { color: var(--sig-long); }
+.q-portfolio-line .q-realized-sum { font-size: 13px; color: var(--text-3); margin-left: auto; }
+.q-portfolio-line .q-realized-sum b.up { color: var(--up); } .q-portfolio-line .q-realized-sum b.down { color: var(--down); }
+.marketplace-positions .q-position > .q-position-realized { grid-column: 1 / -1; margin: 0; }
+.marketplace-positions .q-position-expanded .q-real { border-top: 1px solid var(--border); padding-top: 5px; }
+.marketplace-positions .q-position { display: grid; grid-template-columns: minmax(260px, .95fr) minmax(520px, 1.6fr); gap: 8px 24px; padding: 22px 24px 6px; box-shadow: var(--shadow-lift); }
+.marketplace-positions .q-position-heading { grid-column: 1; display: flex; align-items: flex-start; justify-content: start; gap: 12px; }
+.q-position-heading > .asset { flex: 0 0 34px; }
+.q-position-heading > .asset > span { display: none; }
+.q-position-heading > div { min-width: 0; display: grid; gap: 7px; }
+.q-position .q-card-title { font-size: 14px; line-height: 1.5; }
+.q-position .q-position-side { display: block; font-size: 12px; line-height: 1.5; }
+.q-position-side.higher { color: var(--up); }
+.q-position-side.lower { color: var(--down); }
+.marketplace-positions .q-position > .q-card-status { grid-column: 1; padding-left: 46px; font-size: 12px; font-weight: 400; align-items: flex-start; }
+.marketplace-positions .q-position > .q-card-status .info { flex-shrink: 0; margin-top: -4px; }
+.marketplace-positions .q-position-figures { grid-column: 2; grid-row: 1 / span 2; grid-template-columns: .75fr 1fr 1fr 1.2fr; gap: 12px; align-content: center; padding: 0; border: 0; }
+.q-position-figures > div { min-width: 0; }
+.q-position-figures .q-noprice { font: 400 12px/1.5 var(--font-sans); white-space: normal; flex-wrap: wrap; }
+.marketplace-positions .q-position-figures dt { font-size: 12px; }
+.marketplace-positions .q-position-figures dd { font-size: 17px; }
+.marketplace-positions .q-position-figures > div:last-child dd { font-size: 13px; white-space: normal; }
+.q-position-tools { grid-column: 1 / -1; position: relative; border-top: 1px solid var(--border); margin-top: 6px; }
+.q-position-details > summary { display: flex; width: fit-content; min-height: 44px; align-items: center; gap: 8px; cursor: pointer; color: var(--text-3); font-size: 12px; font-weight: 600; list-style: none; }
+.q-position-details > summary::-webkit-details-marker { display: none; }
+.q-position-details > summary:hover { color: var(--text-1); }
+.q-position-details > summary span { display: inline-block; font: 400 18px var(--font-mono); transition: transform .15s var(--ease); }
+.q-position-details[open] > summary span { transform: rotate(45deg); }
+.q-position-expanded { display: grid; gap: 20px; padding: 12px 0 20px; }
+.marketplace-positions .q-position-extra { grid-template-columns: 1fr 1fr; padding: 14px 18px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-2); }
+.q-position-expanded .q-since { max-width: 740px; }
+.q-position-expanded .q-entry { border-top: 1px solid var(--border); padding-top: 5px; }
+.q-position-expanded .q-entry summary { min-height: 44px; }
+.q-position-expanded .q-card-actions { border-top: 1px solid var(--border); padding-top: 12px; }
+.q-position-remove-note { color: var(--text-3); font-size: 12px; }
+.q-position .q-position-close { position: absolute; top: 5px; right: 0; min-height: 34px; padding: 5px 14px; font-size: 12px; }
+.q-position > .q-ticket { grid-column: 1 / -1; margin-bottom: 16px; }
+.marketplace-positions .q-saved { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--border); }
+.marketplace-positions .q-empty-card { min-height: 300px; align-content: center; justify-items: center; text-align: center; border-style: solid; background: var(--surface-1); padding: 40px 24px; }
+.marketplace-positions .q-empty-card h2 { font-size: 22px; letter-spacing: -.025em; }
+.marketplace-positions .q-empty-card p { max-width: 48ch; color: var(--text-3); line-height: 1.7; }
+.marketplace-positions .q-empty-card .btn { margin-top: 8px; }
+
+@media (max-width: 1050px) {
+  .marketplace-positions .q-position { grid-template-columns: 1fr; padding: 20px 20px 6px; }
+  .marketplace-positions .q-position-figures { grid-column: 1; grid-row: auto; padding: 16px 0 10px; }
+  .marketplace-positions .q-position > .q-card-status { padding-left: 46px; }
+}
+@media (max-width: 600px) {
+  .marketplace-positions .q-head h1 { font-size: 26px; }
+  .marketplace-positions .q-head-top { align-items: flex-start; }
+  .marketplace-positions .q-head-top > .btn { font-size: 12px; padding-inline: 10px; min-height: 40px; }
+  .q-position-intro { font-size: 13px; line-height: 1.6; }
+  .q-portfolio-line .q-realized-sum { margin-left: 0; }
+  .marketplace-positions .q-position { padding: 18px 16px 6px; }
+  .marketplace-positions .q-position-figures { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .marketplace-positions .q-position-figures dd { font-size: 18px; }
+  .marketplace-positions .q-position-extra { grid-template-columns: 1fr; gap: 18px; padding: 14px; }
+  .q-position .q-position-close { min-height: 44px; top: 0; }
+  .q-position-expanded .q-card-actions { gap: 8px 16px; }
+  .marketplace-positions .q-empty-card { min-height: 320px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .q-position-details > summary span { transition: none; }
+}

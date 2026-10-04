@@ -71,7 +71,7 @@ describe("the board", () => {
     expect(dates).toContain("This Friday · 9 Oct");
     expect(dates.join()).not.toMatch(/4 Oct/); // under a day: no tab
     expect(container.querySelector("[class*=pill]")).toBeNull();
-    expect(screen.getAllByRole("heading", { level: 1 })[0].textContent).toBe("Saloon Price outcomes");
+    expect(screen.getAllByRole("heading", { level: 1 })[0].textContent).toBe("Saloon");
     // The guided flow: coin, date, then higher or lower on the date's headline level.
     expect(screen.getAllByRole("region").map((r) => r.getAttribute("aria-label")).slice(0, 3)).toEqual(["Coin", "Date", "Higher or lower"]);
   });
@@ -166,16 +166,16 @@ describe("the question page", () => {
     expect(radios[0].getAttribute("aria-label")).toBe("Higher, full $1 from $89,000, 38 cents per $1");
     expect(container.querySelector(".q-amount")).toBeNull();
     expect(container.querySelector(".q-ticket")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Place on Derive" })).toBeNull();
+    expect(container.querySelector(".md-unpicked .payzone")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Review orders" })).toBeNull();
     const user = userEvent.setup({ advanceTimers: () => {} });
     await user.click(radios[0]);
-    // Picking opens the amount step; the preview and the orders wait for its one action.
+    // A marketplace selection shows amount and payout immediately. Orders stay behind review.
     expect(container.querySelector(".q-amount")).not.toBeNull();
-    expect(screen.queryByRole("button", { name: "Place on Derive" })).toBeNull();
     expect(container.querySelector(".q-ticket")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "See what it pays" }));
     expect(screen.getByRole("region", { name: "What it pays" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Place on Derive" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Review orders" })).toBeTruthy();
+    expect(screen.getByTestId("chart")).toBeTruthy();
   });
 
   it("shows pay, fees, total, most it pays, most you can make, breakeven and settlement, the worst case before any action", async () => {
@@ -183,17 +183,19 @@ describe("the question page", () => {
     const figs = container.querySelector(".q-amount .op-figs").textContent;
     // The budget convention: $100 typed is the total, Derive's fees included. 0.04277 contracts:
     // $97.05 for the two options + $2.95 fees = $100.00 (was $99.99 + $3.01 = $103.01 before fees).
-    expect(figs).toContain("The two options$97.05");
-    expect(figs).toContain("Derive fees, abouti$2.95");
-    expect(figs).toContain("You pay, the most you can losefees included, within your $100.00$100.00");
+    expect(figs).toContain("You payi$100.00 incl. fees");
     expect(figs).toContain("Most it paystotal back, full $1 from $89,000$256.62");
     expect(figs).toContain("Most you can makeafter what you pay+$156.62");
     expect(figs).toContain("BreakeveniBTC at $85,338");
-    expect(figs).toContain("SettlesFri 9 Oct, 08:00 UTC");
-    const lose = screen.getAllByText(/^You pay, the most you can lose/)[0];
-    const get = screen.getByRole("button", { name: "Place on Derive" });
+    expect(container.querySelector(".md-heading").textContent).toContain("Settles Fri 9 Oct, 08:00 UTC");
+    const user = userEvent.setup({ advanceTimers: () => {} });
+    await user.click(screen.getByRole("button", { name: "What you pay" }));
+    expect(document.querySelector(".pop").textContent).toContain("$97.05 for the two options plus Derive's fees, about $2.95. It is the most you can lose once both orders fill.");
+    await user.click(screen.getByRole("button", { name: "What you pay" }));
+    const lose = screen.getByText("Your cost is the most you can lose once both orders fill.");
+    const get = screen.getByRole("button", { name: "Review orders" });
     expect(lose.compareDocumentPosition(get) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const ex = [...container.querySelectorAll(".q-amount .op-ex tbody tr")].map((r) => r.textContent);
+    const ex = [...container.querySelectorAll(".md-payoff-study .op-ex tbody tr")].map((r) => r.textContent);
     expect(ex).toEqual(["$83,000 or lower$0.00-$100.00", "$86,000$128.31+$28.31", "$89,000 or higher$256.62+$156.62"]);
     expect(container.textContent).toContain("Selling back before 08:00 UTC is valued at Derive's sell-back price then, not by this chart.");
     expect(container.textContent).not.toMatch(/\b(agrees?|matches)\b/i);
@@ -217,14 +219,48 @@ describe("the question page", () => {
 
   it("mirrors Lower: full below the zone, nothing above it", () => {
     const { container } = show(`${Q86}?side=no`);
-    const ex = [...container.querySelectorAll(".q-amount .op-ex tbody tr")].map((r) => r.textContent);
+    const ex = [...container.querySelectorAll(".md-payoff-study .op-ex tbody tr")].map((r) => r.textContent);
     expect(ex[0]).toMatch(/^\$83,000 or lower\$[\d.,]+\+\$/);
     expect(ex[2]).toMatch(/^\$89,000 or higher\$0\.00-\$/);
     expect(container.querySelector(".op-figs").textContent).toContain("total back, full $1 at or below $83,000");
   });
 
-  it("keeps the orders inside a closed Order details, the bought leg first, on the tick", () => {
+  it("recalculates immediately when the amount or answer changes and closes the previous order review", async () => {
+    const user = userEvent.setup({ advanceTimers: () => {} });
     const { container } = show(`${Q86}?side=yes`);
+    fireEvent.change(screen.getByRole("textbox", { name: /Amount, fees included/ }), { target: { value: "200" } });
+    const amount = parseFloat(container.querySelector(".md-preview .op-total dd").textContent.replace(/[$,]/g, ""));
+    expect(amount).toBeLessThanOrEqual(200);
+    expect(amount).toBeGreaterThan(199.9);
+    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    expect(screen.getByRole("dialog", { name: "Ticket" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "What it pays" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Back to payout" }));
+    await user.click(screen.getAllByRole("radio")[1]);
+    expect(container.querySelector(".q-ticket")).toBeNull();
+    expect(container.querySelector(".md-preview .op-figs").textContent).toContain("full $1 at or below $83,000");
+    expect(screen.getByRole("textbox", { name: /Amount, fees included/ }).value).toBe("200");
+    await user.click(screen.getByRole("button", { name: "Other levels" }));
+    const nextLevel = screen.getAllByRole("row").find((row) => !row.classList.contains("headline") && row.querySelector("a.q-btn.yes"));
+    await user.click(nextLevel.querySelector("a.q-btn.yes"));
+    expect(screen.getByRole("textbox", { name: /Amount, fees included/ }).value).toBe("200");
+  });
+
+  it.each(["paused", "retired"])("does not expose orders for a %s outcome through a selected-side deep link", (state) => {
+    const b = structuredClone(btc);
+    if (state === "paused") b.paused = true;
+    else b.dates.find((d) => d.expiry === "20261009").levels.find((lv) => lv.id === Q86.slice(3)).state = "retired";
+    docs.current["questions/BTC.json"] = b;
+    const { container } = show(`${Q86}?side=yes`);
+    expect(screen.getByRole("button", { name: "Review orders" }).disabled).toBe(true);
+    expect(container.querySelector(".q-ticket")).toBeNull();
+    expect(container.querySelector(".md-preview")).toBeNull();
+    expect(container.textContent).toContain("No price now for Higher");
+  });
+
+  it("keeps the orders inside a closed Order details, the bought leg first, on the tick", async () => {
+    const { container } = show(`${Q86}?side=yes`);
+    await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("button", { name: "Review orders" }));
     const details = container.querySelector(".q-ticket details.q-details");
     expect(details.open).toBe(false);
     expect(details.querySelector("summary").textContent).toBe("Order details");
@@ -238,8 +274,9 @@ describe("the question page", () => {
     expect(container.textContent).not.toMatch(/guarantee/i);
   });
 
-  it("shows what the first order needs on its own, and what it can lose if line 2 never fills", () => {
+  it("shows what the first order needs on its own, and what it can lose if line 2 never fills", async () => {
     const { container } = show(`${Q86}?side=yes`);
+    await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("button", { name: "Review orders" }));
     const hand = container.querySelector(".q-hand").textContent;
     // Line 1 buys the 83,000 call alone: 0.04277 x 2,431 = $103.97, plus its fee.
     expect(hand).toContain("Cash needed for line 1$103.97");
@@ -247,8 +284,9 @@ describe("the question page", () => {
     expect(hand).toContain("Once both fill, most you can lose$100.00");
   });
 
-  it("words the Lower ticket as a payment, never cash received", () => {
+  it("words the Lower ticket as a payment, never cash received", async () => {
     const { container } = show(`${Q86}?side=no`);
+    await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("button", { name: "Review orders" }));
     const t = container.querySelector(".q-ticket").textContent;
     expect(t).not.toMatch(/receive now|Derive holds/i);
     expect(t).toMatch(/You payi\$[\d.,]+ incl\. fees/);
@@ -258,6 +296,7 @@ describe("the question page", () => {
     localStorage.clear();
     const user = userEvent.setup({ advanceTimers: () => {} });
     const { container } = show(`${Q86}?side=yes`);
+    await user.click(screen.getByRole("button", { name: "Review orders" }));
     const ticket = container.querySelector(".q-ticket");
     await user.click(within(ticket).getByRole("button", { name: "I placed it" }));
     await user.click(within(ticket).getByRole("radio", { name: "Not yet" }));
@@ -283,7 +322,7 @@ describe("the question page", () => {
   it("opens the phone ticket as a dialog: focus moves in, Escape closes it and focus returns", async () => {
     const user = userEvent.setup({ advanceTimers: () => {} });
     const { container } = show(`${Q86}?side=yes`);
-    const open = screen.getByRole("button", { name: "Place on Derive" });
+    const open = screen.getByRole("button", { name: "Review orders" });
     await user.click(open);
     const sheet = screen.getByRole("dialog", { name: "Ticket" });
     expect(sheet.getAttribute("aria-modal")).toBe("true");
@@ -301,7 +340,7 @@ describe("the question page", () => {
     vi.setSystemTime(Date.UTC(2026, 9, 9, 7, 45));
     const { container } = show(`${Q86}?side=yes`);
     expect(container.textContent).toContain("Settling · average from 07:30 to 08:00 UTC");
-    expect(screen.queryByRole("button", { name: "Place on Derive" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Review orders" })).toBeNull();
     expect(container.querySelector(".q-ticket")).toBeNull();
   });
 
