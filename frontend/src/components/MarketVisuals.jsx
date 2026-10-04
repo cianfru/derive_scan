@@ -7,10 +7,14 @@ import { Info } from "./ui.jsx";
 
 // Marks drawn in white: an ink copy (public/coins/*-ink.svg) is shown on the light theme instead.
 const INK = new Set(["XRP", "XAUT"]);
-export function Asset({ und, compact = false }) {
+/** A coin's icon (with its ink copy for the light theme when it has one). */
+export function CoinIcon({ und }) {
   const ext = ["HYPE", "PUMP"].includes(und) ? "jpg" : ["CC", "LIT", "VVV"].includes(und) ? "png" : "svg";
   const icon = (cls, file) => <img className={`asset-icon${cls}`} src={`/coins/${file}`} alt="" width="34" height="34" />;
-  return <span className="asset">{INK.has(und) ? <>{icon(" on-dark", `${und}.${ext}`)}{icon(" on-light", `${und}-ink.svg`)}</> : icon("", `${und}.${ext}`)}<span><b>{und}</b>{!compact && <small>{ASSET_NAMES[und] || "Derive market"}</small>}</span></span>;
+  return INK.has(und) ? <>{icon(" on-dark", `${und}.${ext}`)}{icon(" on-light", `${und}-ink.svg`)}</> : icon("", `${und}.${ext}`);
+}
+export function Asset({ und, compact = false }) {
+  return <span className="asset"><CoinIcon und={und} /><span><b>{und}</b>{!compact && <small>{ASSET_NAMES[und] || "Derive market"}</small>}</span></span>;
 }
 export function Reading({ alignment, horizon = "30d", kind, detail = false }) {
   const { state, label, row } = viewReading(alignment, horizon, kind);
