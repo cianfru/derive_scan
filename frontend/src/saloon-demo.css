@@ -1,5 +1,6 @@
+/* The landing's worked example (components/SaloonDemo.jsx): made-up numbers, stamped Illustration. */
 .saloon-demo {
-  min-width: 0; padding: 24px 28px 18px; position: relative; overflow: hidden;
+  min-width: 0; padding: 24px 28px 18px; position: relative; overflow: hidden; display: grid; gap: 16px;
   background: linear-gradient(145deg, var(--surface-2), var(--surface-1) 60%);
   border: 1px solid var(--border-strong); border-radius: 12px;
   box-shadow: 0 20px 70px rgb(0 0 0 / .16), inset 0 1px 0 rgb(255 255 255 / .04);
@@ -7,52 +8,72 @@
 .sd-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .sd-heading h3 { font-size: 18px; font-weight: 600; letter-spacing: -.025em; }
 .sd-illustration { color: var(--text-3); font: 400 12px/1.5 var(--font-mono); letter-spacing: .04em; }
-.sd-direction { display: flex; align-items: center; gap: 20px; margin-top: 14px; border-bottom: 1px solid var(--border); }
-.sd-direction button { min-height: 44px; display: inline-flex; align-items: center; gap: 12px; padding: 0 0 10px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; font-size: 14px; color: var(--text-2); }
-.sd-direction button[aria-pressed="true"] { color: var(--accent-text); border-bottom-color: var(--accent); }
-.sd-direction button:hover { color: var(--text-1); }
-.sd-direction svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; }
-.sd-direction > span { font-size: 12px; color: var(--text-3); margin-left: auto; padding-bottom: 10px; }
-.sd-plot { padding-top: 19px; }
-.sd-plot-title { display: flex; justify-content: space-between; color: var(--text-3); font-size: 12px; }
-.sd-chart-wrap { position: relative; }
-.sd-chart { width: 100%; height: 160px; overflow: visible; display: block; }
-.sd-chart path, .sd-chart line { vector-effect: non-scaling-stroke; }
-.sd-grid { stroke: var(--border); stroke-width: 1; }
+
+.sd-card { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--ground); }
+.sd-example { margin: 0; color: var(--accent-text); font-size: 12px; font-weight: 600; }
+.sd-question { margin: 0; color: var(--text-1); font-size: 16px; font-weight: 600; line-height: 1.35; letter-spacing: -.01em; }
+.sd-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sd-choice {
+  display: grid; gap: 4px; min-height: 64px; padding: 10px 12px; text-align: left; cursor: pointer;
+  border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-1); color: var(--text-1);
+  transition: border-color .15s, background-color .15s;
+}
+.sd-choice:hover { border-color: var(--text-3); }
+.sd-choice-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 15px; font-weight: 600; }
+.sd-choice-top > span { display: inline-flex; align-items: center; gap: 8px; }
+.sd-arrow { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; }
+.sd-arrow.yes { border-bottom: 7px solid var(--up); }
+.sd-arrow.no { border-top: 7px solid var(--down); }
+.sd-choice-top b { font: 500 20px/1 var(--font-mono); letter-spacing: -.02em; }
+.sd-choice-top b small { font-size: 13px; margin-left: 1px; color: var(--text-2); }
+.sd-choice > small { color: var(--text-3); font-size: 12px; line-height: 1.35; }
+.sd-choice.yes[aria-pressed="true"] { border-color: var(--up); background: color-mix(in srgb, var(--up) 9%, var(--surface-1)); }
+.sd-choice.no[aria-pressed="true"] { border-color: var(--down); background: color-mix(in srgb, var(--down) 9%, var(--surface-1)); }
+.sd-per { margin: 0; color: var(--text-3); font-size: 12px; }
+
+.sd-figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.sd-figs > div { display: grid; gap: 2px; }
+.sd-figs dt { color: var(--text-3); font-size: 12px; }
+.sd-figs dd { margin: 0; color: var(--text-1); font: 500 15px/1.3 var(--font-mono); }
+
+.sd-chart { width: 100%; height: auto; display: block; overflow: visible; user-select: none; -webkit-user-select: none; }
+.saloon-demo.is-yes .sd-chart, .saloon-demo.is-no .sd-chart { cursor: ew-resize; }
 .sd-zone { fill: var(--neutral-soft); }
-.sd-bound { stroke: var(--border-strong); stroke-dasharray: 3 5; stroke-width: 1; }
-.sd-cost { stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 5 5; opacity: .7; }
-.sd-cost-label, .sd-zone-label, .sd-zero-label { position: absolute; font: 12px/1 var(--font-sans); color: var(--text-3); pointer-events: none; }
-.sd-cost-label { left: 7.25%; top: 47%; }
-.sd-zero-label { left: 7.25%; bottom: 0; white-space: nowrap; }
-.sd-zone-label { left: 50%; bottom: 0; transform: translateX(-50%); white-space: nowrap; }
-.sd-payoff { fill: none; stroke: var(--up); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-.sd-ghost { fill: none; stroke: var(--text-3); stroke-width: 1.5; opacity: .3; stroke-linejoin: round; }
-.sd-cursor { stroke: var(--text-2); stroke-width: 1; stroke-dasharray: 3 5; opacity: .65; }
-.sd-plot-marker { position: absolute; width: 10px; height: 10px; background: var(--up); border: 2px solid var(--surface-1); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 0 5px color-mix(in srgb, var(--up) 12%, transparent); pointer-events: none; }
-.sd-slider { margin: 7px 20px 16px; }
-.sd-slider label { display: block; font-size: 12px; color: var(--text-2); }
-.sd-slider input { width: 100%; height: 30px; margin: 0; background: transparent; accent-color: var(--accent); cursor: ew-resize; }
+.sd-zone-label { fill: var(--text-3); font: 500 12px var(--font-sans); }
+.sd-axis { stroke: var(--border-strong); stroke-width: 1; }
+.sd-tick { stroke: var(--border-strong); stroke-width: 1; }
+.sd-grid { stroke: var(--border); stroke-width: 1; }
+.sd-x, .sd-y { fill: var(--text-3); font: 400 12px var(--font-mono); }
+.sd-cost { stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 5 5; }
+.sd-cost-label { fill: var(--text-2); font: 500 12px var(--font-sans); }
+.sd-payoff { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.sd-payoff.yes { stroke: var(--up); } .sd-payoff.no { stroke: var(--down); }
+.sd-cursor { stroke: var(--text-2); stroke-width: 1; stroke-dasharray: 3 4; opacity: .7; }
+.sd-dot { stroke: var(--surface-1); stroke-width: 2.5; }
+.sd-dot.yes { fill: var(--up); } .sd-dot.no { fill: var(--down); }
+.sd-empty { fill: var(--text-3); font: 400 13px var(--font-sans); }
+
+.sd-slider { display: grid; gap: 2px; }
+.sd-slider label { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--text-2); }
+.sd-slider label b { font: 500 13px var(--font-mono); color: var(--text-1); }
+.sd-slider input { width: 100%; height: 32px; margin: 0; background: transparent; accent-color: var(--accent); cursor: ew-resize; }
 .sd-slider input:disabled { cursor: default; opacity: .35; }
-.sd-price-ends { display: flex; justify-content: space-between; color: var(--text-3); font-size: 12px; margin-top: -5px; }
-.sd-result { display: grid; grid-template-columns: 1fr auto; gap: 2px 16px; padding: 14px 0 13px; border-top: 1px solid var(--border-strong); }
-.sd-result-label { color: var(--text-3); font-size: 12px; grid-column: 1 / -1; }
-.sd-result strong { font-size: 17px; font-weight: 600; letter-spacing: -.02em; color: var(--text-1); }
-.sd-result > span:last-child { color: var(--text-2); font-size: 12px; align-self: center; }
-.sd-result-up strong, .sd-result-up > span:last-child { color: var(--up); }
-.sd-result-down strong, .sd-result-down > span:last-child { color: var(--down); }
+
+.sd-result { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 4px 16px; padding: 14px 0 2px; border-top: 1px solid var(--border-strong); min-height: 64px; }
+.sd-result-line { color: var(--text-2); font-size: 14px; line-height: 1.45; }
+.sd-result-line b { color: var(--text-1); font-family: var(--font-mono); font-weight: 600; }
+.sd-result strong { font: 600 22px/1 var(--font-mono); letter-spacing: -.02em; color: var(--text-1); }
+.sd-result-note { grid-column: 1 / -1; color: var(--text-3); font-size: 12px; }
+.sd-result-up strong { color: var(--up); }
+.sd-result-down strong { color: var(--down); }
 .sd-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-3); font-size: 12px; }
 .sd-foot .info { margin: 0; flex: none; }
 @media (max-width: 600px) {
-  .saloon-demo { padding: 21px 18px 16px; }
+  .saloon-demo { padding: 20px 16px 16px; gap: 14px; }
   .sd-heading h3 { font-size: 17px; }
-  .sd-direction { flex-wrap: wrap; gap: 0 26px; }
-  .sd-direction > span { order: -1; width: 100%; margin-left: 0; padding: 0 0 2px; }
-  .sd-direction button { padding-bottom: 7px; }
-  .sd-chart { height: 150px; }
-  .sd-slider { margin-inline: 0; }
+  .sd-card { padding: 14px 12px; }
+  .sd-question { font-size: 15px; }
+  .sd-choice { padding: 10px; }
   .sd-slider input { height: 44px; }
-  .sd-result { grid-template-columns: 1fr; }
-  .sd-result > span:last-child { margin-top: 2px; }
-  .sd-foot { font-size: 12px; line-height: 1.5; }
+  .sd-result strong { font-size: 20px; }
 }

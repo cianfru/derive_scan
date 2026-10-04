@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import ResearchLayers from "../components/ResearchLayers.jsx";
 import { LayerIcon } from "../components/Chain.jsx";
 import WalletTag from "../components/WalletTag.jsx";
 import { Info } from "../components/ui.jsx";
@@ -11,7 +10,8 @@ import SaloonDemo from "../components/SaloonDemo.jsx";
 import "../landing.css";
 
 // The landing page shows what Cowboy does and never what it currently reads: no prices, no coins,
-// no counts, no results. Every figure is an illustration, labelled as one. The sign carries the
+// no counts, no results. Every figure is an illustration, labelled as one; the Saloon example
+// (components/SaloonDemo.jsx) is the only place with dollar figures, all made up. The sign carries the
 // character (neon, flicker, light spill); everything below it is as calm as the app.
 
 const Tag = () => <span className="lp-illus" aria-hidden="true">Illustration</span>;
@@ -129,6 +129,87 @@ function OptionsFigure() {
   );
 }
 
+
+/* ---------- The three layers at a glance: one small illustration each (no market data) ---------- */
+// Regime: one price line coloured by the phase it is in.
+const MINI_PHASES = [["ACCUM", 0, 104], ["MARKUP", 104, 216], ["REACC", 216, 320]];
+const MINI_PATH = [[0, 86], [14, 82], [28, 88], [42, 83], [56, 87], [70, 82], [84, 85], [104, 82], [122, 72], [140, 64], [158, 52],
+  [176, 44], [196, 32], [216, 24], [232, 34], [248, 44], [264, 40], [280, 50], [296, 47], [320, 54]];
+function seg(x0, x1) {
+  const pts = MINI_PATH.filter(([x]) => x >= x0 && x <= x1);
+  return pts.map(([x, y], i) => `${i ? "L" : "M"}${x},${y}`).join(" ");
+}
+function RegimeMini() {
+  return (
+    <>
+      <svg viewBox="0 0 320 100" className="lp-mini-svg" role="img" aria-label="Illustration: a price line coloured by regime, building a base, then trending up, then cooling off">
+        {MINI_PHASES.map(([k, x0, x1]) => <rect key={k} x={x0} y="8" width={x1 - x0} height="92" className={`mini-band mini-${k}`} />)}
+        {MINI_PHASES.map(([k, x0, x1]) => <path key={k} d={seg(x0, x1)} className={`mini-line mini-${k}`} />)}
+      </svg>
+      <ol className="lp-mini-phases" aria-hidden="true" style={{ gridTemplateColumns: MINI_PHASES.map(([, a, b]) => `${b - a}fr`).join(" ") }}>
+        {MINI_PHASES.map(([k]) => <li key={k} className={`mini-${k}`}>{REGIME[k]}</li>)}
+      </ol>
+    </>
+  );
+}
+// Wallets: fourteen made-up wallets, more positioned up than down.
+const MINI_WALLETS = [1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0];
+function WalletsMini() {
+  const ups = MINI_WALLETS.filter(Boolean).length;
+  return (
+    <div className="lp-mini-wallets" role="img" aria-label="Illustration: how profitable wallets are positioned, more up than down">
+      <div className="mw-dots" aria-hidden="true">
+        {[...MINI_WALLETS].sort((a, b) => b - a).map((up, i) => (
+          <i key={i} className={up ? "up" : "down"}><svg viewBox="0 0 10 10"><path d={up ? "M5 2 8.5 7.5h-7z" : "M5 8 1.5 2.5h7z"} /></svg></i>))}
+      </div>
+      <div className="mw-bar" aria-hidden="true">
+        <span className="up" style={{ flexGrow: ups }} /><span className="down" style={{ flexGrow: MINI_WALLETS.length - ups }} />
+      </div>
+      <div className="mw-ends" aria-hidden="true"><span className="up">Positioned up</span><span className="down">Positioned down</span></div>
+    </div>
+  );
+}
+// Options: price up to now, then the range option prices imply, widening with time.
+function OptionsMini() {
+  const nowX = 132, y0 = 52, x1 = 316;
+  const ts = Array.from({ length: 13 }, (_, i) => i / 12);
+  const X = (t) => nowX + (x1 - nowX) * t;
+  const up = ts.map((t) => [X(t), y0 - 34 * Math.sqrt(t)]);
+  const lo = ts.map((t) => [X(t), y0 + 40 * Math.sqrt(t)]);
+  const pts = (a) => a.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  return (
+    <div className="lp-mini-range">
+      <svg viewBox="0 0 320 104" className="lp-mini-svg" role="img" aria-label="Illustration: price up to now, then the range option prices imply, with its upper and lower ends">
+        <polygon points={pts([...up, ...[...lo].reverse()])} className="mini-band-range" />
+        <polyline points={pts(up)} className="mini-hi" />
+        <polyline points={pts(lo)} className="mini-lo" />
+        <path d="M4,64 L22,60 L40,66 L58,56 L76,59 L94,50 L112,55 L132,52" className="mini-price" />
+        <line x1={nowX} x2={nowX} y1="8" y2="100" className="mini-now" />
+      </svg>
+      <span className="mr-label mr-hi" aria-hidden="true">Upper end</span>
+      <span className="mr-label mr-lo" aria-hidden="true">Lower end</span>
+      <span className="mr-label mr-now" aria-hidden="true">Now</span>
+    </div>
+  );
+}
+const MINIS = [
+  ["engine", "01", "Regime", RegimeMini, "The engine names the phase price is in, from building a base to cooling off."],
+  ["wallets", "02", "Wallets", WalletsMini, "How profitable wallets are positioned. Context, not a signal."],
+  ["options", "03", "Options", OptionsMini, "The range option prices imply, with its upper and lower ends. Market pricing, not a view."],
+];
+function LayerMinis() {
+  return (
+    <ol className="lp-minis" aria-label="The three layers at a glance">
+      {MINIS.map(([kind, n, name, Mini, line]) => (
+        <li key={kind} className={`lp-mini lp-mini-${kind}`}>
+          <div className="lp-mini-head"><span className="lp-mini-n">{n}</span><LayerIcon kind={kind} size={16} /><b>{name}</b><Tag /></div>
+          <Mini />
+          <p>{line}</p>
+        </li>))}
+    </ol>
+  );
+}
+
 const LAYERS = [
   {
     kind: "engine", name: "Regime", Figure: RegimeFigure,
@@ -176,11 +257,13 @@ function ResearchExplorer() {
         <div>
           <p className="lp-kicker">The research behind the read</p>
           <h2 id="lp-research-title">Three perspectives.<br />Keep the whole picture.</h2>
+        </div>
+        <div>
           <p className="lp-body">Price, wallets and options tell different stories. Read them in order, side by side. Each keeps its own meaning.</p>
           <p className="lp-research-principle">Independent readings. Never one blended score.</p>
         </div>
-        <div className="lp-research-waves"><ResearchLayers /></div>
       </div>
+      <LayerMinis />
       <div className="lp-research-tabs" role="tablist" aria-label="Research layers">
         {LAYERS.map((layer, i) => (
           <button key={layer.kind} ref={(el) => { tabs.current[i] = el; }} role="tab"

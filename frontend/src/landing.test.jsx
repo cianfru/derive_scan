@@ -15,7 +15,6 @@ let fetchSpy;
 beforeEach(() => {
   vi.stubGlobal("scrollTo", () => {});
   vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
   fetchSpy = vi.fn(() => Promise.reject(new Error("the landing reads no data")));
   vi.stubGlobal("fetch", fetchSpy);
 });
@@ -93,6 +92,25 @@ describe("landing with the Saloon disabled", () => {
       expect(within(figure).getByText("Illustration")).not.toBeNull();
       expect(within(panel).getByRole("button", { name: /^More about / })).not.toBeNull();
     }
+  });
+
+  it("shows one small illustration per layer in order, each stamped and explained in one sentence", () => {
+    const { container } = show();
+    const minis = within(screen.getByRole("list", { name: "The three layers at a glance" })).getAllByRole("listitem");
+    expect(minis.map((li) => li.querySelector(".lp-mini-head b").textContent)).toEqual(["Regime", "Wallets", "Options"]);
+    for (const li of minis) {
+      expect(within(li).getByText("Illustration")).not.toBeNull();
+      expect(li.querySelectorAll("p")).toHaveLength(1);
+    }
+    expect(within(minis[0]).getByText("Building a base")).not.toBeNull();
+    expect(within(minis[0]).getByText("Trending up")).not.toBeNull();
+    expect(within(minis[0]).getByText("Cooling off")).not.toBeNull();
+    expect(within(minis[1]).getByRole("img", { name: /how profitable wallets are positioned/ })).not.toBeNull();
+    expect(minis[1].textContent).not.toMatch(/\blead/i);
+    expect(within(minis[2]).getByText("Upper end")).not.toBeNull();
+    expect(within(minis[2]).getByText("Lower end")).not.toBeNull();
+    // The old moving waves are gone: nothing on the landing draws to a canvas.
+    expect(container.querySelector("canvas")).toBeNull();
   });
 
   it("switches research with arrow, Home and End keys, keeping focus and staying on the landing", async () => {
