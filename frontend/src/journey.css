@@ -532,6 +532,8 @@ table.grid.market-grid:not(.overview) { min-width: 980px; table-layout: auto; }
 /* One section per layer: copy beside an illustrated figure. */
 .lp-layer { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 72px; align-items: center; padding-block: 96px; }
 .lp-layer + .lp-layer { border-top: 1px solid var(--border); }
+.lp-saloon { grid-template-columns: minmax(0, 1fr); padding-block: 72px 8px; }
+.lp-saloon .lp-copy { max-width: 760px; }
 .lp-layer.flip .lp-copy { order: 2; }
 .lp-copy { display: grid; gap: 16px; align-content: start; }
 .lp-eyebrow { margin: 0; display: inline-flex; align-items: baseline; gap: 10px; font: 600 12px/1 var(--font-sans); color: var(--accent-text); }

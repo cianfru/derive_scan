@@ -32,6 +32,9 @@ it("sends the landing's primary button into the Saloon", () => {
   expect(screen.getAllByRole("link", { name: "Enter the Saloon" }).map((a) => a.getAttribute("href"))).toEqual(["/saloon", "/saloon"]);
   expect(screen.getByRole("link", { name: "See how it works" }).getAttribute("href")).toBe("#how");
   expect(screen.queryByRole("link", { name: "Open the markets" })).toBeNull();
+  // The page explains the Saloon it leads into, in plain words and with no prices.
+  const intro = screen.getByRole("region", { name: "Pick higher or lower. Know your cost first." });
+  expect(intro.textContent).not.toMatch(/\$\d|%|\b(will|expect\w*|likely|predict\w*|probab\w*|odds|chance\w*)\b/i);
 });
 
 it("shows the coin page's Saloon link only for a coin with live questions", () => {
