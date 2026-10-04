@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { NavLink, Link, Outlet, useLocation } from "react-router-dom";
 import { Loading } from "./ui.jsx";
 import ErrorBoundary from "./ErrorBoundary.jsx";
-import { Lockup } from "./Brand.jsx";
+import { Lockup, HatMark } from "./Brand.jsx";
 import { QUESTIONS_ON } from "../lib/flags.js";
 
 function useTheme() {
@@ -22,6 +22,8 @@ function useTheme() {
   };
   return [effective, toggle];
 }
+
+const RESEARCH = [["/markets", "Markets"], ["/radar", "Radar"], ["/options", "Options"], ["/traders", "Traders"], ["/flow", "Flow"]];
 
 export default function Shell() {
   const [theme, toggle] = useTheme();
@@ -50,14 +52,22 @@ export default function Shell() {
           <Link to="/" className="logo" aria-label="Cowboy home">
             <Lockup />
           </Link>
-          <nav aria-label="Main navigation">
-            <NavLink to="/markets">Markets</NavLink>
-            {QUESTIONS_ON && <NavLink to="/saloon" className={({ isActive }) => (isActive || (pathname.startsWith("/q/") || pathname.startsWith("/saloon")) ? "active" : "")}>Saloon</NavLink>}
-            <NavLink to="/radar">Radar</NavLink>
-            <NavLink to="/options">Options</NavLink>
-            <NavLink to="/traders">Traders</NavLink>
-            <NavLink to="/flow">Flow</NavLink>
-          </nav>
+          {QUESTIONS_ON ? (
+            // The Saloon leads; the research pages follow, smaller, after a divider.
+            <nav aria-label="Main navigation" className="nav-saloon">
+              <NavLink to="/saloon" className={({ isActive }) => `nav-primary${isActive || pathname.startsWith("/q/") || pathname.startsWith("/saloon") ? " active" : ""}`}>
+                <HatMark size={18} />Saloon
+              </NavLink>
+              <span className="nav-divider" aria-hidden="true" />
+              <div className="nav-research" role="group" aria-label="Research">
+                {RESEARCH.map(([to, label]) => <NavLink key={to} to={to}>{label}</NavLink>)}
+              </div>
+            </nav>
+          ) : (
+            <nav aria-label="Main navigation">
+              {RESEARCH.map(([to, label]) => <NavLink key={to} to={to}>{label}</NavLink>)}
+            </nav>
+          )}
           <div className="tools">
             <button
               className="icon-btn"

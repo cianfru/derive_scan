@@ -114,6 +114,21 @@ p { max-width: 76ch; }
 .hdr nav a { display: inline-flex; align-items: center; height: 100%; padding-top: 2px; font: 500 14px/1 var(--font-sans); color: var(--text-2); border-bottom: 2px solid transparent; white-space: nowrap; transition: color 120ms var(--ease), border-color 120ms var(--ease); }
 .hdr nav a:hover { color: var(--text-1); }
 .hdr nav a.active { color: var(--accent-text); border-bottom-color: var(--accent); }
+/* With the Saloon on: the Saloon leads (hat mark, heavier), the research pages follow smaller after a divider. */
+.hdr nav.nav-saloon { align-items: center; gap: 22px; }
+.hdr nav .nav-primary { gap: 7px; font-weight: 650; font-size: 15px; color: var(--text-1); }
+.hdr nav .nav-primary .hat-mark { color: var(--accent-text); flex: none; margin-top: -2px; }
+.nav-divider { width: 1px; height: 18px; background: var(--border-strong, var(--border)); flex: none; }
+.nav-research { display: flex; gap: 20px; height: 100%; }
+.hdr .nav-research a { font-size: 13px; color: var(--text-3); }
+.hdr .nav-research a:hover { color: var(--text-1); }
+.hdr .nav-research a.active { color: var(--accent-text); }
+@media (max-width: 600px) {
+  .hdr nav.nav-saloon { justify-content: flex-start; gap: 14px; }
+  .hdr nav .nav-primary { font-size: 14px; }
+  .nav-research { gap: 12px; }
+  .hdr .nav-research a { font-size: 12px; }
+}
 .tools { display: flex; align-items: center; gap: 8px; }
 .icon-btn { border: 1px solid transparent; border-radius: var(--r-md); background: none; width: 36px; height: 36px; display: grid; place-items: center; color: var(--text-2); transition: background 120ms var(--ease), color 120ms var(--ease); }
 .icon-btn:hover { color: var(--text-1); background: var(--surface-2); }

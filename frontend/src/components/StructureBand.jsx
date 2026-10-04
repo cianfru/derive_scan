@@ -1,24 +1,25 @@
 import { Info, Empty } from "./ui.jsx";
 import FearGreed from "./FearGreed.jsx";
-import { REGIME, SIGNAL_LABEL, signalTone, title } from "../lib/format.js";
-import { REGIME_COLORS } from "../lib/regime.js";
+import { REGIME, SIGNAL_LABEL, CONSENSUS, signalTone, title } from "../lib/format.js";
+import { REGIME_COLORS, consensusTerm } from "../lib/regime.js";
 import { currentEngine } from "../lib/research.js";
 
 // The daily market structure as one slim band above the Markets board:
 // consensus | regime mix with its daily history | signal counts (filters) | Fear & Greed.
 
-/** Stacking order of the regime strip, bottom up: Markup first, so the 55% line reads against it. */
+/** Stacking order of the regime strip, bottom up: Trending up first, so the 55% line reads against it. */
 const ORDER = ["MARKUP", "REACC", "ACCUM", "CAP", "MARKDOWN", "BLOWOFF", "FLAT"];
-/** Every daily signal the engine can give, strongest first. Trim includes Trim hard. */
+/** Every daily signal the engine can give, strongest first. Stretched includes Very stretched; Leaning down holds
+ * both engine signals that share that plain label (Risk off and Light short). */
 export const LADDER = ["STRONG_LONG", "LIGHT_LONG", "ACCUMULATE", "REVIVAL_SEED_CONFIRMED", "REVIVAL_SEED", "WAIT",
-  "NO_LONG", "LIGHT_SHORT", "TRIM", "RISK_OFF"];
-const GROUP = { TRIM: ["TRIM", "TRIM_HARD"] };
+  "NO_LONG", "TRIM", "RISK_OFF"];
+const GROUP = { TRIM: ["TRIM", "TRIM_HARD"], RISK_OFF: ["RISK_OFF", "LIGHT_SHORT"] };
 export const isSignal = (c, s) => (GROUP[s] || [s]).includes(c.signal_1d);
 /** Signal counts for a set of markets, in ladder order; zero counts are dropped unless selected. */
 export const signalCounts = (coins, selected = null) =>
   LADDER.map((s) => ({ s, n: coins.filter((c) => isSignal(c, s)).length })).filter((x) => x.n || x.s === selected);
 
-const CONSENSUS_HELP = "The engine's market consensus on the daily close: every Derive perp with enough history sits in one regime, and the market is named when one group holds more than 55% of them (Risk-on: Markup; Accumulation: Accumulation, Re-accumulation and Capitulation; Risk-off: Markdown; Euphoria: Blow-off). Otherwise Mixed. It is one of the nine checks behind a long signal. The strip shows the same count for each past daily close, replayed from price history; today is the last column. A head count of markets, not a strength score.";
+const CONSENSUS_HELP = "The engine's market consensus on the daily close: every Derive perp with enough history sits in one regime, and the market is named when one group holds more than 55% of them (most coins trending up; most coins basing: building a base, cooling off or washed out; most coins trending down; most coins overheated). Otherwise Mixed. It is one of the nine checks behind an up-setup. The strip shows the same count for each past daily close, replayed from price history; today is the last column. A head count of markets, not a strength score.";
 const SIGNAL_COUNT_HELP = "Daily signal counts for the markets in the board's current view. Select one to show only those markets; select it again to show all.";
 
 const month = (t) => new Date(t * 1000).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
@@ -81,9 +82,9 @@ export default function StructureBand({ data, scoped, scopeLabel, signalFilter, 
   return (
     <section className="plate structure-band" aria-label="Daily market structure">
       <div className="sb-cell sb-consensus">
-        <span className="sb-eyebrow">Market · 1D<Info label="Explain market consensus">{CONSENSUS_HELP}</Info></span>
-        <strong className="sb-headline">{consensus ? title(consensus) : <Empty />}</strong>
-        {lead[0] && <small className="sb-sub"><b>{live[lead[0]]}/{measured}</b> in {REGIME[lead[0]]}</small>}
+        <span className="sb-eyebrow">Market · 1D<Info label="Explain market consensus">{CONSENSUS_HELP}{consensus ? consensusTerm(consensus) : ""}</Info></span>
+        <strong className="sb-headline">{consensus ? CONSENSUS[consensus] || title(consensus) : <Empty />}</strong>
+        {lead[0] && <small className="sb-sub"><b>{live[lead[0]]}/{measured}</b> {REGIME[lead[0]]}</small>}
       </div>
 
       <div className="sb-cell sb-mix">

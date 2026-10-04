@@ -671,3 +671,12 @@ table.grid.market-grid:not(.overview) { min-width: 980px; table-layout: auto; }
 .wtag-av .em-tile { fill: var(--brand-tile); stroke: var(--brand-tile-line); stroke-width: 1; }
 .wtag-av .em-iron { fill: none; stroke: var(--em); stroke-linecap: round; stroke-linejoin: round; }
 :root[data-theme="light"] .wtag-av .em-iron { stroke: var(--em-light); }
+
+/* Coin page: the way into the Saloon, near the top, when the coin has live questions (VITE_QUESTIONS only). */
+.saloon-cta { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border: 1px solid var(--border); border-radius: var(--r-lg, 12px); background: var(--surface-1); color: var(--text-1); transition: border-color 120ms var(--ease), background 120ms var(--ease); }
+.saloon-cta:hover { border-color: var(--accent); }
+.saloon-cta .hat-mark { color: var(--accent-text); flex: none; }
+.saloon-cta > span:not(.saloon-cta-go) { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.saloon-cta b { font: 650 16px/1.2 var(--font-sans); }
+.saloon-cta small { font-size: 13px; color: var(--text-3); }
+.saloon-cta-go { font-size: 18px; color: var(--accent-text); flex: none; }

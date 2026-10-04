@@ -32,10 +32,10 @@ describe("checks", () => {
     const list = regime.checks(BTC, CTX);
     expect(list.map((c) => c.name)).toEqual(NAMES);
     expect(list.map((c) => c.label)).toEqual(["Regime", "Market", "Z-score", "BTC", "Heat", "Climax", "Funding", "Fear & Greed", "Stablecoins"]);
-    expect(list.map((c) => c.value)).toEqual(["Markup", "Risk-on", "+1.32", "—", "23", "None", "+11.0%", "67", "−0.37% 7d"]);
+    expect(list.map((c) => c.value)).toEqual(["Trending up", "Most coins trending up", "+1.32", "—", "23", "None", "+11.0%", "67", "−0.37% 7d"]);
     expect(list.every((c) => c.status === "pass" && c.rule)).toBe(true);
     expect(regime.checks(XAUT, CTX)[5]).toMatchObject({ value: "Thin volume", status: "unknown" });
-    expect(regime.checks(HYPE, CTX)[3].value).toBe("Markup");
+    expect(regime.checks(HYPE, CTX)[3].value).toBe("Trending up");
   });
   it("never shows the engine's own check text", () => {
     for (const row of [BTC, HYPE, XAUT, BNB, CC]) {
@@ -53,9 +53,9 @@ describe("checks", () => {
 describe("whyLine", () => {
   const why = (row) => regime.whyLine(row, regime.checks(row, CTX));
   it("explains each coin's signal from published fields", () => {
-    expect(why(BTC)).toBe("Light, not Strong: z-score +1.32 is outside 0 to 1.");
-    expect(why(HYPE)).toBe("Staged entry in a pullback: 7 of 9 checks, heat 28.");
-    expect(why(XAUT)).toBe("4.1% below its weekly band: long entries are off.");
+    expect(why(BTC)).toBe("Leaning up, not a Strong up-setup: z-score +1.32 is outside 0 to 1.");
+    expect(why(HYPE)).toBe("Base forming in a pullback: 7 of 9 checks, heat 28.");
+    expect(why(XAUT)).toBe("4.1% below its weekly band: up-setups are off.");
     expect(why(BNB)).toBe("Derive perp volume too thin for the climax check: entries held.");
     expect(why(CC)).toBe("Price history 233 of 499 bars: no signal yet.");
   });
@@ -65,7 +65,7 @@ describe("against", () => {
   it("lists failed checks in plain words", () => {
     const list = regime.checks(HYPE, CTX);
     expect(regime.against(HYPE, list, regime.bandGate(HYPE))).toEqual([
-      "Regime is Re-accumulation: the check needs Markup or Accumulation",
+      "Regime is Cooling off: the check needs Trending up or Building a base",
       "Z-score −1.36: outside −0.5 to +2.5",
     ]);
     expect(regime.against(BTC, regime.checks(BTC, CTX), regime.bandGate(BTC))).toEqual([]);
@@ -74,7 +74,7 @@ describe("against", () => {
     const notes = regime.against(CC, regime.checks(CC, CTX), regime.bandGate(CC));
     expect(notes).toEqual([
       "Price history 233 of 499 bars: regime, z-score, BTC, heat and climax checks wait for it",
-      "Price 7.3% below its weekly band: long entries are off",
+      "Price 7.3% below its weekly band: up-setups are off",
     ]);
   });
 });
@@ -89,7 +89,7 @@ describe("lastRun", () => {
 });
 
 describe("copy", () => {
-  const BANNED = /\b(will|expect|likely|predict|target|probability|odds|Larsson|Reflex|Uptrend|CTO)\b/i;
+  const BANNED = /\b(will|expect|likely|predict|target|probability|odds|chance|Larsson|Reflex|Uptrend|CTO)\b/i;
   const strings = (v, out = []) => {
     if (typeof v === "string") out.push(v);
     else if (v && typeof v === "object") Object.values(v).forEach((x) => strings(x, out));
@@ -104,9 +104,20 @@ describe("copy", () => {
     expect(all.length).toBeGreaterThan(40);
     for (const s of all) expect(s, s).not.toMatch(BANNED);
   });
+  it("visible copy uses plain labels; the engine's terms stay inside the (i)", () => {
+    const ENGINE = /\b(Markup|Markdown|Blow-off|Re-accumulation|Capitulation|Accumulation|Accumulate|Risk-on|Risk-off|Euphoria|Strong long|Light long|Light short|Revival|Trim|No long)\b/;
+    const visible = [...Object.values(regime.REGIME_SHORT), ...Object.values(regime.SIGNAL_LINE)];
+    for (const row of [BTC, HYPE, XAUT, BNB, CC]) {
+      const list = regime.checks(row, CTX);
+      visible.push(...list.map((c) => String(c.value)), ...list.map((c) => c.rule), regime.whyLine(row, list), ...regime.against(row, list, regime.bandGate(row)));
+    }
+    for (const s of visible) expect(s, s).not.toMatch(ENGINE);
+    expect(REGIME_HELP.REACC).toMatch(/Engine term: Re-accumulation\.$/);
+    expect(SIGNAL_HELP.STRONG_LONG).toMatch(/Engine term: Strong long\.$/);
+  });
   it("help strings share the regime copy", () => {
-    expect(REGIME_HELP.MARKUP).toBe(regime.REGIME_LINE.MARKUP);
-    expect(SIGNAL_HELP.WAIT).toBe(`${regime.SIGNAL_LINE.WAIT} Signals describe the engine's rules at this close.`);
+    expect(REGIME_HELP.MARKUP).toBe(`${regime.REGIME_LINE.MARKUP} Engine term: Markup.`);
+    expect(SIGNAL_HELP.WAIT).toBe(`${regime.SIGNAL_LINE.WAIT} Signals describe the engine's rules at this close. Engine term: Wait.`);
     expect(regime.REGIME_COLORS.BLOWOFF).toBe("var(--regime-blowoff)");
   });
 });
@@ -121,13 +132,13 @@ const history = { engine: { "1d": Array.from({ length: 120 }, (_, i) => {
 describe("panel", () => {
   it("shows the regime run, the signal's reason and the 4H reading", () => {
     render(<RegimeHeader row={BTC} row4={{ regime: "REACC", signal: "WAIT", data_status: "ready" }} history={history} />);
-    expect(screen.getByText("Markup")).toBeTruthy();
+    expect(screen.getByText("Trending up")).toBeTruthy();
     expect(screen.getByText("Above its trend")).toBeTruthy();
     expect(screen.getByText("since 13 Jul · 82d")).toBeTruthy();
-    expect(screen.getByText("Light, not Strong: z-score +1.32 is outside 0 to 1.")).toBeTruthy();
-    expect(screen.getByText("Re-accumulation")).toBeTruthy();
+    expect(screen.getByText("Leaning up, not a Strong up-setup: z-score +1.32 is outside 0 to 1.")).toBeTruthy();
+    expect(screen.getByText("Cooling off")).toBeTruthy();
     expect(document.querySelectorAll(".rh-regime .day-strip i")).toHaveLength(90);
-    expect(document.querySelector(".rh-regime .day-strip i:last-child").title).toBe("2 Oct · Markup");
+    expect(document.querySelector(".rh-regime .day-strip i:last-child").title).toBe("2 Oct · Trending up");
   });
   it("marks a reading that is no longer current", () => {
     render(<RegimeHeader row={{ ...BTC, signal_bar_close_time: END }} row4={null} history={history} current={false} status="ready" />);

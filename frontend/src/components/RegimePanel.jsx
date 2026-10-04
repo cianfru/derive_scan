@@ -8,7 +8,7 @@ import { SIGNAL_HELP } from "../lib/explain.js";
 import { STATUS_NAMES } from "../lib/presentation.js";
 import {
   REGIME_COLORS, REGIME_SHORT, REGIME_LINE, REGIME_INFO, Z_INFO, HEAT_INFO, BAND_INFO, RIBBON_INFO, CHECKS_INFO,
-  RIBBON_STATE, HEAT_PHASE, checks, bandGate, against, whyLine, lastRun, fmtZ,
+  RIBBON_STATE, HEAT_PHASE, regimeTerm, checks, bandGate, against, whyLine, lastRun, fmtZ,
 } from "../lib/regime.js";
 
 const DAYS = 90;
@@ -67,7 +67,7 @@ export function RegimeHeader({ row, row4, history, current = true, current4 = tr
   return (
     <div className={`regime-head${early ? " early" : ""}`}>
       <div className="rh-cell rh-regime">
-        <span className="rh-key">1D regime <Info label="About the regime">{REGIME_INFO} {!early && REGIME_LINE[row.regime]}</Info></span>
+        <span className="rh-key">1D regime <Info label="About the regime">{REGIME_INFO} {!early && REGIME_LINE[row.regime]}{!early && regimeTerm(row.regime)}</Info></span>
         {early ? (
           <>
             <strong style={{ "--rc": "var(--faint)" }}>Warming up</strong>

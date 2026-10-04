@@ -15,6 +15,7 @@ import { SIGNAL_HELP } from "../lib/explain.js";
 import { RegimeHeader, Readings, Checks } from "../components/RegimePanel.jsx";
 import { Link } from "react-router-dom";
 import { QUESTIONS_ON } from "../lib/flags.js";
+import { HatMark } from "../components/Brand.jsx";
 
 // The chart shows the priced range for the next 30 days only, so candles keep most of the width.
 const CONE_DAYS = 30;
@@ -98,6 +99,18 @@ function PerpFigs({ pos }) {
   );
 }
 
+/** The way into the Saloon near the top of the page: only in a build with the Saloon on, for a coin with live questions. */
+export function SaloonCta({ und, live }) {
+  if (!QUESTIONS_ON || !live) return null;
+  return (
+    <Link className="saloon-cta" to={`/saloon/${und}`}>
+      <HatMark size={22} />
+      <span><b>{und} in the Saloon</b><small>Yes or no on {und}'s price, priced from Derive options</small></span>
+      <span className="saloon-cta-go" aria-hidden="true">→</span>
+    </Link>
+  );
+}
+
 export default function Coin() {
   const { und } = useParams();
   const { theme } = useOutletContext();
@@ -132,6 +145,7 @@ export default function Coin() {
         {closed && <span className="coin-stamp mono">Closed {dayTime(closed)}</span>}
       </header>
       <JourneyStrip alignment={data.alignment} />
+      <SaloonCta und={und} live={data.questions === true} />
 
       <Step id="regime" n={1} kind="engine" title="Regime">
         <RegimeHeader row={row} row4={row4} history={data.history} current={engineReady} current4={fourReady}
@@ -161,7 +175,6 @@ export default function Coin() {
           </Step>
           <Step id="options" n={3} kind="options" title="Options"
             right={<span className="step-stamp mono">{dayTime(data.options.ts)}</span>}>
-            {QUESTIONS_ON && data.questions === true && <Link className="text-link q-coin-link" to={`/saloon/${und}`}>{und} in the Saloon</Link>}
             <OptionsWorkspace key={und} opts={data.options} und={und} flow={data.taker_flow} hasSurface={data.has_surface === true} embedded />
           </Step>
         </>

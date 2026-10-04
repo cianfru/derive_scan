@@ -8,7 +8,7 @@ const ARCS = [
   "M138.50,28.86 A86,86 0 0 1 178.37,57.83",
   "M180.75,61.10 A86,86 0 0 1 196,110",
 ];
-const COMPACT_HELP = "Alternative.me's market-wide Fear & Greed index, 0 to 100. Not coin-specific. The engine's not-greedy check needs it below 70; at 40 or below some Accumulate paths open.";
+const COMPACT_HELP = "Alternative.me's market-wide Fear & Greed index, 0 to 100. Not coin-specific. The engine's not-greedy check needs it below 70; at 40 or below some Base forming paths open.";
 
 /** Alternative.me's Fear & Greed dial, as the Markets band shows it: a small dial, the number and its band. */
 export default function FearGreed({ sentiment, at }) {
