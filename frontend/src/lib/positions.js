@@ -1,4 +1,4 @@
-import { sameLegs } from "./questions.js";
+import { payAt, sameLegs } from "./questions.js";
 
 // Positions: what the user says they placed on Derive, kept in this browser only. Nothing is sent
 // anywhere. Storage can be blocked or cleared, so every read and write falls back to memory.
@@ -108,6 +108,54 @@ export function valuePosition(p, found, settlePrice = null, exitFees = null) {
   const gross = side.sell * w * p.contracts;
   return { settled: false, gross, fees: exitFees, now: exitFees == null ? null : gross - exitFees, mark: found.level.fair == null ? null
     : (p.side === "yes" ? found.level.fair : 1 - found.level.fair) * w * p.contracts };
+}
+
+/** How a position was placed and where it stands, in plain words for its status line. */
+export function positionStatus(p, { settled = false, settling = false } = {}) {
+  if (p.closed_at) return { key: "closed", text: "Closed · sold back by hand" };
+  if (settled && !partial(p)) return { key: "settled", text: "Settled" };
+  if (partial(p)) return { key: "partial", text: "Placed by hand · only the first filled", warn: true };
+  if (settling) return { key: "settling", text: "Settling · average from 07:30 to 08:00 UTC" };
+  return { key: "both", text: "Placed by hand · both filled" };
+}
+
+/**
+ * Every figure a Positions card shows, from the saved position, its question on the board (or
+ * null), the settlement price once known, a sell-back ticket (`closeTicket`, or null) and the
+ * coin's price now. Cash amounts are dollars; P/L is always after what was paid, fees included.
+ *   paid, maxPayout             what went in, and the most the answer pays at settlement
+ *   valueNow, plNow             Derive's sell-back price now, after its exit fees, and P/L if sold
+ *   expiryNow, plExpiryNow      what it pays at 08:00 UTC if the coin settles at today's price
+ *   got, pl                     settled or sold back: what came back and the result
+ * A partial fill (only the first option) carries no value for the answer: every figure but paid is null.
+ */
+export function positionFigures(p, { found = null, settlePrice = null, close = null, index = null } = {}) {
+  const w = p.hi - p.lo;
+  const maxPayout = w * p.contracts;
+  const base = { paid: p.paid, maxPayout, valueNow: null, plNow: null, expiryNow: null, plExpiryNow: null, got: null, pl: null };
+  if (partial(p)) return { ...base, maxPayout: null, partial: true };
+  if (p.closed_at) return { ...base, closed: true, got: p.proceeds, pl: p.proceeds - p.paid };
+  if (settlePrice != null) {
+    const per = payAt(settlePrice, p.lo, p.hi, p.side);
+    const got = per * maxPayout;
+    return { ...base, settled: true, per, got, pl: got - p.paid };
+  }
+  const v = valuePosition(p, found, null, close ? close.fees : null);
+  const expiryNow = Number.isFinite(index) ? payAt(index, p.lo, p.hi, p.side) * maxPayout : null;
+  return {
+    ...base, otherLegs: !!v.otherLegs, mark: v.mark ?? null, fees: v.fees ?? null,
+    valueNow: v.now ?? null, plNow: v.now != null ? v.now - p.paid : null,
+    expiryNow, plExpiryNow: expiryNow != null ? expiryNow - p.paid : null,
+  };
+}
+
+/** Closing now: what Derive's sell-back price brings after its fees, and the result against what was
+ * paid, beside holding to 08:00 UTC at today's price. */
+export function closeSummary(t, paid, holdPayout = null) {
+  if (!t) return null;
+  const proceeds = t.premium - t.fees;
+  return { gross: t.premium, fees: t.fees, proceeds, pl: proceeds - paid,
+    holdPayout, holdPl: holdPayout != null ? holdPayout - paid : null };
 }
 
 export function _resetMemory() {

@@ -3,8 +3,10 @@ import { Link } from "react-router-dom";
 import { Info } from "./ui.jsx";
 import OutcomePreview from "./OutcomePreview.jsx";
 import { TRADE_ON } from "../lib/flags.js";
-import { amountText, copyText, deriveLink, fullPay, handRisk, limitText, money, orderedLegs, parseId } from "../lib/questions.js";
-import { addPosition } from "../lib/positions.js";
+import { amountText, copyText, deriveLink, fullPay, handRisk, limitText, money, orderedLegs, parseId, signed } from "../lib/questions.js";
+import { addPosition, closeSummary } from "../lib/positions.js";
+
+const tone = (v) => (v > 0.004 ? "up" : v < -0.004 ? "down" : "");
 
 const clock = (t) => `${new Date(t * 1000).toISOString().slice(11, 16)} UTC`;
 
@@ -85,8 +87,9 @@ function Sold({ estimate, onSave }) {
 /** Stage 1: a summary of the answer, the orders to place on Derive by hand inside Order details
  * (the bought leg first, or, selling back, the short leg bought back first), Open Derive, and then
  * "I placed it", which asks what filled. */
-function QuestionTicket({ und, question, answer, level, sideKey, t, board, pricesTs, settleTs, stale, closing = false, onPlaced, onSold, expiry }) {
+function QuestionTicket({ und, question, answer, level, sideKey, t, board, pricesTs, settleTs, stale, closing = false, onPlaced, onSold, expiry, paid = null, holdPayout = null }) {
   const [step, setStep] = useState(null);
+  const close = closing && paid != null ? closeSummary(t, paid, holdPayout) : null;
   const side = level?.[sideKey];
   const legs = orderedLegs(side, closing);
   const risk = closing ? null : handRisk(t, level, sideKey, board);
@@ -104,10 +107,12 @@ function QuestionTicket({ und, question, answer, level, sideKey, t, board, price
     <section className="q-ticket" aria-label={closing ? "Sell back on Derive" : "Place on Derive"}>
       <h3>{question} <span className="q-ticket-side">{closing ? `Sell back ${answer}` : <>{answer} · {fullPay(level, sideKey)}</>}</span></h3>
       {closing ? (
-        <dl className="q-money">
+        <dl className="q-money q-close-sum">
           <div><dt>Sell-back price, about</dt><dd className="mono">{money(t.premium, { cents: true })}</dd></div>
           <div><dt>Derive fees, about</dt><dd className="mono">-{money(t.fees, { cents: true })}</dd></div>
           <div className="q-lose"><dt>You get, after fees</dt><dd className="mono">{money(t.proceeds, { cents: true })}</dd></div>
+          {close && <div><dt>Profit / loss if closed now<small>after the {money(paid, { cents: true })} you paid</small></dt><dd className={`mono ${tone(close.pl)}`}>{signed(close.pl)}</dd></div>}
+          {close?.holdPl != null && <div><dt>If held to 08:00 UTC instead<small>{und} settling at today's price</small></dt><dd className={`mono ${tone(close.holdPl)}`}>{signed(close.holdPl)}</dd></div>}
         </dl>
       ) : (
         <OutcomePreview und={und} level={level} side={sideKey} t={t} expiry={expiry || parseId(level.id)?.expiry} settleTs={settleTs} summary />
