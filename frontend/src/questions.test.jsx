@@ -72,12 +72,15 @@ describe("the board", () => {
     expect(dates.join()).not.toMatch(/4 Oct/); // under a day: no tab
     expect(container.querySelector("[class*=pill]")).toBeNull();
     expect(screen.getAllByRole("heading", { level: 1 })[0].textContent).toBe("Saloon Price outcomes");
-    expect(screen.getByRole("link", { name: "Positions" }).getAttribute("href")).toBe("/saloon/mine");
+    // The guided flow: coin, date, then higher or lower on the date's headline level.
+    expect(screen.getAllByRole("region").map((r) => r.getAttribute("aria-label")).slice(0, 3)).toEqual(["Coin", "Date", "Higher or lower"]);
   });
 
   it("names the answers Higher and Lower, with the pay zone in every row and in every answer's name", async () => {
     const { container } = show("/saloon/BTC");
-    await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("tab", { name: "This Friday · 9 Oct" }));
+    const user = userEvent.setup({ advanceTimers: () => {} });
+    await user.click(screen.getByRole("tab", { name: "This Friday · 9 Oct" }));
+    await user.click(screen.getByRole("button", { name: "Other levels" }));
     const rows = screen.getAllByRole("row");
     expect(rows[0].getAttribute("aria-label")).toBe("Higher or lower than $85,000");
     expect(rows[0].textContent).toContain("$177 above today");
@@ -95,8 +98,10 @@ describe("the board", () => {
     expect(container.textContent).not.toMatch(/\bby (Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/);
   });
 
-  it("marks the question shown beside the board in the ladder", () => {
+  it("marks the question shown in the flow in the ladder", async () => {
     const { container } = show("/saloon/BTC");
+    expect(container.querySelector(".q-ladder")).toBeNull(); // folded under Other levels
+    await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("button", { name: "Other levels" }));
     const head = container.querySelector(".q-row.headline");
     expect(head.getAttribute("aria-selected")).toBe("true");
   });
@@ -129,6 +134,7 @@ describe("the board", () => {
     lv.no = { state: "screen_wide" };
     docs.current["questions/BTC.json"] = b;
     const { container } = show("/saloon/BTC");
+    await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("button", { name: "Other levels" }));
     const row = screen.getAllByRole("row").find((r) => r.getAttribute("aria-label") === `Higher or lower than $${lv.k.toLocaleString("en-US")}`);
     const off = within(row).getByRole("group", { name: /^Lower, full \$1 at or below \$[\d,]+, no price now$/ });
     expect(off.textContent).toContain("No price now");
@@ -143,6 +149,7 @@ describe("the board", () => {
     cleanup();
     vi.setSystemTime((T14 + 120 * 60) * 1000);
     const { container: c3 } = show("/saloon/BTC");
+    await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("button", { name: "Other levels" }));
     expect(screen.getByText("Prices paused since 14:00 UTC")).toBeTruthy();
     expect(c3.querySelectorAll("a.q-btn")).toHaveLength(0);
   });
@@ -160,7 +167,14 @@ describe("the question page", () => {
     expect(container.querySelector(".q-amount")).toBeNull();
     expect(container.querySelector(".q-ticket")).toBeNull();
     expect(screen.queryByRole("button", { name: "Place on Derive" })).toBeNull();
-    await userEvent.setup({ advanceTimers: () => {} }).click(radios[0]);
+    const user = userEvent.setup({ advanceTimers: () => {} });
+    await user.click(radios[0]);
+    // Picking opens the amount step; the preview and the orders wait for its one action.
+    expect(container.querySelector(".q-amount")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Place on Derive" })).toBeNull();
+    expect(container.querySelector(".q-ticket")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "See what it pays" }));
+    expect(screen.getByRole("region", { name: "What it pays" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Place on Derive" })).toBeTruthy();
   });
 
@@ -303,19 +317,30 @@ describe("Positions", () => {
   it("values an open position at the sell-back price after exit fees, closes it by hand, and passes the word check", async () => {
     localStorage.setItem("cowboy-questions", JSON.stringify([open, old]));
     const { container } = show("/saloon/mine");
-    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Positionsi");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Positions");
     const card = container.querySelector(".q-card");
     expect(card.textContent).toContain("BTC higher or lower than $86,000 on Fri 9 Oct, 08:00 UTC?");
     expect(card.textContent).toContain("Higher · full $1 from $89,000");
-    expect(card.textContent).toContain("Placed by hand · Cowboy cannot see your fills");
+    expect(card.textContent).toContain("Placed by hand · both filled");
+    const fig = (name) => within(card).getByText(name).closest("div").querySelector("dd").textContent;
+    expect(fig("You paid")).toBe("$103.01");
+    expect(fig("Most it pays")).toBe("$264.42"); // 6,000 x 0.04407
     // 0.3463 x 6,000 x 0.04407 = $91.57 gross, less Derive's two exit fees.
-    const worth = within(card).getByText("Now worth").closest("div").querySelector("dd").textContent;
-    expect(Number(worth.replace(/[$,]/g, ""))).toBeLessThan(91.57);
+    const worth = Number(fig("Value now").replace(/[$,]/g, ""));
+    expect(worth).toBeLessThan(91.57);
+    expect(fig("Profit / loss now")).toBe(`-$${(103.01 - worth).toFixed(2)}`);
+    expect(fig("At 08:00 UTC, today's price")).toMatch(/^-\$\d+\.\d\d$/);
+    expect(fig("Settles")).toBe("Fri 9 Oct, 08:00 UTC");
     const user = userEvent.setup({ advanceTimers: () => {} });
-    await user.click(screen.getByRole("button", { name: "Sell back" }));
+    await user.click(screen.getByRole("button", { name: "Close" }));
+    // The close summary first: proceeds, fees and the result, then the orders inside Order details.
+    const sum = container.querySelector(".q-close-sum").textContent;
+    expect(sum).toMatch(/You get, after fees\$[\d.]+/);
+    expect(sum).toContain(`Profit / loss if closed nowafter the $103.01 you paid-$${(103.01 - worth).toFixed(2)}`);
+    expect(sum).toMatch(/If held to 08:00 UTC instead/);
     const legs = [...container.querySelectorAll(".q-legs li")].map((li) => li.textContent);
     expect(legs[0]).toMatch(/^1Buy backBTC-20261009-89000-C/);
-    expect(container.querySelector(".q-ticket").textContent).toMatch(/You get, after fees\$[\d.]+/);
+    expect(container.querySelector(".q-details").open).toBe(false);
     wordcheck(await allText(container));
     await user.click(screen.getByRole("button", { name: "I sold it back" }));
     await user.click(screen.getByRole("checkbox", { name: "Both orders filled" }));
@@ -325,20 +350,23 @@ describe("Positions", () => {
     await user.click(screen.getByRole("button", { name: "Close the position" }));
     expect(container.querySelectorAll(".q-card")).toHaveLength(0);
     await user.click(screen.getByRole("tab", { name: "Closed" }));
-    expect(container.textContent).toContain("Sold back by hand");
-    expect(container.textContent).toMatch(/Got back\$90\.00/);
+    expect(container.textContent).toContain("Closed · sold back by hand");
+    expect(container.textContent).toMatch(/Got backafter fees\$90\.00/);
     expect(container.textContent).toContain("-$13.01");
-    expect(container.textContent).toMatch(/Got\$45\.94 \(77c per \$1\)/); // the older entry, settled
+    expect(container.textContent).toMatch(/Got77c per \$1\$45\.94/); // the older entry, settled
+    expect(container.textContent).toContain("Settled at $84,594 · got $45.94");
     localStorage.clear();
   });
 
   it("never values a partial fill as the answer", () => {
     localStorage.setItem("cowboy-questions", JSON.stringify([{ ...open, exec: "hand_partial" }]));
     const { container } = show("/saloon/mine");
-    expect(container.textContent).toContain("Only the first option filled: this is not the full answer");
-    const res = within(container.querySelector(".q-card")).getByText("Result").closest("div").querySelector("dd").textContent;
-    expect(res).toBe("Not available yeti");
-    expect(screen.queryByRole("button", { name: "Sell back" })).toBeNull();
+    expect(container.textContent).toContain("Placed by hand · only the first filled");
+    const card = container.querySelector(".q-card");
+    for (const name of ["Most it pays", "Value now", "Profit / loss now", "At 08:00 UTC, today's price"]) {
+      expect(within(card).getByText(name).closest("div").querySelector("dd").textContent).toBe("Not available yeti");
+    }
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
     expect(container.querySelector(".q-figs").textContent).not.toContain("—");
     localStorage.clear();
   });
@@ -346,7 +374,7 @@ describe("Positions", () => {
   it("offers no sell-back price for options the board no longer prices for that answer", () => {
     localStorage.setItem("cowboy-questions", JSON.stringify([{ ...open, side: "no", legs: ["BTC-20261009-89000-C", "BTC-20261009-83000-C"] }]));
     const { container } = show("/saloon/mine");
-    expect(screen.queryByRole("button", { name: "Sell back" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
     expect(container.querySelector(".q-figs").textContent).toContain("No price now");
     localStorage.clear();
   });
@@ -354,6 +382,9 @@ describe("Positions", () => {
   it("has an empty state", () => {
     try { localStorage.clear(); } catch { /* blocked */ }
     show("/saloon/mine");
-    expect(screen.getByText(/Nothing here yet/)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "No positions yet" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open the Saloon" }).getAttribute("href")).toBe("/saloon");
+    // Export and import sit under "Saved in this browser".
+    expect(screen.getByRole("button", { name: "Export" }).closest("details.q-saved")).not.toBeNull();
   });
 });

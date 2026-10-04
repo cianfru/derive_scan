@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { usd, pct } from "../lib/format.js";
 import { TYPE_INFO } from "../lib/traders.js";
-import { Plate, Tabs, Loading, Failed, PageHead } from "../components/ui.jsx";
+import { Plate, Tabs, Loading, Failed, PageHead, Lead } from "../components/ui.jsx";
+import { tradersLead } from "../lib/takeaway.js";
 import WalletTag from "../components/WalletTag.jsx";
 import LeanBar from "../components/LeanBar.jsx";
 import CohortExplorer from "../components/CohortExplorer.jsx";
@@ -45,6 +46,7 @@ export default function Traders() {
     <div className="wrap page people-page">
       <PageHead title="Traders" info={PAGE_HELP}
         meta={<>{data.ranked_total?.toLocaleString("en-US") ?? "—"} ranked · {tieredCount} Top and Smart · history to {data.through}</>} />
+      <Lead lead={tradersLead(data)} />
       <Plate title="Leaderboard" info={BOARD_HELP} className="lead-plate"
         right={<Tabs label="Type" value={kind} onChange={(k) => { setKind(k); setAll(false); }} items={[["all", "All"], ["directional", "Directional"], ["income", "Income"], ["hedger", "Hedger"]]} />}
         bodyClass="lb-body">

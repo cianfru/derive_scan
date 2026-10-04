@@ -81,6 +81,17 @@ export function PageHead({ title, info, meta, tabs }) {
   );
 }
 
+/** A research page's lead: one plain takeaway built from the data, then the main thing that limits it. */
+export function Lead({ lead }) {
+  if (!lead) return null;
+  return (
+    <div className="lead" aria-label="Takeaway" role="note">
+      <p className="lead-text">{lead.text}</p>
+      {lead.note && <p className="lead-note">{lead.note}</p>}
+    </div>
+  );
+}
+
 /** A 12px right arrow drawn inline, so it never falls back to a system glyph. */
 export function Arrow({ className = "" }) {
   return <svg className={`arrow-icon ${className}`} width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M1.5 6h8.5M6.5 2.5 10 6l-3.5 3.5" /></svg>;

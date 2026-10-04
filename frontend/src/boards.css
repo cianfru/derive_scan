@@ -124,7 +124,7 @@
 .rd-figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-block: 1px solid var(--seam); }
 .rd-figs > div { display: grid; gap: 4px; padding: 12px 0; min-width: 0; }
 .rd-figs > div + div { padding-left: 12px; border-left: 1px solid var(--seam); }
-.rd-figs span { font: 600 var(--t-key)/1.3 var(--font-body); color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rd-figs > div > span { font: 600 var(--t-key)/1.3 var(--font-body); color: var(--faint); display: flex; align-items: center; flex-wrap: wrap; }
 .rd-figs b { font: 500 15px/1.3 var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .rd-readings { display: grid; gap: 14px; }
 .rd-readings > div { display: grid; grid-template-columns: 72px minmax(0, 1fr); column-gap: 12px; row-gap: 2px; align-items: baseline; }
@@ -172,7 +172,7 @@ b.tone-unknown { color: var(--faint); font-weight: 400; }
 .rp-scrub input::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; margin-top: -5px; border: 0; background: var(--orange); border-radius: var(--r-sm); }
 .rp-scrub input::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: var(--r-lg); background: var(--orange); border-radius: var(--r-sm); }
 .rp-ticks { position: absolute; inset: auto 0 0 0; height: 12px; pointer-events: none; }
-.rp-ticks span { position: absolute; transform: translateX(-50%); font: 400 10px/1 var(--font-mono); color: var(--faint); white-space: nowrap; }
+.rp-ticks span { position: absolute; transform: translateX(-50%); font: 400 11px/1 var(--font-mono); color: var(--faint); white-space: nowrap; }
 .rd-hist { display: grid; gap: 4px; }
 .rd-hist-row { display: grid; grid-template-columns: 60px minmax(0, 1fr); align-items: center; gap: 8px; }
 .rd-hist-row > span { font: 600 var(--t-key)/1.3 var(--font-body); color: var(--faint); }
@@ -186,7 +186,7 @@ b.tone-unknown { color: var(--faint); font-weight: 400; }
 .rd-hist-lone { fill: var(--fg); }
 .rd-hist-cursor { stroke: var(--orange); stroke-opacity: .55; stroke-width: 1; }
 .rd-hist-head { fill: var(--orange); stroke: var(--plate); stroke-width: 1.5; }
-.rd-hist-axis text { fill: var(--faint); font-size: 10px; }
+.rd-hist-axis text { fill: var(--faint); font-size: 11px; }
 .rd-when { color: var(--faint); }
 .radar-help p { margin: 0; }
 .radar-help p + p { margin-top: 10px; }
@@ -241,7 +241,7 @@ b.tone-unknown { color: var(--faint); font-weight: 400; }
 .hs-area { stroke: none; }
 .hs-area.up { fill: var(--up); opacity: .22; }
 .hs-area.down { fill: var(--down); opacity: .22; }
-.hs-area-label, svg.viz .hs-area-label { font: 400 10px var(--font-body); fill: var(--faint); }
+.hs-area-label, svg.viz .hs-area-label { font: 400 11px var(--font-body); fill: var(--faint); }
 .hs-traded, .hs-recorded, .sh-traded, .sh-recorded { fill: none; stroke-linejoin: round; stroke-linecap: round; }
 .hs-traded { stroke: var(--muted); stroke-width: 1; }
 .hs-recorded { stroke: var(--fg); stroke-width: 2.4; }

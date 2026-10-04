@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { useOutletContext, useParams, useLocation } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { price, chg, pct, usd, title, utc, dayTime, strike, DASH } from "../lib/format.js";
-import { Plate, Loading, Failed } from "../components/ui.jsx";
+import { Plate, Loading, Failed, Lead } from "../components/ui.jsx";
+import { coinLead } from "../lib/takeaway.js";
 import CandleChart from "../components/CandleChart.jsx";
 import { Asset } from "../components/MarketVisuals.jsx";
 import EngineComparison from "../components/EngineComparison.jsx";
@@ -144,6 +145,7 @@ export default function Coin() {
         <span className={`coin-chg mono ${dayChg > 0 ? "up" : dayChg < 0 ? "down" : "dim"}`}>{chg(dayChg)}</span>
         {closed && <span className="coin-stamp mono">Closed {dayTime(closed)}</span>}
       </header>
+      <Lead lead={coinLead(und, data)} />
       <JourneyStrip alignment={data.alignment} />
       <SaloonCta und={und} live={data.questions === true} />
 

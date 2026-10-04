@@ -24,11 +24,48 @@ function useTheme() {
 }
 
 const RESEARCH = [["/markets", "Markets"], ["/radar", "Radar"], ["/options", "Options"], ["/traders", "Traders"], ["/flow", "Flow"]];
+/** Research covers its five pages and the pages they open (a coin, a trader). */
+export const isResearch = (path) => RESEARCH.some(([to]) => path === to || path.startsWith(`${to}/`))
+  || path.startsWith("/coin/") || path.startsWith("/trader/");
+
+/** Phones: Research as one menu button. Escape or a pick closes it and focus returns to the button. */
+function ResearchMenu({ active }) {
+  const [open, setOpen] = useState(false);
+  const btn = useRef(null);
+  const menu = useRef(null);
+  const { pathname } = useLocation();
+  useEffect(() => { setOpen(false); }, [pathname]);
+  useEffect(() => {
+    if (!open) return undefined;
+    menu.current?.querySelector("a")?.focus();
+    const key = (e) => { if (e.key === "Escape") { e.preventDefault(); setOpen(false); btn.current?.focus(); } };
+    const away = (e) => { if (!menu.current?.contains(e.target) && !btn.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener("keydown", key);
+    document.addEventListener("pointerdown", away);
+    return () => { document.removeEventListener("keydown", key); document.removeEventListener("pointerdown", away); };
+  }, [open]);
+  return (
+    <div className="nav-more">
+      <button ref={btn} className={`nav-more-btn${active ? " active" : ""}`} aria-expanded={open} aria-controls="research-menu"
+        onClick={() => setOpen((o) => !o)}>
+        Research<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" /></svg>
+      </button>
+      {open && (
+        <div id="research-menu" ref={menu} className="nav-menu" role="group" aria-label="Research pages">
+          {RESEARCH.map(([to, label]) => <NavLink key={to} to={to}>{label}</NavLink>)}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Shell() {
   const [theme, toggle] = useTheme();
   const { pathname, hash } = useLocation();
   const header = useRef(null);
+  const positionsActive = pathname === "/saloon/mine";
+  const saloonActive = !positionsActive && (pathname.startsWith("/saloon") || pathname.startsWith("/q/"));
+  const researchActive = isResearch(pathname);
   useEffect(() => {
     if (!hash) window.scrollTo(0, 0);
   }, [pathname, hash]);
@@ -53,15 +90,18 @@ export default function Shell() {
             <Lockup />
           </Link>
           {QUESTIONS_ON ? (
-            // The Saloon leads; the research pages follow, smaller, after a divider.
+            // Trade, Positions, Research: the Saloon leads; the research pages sit inline after a
+            // divider on wide screens and in a Research menu on phones.
             <nav aria-label="Main navigation" className="nav-saloon">
-              <NavLink to="/saloon" className={({ isActive }) => `nav-primary${isActive || pathname.startsWith("/q/") || pathname.startsWith("/saloon") ? " active" : ""}`}>
-                <HatMark size={18} />Saloon
-              </NavLink>
+              <Link to="/saloon" className={`nav-primary${saloonActive ? " active" : ""}`} aria-current={saloonActive ? "page" : undefined}>
+                <HatMark size={18} />Saloon<span className="nav-sub">Price outcomes</span>
+              </Link>
+              <Link to="/saloon/mine" className={`nav-positions${positionsActive ? " active" : ""}`} aria-current={positionsActive ? "page" : undefined}>Positions</Link>
               <span className="nav-divider" aria-hidden="true" />
               <div className="nav-research" role="group" aria-label="Research">
                 {RESEARCH.map(([to, label]) => <NavLink key={to} to={to}>{label}</NavLink>)}
               </div>
+              <ResearchMenu active={researchActive} />
             </nav>
           ) : (
             <nav aria-label="Main navigation">

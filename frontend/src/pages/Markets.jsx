@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { price, chg, pct, usd, z, title, dayTime, clock, SIGNAL_RANK, REGIME } from "../lib/format.js";
 import { openMarketRow } from "../lib/explain.js";
-import { Signal, Tabs, Loading, Failed, Info, PageHead, Empty } from "../components/ui.jsx";
+import { Signal, Tabs, Loading, Failed, Info, PageHead, Empty, Lead } from "../components/ui.jsx";
+import { marketsLead } from "../lib/takeaway.js";
 import { Asset, MarketTrace } from "../components/MarketVisuals.jsx";
 import { EnginePair, Convergence, CONVERGENCE_HELP } from "../components/EngineComparison.jsx";
 import { currentEngine } from "../lib/research.js";
@@ -67,6 +68,7 @@ export default function Markets() {
     <div className="wrap page markets-page">
       <PageHead title="Markets"
         meta={<>Daily close {data.bars?.["1d"] ? dayTime(data.bars["1d"]) : "—"} · snapshot {clock(data.generated_at)}</>} />
+      <Lead lead={marketsLead(data)} />
       <div className="markets-layout">
         <StructureBand data={data} scoped={scoped} scopeLabel={SCOPE[view]} signalFilter={signalFilter} onSignal={setSignalFilter} />
 

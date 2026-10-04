@@ -3,7 +3,7 @@
 .tr { gap: 14px; }
 .tr-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .tr-head h3 { min-width: 0; }
-.tr-tag { flex: none; font-size: 11px; line-height: 20px; color: var(--text-3); border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
+.tr-tag { flex: none; font-size: 12px; line-height: 20px; color: var(--text-3); border-bottom: 1px solid var(--border-strong); white-space: nowrap; }
 .tr-step, .tr-ticket { display: grid; gap: 12px; align-content: start; }
 .tr-lead { margin: 0; font: 600 15px/1.4 var(--font-sans); color: var(--text-1); }
 .tr-lead .info, .tr-note .info { vertical-align: -2px; margin-left: 4px; }

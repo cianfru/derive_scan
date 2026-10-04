@@ -4,14 +4,28 @@ import { readingState } from "./analytics.js";
 export const ASSET_NAMES = { CC: "Canton", LIT: "Lighter", PUMP: "Pump.fun", VVV: "Venice", XAUT: "Tether Gold", ZEC: "Zcash", BTC: "Bitcoin", ETH: "Ethereum", SOL: "Solana", HYPE: "Hyperliquid", ADA: "Cardano", XRP: "XRP", DOGE: "Dogecoin", AVAX: "Avalanche", LINK: "Chainlink", BNB: "BNB", SUI: "Sui", TRUMP: "Official Trump", AAVE: "Aave", TON: "Toncoin", BCH: "Bitcoin Cash" };
 export const STATE_NAMES = { up: "Upward tone", defensive: "Defensive tone", neutral: "Balanced tone" };
 export const WINDOWS = { "7d": { name: "7-day options", engine: "1D close", options: "7d tenor / 24h flow", wallets: "Expiry within 7d" }, "30d": { name: "30-day options", engine: "1D close", options: "30d tenor / 7d flow", wallets: "Expiry within 30d" } };
-export const STATUS_NAMES = { history_updated: "History recovered", partial_flow: "Collecting flow", skew_only: "From skew", insufficient_data: "Insufficient data", unknown: "Unavailable", missing: "Unavailable", unavailable: "Unavailable", stale: "Stale reading", future: "Check timestamp", thin_volume: "Thin volume", "warming up": "Warming up", "not enough data": "Short history", missing_quotes: "Missing quotes", modelled_delta: "Estimated delta", insufficient_exposure: "Low exposure" };
+// Pipeline states read as plain words (owner, 4 October 2026): "Updating" for a reading past its
+// window, "Not available yet" for one the data cannot give now; the technical reason sits in STATUS_WHY.
+export const STATUS_NAMES = { history_updated: "History recovered", partial_flow: "Collecting flow", skew_only: "From skew", insufficient_data: "Not available yet", unknown: "Unavailable", missing: "Unavailable", unavailable: "Unavailable", stale: "Updating", future: "Updating", thin_volume: "Thin volume", "warming up": "Warming up", "not enough data": "Short history", missing_quotes: "Not available yet", modelled_delta: "Estimated delta", insufficient_exposure: "Low exposure" };
+export const STATUS_WHY = {
+  stale: "The latest reading is older than its update window, so it is held back until the next recorder run replaces it.",
+  future: "The reading's time stamp is ahead of the clock, so it is held back until the two line up.",
+  missing_quotes: "Option quotes this reading needs were missing from the latest snapshot.",
+  insufficient_data: "There is not enough recorded data for this reading yet.",
+  unknown: "No reading was published for this layer.", missing: "No reading was published for this layer.", unavailable: "No reading was published for this layer.",
+  insufficient_exposure: "Smart wallets hold too little on this coin's expiries in the window to read a balance.",
+  partial_flow: "Taker flow does not cover the whole window yet, so the reading uses what was recorded.",
+  building: "Wallet readings start once the trade history has caught up and the wallets are valued on recorded quotes.",
+};
 export function viewReading(alignment, horizon, kind, now) {
-  if (!alignment || alignment.version !== 2) return { label: "Unavailable", state: null };
-  if (kind === "wallets" && !(alignment.wallet_coverage?.ready === true && alignment.wallet_coverage?.status === "ready")) return { label: "Building history", state: null };
+  if (!alignment || alignment.version !== 2) return { label: "Unavailable", state: null, why: STATUS_WHY.unavailable };
+  if (kind === "wallets" && !(alignment.wallet_coverage?.ready === true && alignment.wallet_coverage?.status === "ready")) return { label: "Building history", state: null, why: STATUS_WHY.building };
   const row = (alignment.readings || alignment.horizons)?.[kind === "engine" ? "30d" : horizon]?.[kind];
   const state = readingState(row, kind, now);
   const status = kind === "engine" && row?.data_status && row.data_status !== "ready" ? row.data_status : row?.status;
-  return { label: (state && kind === "engine" ? SIGNAL_LABEL[row?.signal] : state && kind === "wallets" ? {up:"Long delta", defensive:"Short delta", neutral:"Balanced delta"}[state] : STATE_NAMES[state]) || STATUS_NAMES[status === "ready" ? "stale" : status] || "Unavailable", state, row };
+  const key = status === "ready" ? "stale" : status;
+  return { label: (state && kind === "engine" ? SIGNAL_LABEL[row?.signal] : state && kind === "wallets" ? {up:"Long delta", defensive:"Short delta", neutral:"Balanced delta"}[state] : STATE_NAMES[state]) || STATUS_NAMES[key] || "Unavailable", state, row,
+    why: state ? null : STATUS_WHY[key] || STATUS_WHY.unavailable };
 }
 
 // Invalid samples remain gaps. Never connect an absent observation or smooth price beyond the data.
