@@ -3,6 +3,7 @@ import { NavLink, Link, Outlet, useLocation } from "react-router-dom";
 import { Loading } from "./ui.jsx";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import { Lockup, HatMark } from "./Brand.jsx";
+import NavMenu, { MySpace } from "./NavMenu.jsx";
 import { QUESTIONS_ON, TESTNET_FILLS } from "../lib/flags.js";
 import "../marketplace.css";
 import walletCss from "../hdr-wallet.css?inline";
@@ -30,36 +31,17 @@ const RESEARCH = [["/markets", "Markets"], ["/radar", "Radar"], ["/options", "Op
 export const isResearch = (path) => RESEARCH.some(([to]) => path === to || path.startsWith(`${to}/`))
   || path.startsWith("/coin/") || path.startsWith("/trader/");
 
-/** Research as one menu button. Escape or a pick closes it and returns focus. */
-function ResearchMenu({ active }) {
-  const [open, setOpen] = useState(false);
-  const btn = useRef(null);
-  const menu = useRef(null);
-  const { pathname } = useLocation();
-  useEffect(() => { setOpen(false); }, [pathname]);
-  useEffect(() => {
-    if (!open) return undefined;
-    menu.current?.querySelector("a")?.focus();
-    const key = (e) => { if (e.key === "Escape") { e.preventDefault(); setOpen(false); btn.current?.focus(); } };
-    const away = (e) => { if (!menu.current?.contains(e.target) && !btn.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener("keydown", key);
-    document.addEventListener("pointerdown", away);
-    return () => { document.removeEventListener("keydown", key); document.removeEventListener("pointerdown", away); };
-  }, [open]);
-  return (
-    <div className="nav-more">
-      <button ref={btn} className={`nav-more-btn${active ? " active" : ""}`} aria-expanded={open} aria-controls="research-menu"
-        onClick={() => setOpen((o) => !o)}>
-        Research<svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2 3.5 5 6.5 8 3.5" /></svg>
-      </button>
-      {open && (
-        <div id="research-menu" ref={menu} className="nav-menu" role="group" aria-label="Research pages">
-          {RESEARCH.map(([to, label]) => <NavLink key={to} to={to} onClick={() => { setOpen(false); btn.current?.focus(); }}>{label}</NavLink>)}
-        </div>
-      )}
-    </div>
-  );
-}
+/** With the Saloon on: Markets and Traders, each a menu of its pages, after the Saloon. */
+export const MENUS = [
+  { id: "markets", label: "Markets", items: [["/markets", "Board"], ["/radar", "Radar"], ["/options", "Options"], ["/flow", "Flow"]],
+    owns: (p) => ["/markets", "/radar", "/options", "/flow"].some((to) => p === to || p.startsWith(`${to}/`)) || p.startsWith("/coin/") },
+  { id: "traders", label: "Traders", items: [["/traders", "Leaderboard"], ["/traders/cohorts", "Cohorts"]],
+    owns: (p) => p === "/traders" || p.startsWith("/traders/") || p.startsWith("/trader/") },
+];
+
+// Saloon builds only: "My space" (Positions and Following). The menu shows at once; its counts read
+// the browser's records from their own chunk and fill in when it arrives, without remounting the menu.
+const MySpaceCounts = QUESTIONS_ON ? lazy(() => import("./MySpace.jsx")) : null;
 
 // Testnet builds only: the wallet in the header. Its code is the trade chunk's (loaded lazily, so other
 // builds carry none of it) and its styles are inlined here, so the header keeps its shape while that
@@ -95,10 +77,8 @@ export default function Shell() {
   const [theme, toggle] = useTheme();
   const { pathname, hash } = useLocation();
   const header = useRef(null);
-  const positionsActive = pathname === "/saloon/mine";
-  const followingActive = pathname === "/saloon/following";
-  const saloonActive = !positionsActive && !followingActive && (pathname.startsWith("/saloon") || pathname.startsWith("/q/"));
-  const researchActive = isResearch(pathname);
+  const [space, setSpace] = useState(null);
+  const saloonActive = pathname !== "/saloon/mine" && pathname !== "/saloon/following" && (pathname.startsWith("/saloon") || pathname.startsWith("/q/"));
   useEffect(() => {
     if (!hash) window.scrollTo(0, 0);
   }, [pathname, hash]);
@@ -134,15 +114,13 @@ export default function Shell() {
             </Link>
           )}
           {QUESTIONS_ON ? (
-            // Outcomes first; saved answers and records stay one click away. Research keeps its
-            // own destinations inside one menu, on every screen size.
+            // Outcomes first; the research pages sit in two menus, Markets and Traders, on every screen
+            // size. My space (Positions, Following) sits on the right, beside the tools.
             <nav aria-label="Main navigation" className="nav-saloon">
               <Link to="/saloon" className={`nav-primary${saloonActive ? " active" : ""}`} aria-current={saloonActive ? "page" : undefined}>
                 <HatMark size={18} />Saloon<span className="nav-sub">Price outcomes</span>
               </Link>
-              <Link to="/saloon/following" className={`nav-following${followingActive ? " active" : ""}`} aria-current={followingActive ? "page" : undefined}>Following</Link>
-              <Link to="/saloon/mine" className={`nav-positions${positionsActive ? " active" : ""}`} aria-current={positionsActive ? "page" : undefined}>Positions</Link>
-              <ResearchMenu active={researchActive} />
+              {MENUS.map((m) => <NavMenu key={m.id} id={m.id} label={m.label} items={m.items.map(([to, text]) => ({ to, text }))} active={m.owns(pathname)} />)}
             </nav>
           ) : (
             <nav aria-label="Main navigation">
@@ -150,6 +128,8 @@ export default function Shell() {
             </nav>
           )}
           <div className="tools">
+            {QUESTIONS_ON && <MySpace positions={space?.positions} following={space?.following} counted={!!space} />}
+            {QUESTIONS_ON && <Suspense fallback={null}><MySpaceCounts onCounts={setSpace} /></Suspense>}
             {TESTNET_FILLS && <HeaderWallet />}
             <button
               className="icon-btn"

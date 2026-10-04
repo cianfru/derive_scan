@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { usd, pct } from "../lib/format.js";
 import { TYPE_INFO } from "../lib/traders.js";
@@ -7,7 +7,6 @@ import { Plate, Tabs, Loading, Failed, PageHead, Lead } from "../components/ui.j
 import { tradersLead } from "../lib/takeaway.js";
 import WalletTag from "../components/WalletTag.jsx";
 import LeanBar from "../components/LeanBar.jsx";
-import CohortExplorer from "../components/CohortExplorer.jsx";
 import HistoryStatus, { coverageReady, GapNote } from "../components/HistoryStatus.jsx";
 
 const PAGE_HELP = `Options traders on Derive, ranked by gross results on expired options, before fees. Market makers are left out. ${TYPE_INFO}`;
@@ -80,7 +79,10 @@ export default function Traders() {
         </div>
         {list.length > shown.length && <button className="btn lb-more" onClick={() => setAll(true)}>Show all {list.length}</button>}
       </Plate>
-      <CohortExplorer cohorts={data.cohorts} through={data.through} valuedAt={data.generated_at} />
+      <Link className="cohorts-link" to="/traders/cohorts">
+        <span><b>Cohorts</b><small>Traders grouped by results and by size, and how each group is positioned per coin</small></span>
+        <span aria-hidden="true">→</span>
+      </Link>
       <p className="status">History to {data.through} UTC · positions valued on the newest options chain<GapNote data={data} /></p>
     </div>
   );

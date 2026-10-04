@@ -39,14 +39,12 @@
   .hdr .hw { position: static; }
   .hw-menu { top: calc(100% + 6px); left: 12px; right: 12px; width: auto; max-height: calc(100svh - var(--header-h, 96px) - 24px); overflow-y: auto; }
   .hdr .hw-btn { padding: 0 12px; }
-  /* The landing's header takes two rows here, like every other page, so the wallet has room. */
-  .hdr.hdr-marketplace.hdr-wallet.hdr-landing .wrap { display: grid; grid-template-columns: 1fr auto; grid-template-rows: 52px 44px; height: auto; gap: 0; }
-  .hdr.hdr-marketplace.hdr-wallet.hdr-landing .logo { width: fit-content; }
-  .hdr.hdr-marketplace.hdr-wallet.hdr-landing .logo svg { height: 24px; }
-  .hdr.hdr-marketplace.hdr-wallet.hdr-landing .tools { grid-column: 2; grid-row: 1; margin-left: 0; }
-  .hdr.hdr-marketplace.hdr-wallet.hdr-landing .tools .icon-btn { width: 36px; min-height: 36px; }
-  .hdr.hdr-marketplace.hdr-wallet.hdr-landing nav.nav-saloon { grid-column: 1 / -1; grid-row: 2; display: flex; justify-content: space-between; gap: 14px; margin-left: 0; }
-  .hdr.hdr-marketplace.hdr-wallet.hdr-landing .nav-following, .hdr.hdr-marketplace.hdr-wallet.hdr-landing .nav-positions { display: inline-flex; }
+  /* With the wallet in row one, My space moves to the end of row two, beside Traders. */
+  .hdr.hdr-marketplace.hdr-wallet .wrap { grid-template-columns: 1fr auto auto; }
+  .hdr.hdr-marketplace.hdr-wallet .tools { display: contents; }
+  .hdr.hdr-marketplace.hdr-wallet .tools .hw { grid-column: 2; grid-row: 1; }
+  .hdr.hdr-marketplace.hdr-wallet .tools .icon-btn { grid-column: 3; grid-row: 1; align-self: center; margin-left: 4px; }
+  .hdr.hdr-marketplace.hdr-wallet .nav-myspace { grid-column: 2 / 4; grid-row: 2; justify-self: end; height: 44px; }
 }
 /* Narrow phones and small tablets: the short label, so the header keeps one line per row. */
 @media (min-width: 761px) and (max-width: 880px) {

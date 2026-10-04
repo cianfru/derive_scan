@@ -1,26 +1,42 @@
 /* The Saloon's marketplace navigation. All styling is scoped to the enabled Saloon. */
 .hdr.hdr-marketplace .nav-more { display: flex; margin-left: 0; }
 .hdr.hdr-marketplace nav.nav-saloon { gap: 30px; }
-.hdr.hdr-marketplace .nav-following, .hdr.hdr-marketplace .nav-positions { color: var(--text-3); font-weight: 500; }
-.hdr.hdr-marketplace .nav-following.active, .hdr.hdr-marketplace .nav-positions.active { color: var(--accent-text); }
 .hdr.hdr-marketplace .nav-more-btn { font-size: 14px; }
-.hdr.hdr-marketplace .tools { margin-left: auto; }
-.hdr.hdr-marketplace.hdr-landing .nav-following { display: none; }
+.hdr.hdr-marketplace .tools { margin-left: auto; align-self: stretch; gap: 12px; }
 .hdr.hdr-marketplace.hdr-landing nav.nav-saloon { flex: none; margin-left: auto; }
 .hdr.hdr-marketplace.hdr-landing .tools { margin-left: 0; }
+/* Menus: Markets and Traders open under their button, My space under its right edge. Active pages
+   are orange text, no fill. */
+.hdr.hdr-marketplace .nav-menu-start { left: 0; right: auto; }
+.hdr.hdr-marketplace .nav-menu-end { right: 0; left: auto; }
+.hdr.hdr-marketplace .nav-menu a { display: flex; align-items: center; justify-content: space-between; gap: 16px; font: 500 14px/1 var(--font-sans); color: var(--text-2); }
+.hdr.hdr-marketplace .nav-menu a:hover { color: var(--text-1); }
+.hdr.hdr-marketplace .nav-menu a.active { color: var(--accent-text); }
+.hdr.hdr-marketplace .nav-menu a.active { background: none; }
+.hdr.hdr-marketplace .nav-menu a.active:hover { background: var(--surface-2); }
+.hdr .nav-count { font-size: 13px; color: var(--text-3); }
+.hdr .nav-menu a.active .nav-count { color: var(--accent-text); }
+.hdr.hdr-marketplace .nav-myspace .nav-more-btn { font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.hdr.hdr-marketplace .nav-myspace .nav-more-btn.active { color: var(--accent-text); }
 .saloon-heading h1 { font-size: 30px; letter-spacing: -.035em; font-weight: 650; }
 .saloon-heading p { margin: 7px 0 0; color: var(--text-3); font-size: 14px; }
 .saloon-view-link { display: inline-flex; gap: 14px; align-items: center; min-height: 44px; font-size: 13px; font-weight: 500; color: var(--text-2); }
 .saloon-view-link span { color: var(--accent-text); }
 .saloon-view-link:hover { color: var(--accent-text); }
 @media (max-width: 760px) {
-  .hdr.hdr-marketplace:not(.hdr-landing) .wrap { display: grid; grid-template-columns: 1fr auto; grid-template-rows: 52px 44px; height: auto; gap: 0; }
-  .hdr.hdr-marketplace:not(.hdr-landing) .logo { width: fit-content; }
-  .hdr.hdr-marketplace:not(.hdr-landing) .tools { grid-column: 2; grid-row: 1; }
-  .hdr.hdr-marketplace:not(.hdr-landing) nav.nav-saloon { grid-column: 1 / -1; grid-row: 2; display: flex; justify-content: space-between; gap: 14px; overflow: visible; }
-  .hdr.hdr-marketplace:not(.hdr-landing) .nav-sub { display: none; }
-  .hdr.hdr-marketplace nav.nav-saloon a, .hdr.hdr-marketplace .nav-more-btn { font-size: 13px; }
-  .hdr.hdr-marketplace:not(.hdr-landing) .nav-primary .hat-mark { display: none; }
+  /* Phones: two rows on every page, the landing too. Row one: the logo, My space and the tools;
+     row two: Saloon, Markets, Traders. Menus open across the screen under the whole header. */
+  .hdr.hdr-marketplace .wrap, .hdr.hdr-marketplace.hdr-landing .wrap { display: grid; grid-template-columns: 1fr auto; grid-template-rows: 52px 44px; height: auto; gap: 0; }
+  .hdr.hdr-marketplace .logo { width: fit-content; }
+  .hdr.hdr-marketplace.hdr-landing .logo svg { height: 24px; }
+  .hdr.hdr-marketplace .tools, .hdr.hdr-marketplace.hdr-landing .tools { grid-column: 2; grid-row: 1; margin-left: 0; gap: 6px; }
+  .hdr.hdr-marketplace.hdr-landing .tools .icon-btn { width: 36px; min-height: 36px; }
+  .hdr.hdr-marketplace nav.nav-saloon, .hdr.hdr-marketplace.hdr-landing nav.nav-saloon { grid-column: 1 / -1; grid-row: 2; display: flex; justify-content: flex-start; gap: 28px; margin-left: 0; overflow: visible; }
+  .hdr.hdr-marketplace .nav-sub { display: none; }
+  .hdr.hdr-marketplace nav.nav-saloon a, .hdr.hdr-marketplace .nav-more-btn { font-size: 14px; }
+  .hdr.hdr-marketplace .nav-primary .hat-mark { display: none; }
+  .hdr.hdr-marketplace .nav-more { position: static; }
+  .hdr.hdr-marketplace .nav-menu, .hdr.hdr-marketplace .nav-menu-start, .hdr.hdr-marketplace .nav-menu-end { top: calc(100% + 6px); left: 12px; right: 12px; min-width: 0; }
   .saloon-heading h1 { font-size: 27px; }
   .saloon-heading p { font-size: 13px; }
 }

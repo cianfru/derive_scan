@@ -167,7 +167,7 @@ describe("one tap on Derive's testnet", () => {
     const go = await within(sell).findByRole("button", { name: "Sell for $91.30" });
     expect(fake.calls("private/send_rfq").at(-1).params).toMatchObject({ min_total_cost: "88.64", label: `${ID}:yes:close` });
     await user.click(go);
-    await screen.findByText("Nothing open yet.");
+    await screen.findByText("Nothing open right now");
     await user.click(screen.getByRole("tab", { name: "Closed" }));
     expect(await screen.findByText("Closed · sold back in one tap")).toBeTruthy();
     expect(screen.getAllByText("Realized P/L").length).toBeGreaterThan(0);

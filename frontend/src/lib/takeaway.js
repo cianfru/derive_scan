@@ -86,6 +86,22 @@ export function tradersLead(data) {
   return { text: `${text}.`, note: `Ranks count expired options before fees; ${STUDY}.` };
 }
 
+/** Cohorts: how the most profitable results cohort holds its open options, on complete quotes only. */
+export function cohortsLead(data) {
+  const rows = (data?.cohorts?.pnl || []).filter((c) => c.wallets > 0);
+  const c = rows.find((r) => r.name === "Money Printer") || rows[0];
+  if (!c) return null;
+  const coins = Object.values(c.windows?.all?.coins || {}).filter((b) => b.positions > 0 && b.score != null && Number.isFinite(b.net_delta_usd));
+  const n = c.wallets.toLocaleString("en-US");
+  if (!coins.length) return { text: `${n} ${c.name} wallets hold no open options with complete quotes now.`, note: `Cohorts by results count expired options before fees; ${STUDY}.` };
+  const net = coins.reduce((s, b) => s + b.net_delta_usd, 0);
+  const side = net > 0 ? "long" : net < 0 ? "short" : "balanced";
+  const text = side === "balanced"
+    ? `${n} ${c.name} wallets hold balanced option delta across ${coins.length} ${coins.length === 1 ? "coin" : "coins"}`
+    : `${n} ${c.name} wallets hold ${usd(Math.abs(net))} of net ${side} option delta across ${coins.length} ${coins.length === 1 ? "coin" : "coins"}`;
+  return { text: `${text}.`, note: `Cohorts by results count expired options before fees; ${STUDY}.` };
+}
+
 /** Flow: option premium bought and sold by takers, and the busiest market. */
 export function flowLead(data) {
   const by = data?.by_coin || {};

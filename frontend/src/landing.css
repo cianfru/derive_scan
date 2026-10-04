@@ -108,7 +108,7 @@
 .cowboy-draft .landing-close > div { display: flex; gap: 20px; align-items: center; }
 .cowboy-draft .landing-close h2 { font-size: 29px; }
 .hdr.hdr-landing nav.nav-saloon { margin-left: auto; flex: none; gap: 32px; }
-.hdr-landing .nav-research, .hdr-landing .nav-divider, .hdr-landing .nav-positions { display: none; }
+.hdr-landing .nav-research, .hdr-landing .nav-divider { display: none; }
 .hdr-landing .nav-more { display: flex; }
 .hdr-landing .tools { margin-left: 0; }
 @media (max-width: 950px) {
