@@ -28,6 +28,13 @@ It builds on:
 
 Open points to confirm on testnet or with Derive are collected in 7.0.
 
+**Status (4 October 2026).** The owner approved the plan; P1 to P5 are built behind `VITE_SALOON_TRADE` (README "Saloon stage 2"). Built as designed, with these notes:
+- P2 uses a thin JSON-RPC client over the browser's WebSocket plus the SDK's action encoders (`@derivexyz/derive-ts/codecs`) and ethers, rather than the SDK's client: the client signs with a raw key, while the owner's grant has to go through the browser wallet's `eth_signTypedData_v4`, and it pulls in a Node WebSocket package.
+- `public/execute_quote_debug` signs over the subaccount's real owner (it reads the owner from the subaccount, not from the request), and the browser's encoding matched it byte for byte on V3 testnet.
+- `private/get_pending_deposits` reports new-subaccount deposits under subaccount 0, so the Saloon account is found after the first deposit as the one new, unlabelled PRIME Standard subaccount, then labelled "Cowboy".
+- The session key holds no off-chain scope (the SDK's default would add `account_info`).
+- Sell back is in the maths and the dry run but not on screen: it needs positions in the Saloon account, which come with P6.
+
 ---
 
 ## 1. The user's journey

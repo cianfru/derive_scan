@@ -74,6 +74,15 @@ The app files exist only when the Action runs with `QUESTIONS_PUBLISH=on` (`reco
 
 `prices_ts` is the 15-minute slot start. Prices over 35 minutes old show their age; over 90 minutes `publish_site.py` marks the files `paused` and the app shows em dashes.
 
+## Saloon stage 2 (testnet dry run, off by default)
+
+One-tap answers through Derive RFQ (`docs/saloon-stage2-design.md`), built up to the dry run (passes P1 to P5) on Derive's V3 testnet only. The app shows it only in a build with both `VITE_QUESTIONS=1` and `VITE_SALOON_TRADE=1` (`dryrun` and `testnet` mean the same until testnet fills are built; any other value, including `mainnet`, leaves it off). With it off the build carries no trading code (`src/lib/trade/bundle.test.js`); with it on, the trading code is one lazy chunk loaded by the ticket.
+
+- `frontend/src/lib/trade/`: `package.js` (debit packages, contracts, the RFQ ceiling and floor, Derive's RFQ fee groups, quote checks, caps in `TRADE_LIMITS`), `derive.js` (JSON-RPC over the browser's WebSocket, retries, plain messages), `sign.js` (Derive's action signing; data encoders from `@derivexyz/derive-ts/codecs`), `wallet.js` (an injected browser wallet), `account.js` (the Saloon account: a PRIME Standard subaccount labelled "Cowboy"), `sessionKey.js` (approving Cowboy: `trade:rfq:option`, one subaccount, 7 days; switch off), `rfq.js` (the dry run), `seat.js` (the page's wallet, connection and account), `config.js` (testnet endpoint and constants; mainnet listed as disabled).
+- `frontend/src/components/trade/`: `TradePanel.jsx` (beside stage 1's ticket, which stays one tap away as "Place by hand" and is the only ticket for coins other than BTC and ETH), `SeatSetup.jsx` (connect, Derive's terms, add USDC), `ApproveCowboy.jsx`, `TradeTicket.jsx`.
+- The dry run sends the RFQ, re-reads the best quote, signs the execution with the Saloon key and sends it only to `public/execute_quote_debug`, which fills nothing; the RFQ is always cancelled. Nothing in the app calls `private/execute_quote` yet.
+- Tests replay frames recorded from V3 testnet's public methods (`src/fixtures/trade/public_frames.json`) and one recorded `public/execute_quote_debug` answer that the browser's signing matches byte for byte (`execute_quote_debug.json`); private call shapes come from Derive's openapi (`private_shapes.json`).
+
 ## Tracking values over time
 
 Coin pages include **Market history**: dated engine metrics, funding and open interest. Inspect exact samples by pointer, touch or keyboard; select daily or four-hour readings. Missing intervals remain gaps. Details: `docs/history-tracking.md`.
