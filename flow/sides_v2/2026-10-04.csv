@@ -1,3 +1,9 @@
 bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sell_premium_usd,legs
 1791072000,CC,perp,0.0,2.89,0.0,0.0,1
 1791072000,SOL,perp,0.0,58.47,0.0,0.0,1
+1791072000,BTC,perp,0.0,103544.21,0.0,0.0,16
+1791072000,ETH,call,1343.62,0.0,1.2,0.0,1
+1791072000,ETH,perp,1507.23,0.0,0.0,0.0,1
+1791072000,HYPE,perp,0.0,1791.22,0.0,0.0,1
+1791072000,PUMP,perp,288.36,383.92,0.0,0.0,6
+1791072900,PUMP,perp,163.23,0.0,0.0,0.0,1
