@@ -2,7 +2,7 @@
 // over WebSocket"). One connection per page; calls correlate by id. Reads that Derive marks as safe to
 // repeat (9002 backend unavailable, -32000 rate limit) are retried with a growing pause; a dropped
 // socket reconnects on the next call and logs in again. Nothing here holds or sends a wallet key.
-import { NETWORK } from "./config.js";
+import { NETWORK, TESTNET_WS } from "./config.js";
 
 export class DeriveError extends Error {
   constructor(code, message, data) {
@@ -17,11 +17,14 @@ export class DeriveError extends Error {
 export const RETRYABLE = new Set([9002, -32000]);
 export const SOCKET_CLOSED = "socket_closed";
 export const TIMEOUT = "timeout";
+export const MAINNET_GUARD = "mainnet_guard";
+/** The only signed fill call. The client refuses it on any endpoint but the testnet's. */
+export const EXECUTE = "private/execute_quote";
 
 /** Plain messages for what can go wrong (design 2.4). No codes on screen. */
 const PLAIN = {
   11104: "That price is no longer open. Asking again.",
-  11110: "Derive's screen has a better price. Asking again.",
+  11110: "Derive's screen has a better price. Get a new price.",
   11112: "Derive takes fewer legs in one package.",
   11111: "Derive has this kind of trade switched off for your account.",
   11107: "Derive's price is far from its mark right now.",
@@ -41,6 +44,16 @@ const PLAIN = {
   403: "Derive is not available here.",
   4001: "You declined in your wallet.",
   [SOCKET_CLOSED]: "Derive isn't taking orders right now.",
+  [MAINNET_GUARD]: "One tap works on Derive's testnet only.",
+  11102: "That price is no longer open. Get a new price.",
+  11023: "Derive's fee is higher than usual right now.",
+  11011: "That price is no longer open. Get a new price.",
+  11017: "Derive did not accept this trade. Get a new price.",
+  11035: "Derive did not accept this trade. Get a new price.",
+  14023: "Cowboy's approval has ended. Approve again to continue.",
+  14026: "Cowboy's approval has ended. Approve again to continue.",
+  14030: "Cowboy's approval has ended. Approve again to continue.",
+  14031: "Cowboy's approval does not cover this trade.",
   [TIMEOUT]: "Derive isn't taking orders right now.",
 };
 export const CANCEL_PLAIN = {
@@ -156,6 +169,8 @@ export function createClient({
 
   /** One call. `safe` (default true) allows Derive's retryable errors to be retried. */
   async function call(method, params, { safe = true } = {}) {
+    // The mainnet guard, at the last step before the wire: a fill goes nowhere but the testnet.
+    if (method === EXECUTE && url !== TESTNET_WS) throw new DeriveError(MAINNET_GUARD, PLAIN[MAINNET_GUARD]);
     let attempt = 0;
     for (;;) {
       try {
@@ -172,6 +187,7 @@ export function createClient({
 
   return {
     call,
+    url,
     get status() { return status; },
     /** Logs this connection in for `wallet`; `sign(timestamp)` signs the EIP-191 message (the wallet or the session key). */
     async login(wallet, sign) {

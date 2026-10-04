@@ -33,6 +33,10 @@ jobs:
       # Questions: the data branch always keeps their state and hourly history; the app files
       # (site-data questions/) are published only when this is "on". Off until the owner switches it on.
       QUESTIONS_PUBLISH: "on"
+      # Saloon stage 2 kill switch, published as `trading` in questions/index.json: on, sell_only or
+      # off. Set the repository variable QUESTIONS_TRADING to change it without a redeploy; unset
+      # means on (one-tap trading exists only in testnet builds today).
+      QUESTIONS_TRADING: ${{ vars.QUESTIONS_TRADING }}
     steps:
       - uses: actions/checkout@v4
 

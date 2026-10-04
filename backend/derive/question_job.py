@@ -7,7 +7,9 @@ Data branch (always, small):
                                         ts,id,fair,yes_buy,yes_sell,no_buy,no_sell,index
 
 App files (site-data), only when publishing is switched on (QUESTIONS_PUBLISH=on):
-  questions/index.json                  coins with at least one live question, prices_ts
+  questions/index.json                  coins with at least one live question, prices_ts, and `trading`:
+                                        the Saloon stage 2 kill switch (on / sell_only / off, from
+                                        QUESTIONS_TRADING; default on, any other value off)
   questions/{UND}.json                  the board: dates, levels, both answers' prices and legs
   questions/history/{UND}-{YYYYMMDD}.json  one date's hourly prices per question, and its settlement
 
@@ -39,6 +41,19 @@ SETTLE_RETRY_SEC = 3600
 def publishing() -> bool:
     """The off switch: questions reach the app only with QUESTIONS_PUBLISH=on (default off)."""
     return os.getenv("QUESTIONS_PUBLISH", "off").strip().lower() in ("on", "1", "true", "yes")
+
+
+TRADING_STATES = ("on", "sell_only", "off")
+
+
+def trading_state() -> str:
+    """The kill switch for one-tap trading (Saloon stage 2), read by the app from questions/index.json:
+    "on" buys and sells, "sell_only" only sells back, "off" neither. Set from the Action variable
+    QUESTIONS_TRADING; unset or empty means "on" (testnet only today), anything unknown means "off"."""
+    v = os.getenv("QUESTIONS_TRADING", "").strip().lower()
+    if not v:
+        return "on"
+    return v if v in TRADING_STATES else "off"
 
 
 def _dump(obj) -> str:
@@ -244,7 +259,7 @@ def write_site(site: Path, root: Path, boards: dict, state: dict, now: float, pr
         und, e = f.stem.rsplit("-", 1)
         if e not in (state["coins"].get(und) or {}).get("dates", {}):
             f.unlink()
-    (out / "index.json").write_text(_dump({"schema": SCHEMA, "prices_ts": prices_ts, "generated_at": int(now),
+    (out / "index.json").write_text(_dump({"schema": SCHEMA, "prices_ts": prices_ts, "generated_at": int(now), "trading": trading_state(),
                                            "coins": sorted(coins, key=lambda c: (c["thin"], Q.QUESTION_GATES["majors"].index(c["und"]) if not c["thin"] else 0, -c["questions"]))}))
 
 
@@ -323,6 +338,10 @@ def mark_paused(site: Path, now: float) -> bool:
     except (OSError, ValueError):
         return False
     paused = now - (idx.get("prices_ts") or 0) > Q.QUESTION_GATES["paused_sec"]
+    trading = trading_state()
+    if idx.get("trading") != trading:  # the kill switch takes effect at every publish, not only at a record
+        idx["trading"] = trading
+        p.write_text(_dump(idx))
     if bool(idx.get("paused")) == paused:
         return paused
     idx["paused"] = paused

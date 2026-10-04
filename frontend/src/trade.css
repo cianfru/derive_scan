@@ -38,3 +38,15 @@
   .q-sheet .tr { border: 0; padding: 0; background: none; }
   .q-sheet .tr-head { padding-right: 56px; } /* room for the sheet's Close */
 }
+/* P6, testnet fills: the badge, the Positions check against Derive, and what Derive holds besides. */
+.tr-tag.tr-testnet { color: var(--accent-text); border-bottom-color: var(--accent); display: inline-flex; align-items: center; gap: 4px; }
+.tr-done p { margin: 0; }
+.tr-done { display: grid; gap: 6px; }
+.tr-msg.warn { border-left-color: var(--down); }
+.tr-sync { display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); }
+.tr-sync .tr-actions { font-size: 12px; }
+.tr-sync .tr-wait { min-height: 0; }
+.tr-also { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 12px; color: var(--text-2); }
+.q-sync { font-size: 12px; }
+.q-trade-ids { display: grid; gap: 2px; font-size: 11px; overflow-wrap: anywhere; text-align: right; }
+@media (pointer: coarse) { .tr-sync .text-control { min-height: 44px; } }

@@ -3,7 +3,7 @@ import { NavLink, Link, Outlet, useLocation } from "react-router-dom";
 import { Loading } from "./ui.jsx";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import { Lockup, HatMark } from "./Brand.jsx";
-import { QUESTIONS_ON } from "../lib/flags.js";
+import { QUESTIONS_ON, TESTNET_FILLS } from "../lib/flags.js";
 import "../marketplace.css";
 
 function useTheme() {
@@ -88,9 +88,20 @@ export default function Shell() {
       </a>
       <header className={`hdr${QUESTIONS_ON ? " hdr-marketplace" : ""}${QUESTIONS_ON && pathname === "/" ? " hdr-landing" : ""}`} ref={header}>
         <div className="wrap">
-          <Link to="/" className="logo" aria-label="Cowboy home">
-            <Lockup />
-          </Link>
+          {TESTNET_FILLS ? (
+            // Testnet builds only: one-tap trades go to Derive's testnet. Styled inline, and written as a
+            // separate branch, so other builds stay byte-identical.
+            <Link to="/" className="logo" aria-label="Cowboy home, testnet build">
+              <Lockup />
+              <span className="hdr-testnet mono" title="One-tap trades in this build go to Derive's testnet with test USDC. Board prices come from Derive's live market."
+                style={{ marginLeft: 10, padding: "1px 6px", fontSize: 11, lineHeight: "16px", letterSpacing: ".04em", textTransform: "uppercase",
+                  color: "var(--accent-text)", border: "1px solid var(--accent)", borderRadius: 4, whiteSpace: "nowrap" }}>Testnet</span>
+            </Link>
+          ) : (
+            <Link to="/" className="logo" aria-label="Cowboy home">
+              <Lockup />
+            </Link>
+          )}
           {QUESTIONS_ON ? (
             // Outcomes first; saved answers and records stay one click away. Research keeps its
             // own destinations inside one menu, on every screen size.

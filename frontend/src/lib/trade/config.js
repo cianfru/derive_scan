@@ -1,13 +1,19 @@
 // Saloon stage 2: where the browser trades and the fixed values it uses. Pure data, no network.
-// Stage 2 runs on Derive's V3 testnet only (owner, 4 October 2026: testnet, dry run first). Mainnet
-// is listed only as disabled: it has no endpoint here and nothing can select it.
+// Stage 2 runs on Derive's V3 testnet only (owner, 4 October 2026: testnet, dry run first; P6 real
+// fills on testnet only). Mainnet is listed only as disabled: it has no endpoint here, nothing can
+// select it, and the execute path refuses anything but the testnet (fillsAllowed, and the client).
+import { tradeMode } from "../flags.js";
+
+/** The one endpoint fills may go to. */
+export const TESTNET_WS = "wss://testnet.api.derive.xyz/v3/ws";
+export const TESTNET_CHAIN = 11155111;
 
 export const NETWORKS = {
   testnet: {
     name: "testnet",
     enabled: true,
-    wsUrl: "wss://testnet.api.derive.xyz/v3/ws",
-    chainId: 11155111, // Ethereum Sepolia: the testnet's settlement chain and signing domain
+    wsUrl: TESTNET_WS,
+    chainId: TESTNET_CHAIN, // Ethereum Sepolia: the testnet's settlement chain and signing domain
     chainName: "Sepolia",
     appUrl: "https://testnet.app.derive.xyz/",
     usdc: "0x73Efab09362052D26FB93A730Be4F8a5EdC833af", // testnet USDC (mintable in Derive's testnet app)
@@ -18,6 +24,19 @@ export const NETWORKS = {
 };
 
 export const NETWORK = NETWORKS.testnet;
+
+/** This build's mode: "testnet" (real fills on the testnet), "dryrun" (nothing fills) or "off". */
+export const MODE = tradeMode(import.meta.env?.VITE_SALOON_TRADE, true);
+
+/**
+ * The mainnet guard: fills (private/execute_quote) are allowed only in a "testnet" build, on the
+ * testnet network, its Sepolia signing domain and its testnet endpoint. Anything else, including any
+ * mainnet configuration, is refused.
+ */
+export function fillsAllowed(network, mode) {
+  return mode === "testnet" && !!network && network.name === "testnet" && network.enabled === true
+    && network.chainId === TESTNET_CHAIN && network.wsUrl === TESTNET_WS;
+}
 
 /** Fixed protocol values from Derive's docs (Action signing, Contracts), the same on every network. */
 export const PROTOCOL = {
@@ -47,8 +66,13 @@ export const SWITCH_OFF_SEC = 330;
 export const QUOTE_WAIT_MS = 10_000;
 export const FIRM_MS = 12_000;
 export const POLL_MS = 1_500;
+/** After a tap with no clear answer (timeout, dropped socket): re-read the RFQ this many times, this
+ * far apart, before saying "Checking your fill". Never re-send the execution. */
+export const CHECK_TRIES = 6;
+export const CHECK_MS = 1_500;
 
-/** RFQ fields Cowboy always sends: no builder fee, fills all or nothing (see the open questions). */
+/** RFQ fields Cowboy always sends: no builder fee, fills all or nothing (see the open questions).
+ * A fill that still comes back below 100% is recorded as filled, and the rest is cancelled. */
 export const EXTRA_FEE = "0";
 export const PARTIAL_FILL_STEP = "1";
 
