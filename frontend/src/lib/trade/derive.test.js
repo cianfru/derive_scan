@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import frames from "../../fixtures/trade/public_frames.json";
 import debugFixture from "../../fixtures/trade/execute_quote_debug.json";
-import { CANCEL_PLAIN, DeriveError, checkIncidents, createClient, incidentState, instrumentCache, plainError } from "./derive.js";
+import { CANCEL_PLAIN, DeriveError, asWalletError, checkIncidents, createClient, errorDetail, incidentState, instrumentCache, plainError } from "./derive.js";
 import { fakeDerive, deriveError } from "./fakeSocket.js";
 import { BANNED } from "../questions.js";
 import { buildExecute, debugMatches, domainSeparator, keyFromSecret } from "./sign.js";
@@ -51,8 +51,31 @@ describe("the Derive connection", () => {
       expect(plainError(new DeriveError(code))).toMatch(re);
     }
     expect(plainError("compliance")).toBe("Derive did not accept this trade.");
+    for (const [code, re] of [[14014, /sign-in signature didn't check out.*another wallet/], [14013, /address/], [14020, /different wallet/], [14021, /network/],
+      [14035, /Approve again/], [10006, /too many approvals/], [11032, /minimum/], [-32602, /^Derive couldn't read Cowboy's request\.$/], [-32600, /Cowboy's request/]]) {
+      expect(plainError(new DeriveError(code, "x"))).toMatch(re);
+    }
     expect(plainError({ code: 99999 })).toMatch(/didn't accept/);
     for (const m of [...Object.values(CANCEL_PLAIN), plainError({ code: 11104 }), plainError({ code: 11110 })]) expect(m).not.toMatch(BANNED);
+  });
+
+  it("keeps wallet errors apart from Derive's", () => {
+    const w = (code, data) => asWalletError(Object.assign(new Error("w"), { code, data }), "switch network");
+    expect(plainError(w(4001))).toBe("You declined in your wallet.");
+    expect(plainError(w(4100))).toBe("Your wallet hasn't given this site access yet. Unlock it and try again.");
+    expect(plainError(w(4200))).toBe("Your wallet can't do this step.");
+    expect(plainError(w(4900))).toBe("Your wallet is disconnected from the network.");
+    expect(plainError(w(4901))).toBe("Your wallet is disconnected from the network.");
+    expect(plainError(w(-32002))).toBe("Your wallet already has a request waiting. Open your wallet to finish or close it.");
+    expect(plainError(w(-32603))).toBe("Your wallet stopped the request. Try again.");
+    expect(plainError(w(12345))).toBe("Your wallet stopped the request. Try again.");
+    expect(w(-32603, { originalError: { code: 4902 } })).toMatchObject({ code: 4902, source: "wallet" });
+    expect(plainError(w(-32603, { originalError: { code: 4902 } }))).toMatch(/Sepolia test network/);
+    // the same code from Derive is Derive's
+    expect(plainError(new DeriveError(-32603, "Internal error"))).toBe("Derive didn't accept that. Try again.");
+    const d = errorDetail(new DeriveError(14000, "Account not found", "Requested account does not exist."), "sign in");
+    expect(d).toEqual({ step: "sign in", source: "Derive", code: 14000, message: "Account not found", data: "Requested account does not exist." });
+    expect(errorDetail(w(4100))).toMatchObject({ step: "switch network", source: "wallet", code: 4100 });
   });
 
   it("reads incidents: none is ok, medium or high is down", async () => {

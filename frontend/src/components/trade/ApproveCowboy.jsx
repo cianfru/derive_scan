@@ -2,6 +2,7 @@ import { Info } from "../ui.jsx";
 import { money } from "../../lib/questions.js";
 import { KEY_DAYS } from "../../lib/trade/config.js";
 import { approve, switchOff, useSeat } from "../../lib/trade/seat.js";
+import ErrorDetail from "./ErrorDetail.jsx";
 
 /** The approval's end, in UTC: "Sat 10 Oct, 14:00 UTC". */
 export const until = (sec) => {
@@ -28,7 +29,7 @@ export default function ApproveCowboy() {
         <div><dt>Saloon account</dt><dd className="mono">{money(seat.saloon?.usdc, { cents: true })}</dd></div>
       </dl>
       <button className="btn primary lg" onClick={approve} disabled={seat.busy || !seat.saloon}>{seat.busy ? "Waiting for your wallet…" : "Approve in wallet"}</button>
-      {seat.message && <p className="tr-msg">{seat.message}</p>}
+      {seat.message && <p className="tr-msg">{seat.message}<ErrorDetail detail={seat.detail} /></p>}
     </div>
   );
 }

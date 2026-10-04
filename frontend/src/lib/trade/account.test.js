@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import shapes from "../../fixtures/trade/private_shapes.json";
 import { createClient } from "./derive.js";
 import { fakeDerive } from "./fakeSocket.js";
 import { fakeWallet } from "./fakeWallet.js";
 import { arriving, depositAddress, depositCheck, depositParams, findNew, findSaloon, pickSaloon, rememberKnown, summarise } from "./account.js";
 import { connectWallet, usdcTransfer, usdcUnits } from "./wallet.js";
+import { plainError } from "./derive.js";
 
 const client = (handlers) => {
   const fake = fakeDerive({ handlers });
@@ -67,6 +68,41 @@ describe("the wallet", () => {
     expect(await connectWallet(w)).toBe(w.address);
     expect(w.calls.find((x) => x.method === "wallet_switchEthereumChain").params[0].chainId).toBe("0xaa36a7");
     await expect(connectWallet(fakeWallet({ code: "0x6080" }))).rejects.toMatchObject({ code: "contract_wallet" });
+  });
+  /** A wallet without Sepolia: switching answers `noChain` until wallet_addEthereumChain succeeds. */
+  const noSepolia = (noChain, { addFails = null } = {}) => {
+    const w = fakeWallet({ chainId: 1 });
+    let added = false;
+    return { ...w, async request(a) {
+      if (a.method === "wallet_addEthereumChain") { w.calls.push(a); if (addFails) throw addFails; added = true; return null; }
+      if (a.method === "wallet_switchEthereumChain" && !added) { w.calls.push(a); throw noChain; }
+      return w.request(a);
+    } };
+  };
+  it("adds Sepolia once when the wallet lacks it, then switches again", async () => {
+    for (const err of [Object.assign(new Error("Unrecognized chain ID"), { code: 4902 }),
+      Object.assign(new Error("Internal"), { code: -32603, data: { originalError: { code: 4902 } } })]) {
+      const w = noSepolia(err);
+      expect(await connectWallet(w)).toBe(w.address);
+      const add = w.calls.filter((c) => c.method === "wallet_addEthereumChain");
+      expect(add).toHaveLength(1);
+      expect(add[0].params[0]).toMatchObject({ chainId: "0xaa36a7", chainName: "Sepolia", nativeCurrency: { decimals: 18 }, blockExplorerUrls: ["https://sepolia.etherscan.io"] });
+      expect(add[0].params[0].rpcUrls[0]).toMatch(/^https:\/\/.*sepolia/);
+      expect(w.calls.filter((c) => c.method === "wallet_switchEthereumChain")).toHaveLength(2);
+    }
+  });
+  it("says what to do when the wallet still lacks Sepolia, as the wallet's error", async () => {
+    const e = await connectWallet(noSepolia(Object.assign(new Error("x"), { code: 4902 }), { addFails: Object.assign(new Error("y"), { code: 4902 }) })).catch((x) => x);
+    expect(e).toMatchObject({ source: "wallet", code: 4902, step: "add network" });
+    expect(plainError(e)).toMatch(/doesn't have the Sepolia test network yet\. Turn on test networks in your wallet \(MetaMask: Settings, then Advanced, then Show test networks\)/);
+  });
+  it("takes a wallet whose code cannot be read as an ordinary wallet", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const w = fakeWallet();
+    const p = { ...w, request: (a) => (a.method === "eth_getCode" ? Promise.reject(Object.assign(new Error("nope"), { code: -32603 })) : w.request(a)) };
+    expect(await connectWallet(p)).toBe(w.address);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
   it("builds a USDC transfer to the deposit address in 6 decimals", () => {
     expect(usdcUnits(100.5)).toBe(100500000n);

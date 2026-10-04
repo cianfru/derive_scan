@@ -13,6 +13,7 @@ import { MODE } from "../../lib/trade/config.js";
 import { capGate, capMessage, tradingAllows, TRADING_NOTICE } from "../../lib/trade/limits.js";
 import { buyLabel, closeLabel } from "../../lib/trade/record.js";
 import { remainingQty } from "../../lib/realized.js";
+import ErrorDetail from "./ErrorDetail.jsx";
 
 const perDollar = (x) => cents(Math.round(x * 100));
 const qty = (v) => String(Number((v ?? 0).toFixed(8)));
@@ -178,7 +179,7 @@ export default function TradeTicket({ plan, onByHand, onFill, trading = "on", mo
       )}
       {st.phase === "no_quote" && (
         <>
-          <p className="tr-msg">No price from Derive right now.</p>
+          <p className="tr-msg">No price from Derive right now.<ErrorDetail detail={st.detail} /></p>
           <div className="tr-actions">{allowed && <button className="btn lg" onClick={ask}>Try again</button>}{onByHand && <button className="text-control" onClick={onByHand}>Place by hand</button>}</div>
         </>
       )}
@@ -193,14 +194,14 @@ export default function TradeTicket({ plan, onByHand, onFill, trading = "on", mo
         </>
       )}
       {st.phase === "filled" && <Filled fill={st.fill} buy={buy} />}
-      {["expired", "busy", "rejected", "not_filled"].includes(st.phase) && <><p className="tr-msg" role="alert">{st.message}</p>{again(st.phase === "busy" ? "Try again" : "Get a new price")}</>}
+      {["expired", "busy", "rejected", "not_filled"].includes(st.phase) && <><p className="tr-msg" role="alert">{st.message}<ErrorDetail detail={st.detail} /></p>{again(st.phase === "busy" ? "Try again" : "Get a new price")}</>}
       {st.phase === "unknown" && (
         <>
           <p className="tr-msg warn" role="alert">{st.message}</p>
           <button className="btn lg tr-go" onClick={() => run.current?.recheck()}>Check again</button>
         </>
       )}
-      {st.phase === "error" && <><p className="tr-msg">{st.message}</p>{again("Try again")}</>}
+      {st.phase === "error" && <><p className="tr-msg">{st.message}<ErrorDetail detail={st.detail} /></p>{again("Try again")}</>}
     </div>
   );
 }

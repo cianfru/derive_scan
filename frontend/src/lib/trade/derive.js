@@ -38,6 +38,15 @@ const PLAIN = {
   "-32100": "Too many Derive tabs are open. Close one and try again.",
   14000: "Derive has no account for this wallet yet.",
   14001: "Derive has no Saloon account for this wallet yet.",
+  14013: "Derive couldn't read the wallet address Cowboy sent. Disconnect and connect again.",
+  14014: "The sign-in signature didn't check out. Try again; if it repeats, use another wallet.",
+  14020: "Derive saw a different wallet on this connection. Disconnect and connect again.",
+  14021: "Derive doesn't take this approval from your current network. Switch Cowboy off and approve again.",
+  14035: "That approval key is already taken on Derive. Approve again.",
+  10006: "This wallet has too many approvals on Derive. Remove an old one on Derive, then approve again.",
+  11032: "That deposit is below Derive's minimum for a new account.",
+  "-32602": "Derive couldn't read Cowboy's request.",
+  "-32600": "Derive couldn't read Cowboy's request.",
   16001: "Derive did not accept this trade.",
   16002: "Derive did not accept this trade.",
   401: "Connect again to continue.",
@@ -66,11 +75,84 @@ export const CANCEL_PLAIN = {
 };
 export const FALLBACK_PLAIN = "Derive didn't accept that. Try again.";
 
+/** Derive's code when the wallet has no Derive account yet (created by the first deposit). */
+export const NO_ACCOUNT = 14000;
+
+/** What the user's own wallet answered (EIP-1193 and MetaMask's codes), never blamed on Derive. */
+export const WALLET_PLAIN = {
+  4001: "You declined in your wallet.",
+  4100: "Your wallet hasn't given this site access yet. Unlock it and try again.",
+  4200: "Your wallet can't do this step.",
+  4900: "Your wallet is disconnected from the network.",
+  4901: "Your wallet is disconnected from the network.",
+  4902: "Your wallet doesn't have the Sepolia test network yet. Turn on test networks in your wallet (MetaMask: Settings, then Advanced, then Show test networks), then try again.",
+  "-32002": "Your wallet already has a request waiting. Open your wallet to finish or close it.",
+  contract_wallet: "Use an ordinary wallet for the Saloon for now.",
+  wrong_signer: "Your wallet signed with another account. Switch to the connected account and try again.",
+};
+export const WALLET_FALLBACK = "Your wallet stopped the request. Try again.";
+
+/** An error from the user's wallet (provider.request), tagged so it is never read as Derive's. */
+export class WalletError extends Error {
+  constructor(code, message, data, step) {
+    super(message || `Wallet error ${code}`);
+    this.name = "WalletError";
+    this.source = "wallet";
+    this.code = code;
+    this.data = data;
+    if (step) this.step = step;
+  }
+}
+
+/** A wallet's code: MetaMask wraps some answers (4902 on a chain switch) in -32603 with the real code inside. */
+export function walletCode(e) {
+  const inner = e?.data?.originalError?.code ?? e?.error?.code;
+  return e?.code === -32603 && inner != null ? inner : e?.code;
+}
+export function asWalletError(e, step) {
+  if (e?.source === "wallet") { if (step && !e.step) e.step = step; return e; }
+  return new WalletError(walletCode(e), e?.message, e?.data ?? null, step);
+}
+
 export function plainError(err) {
   if (!err) return FALLBACK_PLAIN;
   if (typeof err === "string") return CANCEL_PLAIN[err] || PLAIN[err] || FALLBACK_PLAIN;
   const code = err.code ?? err?.error?.code;
+  if (err.source === "wallet") return WALLET_PLAIN[String(code)] || WALLET_FALLBACK;
   return PLAIN[String(code)] || PLAIN[code] || FALLBACK_PLAIN;
+}
+
+/** Marks the step an error happened at, unless an inner step already did. */
+export function tagStep(e, step) {
+  if (e && typeof e === "object" && !e.step) { try { e.step = step; } catch { /* frozen */ } }
+  return e;
+}
+/** Runs `p`, tagging a failure with `step`. */
+export const at = (step, p) => Promise.resolve(p).catch((e) => { throw tagStep(e, step); });
+
+/** Who answered: the wallet, Derive, or Cowboy's own checks. */
+function sourceOf(err) {
+  if (typeof err === "string") return "Derive";
+  if (err?.source) return err.source;
+  return err?.name === "DeriveError" ? "Derive" : "Cowboy";
+}
+
+/** The raw facts behind a plain message, for the testnet build's "Details for testing". */
+export function errorDetail(err, step) {
+  const s = err?.step || step || "unknown";
+  if (typeof err === "string") return { step: s, source: "Derive", code: err, message: "", data: "" };
+  const data = err?.data;
+  return {
+    step: s, source: sourceOf(err), code: err?.code ?? err?.error?.code ?? "", message: err?.message || "",
+    data: data == null ? "" : typeof data === "string" ? data : (() => { try { return JSON.stringify(data); } catch { return String(data); } })(),
+  };
+}
+
+/** A failure as the screens keep it: the plain `message` and its `detail`; the raw error goes to the console. */
+export function failure(err, step) {
+  const detail = errorDetail(err, step);
+  try { console.warn(`[Cowboy] ${detail.step} failed`, err); } catch { /* no console */ }
+  return { message: plainError(err), detail };
 }
 
 /** Derive is "down" for the Saloon when any live incident is medium or high. */

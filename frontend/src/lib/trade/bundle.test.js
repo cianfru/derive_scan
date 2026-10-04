@@ -35,6 +35,7 @@ it("leaves trading code out of a build with the flag off, even with the Saloon o
     for (const m of MARKERS) expect(m.test(src), `${f} ${m}`).toBe(false);
     expect(src, f).not.toMatch(/testnet build|One tap works|Bought in one tap|Testnet</);
     expect(src, f).not.toMatch(WALLET);
+    expect(src, f).not.toMatch(/Details for testing/);
   }
 }, 120_000);
 
@@ -61,6 +62,8 @@ it("builds a testnet app: fills on the testnet only, in the trade chunk, with th
   expect(entry.src).toMatch(/\.hw-btn/);
   for (const m of MARKERS) expect(m.test(entry.src), `entry ${m}`).toBe(false);
   expect(entry.src).not.toMatch(/Switch off Cowboy/);
+  // Error details for testing: in the trade chunk of this build only.
+  expect(files.filter(({ src }) => /Details for testing/.test(src)).map(({ f }) => f)).toEqual(withTrade);
   const menu = files.filter(({ src }) => /Switch off Cowboy/.test(src)).map(({ f }) => f);
   expect(menu).toEqual(withTrade);
   for (const { src } of files) {
@@ -76,6 +79,8 @@ it("keeps trading code in its own chunk, on testnet only, with the flag on", asy
   expect(withTrade[0]).toMatch(/^TradePanel-/);
   // The dry run has no wallet in the header: the entry carries none of it.
   expect(files.find(({ f }) => f.startsWith("index-")).src).not.toMatch(WALLET);
+  // Nor the testnet build's error details.
+  for (const { f, src } of files) expect(src, f).not.toMatch(/Details for testing/);
   for (const { src } of files) {
     expect(src).not.toMatch(/wss:\/\/api\.derive\.xyz/);
     expect(src).not.toMatch(/https:\/\/api\.derive\.xyz/);

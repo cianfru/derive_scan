@@ -50,3 +50,7 @@
 .q-sync { font-size: 12px; }
 .q-trade-ids { display: grid; gap: 2px; font-size: 11px; overflow-wrap: anywhere; text-align: right; }
 @media (pointer: coarse) { .tr-sync .text-control { min-height: 44px; } }
+/* Testnet builds: "Details for testing" inside an error's (i). */
+.tr-detail { display: grid; gap: 4px; font-size: 12px; line-height: 1.4; }
+.tr-detail-row { display: grid; grid-template-columns: 64px 1fr; gap: 8px; overflow-wrap: anywhere; }
+.tr-detail-row > span:first-child { color: var(--text-2); }
