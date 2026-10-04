@@ -10,13 +10,13 @@ const tone = (v) => (v > 0.004 ? "up" : v < -0.004 ? "down" : "");
 
 /** The figures every preview and ticket shares: what you pay, what it pays, what you can make,
  * breakeven and settlement. Total payout and profit are always two separate lines. */
-function Figures({ und, level, side, t, expiry, settleTs, summary }) {
+export function OutcomeFigures({ und, level, side, t, expiry, settleTs, summary, compact = false }) {
   const be = breakeven(t, level, side);
   const most = t.payout - t.mostLose;
   return (
     <dl className={`op-figs${summary ? " summary" : ""}`}>
       {summary ? (
-        <div className="op-total"><dt>You pay<Info label="What you pay">{usd(t.premium)} for the two options plus Derive's fees, about {usd(t.fees)}. It is the most you can lose.</Info></dt>
+        <div className="op-total"><dt>You pay<Info label="What you pay">{usd(t.premium)} for the two options plus Derive's fees, about {usd(t.fees)}. It is the most you can lose once both orders fill.</Info></dt>
           <dd className="mono">{usd(t.mostLose)} <small>incl. fees</small></dd></div>
       ) : (
         <>
@@ -31,7 +31,7 @@ function Figures({ und, level, side, t, expiry, settleTs, summary }) {
         <dd className={`mono ${tone(most)}`}>{most > 0 ? signed(most) : "None at this price"}</dd></div>
       <div><dt>Breakeven<Info label="About breakeven">The settlement price where what it pays equals what you pay. {side === "yes" ? "Above it" : "Below it"} you end with more than you paid; {side === "yes" ? "below it" : "above it"}, less. It counts Derive's fees.</Info></dt>
         <dd className="mono">{be == null ? "None at this price" : <>{und} at {money(be)}</>}</dd></div>
-      <div><dt>Settles</dt><dd className="mono">{dayLabel(expiry)}, 08:00 UTC{countdown(settleTs) && <small> · {countdown(settleTs)}</small>}</dd></div>
+      {!compact && <div><dt>Settles</dt><dd className="mono">{dayLabel(expiry)}, 08:00 UTC{countdown(settleTs) && <small> · {countdown(settleTs)}</small>}</dd></div>}
     </dl>
   );
 }
@@ -90,20 +90,23 @@ function Examples({ und, level, side, t }) {
  * only (a ticket beside the full preview); the full one adds the slider, the dollar examples and
  * the line on selling back early.
  */
+export function OutcomePayoffStudy({ und, level, side, t, index }) {
+  if (!t) return null;
+  return <>
+    <Slider und={und} level={level} side={side} t={t} index={index} />
+    <Examples und={und} level={level} side={side} t={t} />
+    <p className="op-note">Selling back before 08:00 UTC is valued at Derive's sell-back price then, not by this chart.
+      <Info label="About selling back early">Until a minute before 08:00 UTC you can sell back on Derive. You then get what Derive's screen bids for the two options at that moment, which follows the coin's price and the time left, so it differs from this chart, and fees apply again. Holding to 08:00 UTC pays as this chart shows.</Info>
+    </p>
+  </>;
+}
+
 export default function OutcomePreview({ und, level, side, t, expiry, settleTs, index, summary = false }) {
   if (!t) return null;
   return (
     <section className={`op${summary ? " op-summary" : ""}`} aria-label="What you pay and what it pays">
-      <Figures und={und} level={level} side={side} t={t} expiry={expiry} settleTs={settleTs} summary={summary} />
-      {!summary && (
-        <>
-          <Slider und={und} level={level} side={side} t={t} index={index} />
-          <Examples und={und} level={level} side={side} t={t} />
-          <p className="op-note">Selling back before 08:00 UTC is valued at Derive's sell-back price then, not by this chart.
-            <Info label="About selling back early">Until a minute before 08:00 UTC you can sell back on Derive. You then get what Derive's screen bids for the two options at that moment, which follows the coin's price and the time left, so it differs from this chart, and fees apply again. Holding to 08:00 UTC pays as this chart shows.</Info>
-          </p>
-        </>
-      )}
+      <OutcomeFigures und={und} level={level} side={side} t={t} expiry={expiry} settleTs={settleTs} summary={summary} />
+      {!summary && <OutcomePayoffStudy und={und} level={level} side={side} t={t} index={index} />}
     </section>
   );
 }

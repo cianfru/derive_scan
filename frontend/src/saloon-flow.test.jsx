@@ -23,7 +23,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); });
 const show = (path) => render(
   <MemoryRouter initialEntries={[path]}>
     <Routes>
-      <Route path="/saloon" element={<Questions />} />
+      <Route path="/saloon/guided" element={<Questions />} />
       <Route path="/saloon/:und" element={<Questions />} />
       <Route path="/q/:id" element={<Questions />} />
     </Routes>
@@ -35,7 +35,7 @@ const step = (name) => screen.queryByRole("region", { name });
 
 describe("the guided flow", () => {
   it("opens on coin, date and higher or lower, with no direction picked and nothing to place", () => {
-    const { container } = show("/saloon");
+    const { container } = show("/saloon/guided");
     expect(screen.getAllByRole("radio").map((r) => r.getAttribute("aria-checked"))).toEqual(["false", "false"]);
     expect(step("Amount")).toBeNull();
     expect(step("What it pays")).toBeNull();
@@ -47,9 +47,9 @@ describe("the guided flow", () => {
     for (const n of ["Coin", "Date", "Higher or lower"]) expect(primaries(step(n))).toHaveLength(0);
   });
 
-  it("reaches the outcome preview in two taps from /saloon, one primary action per step", async () => {
+  it("reaches the outcome preview in two taps from /saloon/guided, one primary action per step", async () => {
     const u = user();
-    show("/saloon");
+    show("/saloon/guided");
     await u.click(screen.getAllByRole("radio")[1]); // 1: Lower
     const amount = step("Amount");
     expect(primaries(amount)).toHaveLength(1);
@@ -72,10 +72,10 @@ describe("the guided flow", () => {
   it("lands a deep link with an answer on the preview", () => {
     show("/q/BTC-20261009-A-83000-89000?side=yes");
     expect(step("What it pays")).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Place on Derive" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Review orders" })).toBeTruthy();
   });
 
-  it("puts the full ladder under Other levels; a pick there opens that level at the amount step", async () => {
+  it("puts the full ladder under Other levels; a pick opens that outcome with its amount and payout", async () => {
     const u = user();
     const { container } = show("/saloon/BTC");
     const other = screen.getByRole("button", { name: "Other levels" });
@@ -87,7 +87,7 @@ describe("the guided flow", () => {
     await u.click(row.querySelector("a.q-btn.yes"));
     expect(screen.getByRole("heading", { level: 1, name: new RegExp(`than \\${k.replace(/,/g, ",")} on`) })).toBeTruthy();
     expect(step("Amount")).not.toBeNull();
-    expect(step("What it pays")).toBeNull();
+    expect(step("What it pays")).not.toBeNull();
     expect(container.querySelector(".q-ladder")).toBeNull();
     expect(screen.getAllByRole("radio")[0].getAttribute("aria-checked")).toBe("true");
   });

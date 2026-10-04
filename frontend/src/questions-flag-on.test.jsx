@@ -24,19 +24,19 @@ const shell = (page = <p>home</p>) => render(
 const shellAt = (path) => render(
   <MemoryRouter initialEntries={[path]}><Routes><Route element={<Shell />}><Route path="*" element={<p>page</p>} /></Route></Routes></MemoryRouter>);
 
-it("keeps application navigation as Saloon, Positions, then the inline research group", () => {
+it("puts outcomes, follows and positions before the research menu", () => {
   shellAt("/markets");
   const nav = screen.getByRole("navigation", { name: "Main navigation" });
   const links = [...nav.querySelectorAll("a")];
-  expect(links.map((a) => a.textContent)).toEqual(["SaloonPrice outcomes", "Positions", "Markets", "Radar", "Options", "Traders", "Flow"]);
+  expect(links.map((a) => a.textContent)).toEqual(["SaloonPrice outcomes", "Following", "Positions"]);
   expect(links[0].getAttribute("href")).toBe("/saloon");
   expect(links[0].classList.contains("nav-primary")).toBe(true);
-  expect(links[1].getAttribute("href")).toBe("/saloon/mine");
-  const research = within(nav).getByRole("group", { name: "Research" });
-  expect([...research.querySelectorAll("a")].map((a) => a.textContent)).toEqual(["Markets", "Radar", "Options", "Traders", "Flow"]);
+  expect(links[1].getAttribute("href")).toBe("/saloon/following");
+  expect(links[2].getAttribute("href")).toBe("/saloon/mine");
+  expect(within(nav).getByRole("button", { name: "Research" }).getAttribute("aria-expanded")).toBe("false");
 });
 
-it("opens Research as a menu on phones; Escape closes it and returns focus", async () => {
+it("opens Research as a menu; Escape closes it and returns focus", async () => {
   const user = userEvent.setup();
   shellAt("/markets");
   const btn = screen.getByRole("button", { name: "Research" });
@@ -49,9 +49,13 @@ it("opens Research as a menu on phones; Escape closes it and returns focus", asy
   await user.keyboard("{Escape}");
   expect(screen.queryByRole("group", { name: "Research pages" })).toBeNull();
   expect(document.activeElement).toBe(btn);
+  await user.click(btn);
+  await user.click(screen.getByRole("link", { name: "Markets", exact: true }));
+  expect(screen.queryByRole("group", { name: "Research pages" })).toBeNull();
+  expect(document.activeElement).toBe(btn);
 });
 
-it("marks the active destination: Saloon, Positions, or Research for its pages", () => {
+it("marks the active destination: Saloon, Following, Positions, or Research", () => {
   vi.stubGlobal("scrollTo", () => {});
   const active = () => [...document.querySelectorAll(".hdr .active")].map((a) => a.textContent);
   shellAt("/saloon/BTC");
@@ -63,6 +67,10 @@ it("marks the active destination: Saloon, Positions, or Research for its pages",
   shellAt("/saloon/mine");
   expect(active()).toEqual(["Positions"]);
   expect(screen.getByRole("link", { name: "Positions" }).getAttribute("aria-current")).toBe("page");
+  cleanup();
+  shellAt("/saloon/following");
+  expect(active()).toEqual(["Following"]);
+  expect(screen.getByRole("link", { name: "Following" }).getAttribute("aria-current")).toBe("page");
   for (const path of ["/markets", "/radar", "/options", "/traders", "/flow", "/coin/BTC", "/trader/0xabc"]) {
     cleanup();
     shellAt(path);

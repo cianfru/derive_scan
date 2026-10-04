@@ -101,6 +101,8 @@ describe("one tap through Derive (testnet, dry run)", () => {
     saveBudget(Math.ceil(ticket(level, "yes", 100, btc).mostLose * 100) / 100);
     const user = userEvent.setup();
     show(`/q/${ID}?side=yes`);
+    expect(screen.queryByRole("region", { name: "Higher through Derive" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Review orders" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     expect(within(panel).getByText("Testnet · dry run")).toBeTruthy();
     await wordcheck(user, panel);
@@ -151,6 +153,7 @@ describe("one tap through Derive (testnet, dry run)", () => {
     localStorage.setItem("cowboy-saloon-terms:testnet", JSON.stringify({ at: 1 }));
     const user = userEvent.setup();
     show(`/q/${ID}?side=yes`);
+    await user.click(screen.getByRole("button", { name: "Review orders" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     await user.click(within(panel).getByRole("button", { name: "Connect wallet" }));
     await within(panel).findByText("Add USDC to your Saloon account");
@@ -165,15 +168,24 @@ describe("one tap through Derive (testnet, dry run)", () => {
     await wordcheck(user, panel);
   });
 
-  it("keeps stage 1's ticket one tap away, and alone for coins outside BTC and ETH", async () => {
+  it("keeps stage 1's ticket one tap from order review, and alone for coins outside BTC and ETH", async () => {
     setup();
     const user = userEvent.setup();
     show(`/q/${ID}?side=yes`);
+    await user.click(screen.getByRole("button", { name: "Review orders" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     await user.click(within(panel).getByRole("button", { name: "Place by hand" }));
     expect(within(panel).getByText("Place these two orders on Derive, in this order.")).toBeTruthy();
     cleanup();
+    // The old HYPE credit package stays unavailable; use its live debit neighbour to verify
+    // that an actual order review outside BTC/ETH exposes the manual ticket alone.
     show("/q/HYPE-20261009-A-85-91?side=yes");
+    expect(screen.getByRole("button", { name: "Review orders" }).disabled).toBe(true);
+    expect(screen.queryByRole("region", { name: /through Derive/ })).toBeNull();
+    cleanup();
+    show("/q/HYPE-20261009-A-89-95?side=yes");
+    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    expect(await screen.findByRole("region", { name: "Place on Derive" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: /through Derive/ })).toBeNull();
   });
 });
