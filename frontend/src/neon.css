@@ -228,6 +228,20 @@
   100% { opacity: 1; }
 }
 
+/* Light theme: the owner's on-light artwork (burnt-orange tube #b84300, lighter core #ff8a3d) over pale
+   unlit glass, with a soft burnt-orange glow in place of the halo. The keyframes above are shared, so the
+   switch-on and flicker run unchanged; a dimmed or dark letter shows its pale glass. */
+:root[data-theme="light"] .neon-sign .ng-body { stroke: #ebe2d6; }
+:root[data-theme="light"] .neon-sign .ng-edge { stroke: #dccfbf; }
+:root[data-theme="light"] .neon-sign .nl-halo { stroke: #e8742a; opacity: .2; }
+:root[data-theme="light"] .neon-sign .nl-glow { stroke: #d65a12; opacity: .24; }
+:root[data-theme="light"] .neon-sign .nl-tube { stroke: #b84300; }
+:root[data-theme="light"] .neon-sign .nl-core { stroke: #ff8a3d; stroke-width: 4px; }
+:root[data-theme="light"] .neon-sign .nl-hot { opacity: 0; }
+:root[data-theme="light"] .neon-spill {
+  background: radial-gradient(50% 50% at 50% 52%, rgb(240 120 40 / .11), rgb(240 120 40 / .045) 45%, rgb(240 120 40 / 0) 72%);
+}
+
 /* The small lit lockup (header, footer): two layers, no blur; strokes in screen pixels. */
 .lockup { display: block; height: 28px; width: auto; overflow: visible; }
 .lockup g { fill: none; stroke-linecap: round; stroke-linejoin: round; }

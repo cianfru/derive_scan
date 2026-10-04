@@ -65,6 +65,10 @@ describe("landing with the Saloon disabled", () => {
     expect(sign.classList.contains("neon-sign")).toBe(true);
     expect(sign.querySelector("svg.neon-glass")).not.toBeNull();
     expect(sign.querySelector("svg.neon-lit")).not.toBeNull();
+    // The light theme restyles the sign by these layer classes (neon.css), so the stage follows the theme.
+    for (const layer of ["ng-body", "ng-edge", "nl-halo", "nl-glow", "nl-tube", "nl-core", "nl-hot"]) {
+      expect(sign.querySelector(`g.${layer}`)).not.toBeNull();
+    }
     expect(screen.getAllByRole("link", { name: "Cowboy home" }).every((link) => link.getAttribute("href") === "/")).toBe(true);
   });
 
