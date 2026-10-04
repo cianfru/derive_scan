@@ -35,23 +35,23 @@ it("counts the band's signals in the board's view, so a filter shows as many row
   fixture.current = markets([coin("AAA", true), coin("BBB", true), coin("CCC", false)]);
   show();
   const user = userEvent.setup();
-  const wait = band().getByRole("button", { name: "Wait: 2 markets" });
-  expect(wait.textContent).toBe("Wait2");
+  const wait = band().getByRole("button", { name: "No clear setup: 2 markets" });
+  expect(wait.textContent).toBe("No clear setup2");
   await user.click(wait);
   expect(wait.getAttribute("aria-pressed")).toBe("true");
   expect(boardRows()).toHaveLength(2);
   // The consensus headline still counts every perp, whatever the view.
-  expect(band().getByText("Risk-on")).toBeTruthy();
+  expect(band().getByText("Most coins trending up")).toBeTruthy();
   expect(band().getByText("3/3")).toBeTruthy();
 
   await user.click(screen.getByRole("tab", { name: "Perps only" }));
-  const perps = band().getByRole("button", { name: "Wait: 1 market" });
+  const perps = band().getByRole("button", { name: "No clear setup: 1 market" });
   expect(perps.getAttribute("aria-pressed")).toBe("true");
   expect(boardRows()).toHaveLength(1);
   await user.click(perps);
   expect(perps.getAttribute("aria-pressed")).toBe("false");
   expect(boardRows()).toHaveLength(1);
-  expect(band().getByText("Risk-on")).toBeTruthy();
+  expect(band().getByText("Most coins trending up")).toBeTruthy();
   expect(band().getByText("3/3")).toBeTruthy();
 });
 
@@ -59,11 +59,11 @@ it("drops the signal filter when the new view holds none of that signal", async 
   fixture.current = markets([coin("AAA", true), coin("BBB", true, "LIGHT_LONG"), coin("CCC", false)]);
   show();
   const user = userEvent.setup();
-  await user.click(band().getByRole("button", { name: "Wait: 1 market" }));
+  await user.click(band().getByRole("button", { name: "No clear setup: 1 market" }));
   expect(boardRows()).toHaveLength(1);
   await user.click(screen.getByRole("tab", { name: "Daily entries" }));
-  expect(band().queryByRole("button", { name: /^Wait/ })).toBeNull();
-  expect(band().getByRole("button", { name: "Light long: 1 market" }).getAttribute("aria-pressed")).toBe("false");
+  expect(band().queryByRole("button", { name: /^No clear setup/ })).toBeNull();
+  expect(band().getByRole("button", { name: "Leaning up: 1 market" }).getAttribute("aria-pressed")).toBe("false");
   expect(boardRows()).toHaveLength(1);
   await user.click(screen.getByRole("tab", { name: "Options markets" }));
   expect(boardRows()).toHaveLength(2);
@@ -74,11 +74,16 @@ it("leaves markets without a current daily engine out of the counts and keeps ev
   const coins = [coin("A", true, "TRIM_HARD"), coin("B", true, "NO_LONG"), coin("C", true, "REVIVAL_SEED"), stale];
   fixture.current = markets(coins);
   show();
-  expect(band().getByRole("button", { name: "Trim: 1 market" })).toBeTruthy();
-  expect(band().getByRole("button", { name: "No long: 1 market" })).toBeTruthy();
-  expect(band().getByRole("button", { name: "Revival seed: 1 market" })).toBeTruthy();
-  expect(band().queryByRole("button", { name: /^Wait/ })).toBeNull();
+  expect(band().getByRole("button", { name: "Stretched: 1 market" })).toBeTruthy();
+  expect(band().getByRole("button", { name: "Up-setups blocked: 1 market" })).toBeTruthy();
+  expect(band().getByRole("button", { name: "Turning: 1 market" })).toBeTruthy();
+  expect(band().queryByRole("button", { name: /^No clear setup/ })).toBeNull();
   expect(signalCounts(coins.slice(0, 3)).reduce((a, x) => a + x.n, 0)).toBe(3);
+});
+
+it("counts both engine signals that read Leaning down under one filter", () => {
+  const coins = [coin("A", true, "RISK_OFF"), coin("B", true, "LIGHT_SHORT")];
+  expect(signalCounts(coins)).toEqual([{ s: "RISK_OFF", n: 2 }]);
 });
 
 it("takes the strip's last column from the board's own readings", () => {

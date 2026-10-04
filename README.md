@@ -63,7 +63,7 @@ The `data` branch always keeps (a few KB, plus about 300 KB a day of hourly CSV 
 | `questions/state.json` | schema 1: per coin, each date's frozen `zone` (set once, at most one change toward the minimum while over 7 days out), `headline` with its two-slot hold, the last hourly gate checks, `shown`, the published ids `{id: [lo, hi]}` and `retired` ids; each coin's instrument `spec` (tick, minimum, amount step, taker rate, base fee, cap); `settle_try` per coin |
 | `questions/history/{UND}/{YYYYMMDD}.csv` | hourly, one row per published question of that date: `ts,id,fair,yes_buy,yes_sell,no_buy,no_sell,index` (per $1) |
 
-The app files exist only when the Action runs with `QUESTIONS_PUBLISH=on` (`record.yml`, `"off"` today); while it is off `publish_site.py` removes any `questions/` folder, and the app shows Questions only in a build with `VITE_QUESTIONS=1` (route, nav entry and the coin page's link). `VITE_DERIVE_REFERRAL` adds a referral code from Derive's API Broker programme to the ticket's "Open Derive" link (`VITE_DERIVE_REFERRAL_PARAM`, default `ref`; `VITE_DERIVE_OPTIONS_URL` for the page).
+The app files exist only when the Action runs with `QUESTIONS_PUBLISH=on` (`record.yml`, `"off"` today); while it is off `publish_site.py` removes any `questions/` folder, and the app shows Questions only in a build with `VITE_QUESTIONS=1` (routes, the Saloon leading the nav with the research pages after it, the landing's "Enter the Saloon" button and the coin page's Saloon card). `VITE_DERIVE_REFERRAL` adds a referral code from Derive's API Broker programme to the ticket's "Open Derive" link (`VITE_DERIVE_REFERRAL_PARAM`, default `ref`; `VITE_DERIVE_OPTIONS_URL` for the page).
 
 | Path (`site-data`) | Content |
 |---|---|

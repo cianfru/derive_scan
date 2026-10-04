@@ -4,6 +4,8 @@ import { LayerIcon } from "../components/Chain.jsx";
 import WalletTag from "../components/WalletTag.jsx";
 import { Info } from "../components/ui.jsx";
 import { HatMark, NeonSign } from "../components/Brand.jsx";
+import { REGIME } from "../lib/format.js";
+import { QUESTIONS_ON } from "../lib/flags.js";
 
 // The landing page shows what Cowboy does and never what it currently reads: no prices, no coins,
 // no counts, no results. Every figure is an illustration, labelled as one. The sign carries the
@@ -14,13 +16,13 @@ const Tag = () => <span className="lp-illus" aria-hidden="true">Illustration</sp
 /* ---------- 01 Regime: regimes along a price path, and the nine checks ---------- */
 const PHASES = [
   // [key, label, x0, x1]
-  ["ACCUM", "Accumulation", 16, 104],
-  ["MARKUP", "Markup", 104, 214],
-  ["REACC", "Re-accumulation", 214, 300],
-  ["MARKUP", "Markup", 300, 360],
-  ["BLOWOFF", "Blow-off", 360, 414],
-  ["MARKDOWN", "Markdown", 414, 486],
-  ["CAP", "Capitulation", 486, 560],
+  ["ACCUM", REGIME.ACCUM, 16, 104],
+  ["MARKUP", REGIME.MARKUP, 104, 214],
+  ["REACC", REGIME.REACC, 214, 300],
+  ["MARKUP", REGIME.MARKUP, 300, 360],
+  ["BLOWOFF", REGIME.BLOWOFF, 360, 414],
+  ["MARKDOWN", REGIME.MARKDOWN, 414, 486],
+  ["CAP", REGIME.CAP, 486, 560],
 ];
 // Illustrative path: price against a rising trend line (y grows downward).
 const TREND = (x) => 176 - x * 0.07;
@@ -38,7 +40,7 @@ function RegimeFigure() {
   return (
     <figure className="lp-figure lp-fig-regime">
       <Tag />
-      <svg viewBox="0 0 576 236" className="lp-phase" role="img" aria-label="Illustration: a price path moving through the six regimes, from Accumulation to Capitulation, around its trend line">
+      <svg viewBox="0 0 576 236" className="lp-phase" role="img" aria-label="Illustration: a price path moving through the six regimes, from building a base to washed out, around its trend line">
         {PHASES.map(([k, label, x0, x1], i) => (
           <g key={i}>
             <rect x={x0} y="22" width={x1 - x0} height="196" className={`ph-band ph-${k}`} />
@@ -50,9 +52,9 @@ function RegimeFigure() {
         <path d={d} className="ph-price" />
       </svg>
       <ul className="lp-phase-key" aria-hidden="true">
-        {[["ACCUM", "Accumulation"], ["MARKUP", "Markup"], ["REACC", "Re-accumulation"], ["BLOWOFF", "Blow-off"], ["MARKDOWN", "Markdown"], ["CAP", "Capitulation"]].map(([k, l]) => <li key={k}><i className={`k-${k}`} />{l}</li>)}
+        {["ACCUM", "MARKUP", "REACC", "BLOWOFF", "MARKDOWN", "CAP"].map((k) => [k, REGIME[k]]).map(([k, l]) => <li key={k}><i className={`k-${k}`} />{l}</li>)}
       </ul>
-      <ul className="lp-checks" aria-label="The nine checks behind a long signal (illustration)">
+      <ul className="lp-checks" aria-label="The nine checks behind an up-setup (illustration)">
         {CHECKS.map(([name, on]) => (
           <li key={name} className={on ? "on" : ""}><i aria-hidden="true">{on ? <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6.5 5 9.2 10 3" fill="none" stroke="currentColor" strokeWidth="2" /></svg> : null}</i>{name}</li>))}
       </ul>
@@ -166,7 +168,7 @@ const LAYERS = [
   {
     kind: "engine", n: "01", name: "Regime", Figure: RegimeFigure,
     head: "Our own engine names the regime.",
-    body: "Every coin is placed in one of six regimes, from Accumulation to Markdown, after each 4-hour and daily close. Nine checks then score the case for a long entry. One candle does not flip the label.",
+    body: "Every coin is placed in one of six regimes, from building a base to trending down, after each 4-hour and daily close. Nine checks then score the case for an up-setup. One candle does not flip the label.",
     proof: [
       ["Every close", "Recomputed minutes after each 4-hour and daily close, on Derive's perps."],
       ["Six regimes", "A new regime has to lead across closes before the label changes. One candle does not flip it."],
@@ -230,6 +232,11 @@ const FAQ = [
   ["Is this advice?", "No. Market data and positioning for research, not investment advice."],
 ];
 
+/** The primary way in: the Saloon when it is switched on, the markets otherwise. */
+const EntryButton = () => (QUESTIONS_ON
+  ? <Link className="btn primary lg" to="/saloon">Enter the Saloon</Link>
+  : <Link className="btn primary lg" to="/markets">Open the markets</Link>);
+
 export default function Landing() {
   return (
     <div className="landing cowboy-landing">
@@ -242,7 +249,7 @@ export default function Landing() {
             <div className="hero-side">
               <p className="hero-description">Cowboy names each coin's regime, follows Derive's best options traders and turns option prices into pictures anyone can read.</p>
               <div className="hero-cta">
-                <Link className="btn primary lg" to="/markets">Open the markets</Link>
+                <EntryButton />
                 <a className="btn lg" href="#how">See how it works</a>
               </div>
             </div>
@@ -287,7 +294,7 @@ export default function Landing() {
         <HatMark size={52} className="close-hat" />
         <h2>The whole range, in three reads.</h2>
         <div className="hero-cta">
-          <Link className="btn primary lg" to="/markets">Open the markets</Link>
+          <EntryButton />
           <Link className="btn lg" to="/traders">Meet the traders</Link>
         </div>
       </section>

@@ -2,7 +2,7 @@
 // (regime, heat and ribbon engines and the signal synthesizer under backend/reflex).
 // Describes what is at the last close, never what comes next. Built only from published
 // fields: the synthesizer's own desc and reason strings are never shown.
-import { DASH, REGIME, SIGNAL_LABEL, title } from "./format.js";
+import { DASH, REGIME, REGIME_TERM, SIGNAL_LABEL, SIGNAL_TERM, CONSENSUS, CONSENSUS_TERM, engineTerm, title } from "./format.js";
 
 export const REGIME_COLORS = { MARKUP: "var(--up)", REACC: "var(--regime-reacc)", ACCUM: "var(--regime-accum)", MARKDOWN: "var(--down)",
   CAP: "var(--regime-cap)", BLOWOFF: "var(--regime-blowoff)", FLAT: "var(--faint)" };
@@ -18,16 +18,23 @@ export const REGIME_SHORT = {
   FLAT: "Not enough history",
 };
 
-/** One line per regime, for the (i). */
+/** One line per regime, for the (i). Plain words first; the numbers stay for those who want them. */
 export const REGIME_LINE = {
-  MARKUP: "Price sits above its usual distance from its long-term trend line.",
-  REACC: "Price sits below its usual distance from its long-term trend line.",
-  ACCUM: "Price sits close to its usual distance from its long-term trend line (z-score about −0.5 to +0.5), usually in quiet trading.",
-  MARKDOWN: "Price sits below its usual distance from its long-term trend line, lower than 30 bars ago, in high volatility.",
-  BLOWOFF: "Price sits far above its usual distance from its long-term trend line; the Blow-off score starts at a z-score of 2.5, scaled for volatility.",
-  CAP: "Price sits far below its usual distance from its long-term trend line; the Capitulation score starts at a z-score of −1, scaled for volatility.",
-  FLAT: "Fewer than 200 bars of price history, so no regime is classified.",
+  MARKUP: "Price is above its long-term trend line by more than usual.",
+  REACC: "Price has pulled back below its usual distance from its long-term trend line.",
+  ACCUM: "Price sits near its usual distance from its long-term trend line (z-score about −0.5 to +0.5), usually in quiet trading.",
+  MARKDOWN: "Price is below its usual distance from its long-term trend line, lower than 30 bars ago, with large swings.",
+  BLOWOFF: "Price is far above its long-term trend line; this reading starts at a z-score of 2.5, scaled for volatility.",
+  CAP: "Price is far below its long-term trend line after heavy selling; this reading starts at a z-score of −1, scaled for volatility.",
+  FLAT: "Fewer than 200 bars of price history, so no regime is named yet.",
 };
+
+/** "… Engine term: Re-accumulation." for a regime's (i). */
+export const regimeTerm = (k) => engineTerm(REGIME_TERM, REGIME, k);
+/** "… Engine term: Strong long." for a signal's (i). */
+export const signalTerm = (k) => engineTerm(SIGNAL_TERM, SIGNAL_LABEL, k);
+/** "… Engine term: Risk-on." for the market consensus (i). */
+export const consensusTerm = (k) => engineTerm(CONSENSUS_TERM, CONSENSUS, k);
 
 export const REGIME_INFO =
   "The regime places price against its own long-term trend line. The engine scores six regimes from the z-score, " +
@@ -35,17 +42,17 @@ export const REGIME_INFO =
 
 /** One line per signal, for the (i). Cowboy's inputs: no taker-flow or wallet inputs enter this engine. */
 export const SIGNAL_LINE = {
-  STRONG_LONG: "The engine's top long setup: at least 8 of 9 checks (weighted), in Accumulation, Capitulation, or Markup with the z-score between 0 and 1, and none of its limits hit (heat, crowded funding, BTC divergence, 3+ regime changes in 7 days, missing data).",
-  LIGHT_LONG: "A long setup with fewer confirmations: Markup with at least 4 of 9 checks and a z-score up to 2 (scaled for volatility), or a Strong long held back by one of its limits.",
-  ACCUMULATE: "A staged-entry setup. Re-accumulation: z-score below 0.5, heat below 80, at least 4 of 9 checks, market Risk-on or Mixed. Accumulation: z-score below 0, low volatility, heat below 70, Fear & Greed 40 or below.",
-  REVIVAL_SEED: "Capitulation with a z-score below −1, high volatility and Fear & Greed at 40 or below, with the market not in Risk-off.",
-  REVIVAL_SEED_CONFIRMED: "Revival seed plus a confirmed floor: three or more absorption bars within 10, the latest on lower volume than the first.",
+  STRONG_LONG: "The engine's strongest up-setup: at least 8 of 9 checks pass (weighted), the coin is Building a base, Washed out, or Trending up with a z-score between 0 and 1, and none of its limits is hit (heat, crowded funding, BTC trending down, 3+ regime changes in 7 days, missing data).",
+  LIGHT_LONG: "An up-setup with fewer checks: Trending up with at least 4 of 9 checks and a z-score up to 2 (scaled for volatility), or a Strong up-setup held back by one of its limits.",
+  ACCUMULATE: "A base is forming. Cooling off: z-score below 0.5, heat below 80, at least 4 of 9 checks, and most coins trending up or a mixed market. Building a base: z-score below 0, low volatility, heat below 70, Fear & Greed 40 or below.",
+  REVIVAL_SEED: "Washed out with a z-score below −1, large swings and Fear & Greed at 40 or below, while most coins are not trending down.",
+  REVIVAL_SEED_CONFIRMED: "Turning, plus a floor that held: three or more bars absorbed selling within 10 bars, the latest on lower volume than the first.",
   WAIT: "No entry or exit rule passed at this close, or an entry was held back (price below its weekly band, a climax bar, missing data).",
-  TRIM: "Exit rule: heat at 95 or more (price very far from its weekly band, either side), or Blow-off with a z-score above 3, scaled for volatility.",
-  TRIM_HARD: "Exit rule: Blow-off with a z-score above 3.5, scaled for volatility.",
-  RISK_OFF: "Exit rule: Markdown while more than 55% of Derive perps are in Markdown, with price above its weekly band.",
-  NO_LONG: "Longs ruled out: Markup or Re-accumulation while BTC is in Markdown and the regime reading is weak, or most perps in Blow-off with a stretched z-score.",
-  LIGHT_SHORT: "Short setup: price below its weekly band, z-score 0.3 to 1.2, heat 20 or more and no higher than the previous close, funding not crowded short.",
+  TRIM: "Price is stretched: heat at 95 or more (very far from its weekly band, either side), or Overheated with a z-score above 3, scaled for volatility.",
+  TRIM_HARD: "Price is very stretched: Overheated with a z-score above 3.5, scaled for volatility.",
+  RISK_OFF: "Trending down while more than 55% of Derive perps are trending down, with price above its weekly band.",
+  NO_LONG: "Up-setups are ruled out: Trending up or Cooling off while BTC is trending down and the regime reading is weak, or most perps overheated with a stretched z-score.",
+  LIGHT_SHORT: "A down-setup: price below its weekly band, z-score 0.3 to 1.2, heat 20 or more and no higher than the previous close, funding not crowded short.",
 };
 
 export const Z_INFO =
@@ -54,11 +61,11 @@ export const Z_INFO =
   "Shaded: the entry check's range, −0.5 to +2.5. Thin line: its range over the last 90 days.";
 export const HEAT_INFO =
   "Distance between the daily close and the weekly band, counted in average weekly ranges: 12.5 points per range, 100 at most. " +
-  "It reads the same above or below the band. Strong long needs heat below 85, Accumulate below 70 (80 in Re-accumulation); at 95 or more the exit rule applies. " +
+  "It reads the same above or below the band. A Strong up-setup needs heat below 85, Base forming below 70 (80 when Cooling off); at 95 or more the exit rule applies. " +
   "Thin line: its range over the last 90 days.";
 export const BAND_INFO =
   "The weekly band is the average of the 21-week exponential and 20-week simple averages of weekly closes. " +
-  "Long entries need the daily close above it; below it the engine checks only short setups.";
+  "Up-setups need the daily close above it; below it the engine checks only down-setups.";
 export const RIBBON_INFO =
   "Four moving averages of the daily close: 32, 35, 50 and 58 days. Gold: stacked upward, shortest on top. Blue: stacked downward. " +
   "Grey: mixed. On the chart, the 32- and 58-day lines take each day's colour. Shown for reference; the signal does not use it.";
@@ -70,9 +77,9 @@ export const CHECKS_INFO =
 export const HEAT_PHASE = {
   Neutral: "Phase: neutral (heat 20 or less).",
   Extension: "Phase: extension (heat above 20).",
-  Fading: "Phase: fading (heat falling from above 40). In Markup this removes one check point.",
+  Fading: "Phase: fading (heat falling from above 40). When Trending up this removes one check point.",
   Entry: "Phase: entry (heat just crossed above 80 above the band).",
-  Exhaustion: "Phase: exhaustion (heat peaked above 80 and turned down). In Markup this removes one check point.",
+  Exhaustion: "Phase: exhaustion (heat peaked above 80 and turned down). When Trending up this removes one check point.",
 };
 
 /** Ribbon trail characters published per daily candle (g gold, b blue, n grey, - warm-up). */
@@ -81,7 +88,6 @@ export const RIBBON_STATE = { g: "gold", b: "blue", n: "grey" };
 const num = (v) => typeof v === "number" && Number.isFinite(v);
 export const fmtZ = (v) => (num(v) ? `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(2)}` : DASH);
 const fmtPct = (v, d = 1) => (num(v) ? `${Math.abs(v).toFixed(d)}%` : DASH);
-const CONSENSUS = { "RISK-ON": "Risk-on", "RISK-OFF": "Risk-off", ACCUMULATION: "Accumulation", EUPHORIA: "Euphoria", MIXED: "Mixed" };
 const warming = (row) => !!row?.data_status && row.data_status !== "ready";
 
 /** The nine checks, in the engine's order, with the app's names, the measured value and the rule. */
@@ -95,12 +101,12 @@ export function checks(row, ctx, tf = "1d") {
   const heatLimit = (detail.heat_ok?.desc || "< 85").replace(/[^0-9]/g, "") || "85";
   const climax = detail.no_climax?.status === "unknown" ? (row?.volume_status === "thin" ? "Thin volume" : DASH) : row?.is_climax ? "Climax bar" : "None";
   const defs = [
-    ["bullish_regime", "Regime", early ? DASH : REGIME[row?.regime] || title(row?.regime), "Passes in Markup or Accumulation."],
+    ["bullish_regime", "Regime", early ? DASH : REGIME[row?.regime] || title(row?.regime), "Passes when Trending up or Building a base."],
     ["consensus", "Market", cons?.status === "ready" || (cons && !cons.status) ? CONSENSUS[cons.consensus] || DASH : DASH,
-      "Passes when more than 55% of Derive perps with a current reading are in Markup (Risk-on), or in Accumulation, Re-accumulation or Capitulation (Accumulation)."],
+      "Passes when more than 55% of Derive perps with a current reading are trending up, or are building a base, cooling off or washed out (most coins basing)."],
     ["z_range", "Z-score", early ? DASH : fmtZ(row?.zscore), "Passes from −0.5 to +2.5."],
-    ["no_bear_div", "BTC", row?.underlying === "BTC" ? DASH : REGIME[btc] || DASH, "Fails when this coin is in Markup or Re-accumulation while BTC is in Markdown."],
-    ["heat_ok", "Heat", num(row?.heat) ? String(row.heat) : DASH, `Passes below ${heatLimit} (85 in most regimes, 75 in Blow-off, 100 in Capitulation and Accumulation).`],
+    ["no_bear_div", "BTC", row?.underlying === "BTC" ? DASH : REGIME[btc] || DASH, "Fails when this coin is Trending up or Cooling off while BTC is Trending down."],
+    ["heat_ok", "Heat", num(row?.heat) ? String(row.heat) : DASH, `Passes below ${heatLimit} (85 in most regimes, 75 when Overheated, 100 when Washed out or Building a base).`],
     ["no_climax", "Climax", climax,
       "Fails on a climax bar: a close below the weekly band on a bar wider than 1.5 average ranges, with a long lower wick, after a burst of selling. Unavailable when fewer than 90 of the last 100 bars traded on the Derive perp."],
     ["funding_ok", "Funding", num(fund) ? `${fund >= 0 ? "+" : "−"}${Math.abs(fund * 24 * 365 * 100).toFixed(1)}%` : DASH,
@@ -116,7 +122,7 @@ export function checks(row, ctx, tf = "1d") {
   });
 }
 
-/** The gate outside the nine checks: long entries need price above the weekly band. */
+/** The gate outside the nine checks: up-setups need price above the weekly band. */
 export function bandGate(row) {
   if (!row) return null;
   if (!row.bmsb_mid) return { status: "unknown", value: "No band yet" };
@@ -134,16 +140,16 @@ export function against(row, list, gate) {
     out.push(`Price history ${row.history_bars ?? DASH} of 499 bars: regime, z-score, BTC, heat and climax checks wait for it`);
     rest = rest.filter((c) => !(HISTORY_CHECKS.includes(c.name) && c.status === "unknown"));
   }
-  if (gate?.status === "fail") out.push(`Price ${gate.value} its weekly band: long entries are off`);
-  if (gate?.status === "unknown") out.push("No weekly band yet: long entries are off");
+  if (gate?.status === "fail") out.push(`Price ${gate.value} its weekly band: up-setups are off`);
+  if (gate?.status === "unknown") out.push("No weekly band yet: up-setups are off");
   for (const c of rest) {
     if (c.status === "pass") continue;
     if (c.status === "unknown") { out.push(c.name === "no_climax" ? "Climax check unavailable: Derive perp volume too thin" : `${c.label}: data unavailable`); continue; }
     out.push({
-      bullish_regime: `Regime is ${c.value}: the check needs Markup or Accumulation`,
-      consensus: `Market is ${c.value}: the check needs Risk-on or Accumulation`,
+      bullish_regime: `Regime is ${c.value}: the check needs Trending up or Building a base`,
+      consensus: `Market: ${c.value}. The check needs most coins trending up or basing`,
       z_range: `Z-score ${c.value}: outside −0.5 to +2.5`,
-      no_bear_div: "BTC in Markdown while this coin is not",
+      no_bear_div: "BTC is trending down while this coin is not",
       heat_ok: `Heat ${c.value}: at or above the limit`,
       no_climax: "Climax bar at this close",
       funding_ok: "Funding crowded long",
@@ -161,18 +167,18 @@ export function whyLine(row, list) {
   if (warming(row)) return `Price history ${row.history_bars ?? DASH} of 499 bars: no signal yet.`;
   if (row.signal_status === "unavailable") return "Engine reading unavailable at this close.";
   if (s === "TRIM" && row.heat >= (row.regime === "BLOWOFF" ? 85 : 95)) return `Heat ${row.heat}: ${dev} ${side} the weekly band, past the exit level.`;
-  if (!row.bmsb_mid && s === "WAIT") return "No weekly band yet: long entries are off.";
-  if (row.heat_direction < 0 && s === "WAIT") return `${dev} below its weekly band: long entries are off.`;
-  if (s === "LIGHT_SHORT") return `${dev} below its weekly band with a stalling rally: short setup.`;
-  if (row.is_climax && s === "WAIT") return "Climax bar below the weekly band: entries wait.";
+  if (!row.bmsb_mid && s === "WAIT") return "No weekly band yet: up-setups are off.";
+  if (row.heat_direction < 0 && s === "WAIT") return `${dev} below its weekly band: up-setups are off.`;
+  if (s === "LIGHT_SHORT") return `${dev} below its weekly band with a stalling rally: a down-setup.`;
+  if (row.is_climax && s === "WAIT") return "Climax bar below the weekly band: entries held.";
   const unknown = (list || []).filter((c) => c.status === "unknown");
   if (unknown.length && row.entry_blocked && s === "WAIT")
     return unknown.length === 1 && unknown[0].name === "no_climax"
       ? "Derive perp volume too thin for the climax check: entries held."
       : `${unknown.map((c) => c.label).join(", ")} unavailable: entries held.`;
-  if (s === "LIGHT_LONG" && row.regime === "MARKUP" && num(z) && !(z > 0 && z < 1)) return `Light, not Strong: z-score ${fmtZ(z)} is outside 0 to 1.`;
-  if (s === "ACCUMULATE" && row.regime === "REACC") return `Staged entry in a pullback: ${row.conditions_met} of 9 checks, heat ${row.heat}.`;
-  if (s === "WAIT" && row.regime === "MARKDOWN") return "Markdown: no long entries.";
+  if (s === "LIGHT_LONG" && row.regime === "MARKUP" && num(z) && !(z > 0 && z < 1)) return `Leaning up, not a Strong up-setup: z-score ${fmtZ(z)} is outside 0 to 1.`;
+  if (s === "ACCUMULATE" && row.regime === "REACC") return `Base forming in a pullback: ${row.conditions_met} of 9 checks, heat ${row.heat}.`;
+  if (s === "WAIT" && row.regime === "MARKDOWN") return "Trending down: no up-setups.";
   if (s === "WAIT" && num(row.conditions_met) && row.conditions_met < 4) return `${row.conditions_met} of 9 checks: too few for an entry.`;
   return SIGNAL_LINE[s] || "";
 }

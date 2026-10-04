@@ -1,13 +1,13 @@
-import { REGIME_LINE, SIGNAL_LINE } from "./regime.js";
+import { REGIME_LINE, SIGNAL_LINE, regimeTerm, signalTerm } from "./regime.js";
 
 // One copy for every screen (coin header, Markets, Radar, engine pair): written in lib/regime.js.
 export const SIGNAL_HELP = Object.fromEntries(
-  Object.entries(SIGNAL_LINE).map(([k, v]) => [k, `${v} Signals describe the engine's rules at this close.`]),
+  Object.entries(SIGNAL_LINE).map(([k, v]) => [k, `${v} Signals describe the engine's rules at this close.${signalTerm(k)}`]),
 );
-export const REGIME_HELP = { ...REGIME_LINE };
+export const REGIME_HELP = Object.fromEntries(Object.entries(REGIME_LINE).map(([k, v]) => [k, `${v}${regimeTerm(k)}`]));
 export const READING_HELP = {
   engine:
-    "The daily engine has two outputs: a signal (such as Long, Wait or Revival) and a regime (such as Markup or Capitulation). Both use the last completed UTC day. Changing the options window never changes this engine.",
+    "The daily engine has two outputs: a signal (such as Leaning up, No clear setup or Turning) and a regime (such as Trending up or Washed out). Both use the last completed UTC day. Changing the options window never changes this engine.",
   options:
     "Options tone averages 25-delta call-minus-put implied volatility and covered taker premium balance. Positive: calls priced richer and/or calls bought plus puts sold. Negative: puts priced richer and/or puts bought plus calls sold. Values at or above +0.25 are Upward tone; at or below −0.25 are Defensive tone. Both components must be available. It describes option prices and taker trades, not our view or a measure of trader intent.",
   wallets:

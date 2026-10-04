@@ -38,12 +38,12 @@ it("shows the exact daily signal even when the short-window legacy engine disagr
     },
   };
   expect(viewReading(alignment, "7d", "engine", now)).toMatchObject({
-    label: "Risk off",
+    label: "Leaning down",
     state: "defensive",
   });
   render(<Reading alignment={alignment} horizon="7d" kind="engine" />);
-  expect(screen.getByText("Risk off")).toBeTruthy();
-  expect(screen.getByText("Markdown")).toBeTruthy();
+  expect(screen.getByText("Leaning down")).toBeTruthy();
+  expect(screen.getByText("Trending down")).toBeTruthy();
 });
 it("keeps the row clickable without swallowing help, links or their keyboard input", () => {
   const navigate = vi.fn();

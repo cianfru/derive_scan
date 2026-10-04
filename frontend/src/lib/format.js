@@ -1,4 +1,11 @@
+// Plain labels for the engine's names (owner, 4 October 2026). The engine's own term is kept for the (i):
+// "Engine term: Re-accumulation". Data files keep the engine's codes.
 export const SIGNAL_LABEL = {
+  STRONG_LONG: "Strong up-setup", LIGHT_LONG: "Leaning up", ACCUMULATE: "Base forming", REVIVAL_SEED: "Turning",
+  REVIVAL_SEED_CONFIRMED: "Turn confirmed", WAIT: "No clear setup", TRIM: "Stretched", TRIM_HARD: "Very stretched",
+  RISK_OFF: "Leaning down", NO_LONG: "Up-setups blocked", LIGHT_SHORT: "Leaning down",
+};
+export const SIGNAL_TERM = {
   STRONG_LONG: "Strong long", LIGHT_LONG: "Light long", ACCUMULATE: "Accumulate", REVIVAL_SEED: "Revival seed",
   REVIVAL_SEED_CONFIRMED: "Revival confirmed", WAIT: "Wait", TRIM: "Trim", TRIM_HARD: "Trim hard", RISK_OFF: "Risk off",
   NO_LONG: "No long", LIGHT_SHORT: "Light short",
@@ -17,8 +24,16 @@ export const DASH = "—";
 const ok = (v) => v != null && Number.isFinite(v);
 const fmt = (v, min, max) => v.toLocaleString("en-US", { minimumFractionDigits: min, maximumFractionDigits: max });
 export const title = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : DASH);
-export const REGIME = { MARKUP: "Markup", BLOWOFF: "Blow-off", REACC: "Re-accumulation", MARKDOWN: "Markdown",
+export const REGIME = { MARKUP: "Trending up", BLOWOFF: "Overheated", REACC: "Cooling off", MARKDOWN: "Trending down",
+  CAP: "Washed out", ACCUM: "Building a base", FLAT: "No regime yet" };
+export const REGIME_TERM = { MARKUP: "Markup", BLOWOFF: "Blow-off", REACC: "Re-accumulation", MARKDOWN: "Markdown",
   CAP: "Capitulation", ACCUM: "Accumulation", FLAT: "Flat" };
+/** The engine's market consensus (more than 55% of perps in one group). */
+export const CONSENSUS = { "RISK-ON": "Most coins trending up", "RISK-OFF": "Most coins trending down", ACCUMULATION: "Most coins basing",
+  EUPHORIA: "Most coins overheated", MIXED: "Mixed" };
+export const CONSENSUS_TERM = { "RISK-ON": "Risk-on", "RISK-OFF": "Risk-off", ACCUMULATION: "Accumulation", EUPHORIA: "Euphoria", MIXED: "Mixed" };
+/** "Engine term: Re-accumulation." for an (i), or "" when the plain label is the engine's own word. */
+export const engineTerm = (map, plain, key) => (map[key] && map[key] !== plain[key] ? ` Engine term: ${map[key]}.` : "");
 
 /** Price: decimals by magnitude, grouped. 84,567 · 2,681.2 · 88.02 · 0.2446 */
 export function price(v) {
