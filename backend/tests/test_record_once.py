@@ -28,12 +28,16 @@ async def test_questions_failure_is_recorded_without_discarding_snapshots(tmp_pa
     assert rec.status["questions:v2_mainnet"] == {"ok": False, "ts": 900, "error": "bad board"}
 
 
-def test_partial_recording_fails_the_command(tmp_path, monkeypatch):
+def test_only_a_run_that_recorded_nothing_fails_the_command(tmp_path, monkeypatch):
     monkeypatch.setenv("DERIVE_UNDERLYINGS", "BTC,ETH")
     monkeypatch.setattr("sys.argv", ["record_once.py", "--out", str(tmp_path)])
-    async def partial(*args, **kwargs):
-        return {"v2_mainnet:BTC": {"ok": True}, "v2_mainnet:ETH": {"ok": False}}
-    monkeypatch.setattr(record_once, "record", partial)
+    result = {}
+    async def fake(*args, **kwargs):
+        return result
+    monkeypatch.setattr(record_once, "record", fake)
+    result.update({"v2_mainnet:BTC": {"ok": True}, "v2_mainnet:ETH": {"ok": False}})
+    assert record_once.main() == 0
+    result.update({"v2_mainnet:BTC": {"ok": False}})
     assert record_once.main() == 1
 
 

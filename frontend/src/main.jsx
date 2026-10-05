@@ -9,7 +9,7 @@ import "./boards.css";
 import "./people.css";
 import Shell from "./components/Shell.jsx";
 import Landing from "./pages/Landing.jsx";
-import { QUESTIONS_ON, TRADE_ON } from "./lib/flags.js";
+import { QUESTIONS_ON } from "./lib/flags.js";
 const Radar = lazy(() => import("./pages/Radar.jsx"));
 const Markets = lazy(() => import("./pages/Markets.jsx"));
 const Coin = lazy(() => import("./pages/Coin.jsx"));
@@ -48,6 +48,7 @@ createRoot(document.getElementById("root")).render(
         </Route>
       </Routes>
     </BrowserRouter>
-    {!TRADE_ON && <Analytics />}
+    {/* Vercel Web Analytics: page views only, no custom events, no cookies, no personal data. */}
+    <Analytics />
   </React.StrictMode>,
 );

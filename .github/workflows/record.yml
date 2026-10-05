@@ -77,7 +77,7 @@ jobs:
 
       - name: Install
         if: github.event_name == 'push' || steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true' || steps.due.outputs.history_due == 'true' || steps.due.outputs.flow_due == 'true'
-        run: pip install -q -r backend/requirements.lock
+        run: pip install -q -r backend/requirements-record.txt
 
       - name: Record
         if: steps.due.outputs.due == 'true'

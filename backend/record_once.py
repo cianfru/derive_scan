@@ -157,7 +157,9 @@ def main() -> int:
         return 0
     status = asyncio.run(record(settings, store, slot, keys, Path(args.site) if args.site else None))
     print(json.dumps(status, indent=1))
-    return 0 if status and all(v.get("ok") for v in status.values()) else 1
+    # Fail the run only when nothing at all was recorded, so a dead source shows in Actions; one coin's
+    # hiccup is retried next slot and shows in status.json and the health file.
+    return 0 if any(v.get("ok") for v in status.values()) else 1
 
 
 if __name__ == "__main__":

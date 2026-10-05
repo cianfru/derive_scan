@@ -91,10 +91,6 @@ def process_symbol(und: str, timeframe: str, ohlcv: dict, weekly: Optional[dict]
     if len(ohlcv["close"]) == 0:
         raise ValueError("No completed candles available")
     engine_errors = [] if weekly is not None else ["Weekly history missing"]
-    for label, data, tf in (("Candle", ohlcv, timeframe), ("Weekly", weekly, "1w"),
-                            ("BTC", btc_data, timeframe), ("ETH", eth_data, timeframe)):
-        if data is not None and len(data["timestamp"]) > 1 and not np.all(np.diff(data["timestamp"]) == TF_MS[tf]):
-            engine_errors.append(f"{label} history has gaps")
 
     rcce: dict = {}
     try:

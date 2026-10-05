@@ -3,11 +3,6 @@
 import { NETWORK } from "./config.js";
 
 const memory = new Map();
-const ephemeral = (key) => key.startsWith("cowboy-saloon-key:");
-try {
-  const s = globalThis.localStorage;
-  for (const key of Object.keys(s)) if (ephemeral(key)) s.removeItem(key);
-} catch {}
 export function _resetTradeStorage() { memory.clear(); }
 function storage() {
   try {
@@ -23,7 +18,6 @@ function storage() {
 export function read(key) {
   const s = storage();
   try {
-    if (ephemeral(key)) { s?.removeItem(key); return memory.has(key) ? JSON.parse(memory.get(key)) : null; }
     const raw = memory.has(key) ? memory.get(key) : s?.getItem(key);
     return raw == null ? null : JSON.parse(raw);
   } catch {
@@ -33,7 +27,6 @@ export function read(key) {
 export function write(key, value) {
   const raw = JSON.stringify(value);
   const s = storage();
-  if (ephemeral(key)) { memory.set(key, raw); try { s?.removeItem(key); } catch {} return; }
   try {
     if (s) { s.setItem(key, raw); memory.delete(key); } else memory.set(key, raw);
   } catch { memory.set(key, raw); }

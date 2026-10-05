@@ -22,7 +22,7 @@ export default function ApproveCowboy() {
         <li><b>For {KEY_DAYS} days</b></li>
         <li><b>Nothing else.</b> Cowboy cannot withdraw, transfer, or touch your other Derive accounts.</li>
       </ul>
-      <p className="tr-note">You can switch this off at any time. No funds move. Reloading the page requires a new approval.
+      <p className="tr-note">You can switch this off at any time. No funds move.
         <Info label="What approving does">Your wallet signs one approval for a small key that this browser makes and keeps. Derive lets that key trade options by request for quote, in this account only, until the approval ends. It can never withdraw or move money. Anything able to run inside this page could still trade the account's balance until then, so keep in this account only what you use in the Saloon. Once approved, Cowboy labels the account "Cowboy" on Derive.</Info>
       </p>
       <button className="btn primary lg" onClick={approve} disabled={seat.busy || !seat.saloon}>{seat.busy ? "Waiting for your wallet…" : "Approve Cowboy"}</button>

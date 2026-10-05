@@ -18,16 +18,11 @@ it("reads the latest value after a quota failure despite a successful probe", ()
   write(key, { id: 3 });
   expect(read(key)).toEqual({ id: 3 });
 });
-it("keeps approved keys for this visit and removes a previously persisted value", () => {
+it("keeps the approved key across a reload (owner, 5 October 2026: the connection survives a reload)", () => {
   const key = KEYS.key("0x1");
-  localStorage.setItem(key, JSON.stringify({ secret: "previous" }));
-  expect(read(key)).toBeNull();
-  expect(localStorage.getItem(key)).toBeNull();
   write(key, { secret: "current" });
-  expect(read(key)).toEqual({ secret: "current" });
-  expect(localStorage.getItem(key)).toBeNull();
   _resetTradeStorage();
-  expect(read(key)).toBeNull();
+  expect(read(key)).toEqual({ secret: "current" });
 });
 it("retains positions after a failed large write on each network", () => {
   const row = { id: "answer", side: "yes", contracts: 1 };
