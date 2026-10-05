@@ -1,0 +1,21 @@
+import ADA from "../../public/coins/ADA.svg";
+import BNB from "../../public/coins/BNB.svg";
+import BTC from "../../public/coins/BTC.svg";
+import CC from "../../public/coins/CC.png";
+import DOGE from "../../public/coins/DOGE.svg";
+import ETH from "../../public/coins/ETH.svg";
+import HYPE from "../../public/coins/HYPE.jpg";
+import LIT from "../../public/coins/LIT.png";
+import LINK from "../../public/coins/LINK.svg";
+import PUMP from "../../public/coins/PUMP.jpg";
+import SOL from "../../public/coins/SOL.svg";
+import VVV from "../../public/coins/VVV.png";
+import XAUT from "../../public/coins/XAUT.svg";
+import XAUTInk from "../../public/coins/XAUT-ink.svg";
+import XRP from "../../public/coins/XRP.svg";
+import XRPInk from "../../public/coins/XRP-ink.svg";
+import ZEC from "../../public/coins/ZEC.svg";
+export const coinImages = { ADA, BNB, BTC, CC, DOGE, ETH, HYPE, LIT, LINK, PUMP, SOL, VVV, XAUT, XRP, ZEC };
+const lightImages = { XAUT: XAUTInk, XRP: XRPInk };
+export const coinImage = (und, theme = typeof document === "undefined" ? "light" : document.documentElement.dataset.theme) =>
+  (theme === "light" && lightImages[und]) || coinImages[und];

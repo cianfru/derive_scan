@@ -1,0 +1,264 @@
+{
+  "schema": 1,
+  "sourceRepository": "cianfru/derive_scan",
+  "sourceBranch": "site-data",
+  "sourceCommit": "2baf367b15f6787b8c81850a2334bae390112f14",
+  "snapshotAt": 1791225986,
+  "snapshotUTC": "2026-10-05T18:46:26+00:00",
+  "capturedAtUTC": "2026-10-05T18:53:33.303155+00:00",
+  "scope": "Full published Markets, outcome index, every referenced outcome coin board and active outcome quote-history file, and full published leaderboard/cohorts at one site-data commit. No rows or fields removed. Individual trader profiles are outside this snapshot scope. No private wallet or execution data included.",
+  "files": {
+    "markets.json": {
+      "bytes": 130676,
+      "sha256": "6e857bcf4b3118875d36def4ed48fdc50a405a0db2e135a866606a70e1cd447e"
+    },
+    "traders.json": {
+      "bytes": 173374,
+      "sha256": "d54f0fbec9e88695573a7fab6b5deb888f0a322bddcb1fa3749086a74f62c652"
+    },
+    "questions/index.json": {
+      "bytes": 579,
+      "sha256": "8577001c91dfd249e7ecd89475e44ee80d1561de5c494b931641a4a0a8b63382"
+    },
+    "questions/BTC.json": {
+      "bytes": 31092,
+      "sha256": "f6194425b075ef0c4a3f01828d3eee66473556443cf8c580cd2dda99503fcbab"
+    },
+    "questions/ETH.json": {
+      "bytes": 50424,
+      "sha256": "ab09614753567d8bfb2138a7ff64059bd175ac536f8bcd90e4165fbb2b3c4756"
+    },
+    "questions/HYPE.json": {
+      "bytes": 28263,
+      "sha256": "b75b29a51358cc6b0aea9d60be67398ddf37093dfd21f316c72ab1deaed6c37a"
+    },
+    "questions/SOL.json": {
+      "bytes": 18648,
+      "sha256": "d168c0609c01d15624bd0e935df61a862cdc83a568b1bbd7042c7ac8caabfbe8"
+    },
+    "questions/XAUT.json": {
+      "bytes": 8392,
+      "sha256": "0be04c9de2c497d0c5526dcdeb19fea65f4c5795c416bc4400bd355809eee9bf"
+    },
+    "questions/XRP.json": {
+      "bytes": 16059,
+      "sha256": "8159e8464c6c2a44b7bfb386f58de81c6afbf4f672252f76def160ce29378d67"
+    },
+    "coins/ADA.json": {
+      "bytes": 232800,
+      "sha256": "945716588e94cb8786c79b17ccd34e6ad6723f20a2f282d9cd32b24d1f53c6b7"
+    },
+    "coins/BNB.json": {
+      "bytes": 212833,
+      "sha256": "5e187a76e99815ab3c283a0d62330fdd8819d8a113b9ce0afab055a929eca07d"
+    },
+    "coins/BTC.json": {
+      "bytes": 276727,
+      "sha256": "ea5d0ea5c24374c65bff5433e8a25fae678bbde533596e04566539963c7aa338"
+    },
+    "coins/CC.json": {
+      "bytes": 224026,
+      "sha256": "7c6701b821c9d8f59c5ca369c069a47142332beb70f837dd4e7c21803faa055c"
+    },
+    "coins/DOGE.json": {
+      "bytes": 205289,
+      "sha256": "2ef31ab76406242e7c39190a4586749702f95b70ab38a76f51a8688d4ba9cabf"
+    },
+    "coins/ETH.json": {
+      "bytes": 275756,
+      "sha256": "e32dcd1ee29901c1f688244f7030279c6a013836f92b63485776cd4a87e1d351"
+    },
+    "coins/HYPE.json": {
+      "bytes": 262307,
+      "sha256": "517dea8965c6f326e7e616d757a897438211f30d1c0f0e14dccd7350eb37a6c5"
+    },
+    "coins/LINK.json": {
+      "bytes": 209094,
+      "sha256": "84f840cb073f28022bcc4f07e21ed7ed051ede7c0b7d8bc0a6f4ba3e07a94865"
+    },
+    "coins/LIT.json": {
+      "bytes": 223162,
+      "sha256": "d05379e6b2f35360f1441dcb2defb35f432fa09b20b301979fe2b0ca1d7b759f"
+    },
+    "coins/PUMP.json": {
+      "bytes": 233666,
+      "sha256": "efd918fd1c619ce9c40f4a54611a2edc35123f9c0352abb7f7236f50d5177188"
+    },
+    "coins/SOL.json": {
+      "bytes": 255506,
+      "sha256": "ac3b35e56da544a36feb7c45064616c389c1f08645d80ed90770a4d517a2f62b"
+    },
+    "coins/VVV.json": {
+      "bytes": 192808,
+      "sha256": "1e6b88e75d63952c51c2ffd016b8fa31e824677fe075adced6da2c1bfec8f014"
+    },
+    "coins/XAUT.json": {
+      "bytes": 245798,
+      "sha256": "5341e6e695a74707e5e5fb944b7ba5de52ddbc78f741d86709d3d131b6c1e7d6"
+    },
+    "coins/XRP.json": {
+      "bytes": 244234,
+      "sha256": "5a0bd3a86c032f23963ad792a5a117bda01945820aeb2631ad02e7359d187af6"
+    },
+    "coins/ZEC.json": {
+      "bytes": 253032,
+      "sha256": "19886b54385f937725661cf4ae3fea135566b2164232effc48eb289afe4e0eca"
+    },
+    "questions/history/BTC-20261006.json": {
+      "bytes": 25075,
+      "sha256": "b37d2bd39743f554ae2af38e1fea5959e413c327b5179fe7d7508a8d3218ba5b"
+    },
+    "questions/history/BTC-20261007.json": {
+      "bytes": 13223,
+      "sha256": "fdf6426b3f9695c9467218064b6b8a6b02b31401f8ab9d43d3d2f93f142e9544"
+    },
+    "questions/history/BTC-20261008.json": {
+      "bytes": 6747,
+      "sha256": "5226cad9031c2902548e0b9d0563e0b459b761dca7f8e65bd10ef9a1bea0f2e3"
+    },
+    "questions/history/BTC-20261009.json": {
+      "bytes": 33219,
+      "sha256": "852eb5b06321554f668e3150c5001d800e0f289e88d4c7ef41d7440a583956c3"
+    },
+    "questions/history/BTC-20261016.json": {
+      "bytes": 23613,
+      "sha256": "3f46c45a7346d184525d3b40f84802f4fe217c3230755f22fcf5e57373a165fc"
+    },
+    "questions/history/BTC-20261023.json": {
+      "bytes": 14020,
+      "sha256": "e5d2f3804724c43ab0736307ab85c4c438a0ca75d282616f6d99d1f1a59725cb"
+    },
+    "questions/history/BTC-20261030.json": {
+      "bytes": 62175,
+      "sha256": "668cfc99753622f3dee1fecb8cadce8298e2241b9db628c44f095591e181b0d3"
+    },
+    "questions/history/ETH-20261006.json": {
+      "bytes": 46760,
+      "sha256": "d9e40a93747c1f18cccc460ff48d67489b8f6aba5e6443e3e3d94708a1e3bd2f"
+    },
+    "questions/history/ETH-20261007.json": {
+      "bytes": 34180,
+      "sha256": "5083499705cd396d78b5a7111c3a89708c7ff845ba661adf4528e7a76a9d398b"
+    },
+    "questions/history/ETH-20261008.json": {
+      "bytes": 12801,
+      "sha256": "766697d81877a5c3cae8a1b8f5f5c32c75b24951150fb125d6696582ac1e0e9d"
+    },
+    "questions/history/ETH-20261009.json": {
+      "bytes": 65553,
+      "sha256": "9718d2e58ee0dbb535779d83449143292625790484f2d8deabe47fd4c28b549c"
+    },
+    "questions/history/ETH-20261016.json": {
+      "bytes": 52286,
+      "sha256": "611b9ec44aabc304d421a31e457d250d6d2996bbf3963df15a70907a40a7d9c1"
+    },
+    "questions/history/ETH-20261023.json": {
+      "bytes": 42351,
+      "sha256": "e9a7bb9c5a55de0f119c27c22fb0938491896b4cc7a6a269bc01f2667e0ac826"
+    },
+    "questions/history/ETH-20261030.json": {
+      "bytes": 58902,
+      "sha256": "12b8804638d898b3eb7f6a073f6f91a22850d4e62fcf3b581fc1ee0755600452"
+    },
+    "questions/history/HYPE-20261006.json": {
+      "bytes": 7439,
+      "sha256": "5d01e1006d252b9d65e42431bfee1a74ee5f20db7aa29b922e3e3e82a863b6b6"
+    },
+    "questions/history/HYPE-20261007.json": {
+      "bytes": 2758,
+      "sha256": "771a9f4a0e0336af36857dc7f65cade5bc9b91b1f1a5aafdf338f132355639ec"
+    },
+    "questions/history/HYPE-20261009.json": {
+      "bytes": 5761,
+      "sha256": "1b1d7d231f9e6253bad17dae7ed8f5d4d44f09b69dacd0b55c9debbe8e53375c"
+    },
+    "questions/history/HYPE-20261016.json": {
+      "bytes": 19644,
+      "sha256": "e1fdf44ab0ba70b7428967ca282f25e2ce41eb5e38bd880c8da1293a6072344e"
+    },
+    "questions/history/HYPE-20261023.json": {
+      "bytes": 20080,
+      "sha256": "9ec210bb2fe4a2d12d69799ea2bb2d0678508657b02599c505113cff2211347f"
+    },
+    "questions/history/HYPE-20261030.json": {
+      "bytes": 25770,
+      "sha256": "47a5dcc676dafe90d2908e8ab55dd01aba2a28e0182221f76301d26e1ae1e453"
+    },
+    "questions/history/SOL-20261006.json": {
+      "bytes": 6756,
+      "sha256": "464e20c874c768dde644504b8e2adea13934b1bca49c60044a9de92b7305679a"
+    },
+    "questions/history/SOL-20261007.json": {
+      "bytes": 1890,
+      "sha256": "83ca1f4555c7e408972dff5d02e3db9f7924652839688a2811333ee5015f32f6"
+    },
+    "questions/history/SOL-20261009.json": {
+      "bytes": 9067,
+      "sha256": "cf172abfad6cbedbb99511bba8a6c38c6730ab2390ca2487974b4720db1f4814"
+    },
+    "questions/history/SOL-20261016.json": {
+      "bytes": 16889,
+      "sha256": "f5ffb2dbc96df9cd112b327d0e7e99fc6400a85cd6ea37090e7d6040a43c322f"
+    },
+    "questions/history/SOL-20261023.json": {
+      "bytes": 9201,
+      "sha256": "3351ab74e04619d15bda1d280b25a4ef14838385465b597c4ca367cfa6d2116c"
+    },
+    "questions/history/SOL-20261030.json": {
+      "bytes": 12382,
+      "sha256": "caaeb3a13b26d57feb4240bb7d67c8afc051ae9a68fc7fe46ba898e20514e074"
+    },
+    "questions/history/XAUT-20261009.json": {
+      "bytes": 5442,
+      "sha256": "9166a68ecb45145a4ac20b66ed109689cefa3f497c7749102679a23f678c82fe"
+    },
+    "questions/history/XAUT-20261016.json": {
+      "bytes": 7693,
+      "sha256": "bf390ef5403865127001905152b2764e6c73c110f3f0e57fcaf8398d2a689fae"
+    },
+    "questions/history/XAUT-20261023.json": {
+      "bytes": 8736,
+      "sha256": "9d5700933fa1ba286032748ca5117209d71e0ea7eeb975b87db74d703cd6b1a9"
+    },
+    "questions/history/XAUT-20261030.json": {
+      "bytes": 10081,
+      "sha256": "01472fd80ab8daec778dd3f06f2aa8160c54c9de49a7242daa48ab0a2586b45f"
+    },
+    "questions/history/XRP-20261009.json": {
+      "bytes": 19053,
+      "sha256": "b69e8c64ae04c7652e811ddcc177f46d4b1ce014c36daa40217df9e83f5cbc6d"
+    },
+    "questions/history/XRP-20261016.json": {
+      "bytes": 15445,
+      "sha256": "16cfa6a86cd6ca22965bc7093cfb8bd461bf5d59cff26a9d10e4d81e3ed1b770"
+    },
+    "questions/history/XRP-20261023.json": {
+      "bytes": 7657,
+      "sha256": "3d26a36adf481c82711cb6a0e9e0905625b26e8ecc8a58e94d9488372c4f38a6"
+    },
+    "questions/history/XRP-20261030.json": {
+      "bytes": 15919,
+      "sha256": "bb914698804da4e86fd9fb4b23f37c29ac91e53db256df76a07ea9399611432e"
+    }
+  },
+  "auditAssets": {
+    "directory": "/workspace/scratch/cowboy-launch-artifacts/data",
+    "outcomeHistoryFiles": 34,
+    "outcomeHistoryBytes": 718568,
+    "missingOutcomeHistoryFiles": [],
+    "coinFiles": 15,
+    "coinFileBytes": 3547038
+  },
+  "derivations": {
+    "breadthMembers": {
+      "source": "All 15 coins/{UND}.json history.engine[1d] at the same pinned site-data commit",
+      "helpers": "count_breadth and breadth_table from /workspace/cowboy-markets-visuals/backend/publish_site.py",
+      "validation": "All 120 reconstructed rows match the published regime counts and memberships exactly. The published members were already present and were independently verified; no names inferred from count-only data."
+    },
+    "outcomeHistories": {
+      "key": "questions.histories[UND-YYYYMMDD]",
+      "source": "All 34 questions/history/{UND}-{YYYYMMDD}.json files referenced by the six current outcome boards",
+      "validation": "Every current outcome board date has its exact raw history, including null quote values and original timestamp indices."
+    }
+  }
+}
