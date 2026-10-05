@@ -133,7 +133,7 @@ export function coinLead(und, data, now = Date.now() / 1000) {
   }
   let text = `${und} ${regimePhrase(row.regime, 1)} on the daily close`;
   if (row.signal && SIGNAL_LABEL[row.signal]) text += `, and the daily signal reads ${SIGNAL_LABEL[row.signal]}`;
-  if (!data.options) return { text: `${text}.`, note: `${und} has no options on Derive, so only the regime and wallets apply.` };
+  if (!data.options) return { text: `${text}.`, note: `${und} has no options on Derive, so only price-based research is shown.` };
   const w = viewReading(data.alignment, "30d", "wallets", now).state;
   const o = viewReading(data.alignment, "30d", "options", now).state;
   const parts = [w && WALLET_WORDS[w], o && OPTION_WORDS[o]].filter(Boolean);

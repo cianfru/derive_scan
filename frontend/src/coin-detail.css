@@ -1,0 +1,274 @@
+/* Coin research follows the same flat panels and readable rows as Markets and Saloon.
+   All selectors stay within the coin detail page; the underlying research views retain their data. */
+.coin-detail { --cd-pad: 24px; --cd-radius: 13px; row-gap: 24px; }
+.coin-detail.coin-page { gap: 24px; }
+.coin-detail .coin-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px 32px; padding: 18px 0 0; }
+.coin-detail .cd-identity { display: grid; gap: 8px; min-width: 0; }
+.coin-detail .cd-back { display: inline-flex; align-items: center; gap: 7px; width: fit-content; min-height: 32px; color: var(--muted); font: 500 12px/1.4 var(--font-body); }
+.coin-detail .cd-back:hover { color: var(--fg); }
+.coin-detail .cd-back .arrow-icon { transform: rotate(180deg); }
+.coin-detail .cd-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 12px; min-width: 0; }
+.coin-detail .cd-title .asset-icon { width: 42px; height: 42px; flex: none; }
+.coin-detail .cd-title h1 { margin: 0; font: 600 clamp(28px, 3.1vw, 42px)/1.15 var(--font-display); letter-spacing: -.035em; color: var(--fg); }
+.coin-detail .cd-symbol { align-self: baseline; padding-top: 13px; color: var(--muted); font: 400 13px/1.3 var(--font-mono); }
+.coin-detail .cd-price-block { display: grid; gap: 7px; flex: none; text-align: right; padding-bottom: 3px; }
+.coin-detail .cd-price-label { color: var(--muted); font: 400 12px/1.3 var(--font-body); }
+.coin-detail .cd-price-line { display: flex; align-items: baseline; justify-content: flex-end; gap: 12px; }
+.coin-detail .coin-price { font: 500 28px/1.15 var(--font-mono); letter-spacing: -.035em; color: var(--fg); }
+.coin-detail .coin-chg { font: 400 13px/1.3 var(--font-mono); }
+.coin-detail .coin-stamp { width: auto; margin: 0; color: var(--muted); font: 400 12px/1.4 var(--font-mono); }
+.coin-detail > .lead { padding: 0; margin-top: -10px; border: 0; border-radius: 0; background: none; max-width: 1000px; gap: 5px; }
+.coin-detail > .lead .lead-text { font: 400 15px/1.6 var(--font-body); color: var(--fg-2); }
+.coin-detail > .lead .lead-note { font: 400 13px/1.6 var(--font-body); color: var(--muted); }
+
+/* One overview: distinct windows, independently labelled research layers. */
+.coin-detail .journey-strip.cd-overview { display: block; position: static; top: auto; z-index: auto; margin: 0; padding: 0; border: 1px solid var(--seam); border-radius: var(--cd-radius); background: var(--surface-1); backdrop-filter: none; }
+.coin-detail .cd-overview-head, .coin-detail .journey-row.cd-overview-row { display: grid; grid-template-columns: minmax(88px, .65fr) repeat(3, minmax(0, 1fr)); align-items: center; column-gap: 24px; padding-inline: var(--cd-pad); }
+.coin-detail .cd-overview-head { min-height: 52px; padding-block: 6px; border-bottom: 1px solid var(--seam); background: color-mix(in srgb, var(--surface-2) 65%, transparent); border-radius: calc(var(--cd-radius) - 1px) calc(var(--cd-radius) - 1px) 0 0; color: var(--muted); font: 500 13px/1.3 var(--font-body); }
+.coin-detail .cd-layer-link { display: inline-flex; align-items: center; gap: 7px; width: fit-content; min-height: 38px; color: var(--fg-2); font: 500 13px/1.3 var(--font-body); }
+.coin-detail .cd-layer-link svg { color: var(--muted); flex: none; }
+.coin-detail .cd-layer-link:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 4px; }
+.coin-detail .journey-row.cd-overview-row { padding-block: 16px; border-bottom: 1px solid var(--seam); gap: 12px 24px; }
+.coin-detail .cd-window { display: grid; gap: 4px; color: var(--fg); font: 600 13px/1.3 var(--font-body); white-space: normal; }
+.coin-detail .cd-window small { color: var(--muted); font: 400 12px/1.3 var(--font-body); }
+.coin-detail .cd-overview-row.agreed { border-left: 2px solid var(--accent-text); padding-left: calc(var(--cd-pad) - 2px); }
+.coin-detail .cd-window .cd-agreement { color: var(--accent-text); font-weight: 600; }
+.coin-detail .cd-overview .layer-tile { min-height: 0; padding: 2px 0; border: 0; border-radius: 0; background: none; gap: 0; }
+.coin-detail .cd-overview .layer-tile:hover { border-color: transparent; }
+.coin-detail .cd-overview .lt-text { gap: 4px; min-width: 0; }
+.coin-detail .cd-overview .lt-text b { font: 600 14px/1.3 var(--font-body); white-space: normal; overflow: visible; text-overflow: clip; }
+.coin-detail .cd-overview .lt-text small { font: 400 12px/1.35 var(--font-body); color: var(--muted); white-space: normal; overflow: visible; text-overflow: clip; }
+.coin-detail .cd-overview .layer-tile.up .lt-text b { color: var(--up); }
+.coin-detail .cd-overview .layer-tile.defensive .lt-text b { color: var(--down); }
+.coin-detail .cd-overview .layer-tile.neutral .lt-text b { color: var(--fg-2); }
+.coin-detail .cd-overview .layer-tile.unknown .lt-text b { color: var(--muted); font-weight: 500; }
+.coin-detail .cd-overview .layer-tile[data-tip]:hover .lt-text b { text-decoration: underline dotted; text-underline-offset: 3px; }
+.coin-detail .cd-overview .layer-tile[data-tip]:hover::after, .coin-detail .cd-overview .layer-tile[data-tip]:focus::after { box-shadow: none; }
+.coin-detail .cd-overview-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 24px; padding: 8px var(--cd-pad); color: var(--muted); font: 400 12px/1.5 var(--font-body); }
+.coin-detail .cd-overview-footer a { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; color: var(--fg-2); font-weight: 500; }
+.coin-detail .cd-overview-footer a:hover { color: var(--fg); }
+
+/* A quiet way from research to the matching price outcomes. */
+.coin-detail .saloon-cta { padding: 13px var(--cd-pad); gap: 12px; border: 1px solid var(--seam); border-radius: var(--cd-radius); background: var(--surface-1); box-shadow: none; }
+.coin-detail .saloon-cta:hover { border-color: var(--seam-hi); background: color-mix(in srgb, var(--surface-2) 55%, var(--surface-1)); }
+.coin-detail .saloon-cta .hat-mark { color: var(--muted); }
+.coin-detail .saloon-cta b { color: var(--fg); font: 600 14px/1.35 var(--font-body); }
+.coin-detail .saloon-cta small { color: var(--muted); font: 400 12px/1.4 var(--font-body); }
+.coin-detail .saloon-cta-go { color: var(--fg-2); font-size: 18px; }
+
+/* The three full layers, with continuous content inside each outer panel. */
+.coin-detail .step.cd-section { display: block; padding: 0; border: 1px solid var(--seam); border-radius: var(--cd-radius); background: var(--surface-1); min-width: 0; scroll-margin-top: calc(var(--header-h) + 16px); }
+.coin-detail .step-head.cd-section-heading { display: flex; align-items: center; gap: 10px; min-height: 66px; padding: 18px var(--cd-pad); border: 0; border-bottom: 1px solid var(--seam); }
+.coin-detail .cd-section-heading .num { font: 500 12px/1.3 var(--font-mono); color: var(--muted); }
+.coin-detail .cd-section-heading .ico { color: var(--muted); display: inline-flex; flex: none; }
+.coin-detail .cd-section-heading h2 { margin: 0; font: 600 20px/1.25 var(--font-display); letter-spacing: -.02em; color: var(--fg); }
+.coin-detail .cd-section-heading .step-right { margin-left: auto; min-width: 0; }
+.coin-detail .cd-section-heading .step-stamp { color: var(--muted); font: 400 12px/1.4 var(--font-mono); }
+.coin-detail .cd-section-body { display: grid; gap: 0; min-width: 0; }
+.coin-detail .cd-section-body > .plate, .coin-detail .cd-section-body .wallet-grid > .plate, .coin-detail .options-workspace > .plate, .coin-detail .desk-panels > .plate, .coin-detail .expiry-charts > .plate { border: 0; border-radius: 0; background: none; box-shadow: none; }
+.coin-detail .cd-section-body .panel-head, .coin-detail .cd-section-body .plate-h { min-height: 52px; padding: 13px var(--cd-pad); border-bottom: 1px solid var(--seam); }
+.coin-detail .cd-section-body .panel-title { color: var(--fg-2); font: 600 14px/1.3 var(--font-body); }
+.coin-detail .cd-section-body .plate-b { padding: 20px var(--cd-pad); min-width: 0; }
+.coin-detail .regime-head, .coin-detail .readings, .coin-detail .checks, .coin-detail .wallet-read { border: 0; border-radius: 0; border-bottom: 1px solid var(--seam); background: none; }
+.coin-detail .rh-cell { padding: 20px var(--cd-pad); gap: 8px; }
+.coin-detail .rh-key { color: var(--muted); font: 500 12px/1.35 var(--font-body); }
+.coin-detail .rh-regime strong, .coin-detail .rh-signal .sig { font: 600 20px/1.3 var(--font-display); letter-spacing: -.02em; }
+.coin-detail .rh-regime strong { flex-wrap: wrap; }
+.coin-detail .rh-regime strong::before { width: 7px; height: 7px; border-radius: 0; }
+.coin-detail .rh-sub, .coin-detail .rh-why { color: var(--muted); font: 400 13px/1.5 var(--font-body); }
+.coin-detail .rh-four b { font: 600 16px/1.3 var(--font-display); }
+.coin-detail .rh-strip { gap: 10px; margin-top: 5px; }
+.coin-detail .price-stage { border-bottom: 1px solid var(--seam); }
+.coin-detail .price-stage .panel-head { background: color-mix(in srgb, var(--surface-2) 45%, transparent); }
+.coin-detail .price-stage .plate-b { padding: 12px 16px 16px var(--cd-pad); }
+.coin-detail .chart-legend { font: 400 12px/1.4 var(--font-body); color: var(--muted); }
+.coin-detail .rd-cell { padding: 20px var(--cd-pad); gap: 12px; }
+.coin-detail .rd-head > b { font: 500 24px/1.2 var(--font-mono); }
+.coin-detail .rd-head > b.ribbon-name { font: 600 20px/1.2 var(--font-display); }
+.coin-detail .g-needle { box-shadow: none; }
+.coin-detail .checks-list, .coin-detail .checks-against { padding: 20px var(--cd-pad); gap: 13px; }
+.coin-detail .checks-list li { min-height: 34px; font-size: 13px; }
+.coin-detail .checks-list li > span { white-space: normal; overflow: visible; text-overflow: clip; }
+/* A check whose value is long (the market consensus) wraps its value under the label instead of running into it. */
+.coin-detail .checks-list li { grid-template-columns: 16px max-content minmax(0, 1fr) auto; }
+.coin-detail .checks-list li > b { white-space: normal; text-align: right; min-width: 0; }
+.coin-detail .checks-against li { font: 400 13px/1.55 var(--font-body); }
+.coin-detail .engine-detail { padding: 0 var(--cd-pad) 4px; }
+.coin-detail .engine-detail > summary { display: flex; align-items: center; min-height: 52px; width: fit-content; padding: 10px 0; font: 500 13px/1.4 var(--font-body); color: var(--fg-2); }
+.coin-detail .engine-detail > div { padding: 8px 0 20px; gap: 24px; }
+.coin-detail .signal-explanation { font: 400 13px/1.65 var(--font-body); color: var(--muted); }
+.coin-detail .engine-comparison { border: 0; background: none; }
+.coin-detail .perp-figs { border: 1px solid var(--seam); border-radius: 8px; background: none; }
+.coin-detail .perp-figs > div { padding: 16px; }
+.coin-detail .perp-figs span { font: 400 12px/1.4 var(--font-body); }
+.coin-detail .perp-figs strong { font-size: 16px; }
+
+/* Wallet reading and both complete wallet tables stay visible. */
+.coin-detail .wallet-read > div { padding: 20px var(--cd-pad); gap: 7px; }
+.coin-detail .wallet-read span { font: 500 12px/1.3 var(--font-body); }
+.coin-detail .wallet-read strong { font: 600 18px/1.3 var(--font-display); }
+.coin-detail .wallet-read small { font: 400 12px/1.5 var(--font-mono); }
+.coin-detail .wallet-grid { gap: 0; align-items: stretch; }
+.coin-detail .cd-section-body .wallet-grid > .cohorts-plate { border-left: 1px solid var(--seam); }
+.coin-detail .wallet-grid .panel-head { min-height: 76px; border-bottom: 1px solid var(--seam); }
+.coin-detail .wallet-grid .plate-b { padding-block: 10px 20px; }
+.coin-detail .holder { min-height: 62px; grid-template-columns: minmax(0, 1fr) 90px; gap: 5px 14px; padding-block: 12px; }
+.coin-detail .holder .who { grid-column: 1; grid-row: 1; }
+.coin-detail .holder .leg { grid-column: 1 / -1; grid-row: 2; padding-left: 30px; white-space: normal; font-size: 12px; }
+.coin-detail .holder .delta-num { grid-column: 2; grid-row: 1; }
+.coin-detail .holder .who small { white-space: normal; overflow: visible; }
+.coin-detail .holder:hover { background: color-mix(in srgb, var(--surface-2) 60%, transparent); }
+.coin-detail .holders-all { display: inline-flex; align-items: center; min-height: 44px; margin-top: 8px; font: 500 13px/1.4 var(--font-body); }
+.coin-detail .cohort-row { min-height: 52px; grid-template-columns: minmax(0, 1fr) minmax(56px, 100px) 80px; gap: 12px; }
+.coin-detail .cohort-row .name { display: grid; gap: 4px; }
+.coin-detail .cohort-row .name b { font: 600 13px/1.3 var(--font-body); }
+.coin-detail .cohort-row .name small { margin-left: 0; font: 400 12px/1.3 var(--font-mono); }
+.coin-detail .cd-section-body > .status { padding: 18px var(--cd-pad); margin: 0; font: 400 13px/1.55 var(--font-body); }
+
+/* Full options workspace: charts keep their scales and tables keep horizontal scrolling. */
+.coin-detail .options-workspace, .coin-detail .options-workspace.embedded { gap: 0; }
+.coin-detail .options-workspace > .options-dashboard { border-bottom: 1px solid var(--seam); }
+.coin-detail .options-dashboard .panel-head { border-bottom: 0; padding-bottom: 0; }
+.coin-detail .options-dashboard .move-instrument, .coin-detail .options-dashboard .skew-instrument, .coin-detail .options-dashboard .tenor-instrument { padding: 14px var(--cd-pad) 22px; }
+.coin-detail .options-dashboard .move-reading strong { font: 500 26px/1.2 var(--font-mono); }
+.coin-detail .options-dashboard .skew-instrument > strong { font: 600 18px/1.3 var(--font-display); }
+.coin-detail .options-dashboard .dash-rank { color: var(--muted); font-size: 12px; }
+.coin-detail .desk-tabs { padding: 0 var(--cd-pad); border-bottom: 1px solid var(--seam); }
+.coin-detail .desk-tabs .tabs { gap: 26px; }
+.coin-detail .desk-tabs .tabs button { min-height: 48px; padding-block: 14px 13px; font: 500 13px/1.3 var(--font-body); }
+.coin-detail .expiry-rail { background: none; }
+.coin-detail .expiry-rail > button { min-height: 44px; }
+.coin-detail .expiry-desk { padding: 20px var(--cd-pad) 24px; min-width: 0; }
+.coin-detail .expiry-desk-heading h3 { font: 500 20px/1.3 var(--font-mono); }
+.coin-detail .expiry-metrics { padding-block: 20px; gap: 20px; }
+.coin-detail .expiry-metrics span { font: 400 12px/1.35 var(--font-body); }
+.coin-detail .expiry-metrics b { font: 500 20px/1.3 var(--font-mono); }
+.coin-detail .expiry-charts { gap: 24px; }
+.coin-detail .expiry-charts .panel-head { padding: 12px 0; border-bottom: 0; }
+.coin-detail .expiry-charts .plate-b { padding: 12px 0; }
+.coin-detail .selected-range { padding: 16px 0 0; border: 0; border-top: 1px solid var(--seam); }
+.coin-detail .selected-range .label { font-weight: 400; }
+.coin-detail .selected-range strong { font: 500 18px/1.4 var(--font-mono); }
+.coin-detail .desk-panels { padding: 20px var(--cd-pad) 24px; gap: 24px; }
+.coin-detail .desk-panels .panel-head { padding: 12px 0; border-bottom: 0; }
+.coin-detail .desk-panels .plate-b { padding: 12px 0; }
+.coin-detail .desk-panels > .plate + .plate { border-left: 1px solid var(--seam); padding-left: 24px; }
+.coin-detail .table-wrap { max-width: 100%; min-width: 0; overflow-x: auto; }
+.coin-detail .options-workspace svg.viz { max-width: 100%; }
+.coin-detail .tabs button { min-height: 44px; }
+
+/* Measurement history remains a complete, collapsible panel. */
+.coin-detail > .metric-history { margin-top: 0; border: 1px solid var(--seam); border-radius: var(--cd-radius); background: var(--surface-1); box-shadow: none; }
+.coin-detail .metric-history > .panel-head { padding: 13px var(--cd-pad); min-height: 62px; }
+.coin-detail .metric-history .panel-title { font: 600 18px/1.3 var(--font-display); color: var(--fg); }
+.coin-detail .fold-toggle { min-height: 36px; }
+.coin-detail .metric-history .panel-right .tabs button { min-height: 44px; padding-block: 10px; font-size: 13px; }
+.coin-detail .metric-history-chart { padding: 20px var(--cd-pad) 24px; }
+.coin-detail .history-reading strong { font: 500 26px/1.3 var(--font-mono); }
+.coin-detail .history-selected { stroke: var(--fg-2); }
+
+@media (max-width: 1100px) {
+  .coin-detail .wallet-grid { grid-template-columns: minmax(0, 1fr); }
+  .coin-detail .cd-section-body .wallet-grid > .cohorts-plate { border-left: 0; border-top: 1px solid var(--seam); }
+  .coin-detail .cd-overview-head, .coin-detail .journey-row.cd-overview-row { grid-template-columns: 82px repeat(3, minmax(0, 1fr)); column-gap: 18px; }
+  .coin-detail .cd-section-heading .step-stamp { font-size: 11px; }
+}
+@media (max-width: 760px) {
+  .coin-detail .checks-list ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .coin-detail .regime-head { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .coin-detail .rh-regime { grid-column: 1 / -1; }
+  .coin-detail .readings { grid-template-columns: minmax(0, 1fr); }
+  .coin-detail .desk-panels { grid-template-columns: minmax(0, 1fr); }
+  .coin-detail .desk-panels > .plate + .plate { border-left: 0; border-top: 1px solid var(--seam); padding-left: 0; padding-top: 16px; }
+}
+@media (max-width: 680px) {
+  .coin-detail { --cd-pad: 16px; }
+  .coin-detail.coin-page { gap: 16px; }
+  .coin-detail .coin-heading { display: block; padding-top: 6px; }
+  .coin-detail .cd-identity { gap: 7px; }
+  .coin-detail .cd-back { min-height: 44px; }
+  .coin-detail .cd-title { gap: 8px 10px; }
+  .coin-detail .cd-title .asset-icon { width: 34px; height: 34px; }
+  .coin-detail .cd-title h1 { font-size: 30px; }
+  .coin-detail .cd-symbol { font-size: 12px; padding-top: 8px; }
+  .coin-detail .cd-price-block { margin-top: 18px; padding: 0; gap: 6px; text-align: left; }
+  .coin-detail .cd-price-line { justify-content: flex-start; }
+  .coin-detail .coin-price { font-size: 26px; }
+  .coin-detail .coin-stamp { font-size: 11px; }
+  .coin-detail > .lead { margin-top: 0; }
+  .coin-detail > .lead .lead-text { font-size: 14px; }
+  .coin-detail > .lead .lead-note { font-size: 12px; }
+  .coin-detail .journey-strip.cd-overview { margin-inline: -16px; border-inline: 0; border-radius: 0; }
+  .coin-detail .cd-overview-head, .coin-detail .journey-row.cd-overview-row { grid-template-columns: 55px repeat(3, minmax(0, 1fr)); gap: 12px 10px; }
+  .coin-detail .cd-overview-head { min-height: 52px; border-radius: 0; font-size: 11px; padding-block: 4px; }
+  .coin-detail .cd-layer-link { gap: 5px; min-height: 44px; font-size: 12px; }
+  .coin-detail .cd-layer-link svg { width: 13px; height: 13px; }
+  .coin-detail .journey-row.cd-overview-row { padding-block: 16px; }
+  .coin-detail .cd-window { font-size: 12px; }
+  .coin-detail .cd-window small { font-size: 10px; }
+  .coin-detail .cd-overview .lt-text b { font-size: 13px; overflow-wrap: anywhere; }
+  .coin-detail .cd-overview .lt-text small { font-size: 11px; overflow-wrap: anywhere; }
+  .coin-detail .cd-overview-footer { font-size: 11px; }
+  .coin-detail .cd-overview .layer-tile[data-tip]:hover::after, .coin-detail .cd-overview .layer-tile[data-tip]:focus::after { position: fixed; left: 16px; right: 16px; bottom: 16px; width: auto; max-width: none; transform: none; }
+  .coin-detail .saloon-cta { gap: 10px; padding: 12px 16px; }
+  .coin-detail .saloon-cta b { font-size: 13px; }
+  .coin-detail .saloon-cta small { font-size: 12px; }
+  .coin-detail .step.cd-section, .coin-detail > .metric-history { margin-inline: -16px; border-inline: 0; border-radius: 0; }
+  .coin-detail .step-head.cd-section-heading { min-height: 60px; padding-block: 16px; gap: 8px; flex-wrap: wrap; }
+  .coin-detail .cd-section-heading h2 { font-size: 18px; }
+  .coin-detail .cd-section-heading .ico svg { width: 18px; height: 18px; }
+  .coin-detail .cd-section-heading .step-right { margin-left: auto; }
+  .coin-detail .cd-section-heading .step-stamp { font-size: 11px; line-height: 1.5; }
+  .coin-detail .rh-cell, .coin-detail .rd-cell, .coin-detail .checks-list, .coin-detail .checks-against { padding: 18px var(--cd-pad); }
+  .coin-detail .rh-regime strong, .coin-detail .rh-signal .sig { font-size: 18px; }
+  .coin-detail .rh-four b { font-size: 15px; }
+  .coin-detail .rh-why, .coin-detail .rh-sub { font-size: 12px; }
+  .coin-detail .rh-since { font-size: 11px; }
+  .coin-detail .price-stage .panel-head { gap: 8px 12px; }
+  .coin-detail .price-stage .panel-right { margin-left: 0; width: 100%; }
+  .coin-detail .price-stage .plate-b { padding: 10px 8px 12px var(--cd-pad); }
+  .coin-detail .chart-legend { gap: 5px 14px; font-size: 11px; }
+  .coin-detail .checks-list ul { grid-template-columns: minmax(0, 1fr); }
+  .coin-detail .checks-list li { min-height: 40px; }
+  .coin-detail .wallet-read > div { padding: 18px var(--cd-pad); }
+  .coin-detail .wallet-read strong { font-size: 16px; }
+  .coin-detail .wallet-read small { font-size: 11px; overflow-wrap: anywhere; }
+  .coin-detail .holder { min-height: 64px; }
+  .coin-detail .holder .leg { padding-left: 0; font-size: 11px; }
+  .coin-detail .holder .delta-num { font-size: 12px; }
+  .coin-detail .cohort-row { grid-template-columns: minmax(0, 1fr) minmax(40px, 70px) 70px; gap: 9px; }
+  .coin-detail .cohort-row .name b { font-size: 12px; }
+  .coin-detail .cohort-row .name small { font-size: 11px; }
+  .coin-detail .cohort-row .delta-num { font-size: 12px; }
+  .coin-detail .desk-tabs .tabs { gap: 20px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .coin-detail .desk-tabs .tabs button { flex: none; font-size: 13px; }
+  .coin-detail .options-dashboard .move-instrument, .coin-detail .options-dashboard .skew-instrument, .coin-detail .options-dashboard .tenor-instrument { padding: 12px var(--cd-pad) 20px; }
+  .coin-detail .options-dashboard .move-reading strong { font-size: 24px; }
+  .coin-detail .expiry-workspace { grid-template-columns: minmax(0, 1fr); }
+  .coin-detail .expiry-rail { display: flex; overflow-x: auto; padding: 0; scrollbar-width: none; border-bottom: 1px solid var(--seam); }
+  .coin-detail .expiry-rail > button { flex: none; width: auto; min-width: 0; padding-inline: 14px; border-left: 0; border-bottom: 2px solid transparent; }
+  .coin-detail .expiry-rail > button[aria-pressed="true"] { border-bottom-color: var(--accent-text); }
+  .coin-detail .expiry-desk { padding: 18px var(--cd-pad) 20px; }
+  .coin-detail .expiry-desk-heading { flex-wrap: wrap; }
+  .coin-detail .expiry-desk-heading h3 { font-size: 18px; }
+  .coin-detail .expiry-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 16px; }
+  .coin-detail .expiry-metrics b { font-size: 18px; }
+  .coin-detail .expiry-charts { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .coin-detail .desk-panels { padding: 18px var(--cd-pad) 20px; }
+  .coin-detail .metric-history > .panel-head { padding-block: 12px; }
+  .coin-detail .metric-history .panel-right { margin-left: 0; width: 100%; }
+  .coin-detail .metric-history .tab-groups { flex-wrap: wrap; gap: 8px 16px; }
+  .coin-detail .metric-history .tab-groups > :first-child { flex-basis: 100%; }
+  .coin-detail .metric-history-chart { padding: 18px var(--cd-pad) 20px; }
+  .coin-detail .history-reading strong { font-size: 23px; }
+}
+@media (pointer: coarse) {
+  .coin-detail .info { position: relative; width: 44px; height: 44px; min-width: 44px; min-height: 44px; margin-left: 0; border: 0; border-radius: 4px; }
+  .coin-detail .info::before { content: ""; position: absolute; width: 18px; height: 18px; left: 50%; top: 50%; transform: translate(-50%, -50%); border: 1px solid var(--seam-hi); border-radius: 50%; pointer-events: none; }
+  .coin-detail .info:hover::before, .coin-detail .info:focus-visible::before, .coin-detail .info[aria-expanded="true"]::before { border-color: var(--accent); }
+  .coin-detail .fold-toggle, .coin-detail .cd-layer-link, .coin-detail .cd-overview-footer a { min-height: 44px; }
+}
+
+@media (max-width: 380px) {
+  .coin-detail .cd-layer-link .arrow-icon { display: none; }
+}
