@@ -31,7 +31,7 @@ const instrument = ({ instrument_name }) => ({ instrument_name, base_asset_addre
 function bestQuote({ direction = "buy", total = "0.95", fee = "0.65125", quoteId = "7e6d5c4b-3a29-4817-9605-f4e3d2c1b0a9" } = {}) {
   const b = shapes["private/rfq_get_best_quote"];
   return {
-    ...b, direction, estimated_total_cost: total, estimated_fee: fee, suggested_max_fee: "1.2",
+    ...b, direction, estimated_total_cost: total, estimated_fee: fee, suggested_max_fee: "1.2", orderbook_total_cost: total,
     best_quote: { ...b.best_quote, quote_id: quoteId, rfq_id: RFQ, subaccount_id: 70001, direction: direction === "buy" ? "sell" : "buy",
       legs: [{ ...LEGS[0], price: "121" }, { ...LEGS[1], price: "26" }] },
   };
@@ -447,5 +447,31 @@ describe("a complete fill, or one flagged as not yet complete", () => {
     await quoted(t);
     await t.confirm(t.state.check.total);
     expect(t.state.fill).toMatchObject({ complete: true, partial: true, premium: 0.475 });
+  });
+});
+
+describe("a quote worse than Derive's order book (owner's testnet run, 5 October 2026: 11110)", () => {
+  const worse = (fn) => ({ "private/rfq_get_best_quote": (p) => ({ ...bestQuote({ direction: p.direction, total: fn() }), orderbook_total_cost: "1.00" }) });
+
+  it("is never offered: the ticket keeps waiting for a better one", async () => {
+    let n = 0;
+    const { t, fake } = setup({ handlers: worse(() => (n++ < 2 ? "1.10" : "0.95")) });
+    await t.start();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(t.state.phase).toBe("asking");
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(t.state.phase).toBe("quoted");
+    expect(t.state.check.total).toBe(0.95);
+    expect(fake.calls(EXECUTE)).toHaveLength(0);
+  });
+
+  it("says so after twice the usual wait, with both totals in the testnet details", async () => {
+    const { t, fake } = setup({ handlers: worse(() => "1.10") });
+    await t.start();
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(t.state).toMatchObject({ phase: "blocked", check: { reason: "book_better" } });
+    expect(JSON.parse(t.state.detail.data)).toEqual({ quote_total_cost: 1.1, orderbook_total_cost: 1 });
+    expect(fake.calls("private/cancel_rfq")).toHaveLength(1);
+    expect(fake.calls(EXECUTE)).toHaveLength(0);
   });
 });

@@ -41,7 +41,7 @@ let fake, wallet, held, trades;
 
 const quote = (direction, total, fee, prices) => {
   const b = shapes["private/rfq_get_best_quote"];
-  return { ...b, direction, estimated_total_cost: total, estimated_fee: fee,
+  return { ...b, direction, estimated_total_cost: total, orderbook_total_cost: total, estimated_fee: fee,
     best_quote: { ...b.best_quote, rfq_id: direction === "buy" ? BUY_RFQ : SELL_RFQ, direction: direction === "buy" ? "sell" : "buy",
       legs: [{ instrument_name: C82, direction: "buy", amount: "0.03299", price: prices[0] }, { instrument_name: C88, direction: "sell", amount: "0.03299", price: prices[1] }] } };
 };

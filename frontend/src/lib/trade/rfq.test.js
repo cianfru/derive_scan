@@ -11,6 +11,7 @@ import { keyFromSecret } from "./sign.js";
 const key = keyFromSecret(keccak256(toUtf8Bytes("cowboy test session key")));
 const LEGS = shapes["private/send_rfq"].legs;
 const best = shapes["private/rfq_get_best_quote"];
+const withBook = (q) => (q && q.estimated_total_cost != null && q.orderbook_total_cost === best.orderbook_total_cost ? { ...q, orderbook_total_cost: q.estimated_total_cost } : q);
 
 function run({ quotes, handlers = {}, limit = 103.95, ...over } = {}) {
   let i = 0;
@@ -18,7 +19,8 @@ function run({ quotes, handlers = {}, limit = 103.95, ...over } = {}) {
     recorded: frames.frames,
     handlers: {
       "private/send_rfq": shapes["private/send_rfq"],
-      "private/rfq_get_best_quote": () => (typeof quotes === "function" ? quotes(i++) : quotes),
+      // Derive's order book matches the quote unless a test says otherwise.
+      "private/rfq_get_best_quote": () => withBook(typeof quotes === "function" ? quotes(i++) : quotes),
       "private/cancel_rfq": "ok",
       "public/execute_quote_debug": deriveError(-32601, "not in this test"),
       ...handlers,
