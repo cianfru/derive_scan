@@ -29,6 +29,13 @@ def load_universe(out: Path) -> dict:
     return json.loads(p.read_text()) if p.exists() else {}
 
 
+def option_currencies(currencies: list[dict]) -> list[str]:
+    """Coins with options in a `public/get_all_currencies` answer. V2 lists `instrument_types`;
+    V3 dropped it and carries an `option` object instead (docs: migrating/breaking-changes)."""
+    return sorted(c["currency"] for c in currencies
+                  if "option" in (c.get("instrument_types") or []) or c.get("option"))
+
+
 async def discover(settings: Settings, out: Path, now: float) -> list[str]:
     """Coins with options on Derive (`public/get_all_currencies`), refreshed hourly."""
     from derive.client import DeriveClient
@@ -42,7 +49,9 @@ async def discover(settings: Settings, out: Path, now: float) -> list[str]:
         res = await client.public("get_all_currencies", {})
     finally:
         await client.close()
-    unds = sorted(c["currency"] for c in res if "option" in (c.get("instrument_types") or []))
+    unds = option_currencies(res)
+    if not unds:  # an unreadable listing must not empty the recorder for an hour
+        raise ValueError("get_all_currencies listed no coin with options")
     (out / "universe.json").write_text(json.dumps({"at": int(now), "underlyings": unds}))
     return unds
 

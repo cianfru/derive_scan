@@ -32,6 +32,7 @@ from collections import defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
+from .flow import reverted
 from .implied import YEAR, _ncdf, black76_call
 
 FIRST_DAY = date(2023, 12, 1)  # Derive V2 public trades start mid-December 2023
@@ -107,7 +108,7 @@ def day_rows(trades: list[dict]) -> list[list]:
     """Per wallet and instrument totals for one day's legs (both sides of each trade)."""
     agg: dict = defaultdict(lambda: defaultdict(float))
     for tr in trades:
-        if tr.get("tx_status") == "reverted":
+        if reverted(tr):
             continue
         name = tr.get("instrument_name", "")
         opt = parse_option(name)
@@ -276,17 +277,19 @@ def last_complete_day(now: float, settle_sec: int = 3600) -> date:
 
 
 async def update_settlements(client, root: Path, unds: list[str]) -> dict[str, dict[str, float]]:
-    """{UND: {YYYYMMDD: price}} from Derive, kept in history/settlements."""
+    """{UND: {YYYYMMDD: price}} from Derive, kept in history/settlements. Derive's answer is merged
+    into the saved prices, never replaces them: V3 mainnet lists only its own expiries."""
     out = {}
     for und in unds:
         p = root / "history" / "settlements" / f"{und}.json"
+        prices = json.loads(p.read_text()) if p.exists() else {}
         try:
             res = await client.public("get_option_settlement_prices", {"currency": und})
-            prices = {e["expiry_date"]: _f(e["price"]) for e in (res.get("expiries") or []) if e.get("price")}
+            prices.update({e["expiry_date"]: _f(e["price"]) for e in (res.get("expiries") or []) if e.get("price")})
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(json.dumps(dict(sorted(prices.items())), separators=(",", ":")))
         except Exception:  # keep the last saved prices
-            prices = json.loads(p.read_text()) if p.exists() else {}
+            pass
         out[und] = prices
     return out
 

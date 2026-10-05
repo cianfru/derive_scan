@@ -125,6 +125,12 @@ def _commit(root: Path, files: list[tuple[Path, str]]) -> None:
     replay_pending(root.parent)
 
 
+def reverted(t: dict) -> bool:
+    """A leg that did not happen. V2 marks it `tx_status` "reverted"; V3 replaced that field with
+    `batch_status`, whose failed stages end in "Error" (docs: migrating/breaking-changes)."""
+    return t.get("tx_status") == "reverted" or str(t.get("batch_status") or "").endswith("Error")
+
+
 def leg_key(t: dict) -> str:
     return f"{t.get('trade_id')}:{t.get('wallet')}:{t.get('subaccount_id')}:{t.get('direction')}"
 
@@ -144,7 +150,7 @@ def sides(trades: list[dict], run_ts: int, exclude: set[str] = frozenset()) -> l
     """Taker buying and selling per coin and kind, without the excluded wallets."""
     agg: dict = defaultdict(lambda: defaultdict(float))
     for t in trades:
-        if t.get("tx_status") == "reverted":
+        if reverted(t):
             continue
         if t.get("liquidity_role") != "taker" or t.get("wallet") in exclude:
             continue
@@ -167,7 +173,7 @@ def sides(trades: list[dict], run_ts: int, exclude: set[str] = frozenset()) -> l
 def summarise(trades: list[dict], run_ts: int) -> tuple[list[list], list[list]]:
     large, wallets = [], defaultdict(lambda: defaultdict(float))
     for t in trades:
-        if t.get("tx_status") == "reverted":
+        if reverted(t):
             continue
         name = t.get("instrument_name", "")
         kind = kind_of(name)
@@ -271,7 +277,11 @@ async def read_exact(client, params: dict, from_ms: int, to_ms: int, *, deadline
         return (sliced, True) if exact else ({**unique, **sliced}, False)
 
     got, exact = await window(from_ms, to_ms, 0)
-    return list(got.values()), exact
+    legs = list(got.values())
+    alias = getattr(client, "wallet_alias", None)  # V3 mainnet: V2 wallet names (derive/wallet_alias.py)
+    if alias is not None:
+        await alias.apply(legs)
+    return legs, exact
 
 
 async def fetch_since(client: DeriveClient, since_ms: int, until_ms: int, *,

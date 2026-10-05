@@ -6,15 +6,28 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 # Public JSON-RPC bases. Methods are POSTed to base + "public/<method>".
+# "dir": where recorded files go. V3 mainnet continues the mainnet series in `v2_mainnet/` (the
+# directory every reader uses), so switching the source does not start an empty history; status
+# keys, runs/ and latest.json keep the real source name.
+# "wallets_from": V3 mainnet names each subaccount by its owner's own address, where V2 named the
+# Derive Wallet holding it; subaccount ids carry over, so legs read from V3 are given the V2 wallet
+# of their subaccount (derive/wallet_alias.py) and the traders' history keeps one name per trader.
 SOURCES = {
-    "v2_mainnet": {"base": "https://api.lyra.finance/", "api": 2},
-    "v3_testnet": {"base": "https://testnet.api.derive.xyz/v3/", "api": 3},
-    "v3_mainnet": {"base": "https://api.derive.xyz/v3/", "api": 3},
+    "v2_mainnet": {"base": "https://api.lyra.finance/", "api": 2, "dir": "v2_mainnet"},
+    "v3_testnet": {"base": "https://testnet.api.derive.xyz/v3/", "api": 3, "dir": "v3_testnet"},
+    "v3_mainnet": {"base": "https://api.derive.xyz/v3/", "api": 3, "dir": "v2_mainnet",
+                   "wallets_from": "v2_mainnet"},
 }
 
 
+def store_dir(source: str) -> str:
+    """Directory of a source's recorded files (its own name when not listed)."""
+    return SOURCES.get(source, {}).get("dir", source)
+
+
 def _csv(name: str, default: str) -> list[str]:
-    return [x.strip() for x in os.getenv(name, default).split(",") if x.strip()]
+    # An empty variable (e.g. an unset repository variable passed by the workflow) means the default.
+    return [x.strip() for x in (os.getenv(name) or default).split(",") if x.strip()]
 
 
 @dataclass
@@ -37,6 +50,10 @@ class Settings:
         unknown = [s for s in self.sources if s not in SOURCES]
         if unknown:
             raise ValueError(f"unknown DERIVE_SNAPSHOT_SOURCES: {unknown}; known: {list(SOURCES)}")
+        dirs = [store_dir(s) for s in self.sources]
+        if len(set(dirs)) != len(dirs):
+            raise ValueError(f"DERIVE_SNAPSHOT_SOURCES {self.sources} would record into the same directory; "
+                             "list one mainnet source")
         if self.interval_sec < 60:
             raise ValueError("DERIVE_SNAPSHOT_INTERVAL_SEC must be at least 60")
 
