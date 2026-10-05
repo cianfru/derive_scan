@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Info } from "../ui.jsx";
 import { money } from "../../lib/questions.js";
 import { DEPOSIT_SUGGESTED, NETWORK } from "../../lib/trade/config.js";
 import { depositCheck } from "../../lib/trade/account.js";
-import { acceptTerms, connect, deposit, depositGasUsd, holdSend, refreshFunding, useSeat } from "../../lib/trade/seat.js";
+import { acceptTerms, connect, deposit, depositGasUsd, holdSend, pickAccount, refreshFunding, useSeat } from "../../lib/trade/seat.js";
 import ErrorDetail from "./ErrorDetail.jsx";
 
 export const DERIVE_TERMS_URL = "https://www.derive.xyz/terms-of-use";
@@ -15,6 +15,39 @@ export function Copy({ text }) {
     try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1000); } catch { /* the address stays selectable */ }
   };
   return <button className="text-control" onClick={go}>{done ? "Copied" : "Copy"}</button>;
+}
+
+/** A Derive subaccount as the user sees it: "#90212". */
+export const accountName = (sub) => (sub ? `#${sub.id}` : "");
+
+/**
+ * "Use another account" / "Change account": with several funded Derive accounts, an inline list of
+ * them with their USDC, as underlined text. Picking one asks the wallet nothing and moves no funds.
+ */
+export function AccountChoice({ label = "Use another account", className = "" }) {
+  const seat = useSeat();
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  const list = seat.choices || [];
+  if (list.length < 2) return null;
+  return (
+    <div className={`tr-accounts ${className}`.trim()}>
+      <button type="button" className="text-control" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen((o) => !o)}>{label}</button>
+      {open && (
+        <ul id={id} className="tr-account-list" aria-label="Your funded Derive accounts">
+          {list.map((c) => (
+            <li key={c.id}>
+              {c.id === seat.saloon?.id
+                ? <span aria-current="true"><span className="mono">{accountName(c)}</span> <b className="mono">{money(c.usdc, { cents: true })}</b> · in use</span>
+                : <button type="button" className="text-control" disabled={seat.busy} onClick={() => { pickAccount(c.id); setOpen(false); }}>
+                  <span className="mono">{accountName(c)}</span> <span className="mono">{money(c.usdc, { cents: true })}</span>
+                </button>}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 /** Step 1: connect an ordinary browser wallet. */
@@ -58,7 +91,7 @@ export function TermsStep() {
   );
 }
 
-/** Step 3: fund the Saloon account with USDC (a deposit address on the settlement chain). */
+/** Step 3, only when no Derive account of the wallet holds USDC: a deposit address on the settlement chain. */
 export function FundStep({ ethUsd }) {
   const seat = useSeat();
   const [dollars, setDollars] = useState(100);
@@ -76,7 +109,7 @@ export function FundStep({ ethUsd }) {
     return (
       <div className="tr-step">
         <p className="tr-lead">Your deposit is on its way
-          <Info label="Why you can't send again yet">Your first deposit opens your Saloon account on Derive. Sending again before it lands would open a second account, so add more once this one is ready.</Info>
+          <Info label="Why you can't send again yet">Your first deposit opens your Derive account. Sending again before it lands would open a second account, so add more once this one is ready.</Info>
         </p>
         <dl className="tr-figs">
           <div><dt>Arriving</dt><dd className="mono">{onWay > 0 ? money(onWay, { cents: true }) : "Not available yet"}</dd></div>
@@ -92,8 +125,8 @@ export function FundStep({ ethUsd }) {
   }
   return (
     <div className="tr-step">
-      <p className="tr-lead">{isNew ? "Add USDC to start your Saloon account" : "Add USDC to your Saloon account"}
-        <Info label="About the Saloon account">A separate account on Derive, owned by your wallet and labelled Cowboy, for Saloon answers only. It keeps Saloon money apart from anything else you hold on Derive. Withdraw any time on Derive.</Info>
+      <p className="tr-lead">{isNew ? "Add USDC to start trading" : `Add USDC to your Derive account ${accountName(seat.saloon)}`}
+        <Info label="About your Derive account">Cowboy trades from one Derive account owned by your wallet. Money already on Derive works too: once a Derive account holds USDC, Cowboy offers it, and nothing moves. Withdraw any time on Derive.</Info>
       </p>
       {seat.newAccount && <p className="tr-note">Your first deposit opens your Derive account.</p>}
       <div className="tr-amount">
@@ -110,14 +143,14 @@ export function FundStep({ ethUsd }) {
       <dl className="tr-figs">
         <div><dt>Or send USDC on {NETWORK.chainName} to</dt><dd className="mono tr-addr">{seat.depositAddress ? <>{short(seat.depositAddress)} <Copy text={seat.depositAddress} /></> : "—"}</dd></div>
         {(seat.arriving > 0 || seat.sentAmount) && <div><dt>Arriving</dt><dd className="mono">{money(seat.arriving || seat.sentAmount, { cents: true })}</dd></div>}
-        {seat.saloon && <div><dt>In your Saloon account</dt><dd className="mono">{money(seat.saloon.usdc, { cents: true })}</dd></div>}
+        {seat.saloon && <div><dt>In account {accountName(seat.saloon)}</dt><dd className="mono">{money(seat.saloon.usdc, { cents: true })}</dd></div>}
       </dl>
       {(seat.arriving > 0 || seat.sentTx) && <p className="tr-note">Derive credits a deposit after about 2 minutes of confirmations.</p>}
       <div className="tr-actions">
         <button className="text-control" onClick={refreshFunding} disabled={seat.busy}>Check again</button>
-        <a className="text-link" href={NETWORK.appUrl} target="_blank" rel="noreferrer">Test USDC: Mint on Derive's testnet app ↗</a>
+        <a className="text-link" href={NETWORK.appUrl} target="_blank" rel="noreferrer">Fund it on Derive instead ↗</a>
       </div>
-      <p className="tr-note">From another chain, use Derive's own deposit screen.</p>
+      <p className="tr-note">Test USDC comes from Derive's testnet app. Funded there, it shows here after Check again.</p>
       {seat.message && <p className="tr-msg">{seat.message}<ErrorDetail detail={seat.detail} /></p>}
     </div>
   );

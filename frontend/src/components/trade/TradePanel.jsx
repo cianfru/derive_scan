@@ -161,7 +161,7 @@ export function DeriveSync({ onSynced }) {
       {!canRead ? (seat.stage === "terms" ? <TermsStep /> : seat.stage === "no_wallet" ? (
         <p className="tr-note">Checking these against Derive needs a browser wallet such as MetaMask or Rabby.</p>
       ) : seat.wallet && !seat.saloon && seat.stage === "fund" ? (
-        <p className="tr-note">This wallet has no Saloon account on Derive yet. It starts with the first deposit from a ticket.</p>
+        <p className="tr-note">This wallet has no Derive account yet. It starts with the first deposit from a ticket.</p>
       ) : (
         <div className="tr-actions">
           <span className="tr-note">Connect your wallet to check these against your Saloon account.</span>
@@ -172,7 +172,7 @@ export function DeriveSync({ onSynced }) {
         <div className="tr-actions">
           {st.phase === "reading" ? <span className="tr-wait"><span className="spin" aria-hidden="true" />Reading Derive…</span>
             : <span className="tr-note">{st.phase === "done" ? <>Checked with Derive at {at}{st.added ? ` · ${st.added} added from Derive's records` : ""}</> : st.phase === "error" ? <>{st.message}<ErrorDetail detail={st.detail} /></> : "Not checked yet"}</span>}
-          <span className="tr-note">Saloon account <b className="mono">{money(seat.saloon?.usdc, { cents: true })}</b> USDC</span>
+          <span className="tr-note">Derive account <span className="mono">#{seat.saloon?.id}</span> <b className="mono">{money(seat.saloon?.usdc, { cents: true })}</b> USDC</span>
           <button className="text-control" onClick={run} disabled={st.phase === "reading"}>Check again</button>
         </div>
       )}

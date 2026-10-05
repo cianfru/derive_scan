@@ -117,12 +117,12 @@ describe("one tap through Derive (testnet, dry run)", () => {
     await user.click(go);
 
     // The plain-English panel comes before any wallet prompt for the grant.
-    await within(panel).findByText("Let Cowboy place Saloon trades");
+    await within(panel).findByText(/Cowboy trades from your Derive account/);
     expect(within(panel).getByText(/Cowboy cannot withdraw, transfer, or touch your other Derive accounts/)).toBeTruthy();
     expect(wallet.calls.map((c) => c.method)).not.toContain("eth_signTypedData_v4");
     expect(wallet.calls.filter((c) => c.method === "personal_sign")).toHaveLength(1);
     await wordcheck(user, panel);
-    await user.click(within(panel).getByRole("button", { name: "Approve in wallet" }));
+    await user.click(within(panel).getByRole("button", { name: "Approve Cowboy" }));
 
     await within(panel).findByText(/Cowboy approved until/);
     expect(fake.calls("private/set_session_key")[0].params).toMatchObject({ protocol_scopes: ["trade:rfq:option"], subaccount_ids: [90212] });
@@ -157,7 +157,7 @@ describe("one tap through Derive (testnet, dry run)", () => {
     await user.click(screen.getByRole("button", { name: "Review orders" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     await user.click(within(panel).getByRole("button", { name: "Connect wallet" }));
-    await within(panel).findByText("Add USDC to your Saloon account");
+    await within(panel).findByText("Add USDC to your Derive account #90212");
     expect(fake.calls("public/register_deposit_address")[0].params).toEqual({ wallet: wallet.address, subaccount_id: 90212 });
     expect(within(panel).getByText(/0x9a3c…0912/)).toBeTruthy();
     expect(within(panel).getByText("$100.00")).toBeTruthy(); // arriving

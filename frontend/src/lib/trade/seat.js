@@ -2,9 +2,9 @@
 // the Saloon account and Cowboy's approval. One store per page, shared by every ticket.
 import { useSyncExternalStore } from "react";
 import { getAddress } from "ethers";
-import { NETWORK, SENT_HOLD_MS, TRADE_COINS } from "./config.js";
+import { NETWORK, SALOON_LABEL, SENT_HOLD_MS, TRADE_COINS } from "./config.js";
 import { NO_ACCOUNT, at, createClient, failure } from "./derive.js";
-import { arriving, depositAddress, findSaloon, knownList, rememberKnown, summarise } from "./account.js";
+import { arriving, depositAddress, findSaloon, fundedAccounts, labelAccount, listSubaccounts, otherAccounts, rememberAccount, summarise } from "./account.js";
 import { connectWallet, findProvider, gasEth, personalSign, sendTransaction, usdcTransfer } from "./wallet.js";
 import { approveCowboy, keySigner, switchOff as retireKey, usableKey } from "./sessionKey.js";
 import { KEYS, read, remove, write } from "./store.js";
@@ -195,7 +195,14 @@ async function ownerLogin() {
   return true;
 }
 
-/** Log in (with the browser's key when there is one: no wallet prompt), then find the Saloon account. */
+/** The accounts to choose from, and the note on the others, for the account Cowboy uses. */
+const accountsPatch = (subs, saloon) => ({ subs, choices: fundedAccounts(subs), others: saloon ? otherAccounts(subs, saloon.id) : null });
+
+/**
+ * Log in (with the browser's key when there is one: no wallet prompt), then pick the account Cowboy
+ * trades from: the key's own; else one labelled "Cowboy"; else the funded PRIME Standard subaccount
+ * with the most USDC (approval labels it). The deposit step shows only when none holds USDC.
+ */
 async function load() {
   const { client, wallet } = state;
   const stored = usableKey(wallet);
@@ -203,20 +210,37 @@ async function load() {
     await at("sign in", client.login(wallet, keySign(stored)));
     const sub = summarise(await at("find account", client.call("private/get_subaccount", { subaccount_id: stored.subaccount_id })));
     set({ key: stored, loggedAs: "key", newAccount: false });
-    if (!(sub.usdc > 0)) return toFund(sub); // an emptied account still needs its deposit address
-    return set({ saloon: sub, stage: "ready", busy: false });
+    // The other accounts, for "Change account": a read the key may not be allowed, so never in the way.
+    let subs = [sub];
+    try { subs = await listSubaccounts(client, wallet); } catch { /* the key's own account is enough */ }
+    if (!subs.some((x) => x.id === sub.id)) subs = [sub, ...subs];
+    if (sub.usdc > 0) return set({ saloon: sub, ...accountsPatch(subs, sub), stage: "ready", busy: false });
+    const funded = fundedAccounts(subs)[0];
+    if (funded) return set({ saloon: funded, ...accountsPatch(subs, funded), stage: "approve", busy: false });
+    set(accountsPatch(subs, sub));
+    return toFund(sub); // an emptied account still needs its deposit address
   }
   if (!(await ownerLogin())) {
     // No Derive account yet: everything up to the first deposit uses public calls only.
-    rememberKnown(wallet, []);
     return toFund(null);
   }
-  const { saloon, subs, others } = await at("find account", findSaloon(client, wallet));
-  if (!saloon && !knownList(wallet)) rememberKnown(wallet, subs); // only once, before any deposit
-  set({ others });
+  const { saloon, subs } = await at("find account", findSaloon(client, wallet));
+  set(accountsPatch(subs, saloon));
   if (!saloon || !(saloon.usdc > 0)) return toFund(saloon);
   remove(KEYS.sent(wallet));
   set({ saloon, key: null, stage: "approve", busy: false });
+}
+
+/**
+ * "Use another account": Cowboy trades from the funded subaccount the user picks. No wallet prompt
+ * and nothing on Derive changes; the approval that follows is for that account.
+ */
+export function pickAccount(id) {
+  if (state.busy) return;
+  const pick = (state.choices || []).find((c) => c.id === id);
+  if (!pick) return;
+  const ready = state.key?.subaccount_id === pick.id;
+  set({ saloon: pick, others: otherAccounts(state.subs || state.choices, pick.id), stage: ready ? "ready" : "approve", message: null });
 }
 
 async function toFund(saloon) {
@@ -245,15 +269,17 @@ export async function refreshFunding() {
       return set({ saloon: null, ...funding(arr, null), ...sentPatch(wallet), busy: false });
     }
     const had = state.saloon;
-    const { saloon, others } = await at("find account", findSaloon(client, wallet));
+    const { saloon, subs } = await at("find account", findSaloon(client, wallet, { prefer: had?.id ?? state.key?.subaccount_id ?? null }));
+    const accounts = accountsPatch(subs, saloon);
     if (saloon && saloon.usdc > 0) {
       remove(KEYS.sent(wallet));
-      return set({ saloon, others, opening: 0, sentTx: null, sentAmount: null, sentAt: null, stage: state.key ? "ready" : "approve", busy: false });
+      const ready = state.key?.subaccount_id === saloon.id;
+      return set({ saloon, ...accounts, opening: 0, sentTx: null, sentAmount: null, sentAt: null, stage: ready ? "ready" : "approve", busy: false });
     }
-    // A new Saloon account takes its own deposit address from now on (the old one opens another account).
-    const address = saloon && !had ? await at("deposit address", depositAddress(client, wallet, saloon.id)) : state.depositAddress;
+    // An account that now exists takes its own deposit address (the new-account one would open another).
+    const address = saloon && saloon.id !== had?.id ? await at("deposit address", depositAddress(client, wallet, saloon.id)) : state.depositAddress;
     arr = await at("find account", arriving(client, wallet));
-    set({ saloon, others, depositAddress: address, ...funding(arr, saloon), ...(saloon ? {} : sentPatch(wallet)), busy: false });
+    set({ saloon, ...accounts, depositAddress: address, ...funding(arr, saloon), ...(saloon ? {} : sentPatch(wallet)), busy: false });
   } catch (e) { fail(e, "find account"); }
 }
 
@@ -276,14 +302,32 @@ export async function deposit(dollars) {
   } catch (e) { fail(e, "deposit"); }
 }
 
+/**
+ * Approve Cowboy for the account in view: one signature for the grant (plus a sign-in when the page
+ * is not signed in as the owner). Only after Derive accepts it is the account labelled "Cowboy", so a
+ * declined signature leaves the user's account as it was.
+ */
 export async function approve() {
   const { client, provider, wallet, saloon } = state;
+  if (!saloon) return;
   set({ busy: true, message: null });
   try {
-    if (state.loggedAs !== "owner") { await at("sign in", client.login(wallet, ownerSign(provider, wallet))); }
+    if (state.loggedAs !== "owner") {
+      await at("sign in", client.login(wallet, ownerSign(provider, wallet)));
+      set({ loggedAs: "owner" });
+    }
     const stored = await at("approve", approveCowboy({ client, provider, owner: wallet, subaccountId: saloon.id, ...(deps.newKey ? { newKey: deps.newKey } : {}) }));
+    rememberAccount(wallet, saloon.id);
+    let labelled = saloon;
+    let subs = state.subs || [saloon];
+    try {
+      labelled = await labelAccount(client, subs, saloon);
+      subs = subs.map((x) => (x.id === labelled.id ? labelled : x.label === SALOON_LABEL ? { ...x, label: "" } : x));
+    } catch (e) {
+      try { console.warn("[Cowboy] the account label was not set; this browser remembers the account", e); } catch { /* no console */ }
+    }
     await at("sign in", client.login(wallet, keySign(stored))); // later calls sign in with the key, without wallet prompts
-    set({ key: stored, loggedAs: "key", stage: "ready", busy: false });
+    set({ key: stored, saloon: labelled, subs, choices: fundedAccounts(subs), loggedAs: "key", stage: "ready", busy: false });
   } catch (e) { fail(e, "approve"); }
 }
 

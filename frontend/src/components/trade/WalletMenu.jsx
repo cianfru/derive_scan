@@ -5,7 +5,7 @@ import { Link, useLocation } from "react-router-dom";
 import { money } from "../../lib/questions.js";
 import { connect, disconnect, resume, seatState, switchOff, useSeat } from "../../lib/trade/seat.js";
 import { WalletEmblem } from "../WalletTag.jsx";
-import { Copy, TermsStep } from "./SeatSetup.jsx";
+import { AccountChoice, Copy, TermsStep, accountName } from "./SeatSetup.jsx";
 import { until } from "./ApproveCowboy.jsx";
 import ErrorDetail from "./ErrorDetail.jsx";
 
@@ -20,7 +20,7 @@ export function accountStatus(seat) {
   const usdc = Number.isFinite(seat.saloon?.usdc) ? money(seat.saloon.usdc, { cents: true }) : null;
   switch (seat.stage) {
     case "ready": return { key: "ready", label: "Ready", usdc, note: seat.key ? `Cowboy approved until ${until(seat.key.expiry_sec)}` : null };
-    case "approve": return { key: "approve", label: "Approval needed", usdc, note: "Approve Cowboy from the ticket of any answer." };
+    case "approve": return { key: "approve", label: "Approval needed", usdc, note: "Cowboy trades from this account once you approve it, from the ticket of any answer." };
     case "fund": return { key: "fund", label: "Funding needed", usdc: seat.saloon ? usdc : null,
       note: seat.saloon ? "Add USDC from the ticket of any answer."
         : seat.newAccount ? "Your first deposit opens your Derive account. Add USDC from the ticket of any answer."
@@ -29,7 +29,7 @@ export function accountStatus(seat) {
   }
 }
 
-/** Another new Derive account holding USDC beside the Saloon account (Cowboy moves no funds). */
+/** Other Derive accounts holding USDC beside the one Cowboy uses (Cowboy moves no funds). */
 export function otherNote(seat) {
   const o = seat.saloon && seat.others;
   if (!o || !(o.usdc > 0)) return null;
@@ -140,11 +140,12 @@ export default function WalletMenu({ early = null }) {
           {seat.stage === "terms" ? <div className="hw-terms tr"><TermsStep /></div> : (
             <>
               <Link to="/saloon/mine" className="hw-item hw-account">
-                <span>Saloon account</span>
+                <span>{seat.saloon ? <>Derive account <span className="mono">{accountName(seat.saloon)}</span></> : "Derive account"}</span>
                 <span className={`hw-status hw-${st.key}`}>{st.label}{st.usdc && <b className="mono">{st.usdc}</b>}</span>
               </Link>
               {st.note && <p className="hw-note">{st.note}</p>}
               {otherNote(seat) && <p className="hw-note">{otherNote(seat)}</p>}
+              {(seat.stage === "ready" || seat.stage === "approve") && <AccountChoice label="Change account" className="hw-accounts" />}
             </>
           )}
           <div className="hw-sep" role="presentation" />

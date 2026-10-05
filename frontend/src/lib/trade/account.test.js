@@ -4,10 +4,9 @@ import frames from "../../fixtures/trade/public_frames.json";
 import { createClient } from "./derive.js";
 import { fakeDerive } from "./fakeSocket.js";
 import { fakeWallet } from "./fakeWallet.js";
-import { _resetAssets, arriving, depositAddress, depositCheck, depositParams, findNew, findSaloon, pickSaloon, rememberKnown, summarise } from "./account.js";
+import { _resetAssets, arriving, chooseAccount, depositAddress, depositCheck, depositParams, findSaloon, labelAccount, pickSaloon, rememberAccount, summarise } from "./account.js";
 import { connectWallet, usdcTransfer, usdcUnits } from "./wallet.js";
 import { plainError } from "./derive.js";
-import { KEYS, write } from "./store.js";
 
 const client = (handlers, recorded = []) => {
   const fake = fakeDerive({ handlers, recorded });
@@ -37,18 +36,18 @@ describe("the Saloon account", () => {
     expect(fake.calls("private/change_subaccount_label")).toHaveLength(0);
   });
 
-  it("labels the one new PRIME Standard subaccount after the first deposit, and only that", async () => {
+  it("proposes a funded account it did not open, and labels nothing while finding it", async () => {
     const subs = structuredClone(shapes["private/get_subaccount"]);
     subs[90212].label = "";
-    rememberKnown("0xw", [{ id: 90211 }]);
     const { fake, c } = client(subHandlers(subs));
-    const { saloon } = await findSaloon(c, "0xw");
-    expect(saloon.id).toBe(90212);
-    expect(fake.calls("private/change_subaccount_label")[0].params).toEqual({ subaccount_id: 90212, label: "Cowboy" });
-    // a subaccount that was there before the deposit is never claimed
-    expect(findNew([summarise(subs[90212])], { ids: [90212], at: 0 })).toBeNull();
-    // nor a subaccount under another manager
+    const { saloon, choices, others } = await findSaloon(c, "0xw");
+    expect(saloon).toMatchObject({ id: 90212, label: "", usdc: 240.5 });
+    expect(choices.map((x) => x.id)).toEqual([90212]);
+    expect(others).toBeNull();
+    expect(fake.calls("private/change_subaccount_label")).toHaveLength(0);
+    // a subaccount under another manager is never used
     expect(pickSaloon([{ id: 5, label: "Cowboy", manager: 5 }])).toBeNull();
+    expect(chooseAccount([{ id: 5, label: "", manager: 5, usdc: 100 }])).toBeNull();
   });
 
   it("adds up USDC still arriving", async () => {
@@ -89,35 +88,47 @@ describe("the Saloon account", () => {
     expect(later).toMatchObject({ amount: 0, landing: 0, openingCount: 0 });
   });
 
-  it("labels the lowest-id new subaccount holding USDC when two deposits opened two", async () => {
+  const acct = (id, usdc, label = "", manager = 1) => ({ id, usdc, label, manager });
+
+  it("proposes the account with the most USDC, ties to the lowest id, and notes the others", async () => {
     const base = shapes["private/get_subaccount"][90212];
     const mk = (id, usdc, manager = 1) => ({ ...structuredClone(base), subaccount_id: id, manager_id: manager, label: "",
       collaterals: usdc ? base.collaterals.map((x) => ({ ...x, amount: String(usdc) })) : [] });
-    const subs = { 7: mk(7, 0, 0), 8: mk(8, 0), 9: mk(9, 10), 10: mk(10, 10), 11: mk(11, 25) };
-    rememberKnown("0xw", [{ id: 11 }]); // there before Cowboy: never claimed
+    const subs = { 7: mk(7, 500, 0), 8: mk(8, 0), 9: mk(9, 10), 10: mk(10, 25), 11: mk(11, 25) };
     const { fake, c } = client(subHandlers(subs));
-    const { saloon, others } = await findSaloon(c, "0xw");
-    expect(saloon).toMatchObject({ id: 9, label: "Cowboy", usdc: 10 });
-    expect(fake.calls("private/change_subaccount_label").map((m) => m.params)).toEqual([{ subaccount_id: 9, label: "Cowboy" }]);
-    expect(others).toEqual({ count: 1, usdc: 10, ids: [10] });
-    // with nothing funded, none of several is picked
-    expect(findNew([summarise(mk(3, 0)), summarise(mk(4, 0))], null)).toBeNull();
+    const { saloon, choices, others } = await findSaloon(c, "0xw");
+    expect(saloon).toMatchObject({ id: 10, usdc: 25 });
+    expect(choices.map((x) => x.id)).toEqual([10, 11, 9]); // manager 0 and empty accounts are no choice
+    expect(others).toEqual({ count: 2, usdc: 35, ids: [11, 9] });
+    expect(fake.calls("private/change_subaccount_label")).toHaveLength(0);
   });
 
-  it("claims a funded new account even when a list taken after the deposit names it as known", async () => {
-    const base = shapes["private/get_subaccount"][90212];
-    const mk = (id, usdc, since) => ({ ...structuredClone(base), subaccount_id: id, manager_id: 1, label: "",
-      collaterals: usdc ? base.collaterals.map((x) => ({ ...x, amount: String(usdc), creation_timestamp: since })) : [] });
-    // The owner's run: the first version wrote both new accounts into a plain array after the deposits.
-    write(KEYS.known("0xw"), [9, 10]);
-    const subs = { 9: mk(9, 10, 1791089400000), 10: mk(10, 10, 1791089700000) };
-    const { c } = client(subHandlers(subs));
-    const { saloon, others } = await findSaloon(c, "0xw");
-    expect(saloon).toMatchObject({ id: 9, label: "Cowboy" });
-    expect(others).toMatchObject({ count: 1, ids: [10] });
-    // A list taken before the deposit still protects an account funded before it.
-    expect(findNew([summarise(mk(5, 40, 1000))], { ids: [5], at: 2000 })).toBeNull();
-    expect(findNew([summarise(mk(5, 40, 1000)), summarise(mk(6, 10, 3000))], { ids: [5], at: 2000 })).toMatchObject({ id: 6 });
+  it("chooses the account asked for, then Cowboy's label, then this browser's last, while each holds USDC", () => {
+    const subs = [acct(1, 50), acct(2, 5, "Cowboy"), acct(3, 20), acct(4, 0, "Cowboy")];
+    expect(chooseAccount(subs).id).toBe(2);
+    expect(chooseAccount(subs, { prefer: 3 }).id).toBe(3);
+    expect(chooseAccount(subs, { prefer: 4 }).id).toBe(2); // an empty account gives way to a funded one
+    expect(chooseAccount([acct(1, 50), acct(3, 20)], { remembered: 3 }).id).toBe(3);
+    expect(chooseAccount([acct(1, 50), acct(4, 0, "Cowboy")]).id).toBe(1); // deposit only when nothing is funded
+    rememberAccount("0xw", 3);
+    expect(localStorage.getItem("cowboy-saloon-account:testnet:0xw")).toMatch(/"id":3/);
+  });
+
+  it("targets an existing empty account for a deposit, and none when the wallet has no PRIME Standard account", () => {
+    expect(chooseAccount([acct(6, 0), acct(5, 0), acct(4, 0, "", 0)]).id).toBe(5);
+    expect(chooseAccount([acct(6, 0), acct(5, 0, "Cowboy")]).id).toBe(5);
+    expect(chooseAccount([acct(6, 0), acct(5, 0)], { prefer: 6 }).id).toBe(6);
+    expect(chooseAccount([acct(4, 0, "", 0)])).toBeNull();
+    expect(chooseAccount([])).toBeNull();
+  });
+
+  it("labels the approved account Cowboy, keeps a label the user gave, and moves Cowboy's label off the old one", async () => {
+    const { fake, c } = client({ "private/change_subaccount_label": ({ subaccount_id, label }) => ({ subaccount_id, label }) });
+    expect(await labelAccount(c, [acct(1, 50), acct(2, 5, "Cowboy")], acct(1, 50))).toMatchObject({ id: 1, label: "Cowboy" });
+    expect(fake.calls("private/change_subaccount_label").map((m) => m.params)).toEqual([{ subaccount_id: 2, label: "" }, { subaccount_id: 1, label: "Cowboy" }]);
+    const again = client({ "private/change_subaccount_label": ({ subaccount_id, label }) => ({ subaccount_id, label }) });
+    expect(await labelAccount(again.c, [acct(1, 50, "Main")], acct(1, 50, "Main"))).toMatchObject({ label: "Main" });
+    expect(again.fake.calls("private/change_subaccount_label")).toHaveLength(0);
   });
 
   it("refuses under $10, suggests $50 or more, and warns when gas is over 5%", () => {
