@@ -121,7 +121,7 @@ describe("Positions from Derive", () => {
     expect(again.added).toHaveLength(0);
     expect(again.exits).toEqual([{ key: r.key, exit: expect.objectContaining({ via: "rfq", gross: 1.2, fees: 0.62, rfq_id: "5a5a5a5a-0000-4000-8000-000000000001" }) }]);
     const [closed] = closePosition(r.key, again.exits[0].exit, 1790960300, "testnet");
-    expect(recoverFills([closed], fills, 1790960400)).toEqual({ added: [], exits: [] });
+    expect(recoverFills([closed], fills, 1790960400)).toEqual({ added: [], exits: [], repairs: [], claims: [] });
   });
 
   it("reads the Saloon account and the testnet's settlement price over the user's connection", async () => {

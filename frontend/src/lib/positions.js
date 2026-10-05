@@ -98,7 +98,10 @@ function valid(p) {
 export function addPosition(p, now = Date.now()) {
   const net = netOf(p.network);
   const list = loadPositions(net);
-  const row = { ...p, key: `${p.id}:${p.side}:${now}`, at: Math.floor(now / 1000), network: net };
+  // A one-tap record brings its own key (its RFQ and legs): the same fill is never added twice.
+  const key = typeof p.key === "string" && p.key ? p.key : `${p.id}:${p.side}:${now}`;
+  if (list.some((r) => r.key === key)) return list;
+  const row = { ...p, key, at: Math.floor(now / 1000), network: net };
   if (!valid(row)) return list;
   list.push(row);
   savePositions(list, net);
@@ -153,6 +156,29 @@ export function openPart(p) {
 
 /** Only part of the package filled (only the first option, or unequal amounts): never valued as the answer. */
 export const partial = (p) => p.exec === "hand_partial";
+
+/** Merges `patch` into one record (sync attaches the wallet and Derive account to an older record). */
+export function patchPosition(key, patch, network = "mainnet") {
+  const list = loadPositions(network).map((p) => (p.key === key ? { ...p, ...patch } : p));
+  savePositions(list, network);
+  return list;
+}
+
+/** Replaces one record, keeping its key (sync repairs a fill from Derive's trades). */
+export function replacePosition(key, record, network = "mainnet") {
+  const list = loadPositions(network).map((p) => (p.key === key && valid(record) ? { ...record, key } : p));
+  savePositions(list, network);
+  return list;
+}
+
+/** The records Positions shows with `wallet` connected: its own, and every record that names no
+ * wallet (placed by hand, or older one-tap records not yet matched on Derive). Other wallets'
+ * one-tap records stay saved (and in Export) but out of view. No wallet: everything. */
+export function forWallet(list, wallet) {
+  if (!wallet) return list;
+  const w = String(wallet).toLowerCase();
+  return list.filter((p) => !p.wallet || String(p.wallet).toLowerCase() === w);
+}
 
 export function removePosition(key, network = "mainnet") {
   const list = loadPositions(network).filter((p) => p.key !== key);
@@ -241,6 +267,7 @@ export function positionStatus(p, { settled = false, settling = false } = {}) {
   if (partial(p)) return { key: "partial", warn: true, text: p.journal?.fill?.legs?.[1]?.qty > 0
     ? "Placed by hand · not fully filled" : "Placed by hand · only the first filled" };
   if (settling) return { key: "settling", text: "Settling · average from 07:30 to 08:00 UTC" };
+  if (oneTap && p.journal?.fill?.complete === false) return { key: "checking", warn: true, text: "Bought in one tap · Derive's records still being checked" };
   if (oneTap) return { key: "both", text: (p.journal?.fill?.filled_pct ?? 1) < 1 ? "Bought in one tap · part filled" : "Bought in one tap" };
   return { key: "both", text: "Placed by hand · both filled" };
 }

@@ -3,10 +3,10 @@
 import { useSyncExternalStore } from "react";
 import { getAddress } from "ethers";
 import { NETWORK, SALOON_LABEL, SENT_HOLD_MS, TRADE_COINS } from "./config.js";
-import { NO_ACCOUNT, at, createClient, failure } from "./derive.js";
+import { NO_ACCOUNT, at, createClient, deriveKeyRejected, failure, plainError } from "./derive.js";
 import { arriving, depositAddress, findSaloon, fundedAccounts, labelAccount, listSubaccounts, otherAccounts, rememberAccount, summarise } from "./account.js";
 import { connectWallet, findProvider, gasEth, personalSign, sendTransaction, usdcTransfer } from "./wallet.js";
-import { approveCowboy, keySigner, switchOff as retireKey, usableKey } from "./sessionKey.js";
+import { approveCowboy, clearKey, keySigner, switchOff as retireKey, usableKey } from "./sessionKey.js";
 import { KEYS, read, remove, write } from "./store.js";
 
 let deps = { findProvider, createClient, newKey: undefined };
@@ -139,12 +139,14 @@ export async function resume() {
     if (!usableKey(wallet) || !termsAccepted()) return quiet();
     const client = deps.createClient({ url: NETWORK.wsUrl });
     set({ provider, wallet, client, newAccount: false, loggedAs: null });
-    await load();
+    await load({ canPrompt: false });
     watch(provider);
     set({ resuming: false });
     return true;
   } catch (e) {
-    try { console.warn("[Cowboy] resume failed; connect again", e); } catch { /* no console */ }
+    // A key Derive no longer takes is already dropped: the header offers "Reconnect", and that click
+    // signs in as the owner and asks for a fresh approval.
+    if (!e?.keyDropped) try { console.warn("[Cowboy] resume failed; connect again", e); } catch { /* no console */ }
     state.client?.close();
     state = { ...initial(), remembered };
     listeners.forEach((l) => l());
@@ -203,12 +205,26 @@ const accountsPatch = (subs, saloon) => ({ subs, choices: fundedAccounts(subs), 
  * trades from: the key's own; else one labelled "Cowboy"; else the funded PRIME Standard subaccount
  * with the most USDC (approval labels it). The deposit step shows only when none holds USDC.
  */
-async function load() {
+async function load({ canPrompt = true } = {}) {
   const { client, wallet } = state;
-  const stored = usableKey(wallet);
+  let stored = usableKey(wallet);
+  let sub = null;
   if (stored) {
-    await at("sign in", client.login(wallet, keySign(stored)));
-    const sub = summarise(await at("find account", client.call("private/get_subaccount", { subaccount_id: stored.subaccount_id })));
+    try {
+      await at("sign in", client.login(wallet, keySign(stored)));
+      sub = summarise(await at("find account", client.call("private/get_subaccount", { subaccount_id: stored.subaccount_id })));
+    } catch (e) {
+      if (!deriveKeyRejected(e, { login: true })) throw e;
+      // Derive no longer takes this key (expired, revoked or unknown): drop it so it is never tried
+      // again. On a click the owner signs in below and the approve step follows; on a reload, nothing
+      // prompts and the seat stays disconnected.
+      forgetKey(wallet, client);
+      stored = null;
+      if (!canPrompt) throw Object.assign(new Error("Cowboy's key was rejected"), { keyDropped: true });
+      set({ message: plainError({ code: 14030 }) });
+    }
+  }
+  if (stored) {
     set({ key: stored, loggedAs: "key", newAccount: false });
     // The other accounts, for "Change account": a read the key may not be allowed, so never in the way.
     let subs = [sub];
@@ -331,18 +347,49 @@ export async function approve() {
   } catch (e) { fail(e, "approve"); }
 }
 
+/** This browser's copy of the key goes, and the connection stops signing in with it. */
+function forgetKey(wallet, client) {
+  if (wallet) clearKey(wallet);
+  client?.logout();
+}
+
+/**
+ * Derive rejected Cowboy's key in use (a ticket got 14023/14026/14030, or an RFQ cancelled for
+ * "session_key_deregistered"): drop it and go to the approve step. Nothing prompts here; Approve is
+ * the user's click and signs in as the owner first.
+ */
+export function dropKey(message = plainError({ code: 14030 })) {
+  if (!state.wallet) return;
+  forgetKey(state.wallet, state.client);
+  set({ key: null, loggedAs: null, busy: false, stage: state.stage === "ready" ? "approve" : state.stage, message });
+}
+
+export const SWITCHED_OFF = {
+  deleted: "Cowboy's key is deleted from this browser, so nothing can trade with it here.",
+  told: "Derive retires it within 15 minutes.",
+  untold: "Derive was not told to retire it; it ends by itself within 7 days.",
+};
+
+/**
+ * Switch off: the browser's key goes first, whatever the wallet or Derive answer next, so the message
+ * that says so is always true and neither a reload nor a reconnect can bring it back. Then, with the
+ * owner's signature, Derive is told to retire it; the message says separately whether it was.
+ */
 export async function switchOff() {
   const { client, provider, wallet, key } = state;
   remove(KEYS.lastWallet()); // nothing to resume without the key
-  set({ busy: true, message: null });
+  if (wallet) clearKey(wallet);
+  set({ key: null, busy: true, message: null });
+  if (!key || !client) return set({ stage: state.saloon ? "approve" : state.stage, busy: false, message: SWITCHED_OFF.deleted });
   try {
     await at("sign in", client.login(wallet, ownerSign(provider, wallet)));
     set({ loggedAs: "owner" });
     await at("switch off", retireKey({ client, provider, owner: wallet, stored: key }));
-    set({ key: null, stage: "approve", busy: false, message: "Switched off. Derive retires the key within 15 minutes." });
+    set({ stage: "approve", busy: false, message: `Switched off. ${SWITCHED_OFF.deleted} ${SWITCHED_OFF.told}` });
   } catch (e) {
+    if (state.loggedAs !== "owner") { client.logout(); set({ loggedAs: null }); }
     const f = failure(e, "switch off");
-    set({ key: null, stage: "approve", busy: false, message: `${f.message} The key is deleted from this browser.`, detail: f.detail });
+    set({ stage: "approve", busy: false, message: `${SWITCHED_OFF.deleted} ${SWITCHED_OFF.untold} ${f.message}`, detail: f.detail });
   }
 }
 

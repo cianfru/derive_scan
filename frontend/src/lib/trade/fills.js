@@ -74,6 +74,31 @@ export function fillContracts(fill, mults = {}) {
   return l ? round(l.qty / (mults[l.name] || 1)) : 0;
 }
 
+/**
+ * True when a fill holds the whole package: every planned leg, each with its planned contracts times
+ * the share filled (`pct`), and nothing else. Derive's history can catch up one leg at a time; a fill
+ * read half way is not the package.
+ */
+export function fillComplete(fill, planned = {}, pct = 1) {
+  const names = Object.keys(planned);
+  if (!fill?.legs?.length || !names.length || fill.legs.length !== names.length) return false;
+  const share = Number.isFinite(pct) && pct > 0 ? Math.min(1, pct) : 1;
+  return names.every((n) => {
+    const l = fill.legs.find((x) => x.name === n);
+    const want = Number(planned[n]) * share;
+    return !!l && Math.abs(l.qty - want) <= 1e-9 + 1e-6 * Math.abs(want);
+  });
+}
+
+/**
+ * A Saloon package read without its plan (sync, from the RFQ label): two legs, one bought and one
+ * sold, the same contracts on each.
+ */
+export function packageComplete(fill) {
+  const [a, b] = fill?.legs || [];
+  return (fill?.legs || []).length === 2 && a.act !== b.act && a.qty > 0 && Math.abs(a.qty - b.qty) <= 1e-9 + 1e-6 * a.qty;
+}
+
 /** Every trade of the Saloon account since `sinceSec`, newest pages first, at most `maxPages` pages. */
 export async function tradesSince(client, subaccountId, { sinceSec = 0, pageSize = 100, maxPages = 5 } = {}) {
   const out = [];

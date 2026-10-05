@@ -13,8 +13,8 @@ import {
 } from "./config.js";
 import { TRADE_LIMITS, checkQuote, packageCost } from "./package.js";
 import { buildExecute, debugMatches, randomNonce } from "./sign.js";
-import { CANCEL_PLAIN, EXECUTE, MAINNET_GUARD, SOCKET_CLOSED, TIMEOUT, checkIncidents, errorDetail, failure, plainError } from "./derive.js";
-import { fillFromExecute, fillFromTrades, tradesOf, userSide } from "./fills.js";
+import { CANCEL_PLAIN, EXECUTE, MAINNET_GUARD, SOCKET_CLOSED, TIMEOUT, checkIncidents, deriveKeyRejected, errorDetail, failure, plainError } from "./derive.js";
+import { fillComplete, fillFromExecute, fillFromTrades, tradesOf, userSide } from "./fills.js";
 import { TRADING_NOTICE, addSpent, capGate, capMessage, tradingAllows } from "./limits.js";
 
 const secs = (t) => (t > 1e12 ? Math.floor(t / 1000) : Math.floor(t)); // Derive times can be ms
@@ -45,10 +45,12 @@ const UNKNOWN_CODES = new Set([TIMEOUT, SOCKET_CLOSED, 9000, 9001]);
  * min_total_cost (sell), or null for a sell back with no board price, which then takes its floor
  * from Derive's mark. `estimate` is the board's most-you-can-lose, for the caps before any RFQ.
  * `trading()` reads the kill switch. `onFill(fill)` gets every fill once, before the screen changes.
+ * `onKeyRejected()` is called when Derive no longer takes the Saloon key (the seat drops it and asks
+ * for a fresh approval).
  */
 export function createTicket({
   client, getInstrument, subaccountId, owner, wallet = owner, key, legs, direction, limit, payout, feeEstimate, label,
-  estimate = null, tolerance = TRADE_LIMITS.tolerance.major, mode = MODE, network = NETWORK, trading = () => "on", onFill = () => {},
+  estimate = null, tolerance = TRADE_LIMITS.tolerance.major, mode = MODE, network = NETWORK, trading = () => "on", onFill = () => {}, onKeyRejected = () => {},
   referral = REFERRAL, chainId = network?.chainId ?? NETWORK.chainId, onChange = () => {}, now = () => Date.now(),
   schedule = (fn, ms) => setTimeout(fn, ms), unschedule = (t) => clearTimeout(t), makeNonce = randomNonce,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -65,6 +67,8 @@ export function createTicket({
   const set = (patch) => { state = { ...state, ...patch }; onChange(state); };
   const stop = () => { if (timer) unschedule(timer); timer = null; };
   const tapStep = direction === "buy" ? "buy" : "sell";
+  /** Derive refused the key itself: the seat hears it once. */
+  const keyCheck = (e) => { if (deriveKeyRejected(e)) { try { onKeyRejected(); } catch { /* the screen still says it */ } } };
 
   async function cancel() {
     const id = rfq?.rfq_id;
@@ -127,6 +131,7 @@ export function createTicket({
     try {
       rfq = await client.call("private/send_rfq", params);
     } catch (e) {
+      keyCheck(e);
       return set({ phase: "error", ...failure(e, "price") });
     }
     if (closed) return cancel();
@@ -144,6 +149,7 @@ export function createTicket({
       if (closed) return;
       stop();
       await cancel();
+      keyCheck(e);
       return set({ phase: "error", ...failure(e, "price") });
     }
     if (closed || !["asking", "quoted"].includes(state.phase)) return;
@@ -225,6 +231,7 @@ export function createTicket({
     } catch (e) {
       if (UNKNOWN_CODES.has(e?.code)) return settle(sentAt);
       await cancel();
+      keyCheck(e);
       const f = failure(e, tapStep);
       if (EXPIRED_CODES.has(e?.code)) return set({ phase: "expired", message: OUTCOME.expired, detail: f.detail });
       if (BUSY_CODES.has(e?.code)) return set({ phase: "busy", message: OUTCOME.busy, detail: f.detail });
@@ -239,6 +246,7 @@ export function createTicket({
     if (res?.status === "filled" || pct > 0) return record(res, sentAt, Number.isFinite(pct) ? pct : 1);
     await cancel();
     if (res?.status === "cancelled") {
+      keyCheck(res.cancel_reason);
       return set({ phase: "rejected", message: CANCEL_PLAIN[res.cancel_reason] || plainError(null),
         detail: { ...errorDetail(res.cancel_reason || "cancelled", tapStep), message: "execute_quote answered cancelled" } });
     }
@@ -246,20 +254,34 @@ export function createTicket({
     return settle(sentAt);
   }
 
-  /** Read the fill from Derive's trade history (retrying while it catches up), else from the answer. */
+  /**
+   * Read the fill from Derive's trade history, retrying while it catches up, until every planned leg
+   * is there with its share; else take execute_quote's own legs when they are complete. A fill still
+   * short of a leg is recorded flagged `complete: false` (Positions repairs it from Derive's trades on
+   * the next sync), never as the package.
+   */
   async function record(res, sentAt, pct) {
     filled = pct >= 1 - 1e-9;
     set({ phase: "confirming" });
     const rfqId = rfq?.rfq_id || res?.rfq_id;
     let fill = null;
+    let partRead = null;
     for (let i = 0; i < CHECK_TRIES && !fill; i += 1) {
       try {
         const rows = await tradesOf(client, subaccountId, { rfqId, quoteId: res?.quote_id, sinceSec: sentAt });
-        fill = fillFromTrades(rows, { rfqId, planned });
+        const f = fillFromTrades(rows, { rfqId, planned });
+        if (f && fillComplete(f, planned, pct)) fill = f;
+        else if (f) partRead = f;
       } catch { /* read again */ }
       if (!fill && i < CHECK_TRIES - 1) await sleep(CHECK_MS);
     }
-    if (!fill && res?.legs) fill = fillFromExecute(res, userSide(legs, direction), { planned });
+    if (!fill && res?.legs) {
+      const f = fillFromExecute(res, userSide(legs, direction), { planned });
+      if (f && fillComplete(f, planned, pct)) fill = f;
+      else if (f && !partRead) partRead = f;
+    }
+    if (fill) fill = { ...fill, complete: true };
+    else if (partRead) fill = { ...partRead, complete: false };
     if (!fill) return set({ phase: "unknown", message: OUTCOME.unknown, rfqId });
     if (!filled) await cancel(); // a part fill: the rest is cancelled, never retried
     filled = true;

@@ -318,3 +318,71 @@ describe("reading fills", () => {
     expect(fillFromExecute(executed({ pct: "0.5" }), LEGS)).toMatchObject({ premium: 0.475, fees: 0.65125 });
   });
 });
+
+describe("a key Derive rejects in use", () => {
+  it("tells the seat once, from the RFQ, the tap or a cancelled fill, so it can ask for a fresh approval", async () => {
+    const cases = [
+      [{ "private/send_rfq": deriveError(14026, "Session key not found") }, false],
+      [{ [EXECUTE]: deriveError(14030, "Session key expired") }, true],
+      [{ [EXECUTE]: executed({ status: "cancelled", pct: "0", cancel: "session_key_deregistered" }) }, true],
+    ];
+    for (const [handlers, tap] of cases) {
+      const dropped = [];
+      const { t, fake } = setup({ handlers, onKeyRejected: () => dropped.push(1) });
+      if (tap) { await quoted(t); await t.confirm(t.state.check.total); } else await t.start();
+      expect(dropped).toHaveLength(1);
+      expect(t.state.message).toBe("Cowboy's approval has ended. Approve again to continue.");
+      expect(fake.calls(EXECUTE).length).toBeLessThanOrEqual(1);
+    }
+    // Other refusals leave the key alone.
+    const dropped = [];
+    const { t } = setup({ handlers: { [EXECUTE]: deriveError(11110, "Quote taker total cost too high") }, onKeyRejected: () => dropped.push(1) });
+    await quoted(t);
+    await t.confirm(t.state.check.total);
+    expect(dropped).toHaveLength(0);
+  });
+});
+
+describe("a complete fill, or one flagged as not yet complete", () => {
+  // Derive's history can catch up one leg at a time: the second (short) leg alone would read as a
+  // credit of $0.26 instead of the $0.95 paid.
+  const shortLeg = rec.taker.filter((x) => x.instrument_name.includes("92000"));
+
+  it("re-reads while the history holds only one leg of the package, and records the whole package", async () => {
+    let reads = 0;
+    const { t, fills } = setup({ handlers: { "private/get_trade_history": () => (++reads < 3 ? history(shortLeg) : history([...rec.taker, ...rec.maker])) } });
+    await quoted(t);
+    await t.confirm(t.state.check.total);
+    expect(t.state.phase).toBe("filled");
+    expect(t.state.fill).toMatchObject({ premium: 0.95, fees: 0.65125, complete: true, source: "trade_history" });
+    expect(t.state.fill.legs).toHaveLength(2);
+    expect(fills[0].premium).toBe(0.95);
+  });
+
+  it("falls back to execute_quote's complete legs when the history stays one leg short", async () => {
+    const { t } = setup({ handlers: { "private/get_trade_history": history(shortLeg) } });
+    await quoted(t);
+    await t.confirm(t.state.check.total);
+    expect(t.state.fill).toMatchObject({ source: "execute_quote", premium: 0.95, complete: true });
+  });
+
+  it("records it flagged as incomplete when neither the history nor the answer has every leg", async () => {
+    const { t, fills } = setup({ handlers: {
+      [EXECUTE]: { ...executed(), legs: [{ ...LEGS[1], price: "26" }] },
+      "private/get_trade_history": history(shortLeg),
+    } });
+    await quoted(t);
+    await t.confirm(t.state.check.total);
+    expect(t.state.phase).toBe("filled");
+    expect(t.state.fill.complete).toBe(false);
+    expect(fills[0].complete).toBe(false);
+  });
+
+  it("counts a part fill as complete when every leg filled the same share", async () => {
+    const half = rec.taker.map((x) => ({ ...x, trade_amount: "0.005" }));
+    const { t } = setup({ handlers: { [EXECUTE]: executed({ pct: "0.5" }), "private/get_trade_history": history(half) } });
+    await quoted(t);
+    await t.confirm(t.state.check.total);
+    expect(t.state.fill).toMatchObject({ complete: true, partial: true, premium: 0.475 });
+  });
+});

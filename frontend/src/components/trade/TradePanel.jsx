@@ -2,14 +2,14 @@ import { useEffect, useState } from "react";
 import { Info } from "../ui.jsx";
 import { useData } from "../../lib/data.js";
 import { money } from "../../lib/questions.js";
-import { addPosition, closePosition, loadPositions, settlePosition } from "../../lib/positions.js";
+import { addPosition, closePosition, loadPositions, patchPosition, replacePosition, settlePosition } from "../../lib/positions.js";
 import { remainingQty } from "../../lib/realized.js";
 import { MODE } from "../../lib/trade/config.js";
 import { failure } from "../../lib/trade/derive.js";
 import { TRADING_NOTICE, tradingState } from "../../lib/trade/limits.js";
 import { buyRecord, exitFromFill, knownRfqs } from "../../lib/trade/record.js";
 import { canTrade, connect, useSeat } from "../../lib/trade/seat.js";
-import { fillsByRfq, legStatus, readSaloon, recoverFills, settlementPrice, unexplained } from "../../lib/trade/sync.js";
+import { accountRecords, fillsByRfq, legStatus, readSaloon, recoverFills, settlementPrice, unexplained } from "../../lib/trade/sync.js";
 import { ConnectStep, FundStep, TermsStep } from "./SeatSetup.jsx";
 import ApproveCowboy, { SeatLine } from "./ApproveCowboy.jsx";
 import TradeTicket, { sellPlan, ticketPlan } from "./TradeTicket.jsx";
@@ -77,13 +77,19 @@ export default function TradePanel({ und, question, answer, level, sideKey, boar
       return;
     }
     const estimate = t ? { premium: t.premium, fees: t.fees, total: t.mostLose, contracts: t.contracts, ts: pricesTs ?? null } : null;
-    const rec = buyRecord({ fill, id: level.id, side: sideKey, network: "testnet", requested: plan?.contracts, level, board, markets, pricesTs, estimate, question, savedTs });
+    const rec = buyRecord({ fill, id: level.id, side: sideKey, network: "testnet", requested: plan?.contracts, level, board, markets, pricesTs, estimate, question, savedTs,
+      wallet: seat.wallet, subaccountId: seat.saloon?.id ?? null });
     if (rec) addPosition(rec, savedTs * 1000);
   };
 
   // Testnet builds: a level the testnet does not list never opens the one-tap ticket.
   const missing = MODE === "testnet" && !sell && level ? missingLegs(level.id, sideKey, listed) : [];
-  const ticket = <TradeTicket plan={plan} trading={trading} onFill={onFill} />;
+  // A one-tap position sells back only from the Derive account it was bought in.
+  const from = sell?.position?.subaccount_id;
+  const elsewhere = sell && from != null && seat.saloon && seat.saloon.id !== from;
+  const ticket = elsewhere
+    ? <p className="tr-msg" role="status">This position is in Derive account #{from}. Choose that account to sell it back in one tap.</p>
+    : <TradeTicket plan={plan} trading={trading} onFill={onFill} />;
   const step = useStep(ticket);
   if ((closing && !sell) || !canTrade(und)) return fallback;
   return (
@@ -120,15 +126,20 @@ export function DeriveSync({ onSynced }) {
   async function run() {
     setSt({ phase: "reading" });
     const now = Math.floor(Date.now() / 1000);
+    // Only this wallet's records on this Derive account are matched; others stay as they are.
+    const scope = { wallet: seat.wallet, subaccountId: seat.saloon.id };
     try {
       let list = loadPositions("testnet");
-      const firsts = list.map((p) => p.journal?.fill?.ts ?? p.at).filter(Number.isFinite);
+      const firsts = list.filter((p) => !p.wallet || (p.subaccount_id === scope.subaccountId && String(p.wallet).toLowerCase() === String(scope.wallet).toLowerCase()))
+        .map((p) => p.journal?.fill?.ts ?? p.at).filter(Number.isFinite);
       const sinceSec = Math.max(0, (firsts.length ? Math.min(...firsts) : now - 30 * 86400) - 3600);
       const { trades, held } = await readSaloon(seat.client, seat.saloon.id, { sinceSec });
       const fills = fillsByRfq(trades);
-      const { added } = recoverFills(list, fills, now);
+      const { added, repairs, claims } = recoverFills(list, fills, now, scope);
+      for (const c of claims) list = patchPosition(c.key, { wallet: c.wallet, subaccount_id: c.subaccount_id }, "testnet");
+      for (const { key, record } of repairs) list = replacePosition(key, record, "testnet");
       for (const r of added) list = addPosition(r, Date.now());
-      const { exits } = recoverFills(list, fills, now);
+      const { exits } = recoverFills(list, fills, now, scope);
       for (const { key, exit } of exits) list = closePosition(key, exit, now, "testnet");
       const prices = new Map();
       for (const p of list) {
@@ -139,15 +150,18 @@ export function DeriveSync({ onSynced }) {
         const price = prices.get(k);
         if (Number.isFinite(price)) list = settlePosition(p.key, price, now, "testnet");
       }
-      const statuses = legStatus(list, held, now);
-      const extra = unexplained(list, held, now);
-      onSynced?.({ list, statuses, extra, at: now, added: added.length });
-      setSt({ phase: "done", at: now, added: added.length });
+      const { mine } = accountRecords(list, fills, scope);
+      const ours = new Set(mine.map((p) => p.key));
+      const statuses = legStatus(mine, held, now);
+      for (const p of list) if (p.exec === "rfq" && !ours.has(p.key)) statuses[p.key] = { state: "other_account", subaccount_id: p.subaccount_id ?? null };
+      const extra = unexplained(mine, held, now);
+      onSynced?.({ list, statuses, extra, at: now, added: added.length, repaired: repairs.length, wallet: seat.wallet, subaccountId: seat.saloon.id });
+      setSt({ phase: "done", at: now, added: added.length, repaired: repairs.length });
     } catch (e) {
       setSt({ phase: "error", ...failure(e, "sync") });
     }
   }
-  useEffect(() => { if (canRead) run(); }, [canRead, seat.saloon?.id]);
+  useEffect(() => { if (canRead) run(); }, [canRead, seat.saloon?.id, seat.wallet]);
 
   const at = st.at ? `${new Date(st.at * 1000).toISOString().slice(11, 16)} UTC` : null;
   return (
@@ -171,7 +185,7 @@ export function DeriveSync({ onSynced }) {
       )) : (
         <div className="tr-actions">
           {st.phase === "reading" ? <span className="tr-wait"><span className="spin" aria-hidden="true" />Reading Derive…</span>
-            : <span className="tr-note">{st.phase === "done" ? <>Checked with Derive at {at}{st.added ? ` · ${st.added} added from Derive's records` : ""}</> : st.phase === "error" ? <>{st.message}<ErrorDetail detail={st.detail} /></> : "Not checked yet"}</span>}
+            : <span className="tr-note">{st.phase === "done" ? <>Checked with Derive at {at}{st.added ? ` · ${st.added} added from Derive's records` : ""}{st.repaired ? ` · ${st.repaired} corrected from Derive's records` : ""}</> : st.phase === "error" ? <>{st.message}<ErrorDetail detail={st.detail} /></> : "Not checked yet"}</span>}
           <span className="tr-note">Derive account <span className="mono">#{seat.saloon?.id}</span> <b className="mono">{money(seat.saloon?.usdc, { cents: true })}</b> USDC</span>
           <button className="text-control" onClick={run} disabled={st.phase === "reading"}>Check again</button>
         </div>

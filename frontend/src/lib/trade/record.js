@@ -33,7 +33,7 @@ export function exactJournal({ fill, id, side, network, settleTs, contracts, req
       legs: fill.legs.map((l) => ({ name: l.name, act: l.act, signed_qty: (l.act === "buy" ? 1 : -1) * (requested ?? contracts) })),
     },
     fill: {
-      ts: fill.ts, mode: "legs", complete: true, currency: "USDC", source: fill.source,
+      ts: fill.ts, mode: "legs", complete: fill.complete !== false, currency: "USDC", source: fill.source,
       legs: fill.legs.map((l) => ({ name: l.name, act: l.act, planned: l.planned ?? requested ?? contracts, qty: l.qty, signed_qty: l.signed_qty,
         price: l.price, fee: l.fee, trade_ids: l.trade_ids || [] })),
       premium: round(fill.premium), fees: fees == null ? null : round(fees), fees_known: fees != null, limitation: null,
@@ -51,9 +51,18 @@ export function exactJournal({ fill, id, side, network, settleTs, contracts, req
   };
 }
 
+/** A one-tap record's key: from its RFQ and the instruments it traded, so the same fill read twice
+ * (a re-sync, another device, an import) is the same record, and two fills saved in the same instant
+ * never share one. */
+export function oneTapKey(fill) {
+  const names = [...new Set((fill?.legs || []).map((l) => l.name))].sort();
+  return fill?.rfq_id && names.length ? `rfq:${fill.rfq_id}:${names.join("+")}` : null;
+}
+
 /** A position record for addPosition from a one-tap buy (exec "rfq"). `requested` is the contracts
- * asked for; a part fill records what filled. */
-export function buyRecord({ fill, id, side, network = "testnet", requested = null, level = null, board = null, markets = null, pricesTs = null, estimate = null, question = null, savedTs }) {
+ * asked for; a part fill records what filled. `wallet` and `subaccountId` name the wallet and the
+ * Derive account it was traded from: sync matches a record only against that account. */
+export function buyRecord({ fill, id, side, network = "testnet", requested = null, level = null, board = null, markets = null, pricesTs = null, estimate = null, question = null, savedTs, wallet = null, subaccountId = null }) {
   const q = parseId(id);
   if (!q || !fill?.legs?.length) return null;
   const contracts = fill.legs[0].qty;
@@ -64,6 +73,39 @@ export function buyRecord({ fill, id, side, network = "testnet", requested = nul
     paid: journal.cost.total ?? journal.cost.premium, estimate: estimate?.total ?? null, exec: "rfq",
     legs: fill.legs.map((l) => l.name), question: question || questionText(q.und, q, q.expiry), answer: ANSWER[side],
     settle_ts: settleTs, v: 2, network, journal,
+    ...(oneTapKey(fill) ? { key: oneTapKey(fill) } : {}),
+    ...(wallet ? { wallet } : {}), ...(Number.isSafeInteger(subaccountId) ? { subaccount_id: subaccountId } : {}),
+  };
+}
+
+const near = (a, b, tol = 1e-6) => (a == null && b == null) || (Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tol);
+
+/** True when a saved fill (a journal's `fill`, or an exit) disagrees with Derive's: other legs, amounts,
+ * prices, fees, premium or total fees. */
+export function fillDiffers(saved, derive) {
+  const a = [...(saved?.legs || [])].sort((x, y) => (x.name < y.name ? -1 : 1));
+  const b = [...(derive?.legs || [])].sort((x, y) => (x.name < y.name ? -1 : 1));
+  if (a.length !== b.length) return true;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i].name !== b[i].name || a[i].act !== b[i].act || !near(a[i].qty, b[i].qty, 1e-9) || !near(a[i].price, b[i].price) || !near(a[i].fee ?? null, b[i].fee ?? null)) return true;
+  }
+  if ("premium" in (saved || {}) && !near(saved.premium, derive.premium)) return true;
+  if ("gross" in (saved || {}) && !near(saved.gross, -derive.premium)) return true;
+  return !near(saved?.fees ?? null, Number.isFinite(derive?.fees) ? derive.fees : null);
+}
+
+/**
+ * A one-tap buy rebuilt from Derive's complete fill, keeping what was saved at entry: its key, time,
+ * exits, Derive's mark and the readings. The fill, its legs and its cost come from Derive.
+ */
+export function repairBuy(record, fill, { now }) {
+  const j = record.journal || {};
+  const fresh = buyRecord({ fill: { ...fill, pct: j.fill?.filled_pct ?? 1, complete: true }, id: record.id, side: record.side, network: record.network || "testnet",
+    requested: j.fill?.requested ?? null, savedTs: j.saved_ts ?? record.at ?? now, wallet: record.wallet || null, subaccountId: record.subaccount_id ?? null });
+  if (!fresh) return null;
+  return {
+    ...record, contracts: fresh.contracts, paid: fresh.paid, legs: fresh.legs, updated_at: Math.floor(now),
+    journal: { ...j, package: fresh.journal.package, fill: { ...fresh.journal.fill, repaired_ts: Math.floor(now) }, cost: fresh.journal.cost },
   };
 }
 
