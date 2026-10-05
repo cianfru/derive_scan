@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { money } from "../../lib/questions.js";
-import { connect, disconnect, seatState, switchOff, useSeat } from "../../lib/trade/seat.js";
+import { connect, disconnect, resume, seatState, switchOff, useSeat } from "../../lib/trade/seat.js";
 import { WalletEmblem } from "../WalletTag.jsx";
 import { Copy, TermsStep } from "./SeatSetup.jsx";
 import { until } from "./ApproveCowboy.jsx";
@@ -65,7 +65,8 @@ export default function WalletMenu({ early = null }) {
     const s = seatState();
     if (s.stage === "terms" || s.stage === "no_wallet" || s.message) setOpen(true);
   }
-  useEffect(() => { if (early?.current) { early.current = false; go(); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // A tap before the chunk arrived connects now; otherwise pick the remembered wallet back up quietly.
+  useEffect(() => { if (early?.current) { early.current = false; go(); } else resume(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { setOpen(false); }, [pathname]);
 
   const showing = open && (connected || seat.stage === "no_wallet" || !!seat.message);
@@ -97,11 +98,17 @@ export default function WalletMenu({ early = null }) {
   const leave = () => { disconnect(); setOpen(false); btn.current?.focus(); };
 
   if (!connected) {
+    // A wallet this browser connected before: "Reconnect" with its short address (a click, so any
+    // wallet prompt comes from the user), or "Reconnecting…" while the page resumes it quietly.
+    const again = seat.remembered && seat.stage === "disconnected";
+    const label = seat.resuming ? "Reconnecting" : seat.busy ? "Connecting" : again ? `Reconnect wallet ${shortAddr(seat.remembered)}` : "Connect wallet";
     return (
       <div className="hw" ref={wrap} onBlur={blur}>
-        <button ref={btn} type="button" className="btn hw-btn" data-ready="1" aria-label={seat.busy ? "Connecting" : "Connect wallet"}
+        <button ref={btn} type="button" className={`btn hw-btn${again && !seat.busy ? " hw-on" : ""}`} data-ready="1" aria-label={label}
           aria-disabled={seat.busy || undefined} onClick={go}>
-          {seat.busy ? "Connecting…" : <><span className="hw-long">Connect wallet</span><span className="hw-short" aria-hidden="true">Connect</span></>}
+          {seat.resuming ? "Reconnecting…" : seat.busy ? "Connecting…" : again
+            ? <><WalletEmblem address={seat.remembered} size={18} /><span className="mono hw-long">{tinyAddr(seat.remembered)}</span><span>Reconnect</span></>
+            : <><span className="hw-long">Connect wallet</span><span className="hw-short" aria-hidden="true">Connect</span></>}
         </button>
         {showing && (
           <div id={id} ref={panel} className="hw-menu hw-say" role="status">

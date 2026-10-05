@@ -1,6 +1,7 @@
 // Saloon stage 2: the user's seat at Derive for this page visit: the wallet, one Derive connection,
 // the Saloon account and Cowboy's approval. One store per page, shared by every ticket.
 import { useSyncExternalStore } from "react";
+import { getAddress } from "ethers";
 import { NETWORK, SENT_HOLD_MS, TRADE_COINS } from "./config.js";
 import { NO_ACCOUNT, at, createClient, failure } from "./derive.js";
 import { arriving, depositAddress, findSaloon, knownList, rememberKnown, summarise } from "./account.js";
@@ -9,7 +10,14 @@ import { approveCowboy, keySigner, switchOff as retireKey, usableKey } from "./s
 import { KEYS, read, remove, write } from "./store.js";
 
 let deps = { findProvider, createClient, newKey: undefined };
-const initial = () => ({ stage: deps.findProvider() ? "disconnected" : "no_wallet", busy: false, message: null });
+/** Set once this page has tried to resume (or connected): later resets never show "Reconnecting…". */
+let resumed = false;
+const initial = () => {
+  const provider = deps.findProvider();
+  const remembered = read(KEYS.lastWallet());
+  const resuming = !resumed && !!provider && !!remembered;
+  return { stage: provider ? "disconnected" : "no_wallet", busy: resuming, resuming, remembered: provider ? remembered : null, message: null };
+};
 let state = initial();
 const listeners = new Set();
 /** A new message replaces the old one's testing details. */
@@ -25,7 +33,7 @@ export function useSeat() {
   return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => state, () => state);
 }
 /** Tests and local previews swap the wallet and the socket here. */
-export function _setSeatDeps(d) { deps = { ...deps, ...d }; state = initial(); pub?.close(); pub = null; listeners.forEach((l) => l()); }
+export function _setSeatDeps(d) { deps = { ...deps, ...d }; unwatch(); resumed = false; state = initial(); pub?.close(); pub = null; listeners.forEach((l) => l()); }
 export function _setSeatState(s) { state = { ...initial(), ...s }; listeners.forEach((l) => l()); }
 
 /** A connection for public reads (the testnet's instrument list): the seat's own when it has one,
@@ -69,15 +77,94 @@ export function holdSend(seat, now = Date.now()) {
 const ownerSign = (provider, wallet) => (ts) => personalSign(provider, wallet, ts);
 const keySign = (stored) => (ts) => keySigner(stored).signMessage(ts);
 
+/**
+ * The wallet's own events. Another account, or none, ends the seat; so does leaving Sepolia (the seat
+ * never switches network by itself). Added once per connection, removed on disconnect.
+ */
+let watched = null;
+function watch(provider) {
+  if (watched?.provider === provider || typeof provider?.on !== "function") return;
+  unwatch();
+  const accountsChanged = (accounts) => {
+    if (!state.wallet) return;
+    const list = (accounts || []).map((a) => String(a).toLowerCase());
+    if (list.includes(state.wallet.toLowerCase())) return;
+    if (list.length) remove(KEYS.lastWallet()); // another account: forget this one; none (locked): keep it
+    end(null);
+  };
+  const chainChanged = (chainId) => {
+    if (!state.wallet || Number(chainId) === NETWORK.chainId) return;
+    end("Your wallet switched network. Connect again on Sepolia.");
+  };
+  provider.on("accountsChanged", accountsChanged);
+  provider.on("chainChanged", chainChanged);
+  watched = { provider, accountsChanged, chainChanged };
+}
+function unwatch() {
+  if (!watched) return;
+  const { provider, accountsChanged, chainChanged } = watched;
+  watched = null;
+  try {
+    provider.removeListener?.("accountsChanged", accountsChanged);
+    provider.removeListener?.("chainChanged", chainChanged);
+  } catch { /* the wallet went away */ }
+}
+/** Back to "disconnected" (the remembered wallet stays unless the caller forgot it), with a message. */
+function end(message) {
+  unwatch();
+  state.client?.close();
+  state = { ...initial(), message };
+  listeners.forEach((l) => l());
+}
+
+/**
+ * On page load, once: pick the remembered wallet back up without any wallet prompt. It resumes only if
+ * the wallet already exposes that account (eth_accounts never prompts), is on Sepolia, and this browser
+ * holds a usable Cowboy key for it; then the key signs in. Otherwise the seat stays disconnected and
+ * the header offers "Reconnect" (any signature comes from a click). Returns true when resumed.
+ */
+export async function resume() {
+  if (resumed) return false;
+  resumed = true;
+  const provider = deps.findProvider();
+  const remembered = read(KEYS.lastWallet());
+  const quiet = () => { set({ resuming: false, busy: false }); return false; };
+  if (!provider || !remembered || state.wallet) return quiet();
+  set({ resuming: true, busy: true, remembered });
+  try {
+    const accounts = (await provider.request({ method: "eth_accounts" })) || [];
+    if (!accounts.some((a) => String(a).toLowerCase() === remembered.toLowerCase())) return quiet();
+    if (Number(await provider.request({ method: "eth_chainId" })) !== NETWORK.chainId) return quiet();
+    const wallet = getAddress(remembered);
+    if (!usableKey(wallet) || !termsAccepted()) return quiet();
+    const client = deps.createClient({ url: NETWORK.wsUrl });
+    set({ provider, wallet, client, newAccount: false, loggedAs: null });
+    await load();
+    watch(provider);
+    set({ resuming: false });
+    return true;
+  } catch (e) {
+    try { console.warn("[Cowboy] resume failed; connect again", e); } catch { /* no console */ }
+    state.client?.close();
+    state = { ...initial(), remembered };
+    listeners.forEach((l) => l());
+    return false;
+  }
+}
+
 export async function connect() {
   const provider = deps.findProvider();
   if (!provider) return set({ stage: "no_wallet" });
+  if (state.resuming) return undefined;
+  resumed = true;
   set({ busy: true, message: null });
   try {
     const wallet = await at("connect", connectWallet(provider));
     state.client?.close();
     const client = deps.createClient({ url: NETWORK.wsUrl });
-    set({ provider, wallet, client, newAccount: false, loggedAs: null });
+    write(KEYS.lastWallet(), wallet);
+    set({ provider, wallet, client, newAccount: false, loggedAs: null, remembered: wallet });
+    watch(provider);
     if (!termsAccepted()) return set({ stage: "terms", busy: false });
     await load();
   } catch (e) { fail(e, "connect"); }
@@ -202,6 +289,7 @@ export async function approve() {
 
 export async function switchOff() {
   const { client, provider, wallet, key } = state;
+  remove(KEYS.lastWallet()); // nothing to resume without the key
   set({ busy: true, message: null });
   try {
     await at("sign in", client.login(wallet, ownerSign(provider, wallet)));
@@ -215,7 +303,6 @@ export async function switchOff() {
 }
 
 export function disconnect() {
-  state.client?.close();
-  state = initial();
-  listeners.forEach((l) => l());
+  remove(KEYS.lastWallet());
+  end(null);
 }
