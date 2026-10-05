@@ -341,13 +341,13 @@ export default function Landing() {
     <div className="landing cowboy-landing cowboy-draft">
       <section className="hero-stage" aria-labelledby="lp-hero">
         <div className="hero-inner">
-          <p className="hero-eyebrow">{QUESTIONS_ON ? `Engine · Traders · Options · ${oneTapOffered() ? "One tap" : "Saloon"}` : "Independent trader intelligence on Derive."}</p>
+          <p className="hero-eyebrow">{QUESTIONS_ON ? "Market insights · Options trading" : "Independent trader intelligence on Derive."}</p>
           <div className="sign-wrap"><NeonSign /></div>
           <div className="hero-row">
             <h1 id="lp-hero">Know where<br />the herd stands.{QUESTIONS_ON && <span className="hero-then"> Then pick your side.</span>}</h1>
             <div className="hero-side">
               <p className="hero-description">{QUESTIONS_ON
-                ? `The regime, the traders and the options at a glance. Then higher or lower ${oneTapOffered() ? "in one tap" : "on Derive"}, cost shown first.`
+                ? `See market conditions and how traders are positioned. Trade higher or lower ${oneTapOffered() ? "in one tap" : "on Derive"}, with the cost shown before you confirm.`
                 : "Understand the price cycle, follow wallet positioning and see what the options market prices in."}</p>
               <div className="hero-cta">
                 <EntryButton />
