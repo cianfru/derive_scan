@@ -7,8 +7,10 @@ import { createClient } from "./derive.js";
 import { fakeDerive, deriveError } from "./fakeSocket.js";
 import { fakeWallet } from "./fakeWallet.js";
 import { TESTNET_WS } from "./config.js";
-import { KEYS, read } from "./store.js";
-import { _setSeatDeps, connect, deposit, holdSend, refreshFunding, seatState } from "./seat.js";
+import { KEYS, read, write } from "./store.js";
+import { _setSeatDeps, connect, deposit, disconnect, holdSend, refreshFunding, resume, seatState, switchOff } from "./seat.js";
+import { keyFromSecret } from "./sign.js";
+import { keccak256, toUtf8Bytes } from "ethers";
 import { _resetAssets } from "./account.js";
 
 const ADDR = "0x9a3c5be1b0e4d0f7c6d2a8e1f3b4c5d6e7f80912";
@@ -182,5 +184,97 @@ describe("wallet errors are the wallet's", () => {
     expect(s.message).toBe("Your wallet stopped the request. Try again.");
     expect(s.detail).toMatchObject({ step: "switch network", source: "wallet", code: -32603 });
     expect(s.message).not.toMatch(/Derive/);
+  });
+});
+
+describe("a reload keeps the wallet", () => {
+  const prompts = (wallet) => wallet.calls.filter((c) => ["personal_sign", "eth_requestAccounts", "eth_signTypedData_v4", "wallet_switchEthereumChain"].includes(c.method));
+  const withKey = (wallet) => {
+    const k = keyFromSecret(keccak256(toUtf8Bytes("cowboy test session key")));
+    write(KEYS.key(wallet.address), { address: k.address, secret: k.privateKey, wallet: wallet.address, subaccount_id: NEW_SUB,
+      expiry_sec: Math.floor(Date.now() / 1000) + 86400, network: "testnet" });
+  };
+  /** A fresh page: the same browser storage, a new seat. */
+  const reload = (wallet, fake) => _setSeatDeps({ findProvider: () => wallet, createClient: () => createClient({ url: TESTNET_WS, WebSocketImpl: fake.WebSocketImpl, sleep: async () => {} }) });
+  const funded = (derive) => { derive.account = true; derive.subs = { [NEW_SUB]: sub(NEW_SUB, 1, 50, "Cowboy") }; };
+
+  it("uses the stored key name", () => {
+    expect(KEYS.lastWallet()).toBe("cowboy-saloon-wallet:testnet"); // Shell.jsx reads it without the trade chunk
+  });
+
+  it("remembers the wallet on connect and resumes it on reload with no wallet prompt", async () => {
+    const { fake, wallet, derive } = setup();
+    funded(derive);
+    await connect();
+    expect(read(KEYS.lastWallet())).toBe(wallet.address);
+    withKey(wallet);
+    reload(wallet, fake);
+    expect(seatState()).toMatchObject({ resuming: true, stage: "disconnected" });
+    wallet.calls.length = 0;
+    expect(await resume()).toBe(true);
+    expect(prompts(wallet)).toHaveLength(0);
+    expect(wallet.calls.map((c) => c.method)).toEqual(["eth_accounts", "eth_chainId"]);
+    expect(seatState()).toMatchObject({ stage: "ready", wallet: wallet.address, loggedAs: "key", resuming: false, busy: false });
+    expect(seatState().saloon).toMatchObject({ id: NEW_SUB, usdc: 50 });
+    expect(await resume()).toBe(false); // once per page
+  });
+
+  it("does not resume without a key, and asks the wallet for nothing", async () => {
+    const { fake, wallet, derive } = setup();
+    funded(derive);
+    write(KEYS.lastWallet(), wallet.address);
+    reload(wallet, fake);
+    expect(await resume()).toBe(false);
+    expect(prompts(wallet)).toHaveLength(0);
+    expect(fake.log).toHaveLength(0);
+    expect(seatState()).toMatchObject({ stage: "disconnected", resuming: false, busy: false, remembered: wallet.address });
+    expect(seatState().wallet).toBeUndefined();
+  });
+
+  it("does not resume on the wrong chain, nor when the wallet does not expose the account", async () => {
+    const { fake, derive } = setup();
+    funded(derive);
+    for (const wallet of [fakeWallet({ chainId: 1 }), fakeWallet({ exposed: false })]) {
+      write(KEYS.lastWallet(), wallet.address);
+      withKey(wallet);
+      reload(wallet, fake);
+      expect(await resume()).toBe(false);
+      expect(prompts(wallet)).toHaveLength(0);
+      expect(seatState()).toMatchObject({ stage: "disconnected", remembered: wallet.address });
+    }
+    expect(fake.log).toHaveLength(0);
+  });
+
+  it("disconnects when the wallet moves to another account or off Sepolia", async () => {
+    const { wallet, derive } = setup();
+    funded(derive);
+    await connect();
+    expect(wallet.listeners("accountsChanged")).toBe(1);
+    wallet.emit("accountsChanged", [wallet.address.toLowerCase()]);
+    expect(seatState().wallet).toBe(wallet.address);
+    wallet.emit("accountsChanged", ["0x000000000000000000000000000000000000dEaD"]);
+    expect(seatState()).toMatchObject({ stage: "disconnected", remembered: null });
+    expect(seatState().wallet).toBeUndefined();
+    expect(read(KEYS.lastWallet())).toBeNull();
+    expect(wallet.listeners("accountsChanged")).toBe(0);
+
+    await connect();
+    wallet.emit("chainChanged", "0x1");
+    expect(seatState()).toMatchObject({ stage: "disconnected", message: "Your wallet switched network. Connect again on Sepolia." });
+    expect(wallet.listeners("chainChanged")).toBe(0);
+  });
+
+  it("forgets the wallet on Disconnect and on Switch off", async () => {
+    const { wallet, derive } = setup();
+    funded(derive);
+    await connect();
+    disconnect();
+    expect(read(KEYS.lastWallet())).toBeNull();
+    expect(seatState()).toMatchObject({ stage: "disconnected", remembered: null, resuming: false });
+    expect(wallet.listeners("accountsChanged")).toBe(0);
+    await connect();
+    expect(read(KEYS.lastWallet())).toBe(wallet.address);
+    await switchOff().catch(() => {});
+    expect(read(KEYS.lastWallet())).toBeNull();
   });
 });

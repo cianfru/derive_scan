@@ -41,4 +41,6 @@ export const KEYS = {
   known: (wallet) => scope("known", wallet),
   day: (wallet) => scope("day", wallet),
   sent: (wallet) => scope("sent", wallet),
+  /** The wallet last connected on this network, so a reload can resume without a prompt. */
+  lastWallet: () => scope("wallet"),
 };

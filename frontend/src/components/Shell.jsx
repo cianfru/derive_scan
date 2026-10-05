@@ -53,11 +53,25 @@ const QuietBoundary = TESTNET_FILLS ? class extends Component {
   render() { return this.state.failed ? null : this.props.children; }
 } : null;
 
-/** "Connect wallet" until the trade chunk arrives; a tap before then connects once it has. */
+/** The wallet this browser connected before (lib/trade/store.js KEYS.lastWallet), read without the trade chunk. */
+const LAST_WALLET_KEY = TESTNET_FILLS ? "cowboy-saloon-wallet:testnet" : null;
+function remembersWallet() {
+  try { return !!globalThis.window?.ethereum && !!globalThis.localStorage?.getItem(LAST_WALLET_KEY); } catch { return false; }
+}
+
+/**
+ * "Connect wallet" until the trade chunk arrives; a tap before then connects once it has. With a
+ * remembered wallet it reads "Reconnecting…" instead, while the chunk resumes it quietly.
+ */
 function HeaderWallet() {
   const early = useRef(false);
   const [waiting, setWaiting] = useState(false);
-  const slot = (
+  const [resuming] = useState(remembersWallet);
+  const slot = resuming ? (
+    <div className="hw">
+      <button type="button" className="btn hw-btn" aria-label="Reconnecting" aria-disabled="true">Reconnecting…</button>
+    </div>
+  ) : (
     <div className="hw">
       <button type="button" className="btn hw-btn" aria-label={waiting ? "Connecting" : "Connect wallet"} aria-disabled={waiting || undefined}
         onClick={() => { early.current = true; setWaiting(true); }}>
