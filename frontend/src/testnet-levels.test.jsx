@@ -82,7 +82,7 @@ describe("the helper", () => {
     ]);
     await testnetListing("BTC");
     expect(fake.calls("public/get_all_instruments")).toHaveLength(2);
-    expect(await testnetListing("HYPE")).toBeNull();
+    expect(await testnetListing("not a coin")).toBeNull(); // every board coin is read (one tap for all coins); only a non-coin is not
     setup(deriveError(9002, "backend unavailable"));
     expect(await testnetListing("ETH")).toBeNull();
     const client = createClient({ url: TESTNET_WS, WebSocketImpl: fakeDerive({ handlers: { "public/get_all_instruments": { instruments: [], pagination: { num_pages: 1 } } } }).WebSocketImpl });

@@ -23,7 +23,7 @@ export async function listedInstruments(client, und) {
 
 /** The testnet's listed instruments for `und` (a Set), or null when unknown or the read failed. Cached per page. */
 export function testnetListing(und) {
-  if (!TRADE_COINS.includes(und)) return Promise.resolve(null);
+  if (!(TRADE_COINS === "all" ? /^[A-Z0-9]+$/.test(und || "") : TRADE_COINS.includes(und))) return Promise.resolve(null);
   if (!cache.has(und)) {
     let p;
     try {
