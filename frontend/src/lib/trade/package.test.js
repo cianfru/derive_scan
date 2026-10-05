@@ -6,6 +6,7 @@ import {
   KINDS, TRADE_LIMITS, amountText, capCheck, checkQuote, contractsFor, feeCeiling, instrumentName, maxTotalCost,
   minTotalCost, packageCost, packageLegs, parseInstrument, payWidth, payoffAt, rfqFee, strikeText, toleranceFor,
   validateLegs, wireLegs,
+  quoteMatchesPlan,
 } from "./package.js";
 
 const BTC = { und: "BTC", expiry: "20261009" };
@@ -103,7 +104,7 @@ describe("quote checks", () => {
   it("passes a quote inside the ceiling and shows the most you can lose", () => {
     const c = checkQuote(base, ctx);
     expect(c.ok).toBe(true);
-    expect(c.mostLose).toBeCloseTo(101.62, 6);
+    expect(c.mostLose).toBeCloseTo(102.10, 6);
     expect(c.perDollar).toBeCloseTo(100 / 264.42, 6);
   });
   it("refuses a quote beyond the ceiling", () => expect(checkQuote({ ...base, estimated_total_cost: "113.70" }, ctx).reason).toBe("beyond"));
@@ -111,7 +112,7 @@ describe("quote checks", () => {
     expect(checkQuote({ ...base, estimated_total_cost: "80" }, { ...ctx, direction: "sell", limit: 90 }).reason).toBe("beyond");
     const c = checkQuote({ ...base, estimated_total_cost: "95" }, { ...ctx, direction: "sell", limit: 90 });
     expect(c.ok).toBe(true);
-    expect(c.net).toBeCloseTo(93.38, 6);
+    expect(c.net).toBeCloseTo(92.90, 6);
   });
   it("refuses a quote worse than Derive's order book, buying or selling", () => {
     expect(checkQuote({ ...base, orderbook_total_cost: "99.50" }, ctx)).toMatchObject({ ok: false, reason: "book_better", book: 99.5 });
@@ -126,6 +127,29 @@ describe("quote checks", () => {
   it("refuses a fee above the ceiling", () => expect(checkQuote({ ...base, suggested_max_fee: "3.10" }, ctx).reason).toBe("fee"));
   it("passes Derive's own invalid reason through", () => expect(checkQuote({ ...base, is_valid: false, invalid_reason: "x" }, ctx)).toMatchObject({ ok: false, reason: "invalid" }));
   it("handles no quote", () => expect(checkQuote(null, ctx).reason).toBe("no_quote"));
+  it("accepts a valid quote when Derive has no order book comparison", () => {
+    expect(checkQuote({ ...base, orderbook_total_cost: null }, ctx).ok).toBe(true);
+  });
+  it("rejects absent or malformed required amounts", () => {
+    for (const field of ["estimated_total_cost", "estimated_fee", "suggested_max_fee"]) {
+      for (const value of [null, undefined, "", true, "bad", "Infinity"]) {
+        expect(checkQuote({ ...base, [field]: value }, ctx).ok).toBe(false);
+      }
+    }
+    expect(checkQuote({ ...base, suggested_max_fee: "1" }, ctx).ok).toBe(false);
+  });
+});
+
+it("accepts only the intended RFQ, direction, instruments and amounts", () => {
+  const legs = wireLegs(packageLegs({ ...BTC, kind: "yes", lo: 83000, hi: 89000 }), 0.04);
+  const quote = { quote_id: "quote", rfq_id: "rfq", direction: "sell", legs: legs.map((l) => ({ ...l, price: "10" })) };
+  expect(quoteMatchesPlan(quote, legs, "buy", "rfq")).toBe(true);
+  for (const change of [{ rfq_id: "other" }, { direction: "buy" }, { legs: quote.legs.slice(1) },
+    { legs: [quote.legs[0], quote.legs[0]] },
+    { legs: [{ ...quote.legs[0], amount: "0.08" }, quote.legs[1]] },
+    { legs: [{ ...quote.legs[0], direction: "sell" }, quote.legs[1]] }]) {
+    expect(quoteMatchesPlan({ ...quote, ...change }, legs, "buy", "rfq")).toBe(false);
+  }
 });
 
 describe("caps", () => {

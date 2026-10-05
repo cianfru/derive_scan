@@ -36,14 +36,14 @@ export default function Traders() {
   if (error && !data) return <div className="wrap page"><Failed error={error} /></div>;
   if (!data) return <div className="wrap page"><Loading /></div>;
   if (!coverageReady(data)) return (
-    <div className="wrap page"><PageHead title="Traders" /><HistoryStatus data={data} /></div>);
+    <div className="wrap page"><PageHead error={error} title="Traders" /><HistoryStatus data={data} /></div>);
   const list = data.traders.filter((t) => kind === "all" || t.class === kind);
   const shown = all ? list : list.slice(0, 50);
   const tieredCount = data.traders.filter(tiered).length;
   const open = (t) => nav(`/trader/${t.address.toLowerCase()}`);
   return (
     <div className="wrap page people-page">
-      <PageHead title="Traders" info={PAGE_HELP}
+      <PageHead error={error} title="Traders" info={PAGE_HELP}
         meta={<>{data.ranked_total?.toLocaleString("en-US") ?? "—"} ranked · {tieredCount} Top and Smart · history to {data.through}</>} />
       <Lead lead={tradersLead(data)} />
       <Plate title="Leaderboard" info={BOARD_HELP} className="lead-plate"

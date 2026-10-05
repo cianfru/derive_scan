@@ -1,3 +1,4 @@
+import { RefreshNotice } from "../components/ui.jsx";
 import { useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
@@ -141,7 +142,7 @@ function Missing({ address, crumb }) {
   const owner = ownerOf(aliases.data, address);
   if (owner) return <Navigate to={`/trader/${owner}`} replace />;
   if ((!index && !error) || (!aliases.data && !aliases.error)) return <div className="wrap page"><Loading /></div>;
-  return <div className="wrap page people-page trader-page">{crumb(codename(address))}<NoProfile address={address} index={index} /></div>;
+  return <div className="wrap page people-page trader-page"><RefreshNotice error={error} />{crumb(codename(address))}<NoProfile address={address} index={index} /></div>;
 }
 
 export default function Trader() {
@@ -159,6 +160,7 @@ export default function Trader() {
   const large = (data.large_24h || []).slice(0, CAP);
   return (
     <div className="wrap page people-page trader-page">
+      <RefreshNotice error={error} />
       {crumb(name)}
       <section className="plate trader-id">
         <div className="tid">

@@ -1,3 +1,4 @@
+import { _resetTradeStorage } from "./lib/trade/store.js";
 import React from "react";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { cleanup, render, screen, within, act } from "@testing-library/react";
@@ -88,7 +89,7 @@ async function wordcheck(user, root) {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime((T14 + 600) * 1000);
-  localStorage.clear();
+  localStorage.clear(); _resetTradeStorage();
   docs.current = { "questions/index.json": index, "questions/BTC.json": btc, "questions/HYPE.json": hype, "questions/history/BTC-20261009.json": hist, "markets.json": { coins: [] } };
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
@@ -133,7 +134,7 @@ describe("one tap through Derive (testnet, dry run)", () => {
     await wordcheck(user, panel);
 
     await user.click(within(panel).getByRole("button", { name: "Get price" }));
-    const buy = await within(panel).findByRole("button", { name: "Dry run: buy for $98.33" });
+    const buy = await within(panel).findByRole("button", { name: "Dry run: buy for $98.94" });
     expect(within(panel).getByText(/49c per \$1/)).toBeTruthy();
     expect(fake.calls("private/send_rfq")[0].params).toMatchObject({ subaccount_id: 90212, max_total_cost: "103.95", label: `${ID}:yes`,
       legs: [{ instrument_name: "BTC-20261009-82000-C", direction: "buy", amount: "0.03299" }, { instrument_name: "BTC-20261009-88000-C", direction: "sell", amount: "0.03299" }] });

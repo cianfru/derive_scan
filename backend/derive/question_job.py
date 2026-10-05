@@ -38,6 +38,7 @@ HIST_COLS = ["ts", "id", "fair", "yes_buy", "yes_sell", "no_buy", "no_sell", "in
 REBUILD_HOURS = 72  # a missing state is rebuilt from at most this many hours of kept chains
 SETTLED_ON_BOARD_SEC = 86400
 SETTLE_RETRY_SEC = 3600
+TRADING_LEASE_SEC = 900
 
 
 def publishing() -> bool:
@@ -64,6 +65,10 @@ def trading_mainnet_state() -> str:
     QUESTIONS_TRADING_MAINNET; unset, empty or unknown means "off": it opens only when set on purpose."""
     v = os.getenv("QUESTIONS_TRADING_MAINNET", "").strip().lower()
     return v if v in TRADING_STATES else "off"
+
+
+def trading_lease(now: float) -> dict:
+    return {"trading_issued_at": int(now), "trading_valid_until": int(now) + TRADING_LEASE_SEC}
 
 
 def _dump(obj) -> str:
@@ -265,12 +270,24 @@ def write_site(site: Path, root: Path, boards: dict, state: dict, now: float, pr
     for f in out.glob("*.json"):
         if f.stem not in ("index",) and f.stem not in state["coins"]:
             f.unlink()
+    for und in sorted(set(state["coins"]) - set(boards)):
+        try:
+            doc = json.loads((out / f"{und}.json").read_text())
+        except (OSError, ValueError):
+            continue
+        if now - doc.get("prices_ts", 0) > Q.QUESTION_GATES["paused_sec"] or doc.get("paused"):
+            continue
+        live = _live_count(doc)
+        if live:
+            coins.append({"und": und, "thin": doc["thin"], "index": doc["index"], "questions": live,
+                          "dates": sum(1 for d in doc["dates"] if d["board"])})
     for f in (out / "history").glob("*.json") if (out / "history").exists() else []:
         und, e = f.stem.rsplit("-", 1)
         if e not in (state["coins"].get(und) or {}).get("dates", {}):
             f.unlink()
     (out / "index.json").write_text(_dump({"schema": SCHEMA, "prices_ts": prices_ts, "generated_at": int(now), "trading": trading_state(),
                                            "trading_mainnet": trading_mainnet_state(),
+                                           **trading_lease(now),
                                            "coins": sorted(coins, key=lambda c: (c["thin"], Q.QUESTION_GATES["majors"].index(c["und"]) if not c["thin"] else 0, -c["questions"]))}))
 
 
@@ -351,10 +368,11 @@ def mark_paused(site: Path, now: float) -> bool:
         return False
     paused = now - (idx.get("prices_ts") or 0) > Q.QUESTION_GATES["paused_sec"]
     trading, mainnet = trading_state(), trading_mainnet_state()
-    if idx.get("trading") != trading or idx.get("trading_mainnet") != mainnet:
+    if idx.get("trading") != trading or idx.get("trading_mainnet") != mainnet or idx.get("trading_issued_at") != int(now):
         # the kill switches take effect at every publish, not only at a record
         idx["trading"] = trading
         idx["trading_mainnet"] = mainnet
+        idx.update(trading_lease(now))
         p.write_text(_dump(idx))
     if bool(idx.get("paused")) == paused:
         return paused

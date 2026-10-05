@@ -1,3 +1,4 @@
+import { _resetTradeStorage } from "./store.js";
 // Wallet and RPC answers can arrive after the user leaves the seat. These tests hold actual fake
 // provider/socket requests at those boundaries; they never ask a real wallet or send a transaction.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -58,7 +59,7 @@ function hold(wallet, method) {
 }
 const prompts = (wallet, method) => wallet.calls.filter((c) => c.method === method).length;
 
-beforeEach(() => { localStorage.clear(); _resetAssets(); write(KEYS.terms(), { at: 1 }); });
+beforeEach(() => { localStorage.clear(); _resetTradeStorage(); _resetAssets(); write(KEYS.terms(), { at: 1 }); });
 afterEach(() => { disconnect(); vi.restoreAllMocks(); });
 
 describe("a cancelled connection owns no late results", () => {

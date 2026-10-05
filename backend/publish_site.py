@@ -905,6 +905,22 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
         r["ranked"] = (r.get("wallet") or "").lower() in ranked
     _write(site / "flow.json", {"generated_at": int(now), **flow})
     traders_block(data, site, chains, flow, now)
+    from derive.config import Settings
+    from record_once import load_universe
+    settings = Settings(data_dir=data)
+    underlyings = load_universe(data).get("underlyings") or settings.underlyings
+    statuses = json.loads((data / "status.json").read_text()) if (data / "status.json").exists() else {}
+    keys = [f"{source}:{und}" for source in settings.sources for und in underlyings]
+    keys.append(f"questions:{settings.sources[0]}")
+    questions = site / "questions" / "index.json"
+    _write(site / "health.json", {
+        "generated_at": int(now),
+        "recordings": {key: statuses.get(key, {}) for key in keys},
+        "signals": {tf: block.get("bar_close") for tf, block in sig["timeframes"].items() if tf in ("4h", "1d")},
+        "questions": json.loads(questions.read_text()).get("prices_ts") if questions.exists() else None,
+        "questions_required": q_coins is not None,
+        "coverage": coverage,
+    })
     return {"coins": len(markets)}
 
 

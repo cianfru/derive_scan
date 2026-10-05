@@ -41,7 +41,7 @@ export default function Options() {
 
   const row = (c) => {
     const o = c.options, lv = o.levels;
-    const stale = o.status !== "ready" || data.generated_at - o.ts > 1800;
+    const stale = o.status !== "ready" || !Number.isFinite(o.ts) || Date.now() / 1000 - o.ts > 1800 || o.ts > Date.now() / 1000;
     return (
       <Link key={c.und} className="ob-row" to={`/coin/${c.und}#options`} aria-label={`Open ${c.und} options`}>
         <span className="ob-coin">
@@ -65,7 +65,7 @@ export default function Options() {
 
   return (
     <div className="wrap page options-page">
-      <PageHead title="Options" info={PAGE_HELP} tabs={tabs} meta={<>{coins.length} markets · {clock(data.generated_at)}</>} />
+      <PageHead error={error} title="Options" info={PAGE_HELP} tabs={tabs} meta={<>{coins.length} markets · {clock(data.generated_at)}</>} />
       <Lead lead={optionsLead(data)} />
       <section className="plate options-board" aria-label="Options markets">
         <PanelHead title="Surfaces" info={BOARD_HELP} infoLabel="How to read the options board" />

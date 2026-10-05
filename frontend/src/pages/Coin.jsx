@@ -1,3 +1,4 @@
+import { RefreshNotice } from "../components/ui.jsx";
 import { useEffect } from "react";
 import { useOutletContext, useParams, useLocation } from "react-router-dom";
 import { useData } from "../lib/data.js";
@@ -139,6 +140,7 @@ export default function Coin() {
   const history = <MetricHistory key={und} history={data.history} collapsible />;
   return (
     <div className="wrap page coin-page">
+      <RefreshNotice error={error} />
       <header className="coin-heading">
         <h1><Asset und={und} compact /></h1>
         <span className="coin-price mono">{price(last?.[4])}</span>

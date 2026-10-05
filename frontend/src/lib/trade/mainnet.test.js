@@ -1,3 +1,4 @@
+const lease = (state) => ({ trading_mainnet: state, trading_issued_at: Date.now() / 1000, trading_valid_until: Date.now() / 1000 + 900 });
 // Real-money one tap (P8): the mainnet build, its constants, its two-layer off switch and the fill
 // guard in every combination. Builds are simulated by setting VITE_SALOON_TRADE (and the pilot list)
 // before the modules load. Every Derive answer is a frame from a fake socket: nothing touches a network.
@@ -133,21 +134,21 @@ describe("the fill guard, every combination", () => {
   it("client guard: the endpoint, the switch, the direction and the pilot wallet", async () => {
     const { config, live } = await build(MAINNET_ENV);
     expect(config.executeAllowed(TESTNET_URL, { wallet: PILOT, direction: "buy" })).toBe(false);
-    live.setMainnetSwitch("off");
+    live.setMainnetSwitch(lease("off"));
     expect(config.executeAllowed(MAINNET_URL, { wallet: PILOT, direction: "buy" })).toBe(false);
-    live.setMainnetSwitch("on");
+    live.setMainnetSwitch(lease("on"));
     expect(config.executeAllowed(MAINNET_URL, { wallet: PILOT, direction: "buy" })).toBe(true);
     expect(config.executeAllowed(MAINNET_URL, { wallet: PILOT.toLowerCase(), direction: "sell" })).toBe(true);
     expect(config.executeAllowed(MAINNET_URL, { wallet: OTHER, direction: "buy" })).toBe(false);
     expect(config.executeAllowed(MAINNET_URL, { wallet: null, direction: "buy" })).toBe(false);
     expect(config.executeAllowed(MAINNET_URL, { wallet: PILOT, direction: null })).toBe(false);
-    live.setMainnetSwitch("sell_only");
+    live.setMainnetSwitch(lease("sell_only"));
     expect(config.executeAllowed(MAINNET_URL, { wallet: PILOT, direction: "buy" })).toBe(false);
     expect(config.executeAllowed(MAINNET_URL, { wallet: PILOT, direction: "sell" })).toBe(true);
-    live.setMainnetSwitch("maybe");
+    live.setMainnetSwitch(lease("maybe"));
     expect(config.executeAllowed(MAINNET_URL, { wallet: PILOT, direction: "sell" })).toBe(false);
     const t = await build(TESTNET_ENV);
-    t.live.setMainnetSwitch("on");
+    t.live.setMainnetSwitch(lease("on"));
     expect(t.config.executeAllowed(MAINNET_URL, { wallet: PILOT, direction: "buy" })).toBe(false);
     expect(t.config.executeAllowed(TESTNET_URL)).toBe(true);
   });
@@ -156,17 +157,20 @@ describe("the fill guard, every combination", () => {
     const { derive, live } = await build(MAINNET_ENV);
     const fake = fakeDerive({ handlers: { "public/login": [1], [derive.EXECUTE]: executed() } });
     const client = derive.createClient({ url: MAINNET_URL, WebSocketImpl: fake.WebSocketImpl, sleep: async () => {} });
-    live.setMainnetSwitch("on");
+    live.setMainnetSwitch(lease("on"));
     // Not signed in: no wallet to check, refused.
     await expect(client.call(derive.EXECUTE, { direction: "buy" }, { safe: false })).rejects.toMatchObject({ code: derive.MAINNET_GUARD });
     await client.login(OTHER, async () => "0xsig");
     await expect(client.call(derive.EXECUTE, { direction: "buy" }, { safe: false })).rejects.toMatchObject({ code: derive.MAINNET_GUARD });
     await client.login(PILOT, async () => "0xsig");
-    live.setMainnetSwitch("off");
+    live.setMainnetSwitch(lease("off"));
     await expect(client.call(derive.EXECUTE, { direction: "buy" }, { safe: false })).rejects.toMatchObject({ code: derive.MAINNET_GUARD });
     expect(fake.calls(derive.EXECUTE)).toHaveLength(0);
-    live.setMainnetSwitch("on");
+    live.setMainnetSwitch(lease("on"));
     await expect(client.call(derive.EXECUTE, { direction: "buy" }, { safe: false })).resolves.toMatchObject({ status: "filled" });
+    expect(fake.calls(derive.EXECUTE)).toHaveLength(1);
+    live.setMainnetSwitch({ ...lease("on"), trading_issued_at: Date.now() / 1000 - 901, trading_valid_until: Date.now() / 1000 - 1 });
+    await expect(client.call(derive.EXECUTE, { direction: "buy" }, { safe: false })).rejects.toMatchObject({ code: derive.MAINNET_GUARD });
     expect(fake.calls(derive.EXECUTE)).toHaveLength(1);
     // A mainnet build's client refuses the testnet's endpoint, whatever the switch says.
     const t = derive.createClient({ url: TESTNET_URL, WebSocketImpl: fake.WebSocketImpl, sleep: async () => {} });
@@ -176,7 +180,7 @@ describe("the fill guard, every combination", () => {
 
   it("a testnet build's client refuses the mainnet endpoint", async () => {
     const { derive, live } = await build(TESTNET_ENV);
-    live.setMainnetSwitch("on");
+    live.setMainnetSwitch(lease("on"));
     const fake = fakeDerive({ handlers: { "public/login": [1], [derive.EXECUTE]: executed() } });
     const client = derive.createClient({ url: MAINNET_URL, WebSocketImpl: fake.WebSocketImpl, sleep: async () => {} });
     await client.login(PILOT, async () => "0xsig");
@@ -186,7 +190,7 @@ describe("the fill guard, every combination", () => {
 });
 
 describe("the mainnet ticket", () => {
-  async function ticket(mods, { owner = PILOT, readSwitch = async () => "on", trading = "on", handlers = {} } = {}) {
+  async function ticket(mods, { owner = PILOT, readSwitch = async () => lease("on"), trading = "on", handlers = {} } = {}) {
     const { derive, rfq, sign, config } = mods;
     const fake = fakeDerive({
       recorded: frames.frames,
@@ -224,7 +228,7 @@ describe("the mainnet ticket", () => {
     const { fake, t, fills, derive } = await ticket(mods);
     await quoted(t);
     expect(fake.calls("private/send_rfq")[0].params).toMatchObject({ extra_fee: "0", referral_code: "COWBOY" });
-    await t.confirm(t.state.check.total);
+    await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     expect(fake.calls(derive.EXECUTE)).toHaveLength(1);
     expect(fake.calls(derive.EXECUTE)[0].params).toMatchObject({ referral_code: "COWBOY", direction: "buy" });
     expect(t.state.phase).toBe("filled");
@@ -232,11 +236,11 @@ describe("the mainnet ticket", () => {
   });
 
   it("sends nothing when the switch read right before the fill is off, sell-only for a buy, or unreadable", async () => {
-    for (const readSwitch of [async () => "off", async () => "sell_only", async () => { throw new Error("offline"); }, async () => "loading"]) {
+    for (const readSwitch of [async () => lease("off"), async () => lease("sell_only"), async () => ({ ...lease("on"), trading_issued_at: 0, trading_valid_until: 900 }), async () => { throw new Error("offline"); }, async () => "loading"]) {
       const mods = await build(MAINNET_ENV);
       const { fake, t, fills, derive } = await ticket(mods, { readSwitch });
       await quoted(t);
-      await t.confirm(t.state.check.total);
+      await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
       expect(t.state.phase).toBe("paused");
       expect(fake.calls(derive.EXECUTE)).toHaveLength(0);
       expect(fills).toHaveLength(0);
@@ -275,8 +279,8 @@ describe("the published mainnet switch", () => {
     const { limits, live } = await build(MAINNET_ENV);
     expect(limits.tradingState(null)).toBe("loading");
     expect(limits.tradingState({ trading: "on" })).toBe("off");
-    expect(limits.tradingState({ trading: "on", trading_mainnet: "on" })).toBe("on");
-    expect(limits.tradingState({ trading: "off", trading_mainnet: "sell_only" })).toBe("sell_only");
+    expect(limits.tradingState({ ...lease("on"), trading: "on" })).toBe("on");
+    expect(limits.tradingState({ ...lease("sell_only"), trading: "off" })).toBe("sell_only");
     expect(limits.tradingState({ trading_mainnet: "yes" })).toBe("off");
     expect(live.mainnetSwitchState()).toBe("off"); // closed until the page reads it on
     const t = await build(TESTNET_ENV);

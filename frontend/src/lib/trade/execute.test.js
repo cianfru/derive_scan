@@ -83,7 +83,7 @@ describe("testnet fills", () => {
   it("does not dispatch a queued execution after the ticket closes", async () => {
     const { fake, t } = setup();
     await quoted(t);
-    const confirming = t.confirm(t.state.check.total);
+    const confirming = t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     expect(fake.calls(EXECUTE)).toHaveLength(0);
     const closing = t.close();
     await vi.advanceTimersByTimeAsync(5);
@@ -118,7 +118,7 @@ describe("testnet fills", () => {
       [EXECUTE]: () => new Promise((resolve) => { release = resolve; }),
     } });
     await quoted(t);
-    const confirming = t.confirm(t.state.check.total);
+    const confirming = t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     await vi.advanceTimersByTimeAsync(1);
     expect(fake.calls(EXECUTE)).toHaveLength(1);
     await t.close();
@@ -133,7 +133,7 @@ describe("testnet fills", () => {
   it("fills on the tap and records the fill from Derive's trade history, exactly", async () => {
     const { fake, t, fills } = setup();
     await quoted(t);
-    await t.confirm(t.state.check.total);
+    await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     expect(t.state.phase).toBe("filled");
     const sent = fake.calls(EXECUTE);
     expect(sent).toHaveLength(1);
@@ -155,7 +155,7 @@ describe("testnet fills", () => {
     // The referral code goes on the RFQ and the fill when one is set.
     const r = setup({ referral: "COWBOY" });
     await quoted(r.t);
-    await r.t.confirm(r.t.state.check.total);
+    await r.t.confirm({ quoteId: r.t.state.quote.quote_id, total: r.t.state.check.total, maxFee: r.t.state.check.maxFee });
     expect(r.fake.calls("private/send_rfq")[0].params.referral_code).toBe("COWBOY");
     expect(r.fake.calls(EXECUTE)[0].params).toMatchObject({ referral_code: "COWBOY" });
     expect(r.fake.calls("private/send_rfq")[0].params).toMatchObject({ extra_fee: "0", partial_fill_step: "1" });
@@ -165,7 +165,7 @@ describe("testnet fills", () => {
     const half = rec.taker.map((x) => ({ ...x, trade_amount: "0.005", trade_fee: x.trade_fee === "0" ? "0" : "0.5" }));
     const { fake, t } = setup({ handlers: { [EXECUTE]: executed({ pct: "0.5" }), "private/get_trade_history": history(half) } });
     await quoted(t);
-    await t.confirm(t.state.check.total);
+    await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     expect(t.state.phase).toBe("filled");
     expect(t.state.fill).toMatchObject({ partial: true, pct: 0.5, premium: 0.475, fees: 0.5 });
     expect(t.state.fill.legs.map((l) => [l.qty, l.planned])).toEqual([[0.005, 0.01], [0.005, 0.01]]);
@@ -176,7 +176,7 @@ describe("testnet fills", () => {
   it("falls back to execute_quote's own answer when the trade history has not caught up", async () => {
     const { t } = setup({ handlers: { "private/get_trade_history": history([]) } });
     await quoted(t);
-    await t.confirm(t.state.check.total);
+    await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     expect(t.state.fill).toMatchObject({ source: "execute_quote", premium: 0.95, fees: 0.65125, trade_ids: [], ts: 1790949750.491 });
   });
 
@@ -190,7 +190,7 @@ describe("testnet fills", () => {
     for (const [answer, phase, message] of cases) {
       const { fake, t, fills } = setup({ handlers: { [EXECUTE]: answer } });
       await quoted(t);
-      await t.confirm(t.state.check.total);
+      await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
       expect(t.state).toMatchObject({ phase, message });
       expect(message).not.toMatch(BANNED);
       expect(fake.calls(EXECUTE)).toHaveLength(1);
@@ -204,7 +204,7 @@ describe("testnet fills", () => {
     let rfqs = { rfqs: [{ rfq_id: RFQ, status: "open", filled_pct: "0" }] };
     const { fake, t } = setup({ handlers: { [EXECUTE]: () => new Promise(() => {}), "private/get_rfqs": () => rfqs } });
     await quoted(t);
-    const done = t.confirm(t.state.check.total);
+    const done = t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     await vi.advanceTimersByTimeAsync(10_001);
     await done;
     expect(t.state.phase).toBe("unknown");
@@ -219,7 +219,7 @@ describe("testnet fills", () => {
     // An RFQ that ended unfilled says so.
     const s2 = setup({ handlers: { [EXECUTE]: deriveError(9001, "Engine confirmation timeout"), "private/get_rfqs": { rfqs: [{ rfq_id: RFQ, status: "expired", filled_pct: "0" }] } } });
     await quoted(s2.t);
-    await s2.t.confirm(s2.t.state.check.total);
+    await s2.t.confirm({ quoteId: s2.t.state.quote.quote_id, total: s2.t.state.check.total, maxFee: s2.t.state.check.maxFee });
     expect(s2.t.state).toMatchObject({ phase: "not_filled", message: "Derive did not fill it. Nothing was bought or sold." });
   });
 });
@@ -243,14 +243,14 @@ describe("the mainnet guard", () => {
     // The ticket refuses before signing: a mainnet network in a testnet build.
     const a = setup({ network: MAINNET, chainId: 1 });
     await quoted(a.t);
-    await a.t.confirm(a.t.state.check.total);
+    await a.t.confirm({ quoteId: a.t.state.quote.quote_id, total: a.t.state.check.total, maxFee: a.t.state.check.maxFee });
     expect(a.t.state).toMatchObject({ phase: "error", message: "One tap works on Derive's testnet only." });
     expect(a.fake.log.some((m) => m.method === EXECUTE)).toBe(false);
     expect(a.fills).toHaveLength(0);
     // The client refuses on any endpoint but the testnet's, whatever calls it: nothing reaches the wire.
     const b = setup({ url: "wss://api.derive.xyz/v3/ws" });
     await quoted(b.t);
-    await b.t.confirm(b.t.state.check.total);
+    await b.t.confirm({ quoteId: b.t.state.quote.quote_id, total: b.t.state.check.total, maxFee: b.t.state.check.maxFee });
     expect(b.t.state.phase).toBe("rejected");
     expect(b.fake.log.some((m) => m.method === EXECUTE)).toBe(false);
     await expect(b.client.call(EXECUTE, { any: 1 }, { safe: false })).rejects.toMatchObject({ code: MAINNET_GUARD });
@@ -258,7 +258,7 @@ describe("the mainnet guard", () => {
     // A dry-run build never fills, even on the testnet.
     const c = setup({ mode: "dryrun", handlers: { "public/execute_quote_debug": {} } });
     await quoted(c.t);
-    await c.t.confirm(c.t.state.check.total);
+    await c.t.confirm({ quoteId: c.t.state.quote.quote_id, total: c.t.state.check.total, maxFee: c.t.state.check.maxFee });
     expect(c.fake.log.some((m) => m.method === EXECUTE)).toBe(false);
   });
 });
@@ -294,7 +294,7 @@ describe("the kill switch", () => {
     const { fake, t } = setup({ trading: () => state });
     await quoted(t);
     state = "off";
-    await t.confirm(t.state.check.total);
+    await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     expect(t.state.phase).toBe("paused");
     expect(fake.calls(EXECUTE)).toHaveLength(0);
     expect(fake.calls("private/cancel_rfq")).toHaveLength(1);
@@ -322,7 +322,7 @@ describe("the large-trade warnings", () => {
     addSpent(OWNER, 999);
     const b = setup({ estimate: 0.5 });
     await quoted(b.t);
-    await b.t.confirm(b.t.state.check.total);
+    await b.t.confirm({ quoteId: b.t.state.quote.quote_id, total: b.t.state.check.total, maxFee: b.t.state.check.maxFee });
     expect(b.t.state.phase).not.toBe("capped");
     expect(b.fake.calls(EXECUTE)).toHaveLength(1);
   });
@@ -347,8 +347,8 @@ describe("selling back", () => {
     expect(mark.direction).toBe("sell");
     // floor = mark 1.25 - 2c x $20 payout = 0.85
     expect(fake.calls("private/send_rfq")[0].params).toMatchObject({ min_total_cost: "0.85", legs: LEGS });
-    expect(t.state.check.net).toBeCloseTo(0.6, 6);
-    await t.confirm(t.state.check.total);
+    expect(t.state.check.net).toBeCloseTo(0, 6);
+    await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     expect(fake.calls(EXECUTE)[0].params.direction).toBe("sell");
     expect(t.state.fill).toMatchObject({ direction: "sell", premium: -1.2, fees: 0.6 });
     expect(t.state.fill.legs.map((l) => [l.name, l.act])).toEqual([["BTC-20261005-90000-C", "sell"], ["BTC-20261005-92000-C", "buy"]]);
@@ -392,7 +392,7 @@ describe("a key Derive rejects in use", () => {
     for (const [handlers, tap] of cases) {
       const dropped = [];
       const { t, fake } = setup({ handlers, onKeyRejected: () => dropped.push(1) });
-      if (tap) { await quoted(t); await t.confirm(t.state.check.total); } else await t.start();
+      if (tap) { await quoted(t); await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee }); } else await t.start();
       expect(dropped).toHaveLength(1);
       expect(t.state.message).toBe("Cowboy's approval has ended. Approve again to continue.");
       expect(fake.calls(EXECUTE).length).toBeLessThanOrEqual(1);
@@ -401,7 +401,7 @@ describe("a key Derive rejects in use", () => {
     const dropped = [];
     const { t } = setup({ handlers: { [EXECUTE]: deriveError(11110, "Quote taker total cost too high") }, onKeyRejected: () => dropped.push(1) });
     await quoted(t);
-    await t.confirm(t.state.check.total);
+    await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     expect(dropped).toHaveLength(0);
   });
 });
@@ -415,7 +415,7 @@ describe("a complete fill, or one flagged as not yet complete", () => {
     let reads = 0;
     const { t, fills } = setup({ handlers: { "private/get_trade_history": () => (++reads < 3 ? history(shortLeg) : history([...rec.taker, ...rec.maker])) } });
     await quoted(t);
-    await t.confirm(t.state.check.total);
+    await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     expect(t.state.phase).toBe("filled");
     expect(t.state.fill).toMatchObject({ premium: 0.95, fees: 0.65125, complete: true, source: "trade_history" });
     expect(t.state.fill.legs).toHaveLength(2);
@@ -425,7 +425,7 @@ describe("a complete fill, or one flagged as not yet complete", () => {
   it("falls back to execute_quote's complete legs when the history stays one leg short", async () => {
     const { t } = setup({ handlers: { "private/get_trade_history": history(shortLeg) } });
     await quoted(t);
-    await t.confirm(t.state.check.total);
+    await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     expect(t.state.fill).toMatchObject({ source: "execute_quote", premium: 0.95, complete: true });
   });
 
@@ -435,7 +435,7 @@ describe("a complete fill, or one flagged as not yet complete", () => {
       "private/get_trade_history": history(shortLeg),
     } });
     await quoted(t);
-    await t.confirm(t.state.check.total);
+    await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     expect(t.state.phase).toBe("filled");
     expect(t.state.fill.complete).toBe(false);
     expect(fills[0].complete).toBe(false);
@@ -445,7 +445,7 @@ describe("a complete fill, or one flagged as not yet complete", () => {
     const half = rec.taker.map((x) => ({ ...x, trade_amount: "0.005" }));
     const { t } = setup({ handlers: { [EXECUTE]: executed({ pct: "0.5" }), "private/get_trade_history": history(half) } });
     await quoted(t);
-    await t.confirm(t.state.check.total);
+    await t.confirm({ quoteId: t.state.quote.quote_id, total: t.state.check.total, maxFee: t.state.check.maxFee });
     expect(t.state.fill).toMatchObject({ complete: true, partial: true, premium: 0.475 });
   });
 });

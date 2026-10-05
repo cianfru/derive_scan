@@ -66,7 +66,7 @@ export default function Markets() {
 
   return (
     <div className="wrap page markets-page">
-      <PageHead title="Markets"
+      <PageHead error={error} title="Markets"
         meta={<>Daily close {data.bars?.["1d"] ? dayTime(data.bars["1d"]) : "—"} · snapshot {clock(data.generated_at)}</>} />
       <Lead lead={marketsLead(data)} />
       <div className="markets-layout">

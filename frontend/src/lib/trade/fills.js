@@ -105,14 +105,29 @@ export function packageComplete(fill) {
 }
 
 /** Every trade of the Saloon account since `sinceSec`, newest pages first, at most `maxPages` pages. */
-export async function tradesSince(client, subaccountId, { sinceSec = 0, pageSize = 100, maxPages = 5 } = {}) {
+export async function tradesSince(client, subaccountId, { sinceSec = 0, pageSize = 100, maxPages = 1000 } = {}) {
   const out = [];
+  const seen = new Set();
+  let until = null;
   for (let page = 1; page <= maxPages; page += 1) {
-    const r = await client.call("private/get_trade_history", { subaccount_id: subaccountId, from_timestamp: Math.max(0, sinceSec) * 1000, page, page_size: pageSize });
-    out.push(...(r?.trades || []));
-    if (!r?.pagination || page >= (r.pagination.num_pages || 1)) break;
+    const r = await client.call("private/get_trade_history", { subaccount_id: subaccountId, from_timestamp: Math.max(0, sinceSec) * 1000,
+      ...(until == null ? {} : { to_timestamp: until }), page, page_size: pageSize });
+    const rows = r?.trades;
+    if (!Array.isArray(rows)) throw new Error("Derive returned no trade history");
+    if (until == null && rows.length) {
+      const timestamps = rows.map((t) => Number(t.timestamp)).filter(Number.isFinite);
+      if (timestamps.length) until = Math.max(...timestamps);
+    }
+    for (const row of rows) {
+      if (row.trade_id && seen.has(row.trade_id)) continue;
+      if (row.trade_id) seen.add(row.trade_id);
+      out.push(row);
+    }
+    const pages = r?.pagination?.num_pages;
+    if (Number.isInteger(pages) && pages >= 0 ? page >= pages : rows.length < pageSize) return out;
+    if (!rows.length) throw new Error("Derive trade history is incomplete");
   }
-  return out;
+  throw new Error("Derive trade history is incomplete; narrow the requested history and try again");
 }
 
 /** The trade rows of one execution: by the taker's quote id (execute_quote's answer), else by RFQ. */
@@ -122,5 +137,5 @@ export async function tradesOf(client, subaccountId, { rfqId, quoteId, sinceSec 
     const rows = (r?.trades || []).filter((t) => !rfqId || t.rfq_id === rfqId);
     if (rows.length) return rows;
   }
-  return (await tradesSince(client, subaccountId, { sinceSec: Math.max(0, (sinceSec || 0) - 60), maxPages: 2 })).filter((t) => t.rfq_id === rfqId);
+  return (await tradesSince(client, subaccountId, { sinceSec: Math.max(0, (sinceSec || 0) - 60) })).filter((t) => t.rfq_id === rfqId);
 }

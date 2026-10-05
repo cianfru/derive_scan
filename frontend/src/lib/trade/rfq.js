@@ -14,7 +14,7 @@
 import {
   BOOK_ASKS, CHECK_MS, CHECK_TRIES, EXTRA_FEE, FIRM_MS, MODE, NETWORK, PARTIAL_FILL_STEP, POLL_MS, QUOTE_WAIT_MS, REFERRAL, fillsAllowed,
 } from "./config.js";
-import { TRADE_LIMITS, checkQuote, packageCost } from "./package.js";
+import { TRADE_LIMITS, checkQuote, packageCost, quoteMatchesPlan } from "./package.js";
 import { buildExecute, debugMatches, domainSeparator, randomNonce } from "./sign.js";
 import { CANCEL_PLAIN, EXECUTE, MAINNET_GUARD, SOCKET_CLOSED, TIMEOUT, checkIncidents, deriveKeyRejected, errorDetail, failure, plainError } from "./derive.js";
 import { fillComplete, fillFromExecute, fillFromTrades, tradesOf, userSide } from "./fills.js";
@@ -190,7 +190,9 @@ export function createTicket({
       timer = schedule(poll, POLL_MS);
       return;
     }
-    const check = checkQuote(res, { direction, payout, limit: floor, feeEstimate });
+    const check = quoteMatchesPlan(best, legs, direction, rfq.rfq_id)
+      ? checkQuote(res, { direction, payout, limit: floor, feeEstimate })
+      : { ok: false, reason: "invalid", detail: "Quote does not match the requested package" };
     // A quote worse than Derive's order book would be refused at the tap: keep waiting for a better
     // one, then ask again with a new request (makers re-price), BOOK_ASKS requests in all, before
     // saying so.
@@ -218,7 +220,8 @@ export function createTicket({
       return set({ phase: check.reason === "beyond" ? "beyond" : "blocked", check, quote: best, message: null, detail });
     }
     const fresh = best.quote_id !== state.quote?.quote_id;
-    set({ phase: "quoted", quote: best, check, best: res, firmUntil: fresh ? t + FIRM_MS : state.firmUntil, changed: fresh && !!state.quote });
+    const changed = !!state.quote && (fresh || check.total !== state.check?.total || check.maxFee !== state.check?.maxFee);
+    set({ phase: "quoted", quote: best, check, best: res, firmUntil: fresh ? t + FIRM_MS : state.firmUntil, changed });
     if (t >= state.firmUntil) return lapse();
     timer = schedule(poll, POLL_MS);
   }
@@ -238,16 +241,17 @@ export function createTicket({
   }
 
   /**
-   * The user's tap, carrying the exact total they saw. If the quote changed since, nothing is signed
+   * The user's tap, carrying the quote and amounts they saw. If the quote changed since, nothing is signed
    * and the new number waits for a fresh tap. Otherwise the execution is signed with the Saloon key:
    * in a dry run it goes to public/execute_quote_debug and nothing fills; in a testnet build it goes
    * to private/execute_quote on the testnet; in a mainnet build, to private/execute_quote on mainnet
    * once the fresh switch read allows it.
    */
-  async function confirm(shownTotal) {
+  async function confirm(approval) {
     if (closed) return;
     if (state.phase !== "quoted" || now() >= state.firmUntil) return lapse();
-    if (Math.abs(state.check.total - shownTotal) > 0.005) return set({ changed: true });
+    if (!approval || approval.quoteId !== state.quote.quote_id || approval.total !== state.check.total
+      || approval.maxFee !== state.check.maxFee) return set({ changed: true });
     stop();
     if (FILL_MODES.includes(mode)) return execute();
     set({ phase: "checking" });

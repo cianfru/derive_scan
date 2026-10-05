@@ -13,10 +13,10 @@ export default function Cohorts() {
   if (error && !data) return <div className="wrap page"><Failed error={error} /></div>;
   if (!data) return <div className="wrap page"><Loading /></div>;
   if (!coverageReady(data)) return (
-    <div className="wrap page"><PageHead title="Cohorts" /><HistoryStatus data={data} /></div>);
+    <div className="wrap page"><PageHead error={error} title="Cohorts" /><HistoryStatus data={data} /></div>);
   return (
     <div className="wrap page people-page">
-      <PageHead title="Cohorts" info={PAGE_HELP}
+      <PageHead error={error} title="Cohorts" info={PAGE_HELP}
         meta={<>Grouped by results and by size · history to {data.through} · <Link to="/traders">Leaderboard</Link></>} />
       <Lead lead={cohortsLead(data)} />
       <CohortExplorer cohorts={data.cohorts} through={data.through} valuedAt={data.generated_at} title="Positioning by cohort" />
