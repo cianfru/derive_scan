@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useFeeds } from "./Feeds.jsx";
-import { Info } from "./ui.jsx";
+import { Arrow, Info } from "./ui.jsx";
 import { computeNotices, dismiss, dismissAll, loadDoc, saveDoc, useFollowsDoc } from "../lib/follows.js";
 import "../board.css";
 
@@ -66,17 +66,22 @@ export function SaloonNotices() {
 }
 
 /** Browsing is the default. Guided setup remains available without duplicating the main nav. */
-export default function SaloonHead({ view }) {
+export default function SaloonHead({ view, board = false, quoteTs, paused = false }) {
   const following = view === "following";
   const guided = view === "guided";
+  const viewLink = <Link className="saloon-view-link" to={guided ? "/saloon" : "/saloon/guided"}>{guided ? "Browse outcomes" : "Guided setup"}<span aria-hidden="true"><Arrow /></span></Link>;
   return (
-    <header className="q-head sn-head-wrap">
+    <header className={`q-head sn-head-wrap${board ? " bd-heading" : ""}`}>
       <div className="q-head-top">
         <div className="saloon-heading">
+          {board && <span className="bd-eyebrow">{following ? "Your saved outcomes" : "Trade a view"}</span>}
           <h1>{following ? "Following" : "Saloon"}</h1>
-          <p>{following ? "Your saved outcomes, kept in this browser." : guided ? "Choose a coin, a date and an outcome." : "Higher or lower. Find your outcome."}</p>
+          <p>{following ? "Your saved outcomes, kept in this browser." : guided ? "Choose a coin, a date and an outcome." : board ? "Higher or lower. Compare a level, choose a date, see what it pays." : "Higher or lower. Find your outcome."}</p>
         </div>
-        <Link className="saloon-view-link" to={guided ? "/saloon" : "/saloon/guided"}>{guided ? "Browse outcomes" : "Guided setup"}<span aria-hidden="true">↗</span></Link>
+        {board ? <div className="bd-heading-meta">
+          <div className="bd-observed"><span>{paused ? "Prices paused" : "Derive prices"}</span>{quoteTs ? <time className="mono" dateTime={new Date(quoteTs * 1000).toISOString()}>{new Date(quoteTs * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })} · {new Date(quoteTs * 1000).toISOString().slice(11, 16)} UTC</time> : <span>Awaiting published prices</span>}</div>
+          {viewLink}
+        </div> : viewLink}
       </div>
       <SaloonNotices />
     </header>
