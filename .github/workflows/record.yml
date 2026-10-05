@@ -73,11 +73,11 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: backend/requirements*.txt
 
       - name: Install
         if: github.event_name == 'push' || steps.due.outputs.due == 'true' || steps.due.outputs.signals_due == 'true' || steps.due.outputs.history_due == 'true' || steps.due.outputs.flow_due == 'true'
-        run: pip install -q httpx numpy
+        run: pip install -q -r backend/requirements.lock
 
       - name: Record
         if: steps.due.outputs.due == 'true'

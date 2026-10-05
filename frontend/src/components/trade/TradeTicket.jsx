@@ -151,7 +151,9 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE,
   };
   const confirm = () => {
     const active = request.current;
-    if (active && active.token === generation.current && sameSeat(active.scope)) run.current?.confirm(st.check.total);
+    if (active && active.token === generation.current && sameSeat(active.scope)) run.current?.confirm({
+      quoteId: st.quote?.quote_id, total: st.check?.total, maxFee: st.check?.maxFee,
+    });
   };
   const c = st.check;
   const firmLeft = st.firmUntil ? Math.max(0, Math.ceil((st.firmUntil - now) / 1000)) : 0;
@@ -174,8 +176,8 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE,
         <div><dt>Price</dt><dd className="mono">{firm ? <>{perDollar(c.perDollar)} per $1{quoted && <> · <span className="tr-firm">firm for {firmLeft} s</span></>}</> : plan.board != null ? <>about {cents(centsUp(plan.board))} per $1</> : "Ask Derive"}</dd></div>
         <div><dt>{buy ? "Pays up to" : "Contracts"}</dt><dd className="mono">{buy ? money(plan.payout, { cents: true }) : qty(plan.contracts)}</dd></div>
         <div><dt>Derive fees
-          <Info label="About Derive's fees">Derive charges one $0.50 base fee per answer plus a small share of the coin's price on the costliest option; both options fill as one package. Cowboy adds no fee.</Info></dt>
-          <dd className="mono">{firm ? money(c.fee, { cents: true }) : plan.fee != null ? <>about {money(plan.fee, { cents: true })}</> : "From Derive"}</dd></div>
+          <Info label="About Derive's fees">Derive charges one $0.50 base fee per answer plus a small share of the coin's price on the costliest option; both options fill as one package. Cowboy adds no fee. The firm total includes the maximum approved fee; the final receipt shows what Derive charged.</Info></dt>
+          <dd className="mono">{firm ? <>up to {money(c.maxFee, { cents: true })}</> : plan.fee != null ? <>about {money(plan.fee, { cents: true })}</> : "From Derive"}</dd></div>
       </dl>
 
       {!allowed && <p className="tr-msg" role="status">{TRADING_NOTICE[trading] || TRADING_NOTICE.off}</p>}
@@ -191,7 +193,7 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE,
             {fills ? tap : `Dry run: ${tap.toLowerCase()}`}
           </button>
           <p className="tr-note">{MAINNET_FILLS
-            ? <><b>Real money.</b> USDC from your Derive account. One tap fills every option of the answer at this price.</>
+            ? <><b>Real money.</b> USDC from your Derive account. The amount includes the maximum approved fee.</>
             : fills
             ? <>Derive testnet, test USDC. One tap fills every option of the answer at this price.</>
             : "Testnet dry run. Cowboy signs the trade and Derive checks the signature; nothing fills."}</p>

@@ -19,7 +19,7 @@ export const JOURNAL_VERSION = 3;
 export const NETWORKS = ["mainnet", "testnet"];
 const KEYS = { mainnet: "cowboy-questions", testnet: "cowboy-questions:testnet" };
 let memory = { mainnet: [], testnet: [] };
-let lastWriteOk = true;
+const failedWrites = new Set();
 
 function storage() {
   try {
@@ -35,7 +35,7 @@ function storage() {
 
 /** False when this browser keeps nothing past the visit (storage blocked or the last save failed). */
 export function persistent() {
-  return !!storage() && lastWriteOk;
+  return !!storage() && failedWrites.size === 0;
 }
 
 const netOf = (network) => (NETWORKS.includes(network) ? network : "mainnet");
@@ -51,7 +51,7 @@ export function migrateRecord(r, network = "mainnet") {
 export function loadPositions(network = "mainnet") {
   const net = netOf(network);
   const s = storage();
-  if (!s) return [...memory[net]];
+  if (!s || failedWrites.has(net)) return [...memory[net]];
   try {
     const raw = s.getItem(KEYS[net]);
     if (raw == null) return [];
@@ -74,13 +74,13 @@ export function savePositions(list, network = "mainnet") {
   memory[net] = [...list];
   queueMicrotask(() => changed.forEach((fn) => fn()));
   const s = storage();
-  if (!s) { lastWriteOk = false; return false; }
+  if (!s) { failedWrites.add(net); return false; }
   try {
     s.setItem(KEYS[net], JSON.stringify(list));
-    lastWriteOk = true;
+    failedWrites.delete(net);
     return true;
   } catch {
-    lastWriteOk = false;
+    failedWrites.add(net);
     return false;
   }
 }
@@ -384,5 +384,5 @@ export function closeSummary(t, paid, holdPayout = null) {
 
 export function _resetMemory() {
   memory = { mainnet: [], testnet: [] };
-  lastWriteOk = true;
+  failedWrites.clear();
 }

@@ -157,22 +157,25 @@ export function packageCost(quoteLegs) {
  */
 export function checkQuote(best, { direction, payout, limit, feeEstimate }) {
   if (!best) return { ok: false, reason: "no_quote" };
-  if (best.is_valid === false) return { ok: false, reason: "invalid", detail: best.invalid_reason || "" };
-  const total = Number(best.estimated_total_cost);
-  const fee = Number(best.estimated_fee);
-  const maxFee = Number(best.suggested_max_fee);
+  if (best.is_valid !== true) return { ok: false, reason: "invalid", detail: best.invalid_reason || "" };
+  const decimal = (v) => typeof v === "number" ? v : typeof v === "string" && v.trim() !== "" ? Number(v) : NaN;
+  const total = decimal(best.estimated_total_cost);
+  const fee = decimal(best.estimated_fee);
+  const maxFee = decimal(best.suggested_max_fee);
   const perDollar = payout ? Math.abs(total) / payout : null;
   const figures = { total: Math.abs(total), fee, maxFee, perDollar };
-  if (!ok(total) || !ok(fee)) return { ok: false, reason: "invalid", ...figures };
+  if (!ok(total) || !ok(fee) || !ok(maxFee) || fee < 0 || maxFee < fee || !(payout > 0)
+    || !["buy", "sell"].includes(direction)) return { ok: false, reason: "invalid", ...figures };
   if (direction === "buy" && ok(limit) && Math.abs(total) > limit + 1e-9) return { ok: false, reason: "beyond", ...figures };
   if (direction === "sell" && ok(limit) && Math.abs(total) < limit - 1e-9) return { ok: false, reason: "beyond", ...figures };
   // Derive refuses a quote worse than its own order book for the same package (11110), so such a
   // quote is never offered for a tap.
-  const book = Number(best.orderbook_total_cost);
+  const book = decimal(best.orderbook_total_cost);
+  if (best.orderbook_total_cost != null && !ok(book)) return { ok: false, reason: "invalid", ...figures };
   if (ok(book) && (direction === "buy" ? Math.abs(total) > Math.abs(book) + 1e-6 : Math.abs(total) < Math.abs(book) - 1e-6)) {
     return { ok: false, reason: "book_better", ...figures, book: Math.abs(book) };
   }
-  const pre = Number(best.pre_initial_margin), post = Number(best.post_initial_margin);
+  const pre = decimal(best.pre_initial_margin), post = decimal(best.post_initial_margin);
   // Derive's initial margin is the room the account has left: paying the package's price and fee
   // uses that much of it, and a package that would use more locks cash beyond its price.
   const used = pre - post;
@@ -180,7 +183,19 @@ export function checkQuote(best, { direction, payout, limit, feeEstimate }) {
     return { ok: false, reason: "margin", ...figures, margin: { pre, post, used } };
   }
   if (ok(feeEstimate) && maxFee > feeCeiling(feeEstimate) + 1e-9) return { ok: false, reason: "fee", ...figures };
-  return { ok: true, reason: null, ...figures, mostLose: direction === "buy" ? Math.abs(total) + fee : null, net: direction === "sell" ? Math.abs(total) - fee : null };
+  return { ok: true, reason: null, ...figures, mostLose: direction === "buy" ? Math.abs(total) + maxFee : null,
+    net: direction === "sell" ? Math.abs(total) - maxFee : null };
+}
+
+export function quoteMatchesPlan(quote, legs, direction, rfqId) {
+  if (!quote || quote.rfq_id !== rfqId || quote.direction !== (direction === "buy" ? "sell" : "buy")
+    || !Array.isArray(quote.legs) || quote.legs.length !== legs.length || !quote.quote_id) return false;
+  const byName = new Map(quote.legs.map((l) => [l.instrument_name, l]));
+  return byName.size === legs.length && legs.every((l) => {
+    const q = byName.get(l.instrument_name);
+    return q && q.direction === l.direction && Number(q.amount) === Number(l.amount)
+      && ["string", "number"].includes(typeof q.price) && String(q.price).trim() !== "" && Number.isFinite(Number(q.price)) && Number(q.price) >= 0;
+  });
 }
 
 /** Large-trade warnings (owner, 5 October 2026: warn, never block): over $250 most-you-can-lose on

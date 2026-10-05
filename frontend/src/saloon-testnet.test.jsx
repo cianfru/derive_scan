@@ -1,3 +1,4 @@
+import { _resetTradeStorage } from "./lib/trade/store.js";
 // Saloon stage 2, P6 on screen: a testnet build buys an answer in one tap, finds it in Positions from
 // Derive's own records, checks it against the Saloon account, sells it back, and honours the kill
 // switch. Derive is a fake socket answering with frames built from Derive's openapi shapes.
@@ -101,7 +102,7 @@ const page = (path) => render(
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime((T14 + 600) * 1000);
-  localStorage.clear();
+  localStorage.clear(); _resetTradeStorage();
   _resetMemory();
   docs.current = { "questions/index.json": index, "questions/BTC.json": btc, "questions/history/BTC-20261009.json": hist, "markets.json": { coins: [] } };
 });
@@ -128,7 +129,7 @@ describe("one tap on Derive's testnet", () => {
     await within(panel).findByText(/Cowboy approved until/);
 
     await user.click(within(panel).getByRole("button", { name: "Get price" }));
-    const buy = await within(panel).findByRole("button", { name: "Buy for $98.33" });
+    const buy = await within(panel).findByRole("button", { name: "Buy for $98.94" });
     expect(within(panel).getByText(/Derive testnet, test USDC/)).toBeTruthy();
     await user.click(buy);
     await within(panel).findByText(/Bought 0.03299 contracts for/);
@@ -166,7 +167,7 @@ describe("one tap on Derive's testnet", () => {
     await user.click(within(card).getByRole("button", { name: "Close" }));
     const sell = await screen.findByRole("region", { name: "Sell back Higher through Derive" });
     await user.click(within(sell).getByRole("button", { name: "Get sell-back price" }));
-    const go = await within(sell).findByRole("button", { name: "Sell for $91.30" });
+    const go = await within(sell).findByRole("button", { name: "Sell for $90.65" });
     expect(fake.calls("private/send_rfq").at(-1).params).toMatchObject({ min_total_cost: "88.64", label: `${ID}:yes:close` });
     await user.click(go);
     await screen.findByText("Nothing open right now");

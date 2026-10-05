@@ -385,3 +385,21 @@ def test_a_side_above_99c_is_not_offered():
     assert out["state"] == "tail" and out["buy"] == 0.9953  # the true price stays in the file
     assert Q._side_out({**side, "buy": 0.99}, "BTC")["state"] == "open"
     assert Q.side_state(side, "BTC") == "open"  # the date gates are unchanged
+
+
+
+def test_partial_retry_keeps_the_healthy_coin_in_the_index(tmp_path, chain14):
+    root, site, _ = _job(tmp_path, chain14, publish=True)
+    before = json.loads((site / "questions" / "index.json").read_text())
+    assert {c["und"] for c in before["coins"]} == {"BTC", "ETH"}
+    eth = (site / "questions" / "ETH.json").read_bytes()
+    qj.run(root, "v2_mainnet", {"BTC": chain14["BTC"]}, SPECS, T14,
+           site=site, publish=True, now=T14 + 400)
+    after = json.loads((site / "questions" / "index.json").read_text())
+    assert {c["und"] for c in after["coins"]} == {"BTC", "ETH"}
+    assert (site / "questions" / "ETH.json").read_bytes() == eth
+    assert after["trading_issued_at"] == T14 + 400
+    assert after["trading_valid_until"] == T14 + 400 + qj.TRADING_LEASE_SEC
+    qj.mark_paused(site, T14 + 500)
+    renewed = json.loads((site / "questions" / "index.json").read_text())
+    assert renewed["trading_valid_until"] == T14 + 500 + qj.TRADING_LEASE_SEC

@@ -1,0 +1,14 @@
+name: data health
+on:
+  schedule:
+    - cron: "11,26,41,56 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  published-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 backend/check_health.py https://raw.githubusercontent.com/cianfru/derive_scan/site-data/health.json

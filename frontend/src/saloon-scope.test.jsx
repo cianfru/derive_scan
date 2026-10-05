@@ -104,7 +104,7 @@ describe("ownership before selling back", () => {
     addPosition(legacy, NOW);
     page(<DeriveSync />);
     await waitFor(() => expect(mock.reads).toHaveLength(1));
-    expect(mock.reads[0].options.sinceSec).toBe(legacy.journal.fill.ts - 3600);
+    expect(mock.reads[0].options.sinceSec).toBe(0);
   });
 });
 

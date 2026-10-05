@@ -1,3 +1,4 @@
+import { _resetTradeStorage } from "./store.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { AbiCoder, getAddress } from "ethers";
 import { createClient } from "./derive.js";
@@ -22,7 +23,7 @@ const setup = (handlers = {}) => {
   return { fake, c, wallet: fakeWallet() };
 };
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => { localStorage.clear(); _resetTradeStorage(); });
 
 describe("the grant", () => {
   it("is exactly trade:rfq:option, one subaccount and 7 days", () => {

@@ -1,3 +1,4 @@
+import { _resetTradeStorage } from "./store.js";
 // The seat when Derive no longer accepts Cowboy's key (expired, revoked or unknown), and Switch off
 // when the wallet declines: the browser drops the key, says only what is true, and never loops.
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -52,7 +53,7 @@ const keyLogins = (fake) => fake.calls("public/login").filter((m) => recoverLogi
 
 let warn;
 beforeEach(() => {
-  localStorage.clear();
+  localStorage.clear(); _resetTradeStorage();
   localStorage.setItem(KEYS.terms(), JSON.stringify({ at: 1 }));
   warn?.mockRestore();
   warn = vi.spyOn(console, "warn").mockImplementation(() => {});

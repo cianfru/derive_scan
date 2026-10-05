@@ -33,7 +33,7 @@ export default function Flow() {
   const large = all ? matching : matching.slice(0, CAP);
   return (
     <div className="wrap page people-page flow-page">
-      <PageHead title="Flow" meta={<FlowCoverage coverage={data.coverage} as="span" />} />
+      <PageHead error={error} title="Flow" meta={<FlowCoverage coverage={data.coverage} as="span" />} />
       <Lead lead={flowLead(data)} />
       <FlowSummary data={data} selected={selected} onSelect={(u) => { setSelected(u); setAll(false); }} />
       <Plate title="Large trades" bodyClass="flush"

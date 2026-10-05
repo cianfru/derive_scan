@@ -434,7 +434,7 @@ export default function Radar() {
 
   return (
     <div className="wrap page radar-page">
-      <PageHead title="Radar" info={info} tabs={tabs} meta={<>{coins.length} markets · {clock(data.generated_at)}</>} />
+      <PageHead error={error} title="Radar" info={info} tabs={tabs} meta={<>{coins.length} markets · {clock(data.generated_at)}</>} />
       <Lead lead={radarLead(coins, horizon)} />
       <div className="plate radar-workspace">
         <section className="radar-stage" aria-label="Positioning map">

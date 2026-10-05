@@ -46,7 +46,7 @@ describe("the dry run", () => {
     await vi.advanceTimersByTimeAsync(10);
     expect(dry.state.phase).toBe("quoted");
     expect(dry.state.check).toMatchObject({ ok: true, total: 96.9906, fee: 1.3395 });
-    expect(dry.state.check.mostLose).toBeCloseTo(98.3301, 4);
+    expect(dry.state.check.mostLose).toBeCloseTo(96.9906 + Number(best.suggested_max_fee), 4);
     expect(dry.state.firmUntil).toBe(1791089400000 + 12_000);
     const sent = fake.calls("private/send_rfq")[0].params;
     expect(sent).toMatchObject({ subaccount_id: 90212, max_total_cost: "103.95", partial_fill_step: "1", extra_fee: "0", label: "BTC-20261009-A-82000-88000:yes" });
@@ -90,13 +90,25 @@ describe("the dry run", () => {
     const { fake, dry } = run({ quotes: (i) => (i === 0 ? best : q2) });
     await dry.start();
     await vi.advanceTimersByTimeAsync(10);
-    const seen = dry.state.check.total;
+    const seen = { quoteId: dry.state.quote.quote_id, total: dry.state.check.total, maxFee: dry.state.check.maxFee };
     await vi.advanceTimersByTimeAsync(1_600);
     expect(dry.state.check.total).toBe(97.5);
     expect(dry.state.changed).toBe(true);
     await dry.confirm(seen);
     expect(fake.calls("public/execute_quote_debug")).toHaveLength(0);
     expect(dry.state.phase).toBe("quoted");
+  });
+
+  it("requires another tap when only the maximum fee changes", async () => {
+    const q2 = { ...best, suggested_max_fee: String(Number(best.suggested_max_fee) + 0.1) };
+    const { fake, dry } = run({ quotes: (i) => i === 0 ? best : q2 });
+    await dry.start();
+    await vi.advanceTimersByTimeAsync(10);
+    const seen = { quoteId: dry.state.quote.quote_id, total: dry.state.check.total, maxFee: dry.state.check.maxFee };
+    await vi.advanceTimersByTimeAsync(1600);
+    await dry.confirm(seen);
+    expect(dry.state.changed).toBe(true);
+    expect(fake.calls("public/execute_quote_debug")).toHaveLength(0);
   });
 
   it("signs on the tap, checks it with execute_quote_debug byte for byte, fills nothing and cancels", async () => {
@@ -112,7 +124,7 @@ describe("the dry run", () => {
     await dry.start();
     await vi.advanceTimersByTimeAsync(10);
     expect(dry.state.phase).toBe("quoted");
-    await dry.confirm(dry.state.check.total);
+    await dry.confirm({ quoteId: dry.state.quote.quote_id, total: dry.state.check.total, maxFee: dry.state.check.maxFee });
     expect(dry.state.phase).toBe("checked");
     expect(dry.state.debug).toMatchObject({ ok: true, mismatched: [] });
     expect(fake.calls("public/execute_quote_debug")[0].params).toEqual(debugFixture.request);
@@ -131,12 +143,12 @@ describe("the dry run", () => {
   });
 
   it("sells back with a floor, not a ceiling", async () => {
-    const { fake, dry } = run({ quotes: { ...best, direction: "sell", estimated_total_cost: "92.6" }, direction: "sell", limit: 88.6 });
+    const { fake, dry } = run({ quotes: { ...best, best_quote: { ...best.best_quote, direction: "buy" }, direction: "sell", estimated_total_cost: "92.6" }, direction: "sell", limit: 88.6 });
     await dry.start();
     await vi.advanceTimersByTimeAsync(10);
     expect(fake.calls("private/send_rfq")[0].params).toMatchObject({ min_total_cost: "88.6" });
     expect(fake.calls("private/rfq_get_best_quote")[0].params.direction).toBe("sell");
-    expect(dry.state.check.net).toBeCloseTo(92.6 - 1.3395, 6);
+    expect(dry.state.check.net).toBeCloseTo(92.6 - Number(best.suggested_max_fee), 6);
   });
 
   it("stays off when Derive reports an incident", async () => {

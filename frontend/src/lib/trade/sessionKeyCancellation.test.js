@@ -1,3 +1,4 @@
+import { _resetTradeStorage } from "./store.js";
 import { beforeEach, describe, expect, it } from "vitest";
 import { keccak256, toUtf8Bytes } from "ethers";
 import { fakeWallet } from "./fakeWallet.js";
@@ -13,7 +14,7 @@ const newKey = (phrase) => () => keyFromSecret(keccak256(toUtf8Bytes(phrase)));
 const options = (wallet, client, phrase = "old cancellation key") => ({
   client, provider: wallet, owner: wallet.address, subaccountId: 101, newKey: newKey(phrase),
 });
-beforeEach(() => localStorage.clear());
+beforeEach(() => { localStorage.clear(); _resetTradeStorage(); });
 
 describe("browser key writes belong to their approval", () => {
   it("does not store a late accepted grant after its operation is cancelled", async () => {

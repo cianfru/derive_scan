@@ -4,9 +4,10 @@ import json
 import math
 
 import httpx
+import pytest
 
 from derive.candles import CandleCache, last_closed_open, update
-from derive.client import DeriveClient
+from derive.client import DeriveClient, DeriveRPCError
 from derive.context import parse_fear_greed, parse_global, parse_stablecoins
 import signal_once
 
@@ -78,6 +79,34 @@ async def test_candle_cache_appends_only_new_bars(tmp_path):
     data = cache.load("BTC", "4h")
     assert len(data["close"]) == 701 and (data["timestamp"][1:] - data["timestamp"][:-1] == 14_400_000).all()
     assert data["volume"].min() >= 10
+
+
+async def test_volume_failure_does_not_persist_zero_bars(tmp_path):
+    def handler(request):
+        if request.url.path.endswith("get_tradingview_chart_data"):
+            return httpx.Response(503)
+        return derive_handler(request)
+
+    client = DeriveClient("https://x/", transport=httpx.MockTransport(handler), retries=0, backoff=0)
+    cache = CandleCache(tmp_path)
+    with pytest.raises(DeriveRPCError):
+        await update(client, cache, "BTC", "4h", NOW)
+    assert cache.load("BTC", "4h") is None
+    await client.close()
+
+
+async def test_internal_candle_gap_is_repaired_without_new_close(tmp_path):
+    client = DeriveClient("https://x/", transport=httpx.MockTransport(derive_handler), retries=0, backoff=0)
+    cache = CandleCache(tmp_path)
+    await update(client, cache, "BTC", "4h", NOW)
+    path = cache.path("BTC", "4h")
+    lines = path.read_text().splitlines()
+    path.write_text("\n".join(lines[:200] + lines[201:]) + "\n")
+    assert await update(client, cache, "BTC", "4h", NOW) == 1
+    bars = cache.load("BTC", "4h")
+    assert len(bars["timestamp"]) == 700
+    assert (bars["timestamp"][1:] - bars["timestamp"][:-1] == 14_400_000).all()
+    await client.close()
 
 
 def test_context_parsers():

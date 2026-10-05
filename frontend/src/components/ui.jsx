@@ -71,12 +71,13 @@ export function PanelHead({ title, info, infoLabel, right, children, as: Tag = "
 }
 
 /** App page head: 28px title, a mono meta line on the same baseline, optional tabs. */
-export function PageHead({ title, info, meta, tabs }) {
+export function PageHead({ title, info, meta, tabs, error }) {
   return (
     <header className="page-head">
       <h1>{title}{info && <Info label={`About ${title}`}>{info}</Info>}</h1>
       {tabs}
       {meta && <p className="page-meta">{meta}</p>}
+      <RefreshNotice error={error} />
     </header>
   );
 }
@@ -113,3 +114,7 @@ export function Plate({ id, title, info, right, children, className = "", bodyCl
 
 export function Loading() { return <div className="loading"><div className="spin" aria-label="Loading" /></div>; }
 export function Failed({ error }) { return <div className="error">{String(error?.message || error)}</div>; }
+
+export function RefreshNotice({ error }) {
+  return error ? <p className="page-meta" role="status">Refresh failed. Showing the last available data.</p> : null;
+}

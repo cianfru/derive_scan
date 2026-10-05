@@ -1,3 +1,4 @@
+import { _resetTradeStorage } from "./store.js";
 // The seat with a wallet Derive has never seen: sign-in answers 14000 (account not found), and the
 // first deposit, through a deposit address, opens the account. Derive is a fake socket; the replies
 // for login are the ones V3 testnet gave a throwaway wallet (4 October 2026).
@@ -42,7 +43,7 @@ const sub = (id, manager, usdc, label = "") => {
   return { ...s, subaccount_id: id, manager_id: manager, label, collaterals: usdc ? s.collaterals.map((c) => ({ ...c, amount: String(usdc) })) : [] };
 };
 
-beforeEach(() => { localStorage.clear(); _resetAssets(); localStorage.setItem(KEYS.terms(), JSON.stringify({ at: 1 })); });
+beforeEach(() => { localStorage.clear(); _resetTradeStorage(); _resetAssets(); localStorage.setItem(KEYS.terms(), JSON.stringify({ at: 1 })); });
 
 const USDC_ASSET = "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b";
 const row = (status, extra = {}) => ({ action_id: 563, action_type: "DepositToNewSubaccount", asset: USDC_ASSET, amount: "10000000", subaccount_id: 0,

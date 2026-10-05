@@ -5,7 +5,7 @@ import { money } from "../../lib/questions.js";
 import { addPosition, closePosition, incompleteReceipt, loadPositions, patchPosition, replacePosition, settlePosition } from "../../lib/positions.js";
 import { remainingQty } from "../../lib/realized.js";
 import { MODE, NETWORK } from "../../lib/trade/config.js";
-import { mainnetSwitch, setMainnetSwitch } from "../../lib/trade/live.js";
+import { setMainnetSwitch } from "../../lib/trade/live.js";
 import { notePilotInvite, oneTapOffered } from "../../lib/pilot.js";
 import { MAINNET_FILLS, TESTNET_FILLS } from "../../lib/flags.js";
 import { failure } from "../../lib/trade/derive.js";
@@ -54,8 +54,7 @@ export function TestnetTag() {
 async function readMainnetSwitch() {
   const r = await fetch(`${DATA_URL}questions/index.json`, { cache: "no-store" });
   if (!r.ok) return "off";
-  const s = mainnetSwitch(await r.json());
-  return s === "loading" ? "off" : s;
+  return r.json();
 }
 
 /** The stage 1 ticket for a browser outside the mainnet pilot, told one tap is on its way
@@ -87,7 +86,7 @@ export default function TradePanel({ und, question, answer, level, sideKey, boar
   const { data: markets } = useData("markets.json");
   const trading = tradingState(index);
   // Real money: the page's copy of the mainnet switch, which the client checks before any fill.
-  useEffect(() => { if (MODE === "mainnet") setMainnetSwitch(trading); }, [trading]);
+  useEffect(() => { if (MODE === "mainnet") setMainnetSwitch(index); }, [index]);
   if (MODE === "mainnet") notePilotInvite();
   const plan = sell
     ? sellPlan({ position: sell.position, level, board, paused: sell.paused })
@@ -179,10 +178,7 @@ export function DeriveSync({ onSynced, onScope }) {
     // Only this wallet's records on this Derive account are matched; others stay as they are.
     try {
       let list = loadPositions(NETWORK.name);
-      const firsts = list.filter((p) => (!p.wallet || String(p.wallet).toLowerCase() === String(scope.wallet).toLowerCase())
-        && (p.subaccount_id == null || p.subaccount_id === scope.subaccountId))
-        .map((p) => p.journal?.fill?.ts ?? p.at).filter(Number.isFinite);
-      const sinceSec = Math.max(0, (firsts.length ? Math.min(...firsts) : now - 30 * 86400) - 3600);
+      const sinceSec = 0;
       const { trades, held } = await readSaloon(client, scope.subaccountId, { sinceSec });
       if (!current()) return;
       list = loadPositions(NETWORK.name);

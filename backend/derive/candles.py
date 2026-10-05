@@ -1,4 +1,4 @@
-"""Closed OHLCV candles per perp, from Derive, cached as append-only CSV on the `data` branch.
+"""Closed OHLCV candles per perp, from Derive, cached as CSV on the `data` branch.
 
 Price: the spot index Derive marks and settles against (`public/get_index_chart_data`).
 Volume: the perp's traded volume in contracts (`public/get_tradingview_chart_data`); 0 for a
@@ -16,7 +16,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .client import DeriveClient
+from .client import DeriveClient, DeriveRPCError
 
 log = logging.getLogger(__name__)
 
@@ -113,6 +113,22 @@ class CandleCache:
         with p.open("a") as f:
             f.write(buf.getvalue())
 
+    def upsert(self, und: str, tf: str, bars: list[list]) -> int:
+        p = self.path(und, tf)
+        rows = {int(float(r[0])): r for r in self._rows(p)}
+        previous = set(rows)
+        rows.update({int(r[0]): r for r in bars})
+        if not bars:
+            return 0
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_suffix(".csv.tmp")
+        with tmp.open("w", newline="") as f:
+            w = csv.writer(f, lineterminator="\n")
+            w.writerow(FIELDS)
+            w.writerows(rows[t] for t in sorted(rows))
+        tmp.replace(p)
+        return len(set(rows) - previous)
+
 
 async def fetch_bars(client: DeriveClient, und: str, tf: str, start: int, end: int) -> list[list]:
     """Closed bars with open time in [start, end] (seconds), as CSV rows with ms timestamps."""
@@ -120,13 +136,18 @@ async def fetch_bars(client: DeriveClient, und: str, tf: str, start: int, end: i
         return []
     step = TF_SEC[tf]
     params = {"period": step, "start_timestamp": start, "end_timestamp": end + step - 1}
-    index = await client.public("get_index_chart_data", {"currency": und, **params}) or []
+    index = await client.public("get_index_chart_data", {"currency": und, **params})
+    if not isinstance(index, list):
+        raise ValueError(f"invalid index history for {und}")
     try:
-        traded = await client.public("get_tradingview_chart_data", {"instrument_name": f"{und}-PERP", **params}) or []
-    except Exception:  # a perp without trade history still gets price bars
-        log.warning("no traded candles for %s %s", und, tf)
+        traded = await client.public("get_tradingview_chart_data", {"instrument_name": f"{und}-PERP", **params})
+    except DeriveRPCError as exc:
+        if exc.code != 12001:
+            raise
         traded = []
-    volume = {int(c["timestamp"]): float(c.get("volume_contracts") or 0) for c in traded}
+    if not isinstance(traded, list):
+        raise ValueError(f"invalid volume history for {und}")
+    volume = {int(c["timestamp"]): float(c["volume_contracts"]) for c in traded}
     rows = []
     for c in index:
         ts = int(c["timestamp"])
@@ -135,16 +156,27 @@ async def fetch_bars(client: DeriveClient, und: str, tf: str, start: int, end: i
         rows.append([ts * 1000, c["open_price"], c["high_price"], c["low_price"], c["close_price"],
                      repr(volume.get(ts, 0.0))])
     rows.sort(key=lambda r: r[0])
+    if len({r[0] for r in rows}) != len(rows):
+        raise ValueError(f"duplicate candles for {und} {tf}")
+    for r in rows:
+        values = np.asarray(r[1:], dtype=float)
+        if not np.isfinite(values).all() or min(values[:4]) <= 0 or values[4] < 0:
+            raise ValueError(f"invalid candle for {und} {tf}")
+        if values[1] < max(values[0], values[3]) or values[2] > min(values[0], values[3]):
+            raise ValueError(f"invalid OHLC for {und} {tf}")
     return rows
 
 
 async def update(client: DeriveClient, cache: CandleCache, und: str, tf: str, now: float) -> int:
-    """Append the closed bars missing from the cache. Returns the number added."""
+    """Merge closed bars and repair gaps in the engine window. Returns the number added."""
     end = last_closed_open(tf, now)
     last = cache.last_ts_sec(und, tf)
-    if last is not None and last >= end:
+    step = TF_SEC[tf]
+    times = sorted(int(float(r[0])) // 1000 for r in cache._rows(cache.path(und, tf)))
+    cutoff = end - (HISTORY_BARS[tf] - 1) * step
+    gaps = [a + step for a, b in zip(times, times[1:]) if b - a > step and b >= cutoff]
+    if last is not None and last >= end and not gaps:
         return 0
-    start = last + TF_SEC[tf] if last is not None else end - (HISTORY_BARS[tf] - 1) * TF_SEC[tf]
+    start = max(cutoff, min(gaps)) if gaps else last - step if last is not None else cutoff
     rows = await fetch_bars(client, und, tf, start, end)
-    cache.append(und, tf, rows)
-    return len(rows)
+    return cache.upsert(und, tf, rows)

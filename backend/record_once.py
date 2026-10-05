@@ -59,7 +59,10 @@ async def discover(settings: Settings, out: Path, now: float) -> list[str]:
 def due_keys(settings: Settings, store: FileStore, slot: int) -> set[str]:
     status = store.load_status()
     keys = {f"{s}:{u}" for s in settings.sources for u in settings.underlyings}
-    return {k for k in keys if not (status.get(k, {}).get("ok") and status[k].get("ts") == slot)}
+    failed_questions = status.get(f"questions:{settings.sources[0]}", {})
+    retry_questions = failed_questions.get("ts") == slot and failed_questions.get("ok") is False
+    return {k for k in keys if (retry_questions and k.startswith(settings.sources[0] + ":"))
+            or not (status.get(k, {}).get("ok") and status[k].get("ts") == slot)}
 
 
 async def record(settings: Settings, store: FileStore, slot: int, keys: set[str],
@@ -93,7 +96,11 @@ async def questions(settings: Settings, rec, slot: int, site: Path | None) -> No
     root = Path(settings.data_dir)
     chains = {k.split(":")[1]: v for k, v in rec.chains.items() if k.startswith(source + ":")}
     specs = {k.split(":")[1]: v for k, v in rec.specs.items() if k.startswith(source + ":")}
+    key = f"questions:{source}"
+    rec.status[key] = {"ok": False, "ts": slot, "error": "No chains recorded"}
     if not chains:
+        if all(v.get("ok") for k, v in rec.status.items() if k.startswith(source + ":")):
+            rec.status[key] = {"ok": True, "ts": slot}
         return
     try:
         state = qj.load_state(root)
@@ -107,7 +114,9 @@ async def questions(settings: Settings, rec, slot: int, site: Path | None) -> No
         if state:
             qj.save_state(root, state)
         qj.run(root, source, chains, specs, slot, site=site)
-    except Exception:  # Questions must never stop the recording
+        rec.status[key] = {"ok": True, "ts": slot}
+    except Exception as exc:
+        rec.status[key]["error"] = str(exc)
         logging.exception("questions failed")
 
 
@@ -148,8 +157,7 @@ def main() -> int:
         return 0
     status = asyncio.run(record(settings, store, slot, keys, Path(args.site) if args.site else None))
     print(json.dumps(status, indent=1))
-    # Fail the run only when nothing at all was recorded, so a dead source shows in Actions.
-    return 0 if any(v.get("ok") for v in status.values()) else 1
+    return 0 if status and all(v.get("ok") for v in status.values()) else 1
 
 
 if __name__ == "__main__":

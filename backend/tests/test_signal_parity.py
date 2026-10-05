@@ -23,6 +23,15 @@ def _load():
     return raw["as_of"], candles, json.loads((FIX / "reflex_expected.json").read_text())
 
 
+def test_gapped_history_is_ineligible_for_a_signal():
+    as_of, candles, _ = _load()
+    c = candles["SOL"]
+    gapped = {k: np.delete(v, -20) for k, v in c["4h"].items()}
+    row = sig.process_symbol("SOL", "4h", gapped, c["1w"], candles["BTC"]["4h"], candles["ETH"]["4h"], as_of * 1000)
+    assert row["signal_status"] == "unavailable"
+    assert "Candle history has gaps" in row["engine_errors"]
+
+
 def _same(a, b, path=""):
     if isinstance(a, float) or isinstance(b, float):
         assert (a is None and b is None) or math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-12), path
