@@ -1,4 +1,4 @@
-import { remainingQty } from "./realized.js";
+import { incompleteReceipt, remainingQty } from "./realized.js";
 
 // Combined exposure at expiry (Discovery and return 3): open positions grouped by coin, settlement
 // reference and date, each group drawn as one payoff from the combined legs, after what was paid.
@@ -32,6 +32,7 @@ const expiryOf = (p) => p.journal?.package?.expiry || /^[A-Z0-9]+-(\d{8})-/.exec
  * answer (Higher pays like a call spread from lo to hi, Lower like a put spread), marked as such.
  */
 export function positionExposure(p) {
+  if (incompleteReceipt(p)) return null;
   const left = remainingQty(p);
   if (!(left > 0) || !(p.contracts > 0)) return null;
   const r = left / p.contracts;
@@ -51,7 +52,7 @@ export function positionExposure(p) {
     basis = "answer";
   }
   const c = j?.cost;
-  const total = c ? (c.total ?? c.premium) : p.paid;
+  const total = p.exec === "rfq" ? (ok(c?.fees) ? c?.total : null) : c ? (c.total ?? c.premium) : p.paid;
   const feesBasis = c ? c.fees_basis : "included";
   return {
     key: p.key, und: p.und || legs[0]?.und || p.id?.split("-")[0], expiry: expiryOf(p), settle_ts: p.settle_ts ?? null,

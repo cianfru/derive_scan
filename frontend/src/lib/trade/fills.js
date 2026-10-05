@@ -6,7 +6,7 @@
 const num = (v) => (v == null || v === "" ? null : Number(v));
 const ok = Number.isFinite;
 const round = (x, d = 8) => Math.round(x * 10 ** d) / 10 ** d;
-const secs = (t) => (t > 1e12 ? Math.floor(t / 1000) : Math.floor(t));
+const secs = (t) => (t > 1e12 ? t / 1000 : t);
 
 /**
  * One fill from the taker's trade rows of one RFQ. `planned` maps each instrument to the contracts
@@ -17,24 +17,29 @@ export function fillFromTrades(rows, { rfqId = null, planned = {}, source = "tra
   const mine = (rows || []).filter((t) => t.liquidity_role !== "maker" && (!rfqId || t.rfq_id === rfqId));
   if (!mine.length) return null;
   const by = new Map();
+  const seen = new Set();
   for (const t of mine) {
+    // Pages and delayed reads can overlap. A trade contributes cash and contracts only once.
+    if (t.trade_id && seen.has(t.trade_id)) continue;
+    if (t.trade_id) seen.add(t.trade_id);
     const name = t.instrument_name;
     const amount = num(t.trade_amount), price = num(t.trade_price), fee = num(t.trade_fee);
-    if (!name || !ok(amount) || !ok(price)) return null;
-    const leg = by.get(name) || { name, act: t.direction, qty: 0, cost: 0, fee: 0, trade_ids: [] };
+    if (!name || !(amount > 0) || !ok(amount) || !ok(price) || !["buy", "sell"].includes(t.direction)) return null;
+    const leg = by.get(name) || { name, act: t.direction, qty: 0, cost: 0, fee: 0, feeKnown: true, trade_ids: [] };
     if (leg.act !== t.direction) return null; // one RFQ never trades both sides of an instrument
     leg.qty += amount;
     leg.cost += amount * price;
     leg.fee += ok(fee) ? fee : 0;
+    if (!ok(fee)) leg.feeKnown = false;
     if (t.trade_id && !leg.trade_ids.includes(t.trade_id)) leg.trade_ids.push(t.trade_id);
     by.set(name, leg);
   }
   const legs = [...by.values()].sort((a, b) => (a.name < b.name ? -1 : 1)).map((l) => ({
     name: l.name, act: l.act, planned: planned[l.name] ?? null, qty: round(l.qty), signed_qty: round((l.act === "buy" ? 1 : -1) * l.qty),
-    price: round(l.cost / l.qty, 8), fee: round(l.fee, 8), trade_ids: l.trade_ids,
+    price: round(l.cost / l.qty, 8), fee: l.feeKnown ? round(l.fee, 8) : null, trade_ids: l.trade_ids,
   }));
   const premium = round(legs.reduce((a, l) => a + (l.act === "buy" ? 1 : -1) * l.qty * l.price, 0), 8);
-  const fees = round(legs.reduce((a, l) => a + l.fee, 0), 8);
+  const fees = legs.every((l) => ok(l.fee)) ? round(legs.reduce((a, l) => a + l.fee, 0), 8) : null;
   return {
     source, rfq_id: rfqId ?? mine[0].rfq_id ?? null, quote_id: mine[0].quote_id ?? null, label: mine[0].label || null,
     ts: Math.max(...mine.map((t) => secs(num(t.timestamp) || 0))), legs, premium, fees,

@@ -123,6 +123,19 @@ describe("exposure: groups by coin, settlement reference and date", () => {
     expect(g.pl(80000)).toBeCloseTo(20, 9);
     expect(g.pl(90000)).toBeCloseTo(-40, 9);
   });
+
+  it("withholds exposure for an incomplete RFQ entry or exit until its receipt is repaired", () => {
+    const pending = { ...hi, exec: "rfq", journal: { ...hi.journal, fill: { ...hi.journal.fill, complete: false } } };
+    expect(positionExposure(pending)).toBeNull();
+    expect(exposureGroups([pending], NOW)).toEqual([]);
+    const legacy = { ...pending, journal: { ...pending.journal, fill: { ...pending.journal.fill, complete: true, legs: [pending.journal.fill.legs[0]] } } };
+    expect(positionExposure(legacy)).toBeNull();
+    const closing = { ...hi, exec: "rfq", exits: [{ kind: "close", via: "rfq", complete: false, qty: 0, receipt_qty: 0.01 }] };
+    expect(positionExposure(closing)).toBeNull();
+    expect(exposureGroups([closing], NOW)).toEqual([]);
+    const repaired = { ...pending, journal: { ...pending.journal, fill: { ...pending.journal.fill, complete: true } } };
+    expect(exposureGroups([repaired], NOW)[0].mostLose).toBeCloseTo(100, 9);
+  });
 });
 
 describe("exposure: a proposed trade on top of what is held", () => {

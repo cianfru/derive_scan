@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Info } from "../ui.jsx";
 import { cents, centsUp, money, parseId, sameLegs } from "../../lib/questions.js";
@@ -8,11 +8,12 @@ import {
 import { createTicket } from "../../lib/trade/rfq.js";
 import { instrumentCache } from "../../lib/trade/derive.js";
 import { keySigner } from "../../lib/trade/sessionKey.js";
-import { dropKey, useSeat } from "../../lib/trade/seat.js";
+import { dropKey, seatState, useSeat } from "../../lib/trade/seat.js";
 import { MODE } from "../../lib/trade/config.js";
 import { capGate, capMessage, tradingAllows, TRADING_NOTICE } from "../../lib/trade/limits.js";
 import { buyLabel, closeLabel } from "../../lib/trade/record.js";
 import { remainingQty } from "../../lib/realized.js";
+import { partial } from "../../lib/positions.js";
 import ErrorDetail from "./ErrorDetail.jsx";
 
 const perDollar = (x) => cents(Math.round(x * 100));
@@ -46,7 +47,7 @@ export function ticketPlan({ und, level, sideKey, board, contracts, direction = 
 export function sellPlan({ position, level = null, board = null, paused = false }) {
   const q = parseId(position?.id);
   const contracts = position ? remainingQty(position) : 0;
-  if (!q || !(contracts > 0)) return null;
+  if (!q || !(contracts > 0) || partial(position)) return null;
   const legs = packageLegs({ und: q.und, expiry: q.expiry, kind: position.side, lo: position.lo, hi: position.hi });
   if (position.legs && !sameLegs(position.legs, legs.map((l) => [l.instrument_name]))) return null;
   const payout = contracts * (position.hi - position.lo);
@@ -80,9 +81,12 @@ function Filled({ fill, buy }) {
   const c = qty(fill.legs[0]?.qty);
   return (
     <div className="tr-done" role="status">
-      <p>{buy ? <>Bought {c} contracts for <b className="mono">{money(total ?? fill.premium, { cents: true })}</b>{fill.fees != null && <>, Derive fees {money(fill.fees, { cents: true })} included</>}.</>
+      <p>{fill.complete === false ? <>Trade sent. Derive's trade records are still being checked.</> : fill.fees == null
+        ? <>{buy ? "Bought" : "Sold back"} {c} contracts. Premium {buy ? "paid" : "received"} before Derive fees: <b className="mono">{money(buy ? fill.premium : -fill.premium, { cents: true })}</b>.</>
+        : buy ? <>Bought {c} contracts for <b className="mono">{money(total, { cents: true })}</b>, Derive fees {money(fill.fees, { cents: true })} included.</>
         : <>Sold back {c} contracts. Got <b className="mono">{money(total ?? -fill.premium, { cents: true })}</b>{fill.fees != null && <> after Derive fees of {money(fill.fees, { cents: true })}</>}.</>}</p>
       {fill.complete === false && <p>Derive's records don't show every option of this trade yet. Positions checks it again with Derive.</p>}
+      {fill.complete !== false && fill.fees == null && <p>Derive's fees are not available yet. {buy ? "Total cost stays unknown." : "Proceeds after fees stay unknown."}</p>}
       {fill.partial && <p>Derive filled {Math.round(fill.pct * 100)}% of the package; the rest is cancelled and not sent again.</p>}
       <p className="tr-note">From Derive's trade records{fill.trade_ids?.length ? <> · {fill.trade_ids.length} {fill.trade_ids.length === 1 ? "trade" : "trades"}</> : null}. <Link className="text-link" to="/saloon/mine">See it in Positions</Link></p>
     </div>
@@ -97,12 +101,24 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE 
   const seat = useSeat();
   const [st, setSt] = useState({ phase: "idle" });
   const run = useRef(null);
+  const request = useRef(null);
+  const generation = useRef(0);
   const getInstrument = useMemo(() => (seat.client ? instrumentCache(seat.client) : null), [seat.client]);
   const now = useNow(st.phase === "quoted");
   const tradingRef = useRef(trading);
   tradingRef.current = trading;
-  useEffect(() => () => { run.current?.close(); }, []);
-  useEffect(() => { run.current?.close(); run.current = null; setSt({ phase: "idle" }); }, [plan?.label, plan?.contracts]);
+  useLayoutEffect(() => {
+    generation.current += 1;
+    run.current?.close(); run.current = null; request.current = null;
+    setSt({ phase: "idle" });
+    return () => { generation.current += 1; run.current?.close(); run.current = null; request.current = null; };
+  }, [plan?.label, plan?.contracts, seat.wallet, seat.saloon?.id, seat.client, seat.key, seat.stage, mode]);
+
+  const sameSeat = (scope) => {
+    const live = seatState();
+    return live.stage === "ready" && live.client === scope.client && live.key === scope.key
+      && live.saloon?.id === scope.subaccountId && live.wallet === scope.wallet;
+  };
 
   if (!plan) return <p className="status">No price on Derive's screen for this right now.</p>;
   const buy = plan.direction === "buy";
@@ -110,14 +126,24 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE 
   const allowed = tradingAllows(trading, plan.direction);
   const preCap = buy ? capGate(plan.aboutLose, seat.wallet) : { ok: true };
   const ask = () => {
+    const scope = { wallet: seat.wallet, subaccountId: seat.saloon?.id, client: seat.client, key: seat.key };
+    if (!sameSeat(scope) || !tradingAllows(tradingRef.current, plan.direction)) return;
     run.current?.close();
+    const token = ++generation.current;
+    request.current = { scope, token };
+    const current = () => token === generation.current && sameSeat(scope);
     run.current = createTicket({
       client: seat.client, getInstrument, subaccountId: seat.saloon.id, owner: seat.wallet, key: keySigner(seat.key),
       legs: plan.wire, direction: plan.direction, limit: plan.limit, payout: plan.payout, feeEstimate: plan.fee, label: plan.label,
-      estimate: buy ? plan.aboutLose : null, tolerance: plan.T, mode, trading: () => tradingRef.current,
-      onFill: (f) => onFill?.(f), onChange: (s) => setSt({ ...s }), onKeyRejected: () => dropKey(),
+      estimate: buy ? plan.aboutLose : null, tolerance: plan.T, mode, trading: () => current() ? tradingRef.current : "off",
+      onFill: (f) => onFill?.(f, { wallet: scope.wallet, subaccountId: scope.subaccountId }),
+      onChange: (s) => { if (current()) setSt({ ...s }); }, onKeyRejected: () => { if (current()) dropKey(); },
     });
     run.current.start();
+  };
+  const confirm = () => {
+    const active = request.current;
+    if (active && active.token === generation.current && sameSeat(active.scope)) run.current?.confirm(st.check.total);
   };
   const c = st.check;
   const firmLeft = st.firmUntil ? Math.max(0, Math.ceil((st.firmUntil - now) / 1000)) : 0;
@@ -153,7 +179,7 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE 
         <>
           {st.changed && <p className="tr-msg">Derive's price moved. Check the new number.</p>}
           {!cap.ok && <p className="tr-msg">{capMessage(cap)}</p>}
-          <button className="btn primary lg tr-go" disabled={!cap.ok || !allowed} onClick={() => run.current.confirm(c.total)}>
+          <button className="btn primary lg tr-go" disabled={!cap.ok || !allowed} onClick={confirm}>
             {fills ? tap : `Dry run: ${tap.toLowerCase()}`}
           </button>
           <p className="tr-note">{fills

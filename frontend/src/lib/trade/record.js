@@ -5,6 +5,9 @@
 // Testnet records live under the testnet journal key, apart from mainnet.
 import { captureContext, markBenchmark, settleBreakeven } from "../journal.js";
 import { fullPay, parseId, questionText, ANSWER } from "../questions.js";
+import { reconcileExits } from "../positions.js";
+import { packageLegs } from "./package.js";
+import { packageComplete } from "./fills.js";
 
 const round = (v, d = 6) => (Number.isFinite(v) ? Number(v.toFixed(d)) : null);
 const settleOf = (expiry) => Date.UTC(+expiry.slice(0, 4), +expiry.slice(4, 6) - 1, +expiry.slice(6, 8), 8) / 1000;
@@ -24,7 +27,7 @@ export function exactJournal({ fill, id, side, network, settleTs, contracts, req
   const lo = level?.lo ?? q.lo, hi = level?.hi ?? q.hi;
   const fees = Number.isFinite(fill.fees) ? fill.fees : null;
   const total = fees == null ? null : fill.premium + fees;
-  const be = settleBreakeven({ side, lo, hi, contracts, cost: total ?? fill.premium });
+  const be = fill.complete === false || total == null ? null : settleBreakeven({ side, lo, hi, contracts, cost: total });
   return {
     schema: 1, source: "derive", venue: "Derive", network, entered_by_you: [], saved_ts: savedTs,
     package: {
@@ -65,12 +68,13 @@ export function oneTapKey(fill) {
 export function buyRecord({ fill, id, side, network = "testnet", requested = null, level = null, board = null, markets = null, pricesTs = null, estimate = null, question = null, savedTs, wallet = null, subaccountId = null }) {
   const q = parseId(id);
   if (!q || !fill?.legs?.length) return null;
+  fill = { ...fill, complete: fill.complete !== false && matchesPackage(fill, id, side) };
   const contracts = fill.legs[0].qty;
   const settleTs = settleOf(q.expiry);
   const journal = exactJournal({ fill, id, side, network, settleTs, contracts, requested, board, level, markets, pricesTs, estimate, savedTs });
   return {
     id, und: q.und, side, lo: journal.package.lo, hi: journal.package.hi, contracts,
-    paid: journal.cost.total ?? journal.cost.premium, estimate: estimate?.total ?? null, exec: "rfq",
+    paid: journal.cost.total, estimate: estimate?.total ?? null, exec: "rfq",
     legs: fill.legs.map((l) => l.name), question: question || questionText(q.und, q, q.expiry), answer: ANSWER[side],
     settle_ts: settleTs, v: 2, network, journal,
     ...(oneTapKey(fill) ? { key: oneTapKey(fill) } : {}),
@@ -83,6 +87,7 @@ const near = (a, b, tol = 1e-6) => (a == null && b == null) || (Number.isFinite(
 /** True when a saved fill (a journal's `fill`, or an exit) disagrees with Derive's: other legs, amounts,
  * prices, fees, premium or total fees. */
 export function fillDiffers(saved, derive) {
+  if (!near(saved?.ts ?? null, derive?.ts ?? null)) return true;
   const a = [...(saved?.legs || [])].sort((x, y) => (x.name < y.name ? -1 : 1));
   const b = [...(derive?.legs || [])].sort((x, y) => (x.name < y.name ? -1 : 1));
   if (a.length !== b.length) return true;
@@ -103,25 +108,40 @@ export function repairBuy(record, fill, { now }) {
   const fresh = buyRecord({ fill: { ...fill, pct: j.fill?.filled_pct ?? 1, complete: true }, id: record.id, side: record.side, network: record.network || "testnet",
     requested: j.fill?.requested ?? null, savedTs: j.saved_ts ?? record.at ?? now, wallet: record.wallet || null, subaccountId: record.subaccount_id ?? null });
   if (!fresh) return null;
-  return {
+  const mark = j.mark && record.contracts > 0 && fresh.contracts !== record.contracts
+    ? { ...j.mark, value: Number.isFinite(j.mark.value) ? j.mark.value * fresh.contracts / record.contracts : j.mark.value } : j.mark;
+  return reconcileExits({
     ...record, contracts: fresh.contracts, paid: fresh.paid, legs: fresh.legs, updated_at: Math.floor(now),
-    journal: { ...j, package: fresh.journal.package, fill: { ...fresh.journal.fill, repaired_ts: Math.floor(now) }, cost: fresh.journal.cost },
-  };
+    journal: { ...j, package: fresh.journal.package, fill: { ...fresh.journal.fill, repaired_ts: Math.floor(now) }, cost: fresh.journal.cost, ...(mark ? { mark } : {}) },
+  }, now);
+}
+
+/** A receipt must describe the answer's actual debit instruments and sides, not just two equal sizes. */
+export function matchesPackage(fill, id, side, closing = false) {
+  const q = parseId(id);
+  if (!q || !packageComplete(fill)) return false;
+  const expected = packageLegs({ und: q.und, expiry: q.expiry, kind: side, lo: q.lo, hi: q.hi });
+  return expected.every((l) => fill.legs.some((f) => f.name === l.instrument_name
+    && f.act === (closing ? (l.direction === "buy" ? "sell" : "buy") : l.direction)));
 }
 
 /** A one-tap sell back as an exact J2 exit: proceeds before fees, Derive's exit fees, the time, the
  * trade ids, and Derive's mark from the board (when the board had one) as the benchmark. */
-export function exitFromFill(fill, { mark = null, savedTs } = {}) {
-  const qty = fill.legs[0].qty;
-  const gross = round(-fill.premium); // a sell back receives
-  const fees = Number.isFinite(fill.fees) ? round(fill.fees) : null;
+export function exitFromFill(fill, { mark = null, savedTs, qty = fill.legs[0].qty, offset = 0 } = {}) {
+  const fullQty = fill.legs[0].qty;
+  // Cumulative differences leave the last lot with every rounding remainder.
+  const part = (v) => Number.isFinite(v)
+    ? round(round(v * (offset + qty) / fullQty, 12) - round(v * offset / fullQty, 12), 12) : null;
+  const gross = part(-fill.premium); // a sell back receives
+  const fees = part(fill.fees);
   return {
     kind: "close", qty, ts: fill.ts, saved_ts: savedTs, via: "rfq",
+    complete: fill.complete !== false && packageComplete(fill), rfq_qty: fullQty, allocation_offset: offset,
     gross, gross_basis: "exact", fees, fees_basis: fees == null ? "unknown" : "exact",
-    net: fees == null ? null : round(gross - fees),
+    net: fees == null ? null : round(gross - fees, 12),
     mark: mark && Number.isFinite(mark.value) ? { value: mark.value, ts: mark.ts ?? null, source: mark.source || "Derive mark, Cowboy board" } : null,
     rfq_id: fill.rfq_id, quote_id: fill.quote_id, trade_ids: fill.trade_ids || [], source: fill.source,
-    legs: fill.legs.map((l) => ({ name: l.name, act: l.act, qty: l.qty, price: l.price, fee: l.fee })),
+    legs: fill.legs.map((l) => ({ name: l.name, act: l.act, qty: part(l.qty), price: l.price, fee: part(l.fee) })),
   };
 }
 

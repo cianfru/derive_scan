@@ -1,14 +1,14 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Info } from "../ui.jsx";
 import { useData } from "../../lib/data.js";
 import { money } from "../../lib/questions.js";
-import { addPosition, closePosition, loadPositions, patchPosition, replacePosition, settlePosition } from "../../lib/positions.js";
+import { addPosition, closePosition, incompleteReceipt, loadPositions, patchPosition, replacePosition, settlePosition } from "../../lib/positions.js";
 import { remainingQty } from "../../lib/realized.js";
 import { MODE } from "../../lib/trade/config.js";
 import { failure } from "../../lib/trade/derive.js";
 import { TRADING_NOTICE, tradingState } from "../../lib/trade/limits.js";
 import { buyRecord, exitFromFill, knownRfqs } from "../../lib/trade/record.js";
-import { canTrade, connect, useSeat } from "../../lib/trade/seat.js";
+import { canTrade, connect, seatState, useSeat } from "../../lib/trade/seat.js";
 import { accountRecords, fillsByRfq, legStatus, readSaloon, recoverFills, settlementPrice, unexplained } from "../../lib/trade/sync.js";
 import { ConnectStep, FundStep, TermsStep } from "./SeatSetup.jsx";
 import ApproveCowboy, { SeatLine } from "./ApproveCowboy.jsx";
@@ -65,7 +65,7 @@ export default function TradePanel({ und, question, answer, level, sideKey, boar
     ? sellPlan({ position: sell.position, level, board, paused: sell.paused })
     : t?.contracts > 0 && level && board ? ticketPlan({ und, level, sideKey, board, contracts: t.contracts }) : null;
 
-  const onFill = (fill) => {
+  const onFill = (fill, filledScope) => {
     if (MODE !== "testnet") return;
     const savedTs = Math.floor(Date.now() / 1000);
     if (knownRfqs(loadPositions("testnet")).has(fill.rfq_id)) return;
@@ -78,7 +78,7 @@ export default function TradePanel({ und, question, answer, level, sideKey, boar
     }
     const estimate = t ? { premium: t.premium, fees: t.fees, total: t.mostLose, contracts: t.contracts, ts: pricesTs ?? null } : null;
     const rec = buyRecord({ fill, id: level.id, side: sideKey, network: "testnet", requested: plan?.contracts, level, board, markets, pricesTs, estimate, question, savedTs,
-      wallet: seat.wallet, subaccountId: seat.saloon?.id ?? null });
+      wallet: filledScope.wallet, subaccountId: filledScope.subaccountId });
     if (rec) addPosition(rec, savedTs * 1000);
   };
 
@@ -86,9 +86,15 @@ export default function TradePanel({ und, question, answer, level, sideKey, boar
   const missing = MODE === "testnet" && !sell && level ? missingLegs(level.id, sideKey, listed) : [];
   // A one-tap position sells back only from the Derive account it was bought in.
   const from = sell?.position?.subaccount_id;
-  const elsewhere = sell && from != null && seat.saloon && seat.saloon.id !== from;
-  const ticket = elsewhere
-    ? <p className="tr-msg" role="status">This position is in Derive account #{from}. Choose that account to sell it back in one tap.</p>
+  const owner = sell?.position?.wallet;
+  const unclaimed = sell && (!owner || from == null);
+  const elsewhere = sell && !unclaimed && (from !== seat.saloon?.id || String(owner).toLowerCase() !== String(seat.wallet || "").toLowerCase());
+  const ticket = sell && incompleteReceipt(sell.position)
+    ? <p className="tr-msg" role="status">Derive's trade records are still being checked. Selling back needs a complete fill.</p>
+    : unclaimed
+    ? <p className="tr-msg" role="status">Check this position with Derive to confirm its wallet and account before selling it back.</p>
+    : elsewhere
+    ? <p className="tr-msg" role="status">This position is in Derive account #{from}. Connect its wallet and choose that account to sell it back in one tap.</p>
     : <TradeTicket plan={plan} trading={trading} onFill={onFill} />;
   const step = useStep(ticket);
   if ((closing && !sell) || !canTrade(und)) return fallback;
@@ -118,35 +124,55 @@ const short = (n) => n.replace(/^([A-Z0-9]+)-(\d{4})(\d{2})(\d{2})-/, "$1 $4/$3 
  * settlement at the testnet's own settlement price, and says for each record whether Derive holds its
  * legs. `onSynced({ list, statuses, extra, at })` gets the result.
  */
-export function DeriveSync({ onSynced }) {
+export function DeriveSync({ onSynced, onScope }) {
   const seat = useSeat();
   const [st, setSt] = useState({ phase: "idle" });
   const canRead = !!seat.client && !!seat.saloon && ["ready", "approve", "fund"].includes(seat.stage);
+  const generation = useRef(0);
+  const callbacks = useRef({ onSynced, onScope });
+  callbacks.current = { onSynced, onScope };
 
   async function run() {
+    if (!canRead) return;
+    const token = ++generation.current;
+    const client = seat.client;
+    const scope = { wallet: seat.wallet, subaccountId: seat.saloon.id };
+    const current = () => {
+      const live = seatState();
+      return token === generation.current && live.client === client && live.saloon?.id === scope.subaccountId
+        && String(live.wallet || "").toLowerCase() === String(scope.wallet || "").toLowerCase()
+        && ["ready", "approve", "fund"].includes(live.stage);
+    };
     setSt({ phase: "reading" });
     const now = Math.floor(Date.now() / 1000);
     // Only this wallet's records on this Derive account are matched; others stay as they are.
-    const scope = { wallet: seat.wallet, subaccountId: seat.saloon.id };
     try {
       let list = loadPositions("testnet");
-      const firsts = list.filter((p) => !p.wallet || (p.subaccount_id === scope.subaccountId && String(p.wallet).toLowerCase() === String(scope.wallet).toLowerCase()))
+      const firsts = list.filter((p) => (!p.wallet || String(p.wallet).toLowerCase() === String(scope.wallet).toLowerCase())
+        && (p.subaccount_id == null || p.subaccount_id === scope.subaccountId))
         .map((p) => p.journal?.fill?.ts ?? p.at).filter(Number.isFinite);
       const sinceSec = Math.max(0, (firsts.length ? Math.min(...firsts) : now - 30 * 86400) - 3600);
-      const { trades, held } = await readSaloon(seat.client, seat.saloon.id, { sinceSec });
+      const { trades, held } = await readSaloon(client, scope.subaccountId, { sinceSec });
+      if (!current()) return;
+      list = loadPositions("testnet");
       const fills = fillsByRfq(trades);
       const { added, repairs, claims } = recoverFills(list, fills, now, scope);
-      for (const c of claims) list = patchPosition(c.key, { wallet: c.wallet, subaccount_id: c.subaccount_id }, "testnet");
-      for (const { key, record } of repairs) list = replacePosition(key, record, "testnet");
-      for (const r of added) list = addPosition(r, Date.now());
-      const { exits } = recoverFills(list, fills, now, scope);
-      for (const { key, exit } of exits) list = closePosition(key, exit, now, "testnet");
+      const repairedKeys = new Set(repairs.map((r) => r.key));
+      for (const c of claims) { if (!current()) return; list = patchPosition(c.key, { wallet: c.wallet, subaccount_id: c.subaccount_id }, "testnet"); }
+      for (const { key, record } of repairs) { if (!current()) return; list = replacePosition(key, record, "testnet"); }
+      for (const r of added) { if (!current()) return; list = addPosition(r, Date.now()); }
+      const { exits, repairs: laterRepairs, claims: laterClaims, unmatched = [] } = recoverFills(list, fills, now, scope);
+      for (const c of laterClaims) { if (!current()) return; list = patchPosition(c.key, { wallet: c.wallet, subaccount_id: c.subaccount_id }, "testnet"); }
+      for (const { key, record } of laterRepairs) { if (!current()) return; list = replacePosition(key, record, "testnet"); repairedKeys.add(key); }
+      for (const { key, exit } of exits) { if (!current()) return; list = closePosition(key, exit, now, "testnet"); }
       const prices = new Map();
-      for (const p of list) {
-        if (p.closed_at || !(p.settle_ts && now >= p.settle_ts) || !(remainingQty(p) > 0) || (p.exits || []).some((e) => e.kind === "settle")) continue;
+      const { mine: settlingRecords } = accountRecords(list, fills, scope);
+      for (const p of settlingRecords) {
+        if (incompleteReceipt(p) || p.closed_at || !(p.settle_ts && now >= p.settle_ts) || !(remainingQty(p) > 0) || (p.exits || []).some((e) => e.kind === "settle")) continue;
         const expiry = p.id.split("-")[1];
         const k = `${p.und}|${expiry}`;
-        if (!prices.has(k)) prices.set(k, await settlementPrice(seat.client, p.und, expiry).catch(() => null));
+        if (!prices.has(k)) prices.set(k, await settlementPrice(client, p.und, expiry).catch(() => null));
+        if (!current()) return;
         const price = prices.get(k);
         if (Number.isFinite(price)) list = settlePosition(p.key, price, now, "testnet");
       }
@@ -155,13 +181,20 @@ export function DeriveSync({ onSynced }) {
       const statuses = legStatus(mine, held, now);
       for (const p of list) if (p.exec === "rfq" && !ours.has(p.key)) statuses[p.key] = { state: "other_account", subaccount_id: p.subaccount_id ?? null };
       const extra = unexplained(mine, held, now);
-      onSynced?.({ list, statuses, extra, at: now, added: added.length, repaired: repairs.length, wallet: seat.wallet, subaccountId: seat.saloon.id });
-      setSt({ phase: "done", at: now, added: added.length, repaired: repairs.length });
+      if (!current()) return;
+      callbacks.current.onSynced?.({ list, statuses, extra, unmatched, at: now, added: added.length, repaired: repairedKeys.size, ...scope });
+      setSt({ phase: "done", at: now, added: added.length, repaired: repairedKeys.size, unmatched });
     } catch (e) {
-      setSt({ phase: "error", ...failure(e, "sync") });
+      if (current()) setSt({ phase: "error", ...failure(e, "sync") });
     }
   }
-  useEffect(() => { if (canRead) run(); }, [canRead, seat.saloon?.id, seat.wallet]);
+  useLayoutEffect(() => {
+    generation.current += 1;
+    setSt({ phase: "idle" });
+    callbacks.current.onScope?.({ wallet: seat.wallet ?? null, subaccountId: seat.saloon?.id ?? null });
+    if (canRead) run();
+    return () => { generation.current += 1; };
+  }, [canRead, seat.client, seat.saloon?.id, seat.wallet]);
 
   const at = st.at ? `${new Date(st.at * 1000).toISOString().slice(11, 16)} UTC` : null;
   return (
@@ -190,6 +223,10 @@ export function DeriveSync({ onSynced }) {
           <button className="text-control" onClick={run} disabled={st.phase === "reading"}>Check again</button>
         </div>
       )}
+      {st.phase === "done" && st.unmatched?.length > 0 && <p className="tr-note" role="status">
+        {st.unmatched.length} {st.unmatched.length === 1 ? "sell-back receipt needs" : "sell-back receipts need"} matching entry records.
+        {st.unmatched.every((u) => Number.isFinite(u.exit.net)) && <> Derive recorded {money(st.unmatched.reduce((a, u) => a + u.exit.net, 0), { cents: true })} received after fees.</>} This stays out of profit and loss until the entries are found.
+      </p>}
     </section>
   );
 }

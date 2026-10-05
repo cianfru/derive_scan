@@ -187,11 +187,16 @@ export function createClient({
   if (!url) throw new Error("no Derive endpoint for this network");
   let ws = null;
   let opening = null;
+  let rejectOpening = null;
+  let closed = false; // explicit close is terminal; a server-side socket drop can still reconnect
   let nextId = 1;
   let login = null; // { wallet, sign } to repeat after a reconnect
+  let authVersion = 0;
   const pending = new Map();
   let status = "idle";
   const setStatus = (s) => { status = s; onStatus(s); };
+  const closedError = () => new DeriveError(SOCKET_CLOSED, PLAIN[SOCKET_CLOSED]);
+  const assertOpen = () => { if (closed) throw closedError(); };
 
   const failAll = (code) => {
     for (const [, p] of pending) { clearTimeout(p.timer); p.reject(new DeriveError(code, PLAIN[code])); }
@@ -199,23 +204,31 @@ export function createClient({
   };
 
   function open() {
+    if (closed) return Promise.reject(closedError());
     if (ws && ws.readyState === 1) return Promise.resolve();
     if (opening) return opening;
     setStatus("connecting");
     opening = new Promise((resolve, reject) => {
+      rejectOpening = reject;
       const sock = new WebSocketImpl(url);
       ws = sock;
-      sock.onopen = () => { opening = null; setStatus("open"); resolve(); };
+      sock.onopen = () => {
+        if (closed || ws !== sock) return;
+        opening = null; rejectOpening = null; setStatus("open"); resolve();
+      };
       sock.onerror = () => { /* onclose follows */ };
       sock.onclose = () => {
-        if (ws === sock) ws = null;
+        if (ws !== sock) return;
+        ws = null;
         const wasOpening = !!opening;
         opening = null;
+        rejectOpening = null;
         setStatus("closed");
         failAll(SOCKET_CLOSED);
         if (wasOpening) reject(new DeriveError(SOCKET_CLOSED, PLAIN[SOCKET_CLOSED]));
       };
       sock.onmessage = (ev) => {
+        if (closed || ws !== sock) return;
         if (typeof ev.data !== "string" || ev.data === "pong") return;
         let msg;
         try { msg = JSON.parse(ev.data); } catch { return; }
@@ -231,6 +244,7 @@ export function createClient({
   }
 
   function sendOnce(method, params) {
+    if (closed) return Promise.reject(closedError());
     return new Promise((resolve, reject) => {
       const id = nextId++;
       const timer = setTimeout(() => { pending.delete(id); reject(new DeriveError(TIMEOUT, PLAIN[TIMEOUT])); }, timeoutMs);
@@ -249,28 +263,38 @@ export function createClient({
   async function ensure() {
     const fresh = !(ws && ws.readyState === 1);
     await open();
+    assertOpen();
     if (fresh && login) {
       relogin = relogin || doLogin(login).finally(() => { relogin = null; });
       await relogin;
     }
   }
 
-  async function doLogin({ wallet, sign }) {
+  async function doLogin({ wallet, sign }, assertActive = () => {}, version = authVersion) {
+    assertOpen(); assertActive();
     const timestamp = String(Date.now());
     const signature = await sign(timestamp);
+    assertOpen(); assertActive();
+    if (version !== authVersion) throw closedError();
     return sendOnce("public/login", { wallet, timestamp, signature });
   }
 
   /** One call. `safe` (default true) allows Derive's retryable errors to be retried. */
-  async function call(method, params, { safe = true } = {}) {
+  async function call(method, params, { safe = true, assertActive = () => {}, beforeSend = () => {} } = {}) {
     // The mainnet guard, at the last step before the wire: a fill goes nowhere but the testnet.
     if (method === EXECUTE && url !== TESTNET_WS) throw new DeriveError(MAINNET_GUARD, PLAIN[MAINNET_GUARD]);
     let attempt = 0;
     for (;;) {
       try {
+        assertOpen(); assertActive();
         await ensure();
-        return await sendOnce(method, params);
+        assertOpen(); assertActive();
+        beforeSend(); // no await between this boundary and the wire; sent calls still return their result
+        const result = await sendOnce(method, params);
+        assertOpen(); assertActive();
+        return result;
       } catch (e) {
+        assertOpen(); assertActive();
         const retryable = safe && (RETRYABLE.has(e.code) || (e.code === SOCKET_CLOSED && attempt === 0));
         if (!retryable || attempt >= retries) throw e;
         attempt += 1;
@@ -284,14 +308,25 @@ export function createClient({
     url,
     get status() { return status; },
     /** Logs this connection in for `wallet`; `sign(timestamp)` signs the EIP-191 message (the wallet or the session key). */
-    async login(wallet, sign) {
-      login = { wallet, sign };
+    async login(wallet, sign, { assertActive = () => {} } = {}) {
+      assertOpen(); assertActive();
+      const auth = { wallet, sign };
+      login = auth;
+      const version = ++authVersion;
       await open();
-      return doLogin(login);
+      assertOpen(); assertActive();
+      if (version !== authVersion) throw closedError();
+      return doLogin(auth, assertActive, version);
     },
-    logout() { login = null; },
+    logout() { authVersion += 1; login = null; },
     close() {
+      if (closed) return;
+      closed = true;
+      authVersion += 1;
       login = null;
+      rejectOpening?.(closedError());
+      rejectOpening = null;
+      opening = null;
       const s = ws;
       ws = null;
       failAll(SOCKET_CLOSED);

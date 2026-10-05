@@ -67,6 +67,9 @@ export function createTicket({
   const set = (patch) => { state = { ...state, ...patch }; onChange(state); };
   const stop = () => { if (timer) unschedule(timer); timer = null; };
   const tapStep = direction === "buy" ? "buy" : "sell";
+  const beforeSend = () => {
+    if (closed) throw Object.assign(new Error("Ticket closed"), { name: "AbortError" });
+  };
   /** Derive refused the key itself: the seat hears it once. */
   const keyCheck = (e) => { if (deriveKeyRejected(e)) { try { onKeyRejected(); } catch { /* the screen still says it */ } } };
 
@@ -89,14 +92,18 @@ export function createTicket({
   }
 
   async function start() {
+    if (closed) return;
     stop();
     await cancel();
+    if (closed) return;
     rfq = null;
     filled = false;
     set({ phase: "asking", quote: null, check: null, message: null, detail: null, debug: null, firmUntil: null, fill: null, cap: null });
     const blocked = gate(estimate);
     if (blocked) return set(blocked);
-    if (await checkIncidents(client) === "down") return set({ phase: "down", message: plainError({ code: 9002 }) });
+    const incidents = await checkIncidents(client);
+    if (closed) return;
+    if (incidents === "down") return set({ phase: "down", message: plainError({ code: 9002 }) });
     const facts = await Promise.allSettled(legs.map((l) => getInstrument(l.instrument_name)));
     const missing = legs.filter((l, i) => facts[i].status === "rejected" && facts[i].reason?.code === NOT_FOUND).map((l) => l.instrument_name);
     if (missing.length) {
@@ -129,8 +136,9 @@ export function createTicket({
       ...(referral ? { referral_code: referral } : {}),
     };
     try {
-      rfq = await client.call("private/send_rfq", params);
+      rfq = await client.call("private/send_rfq", params, { beforeSend });
     } catch (e) {
+      if (closed && e.name === "AbortError") return;
       keyCheck(e);
       return set({ phase: "error", ...failure(e, "price") });
     }
@@ -197,6 +205,7 @@ export function createTicket({
    * to private/execute_quote on the testnet.
    */
   async function confirm(shownTotal) {
+    if (closed) return;
     if (state.phase !== "quoted" || now() >= state.firmUntil) return lapse();
     if (Math.abs(state.check.total - shownTotal) > 0.005) return set({ changed: true });
     stop();
@@ -215,6 +224,7 @@ export function createTicket({
   }
 
   async function execute() {
+    if (closed) return;
     // The mainnet guard: nothing is signed or sent unless this is a testnet build on the testnet.
     if (!fillsAllowed(network, mode)) {
       await cancel();
@@ -227,8 +237,9 @@ export function createTicket({
     let res;
     try {
       const built = sign();
-      res = await client.call(EXECUTE, { ...built.payload, ...built.extra }, { safe: false });
+      res = await client.call(EXECUTE, { ...built.payload, ...built.extra }, { safe: false, beforeSend });
     } catch (e) {
+      if (closed && e.name === "AbortError") return;
       if (UNKNOWN_CODES.has(e?.code)) return settle(sentAt);
       await cancel();
       keyCheck(e);
@@ -314,7 +325,7 @@ export function createTicket({
 
   /** "Check again" after an unknown answer: never re-sends, only re-reads. */
   async function recheck() {
-    if (state.phase !== "unknown") return;
+    if (closed || state.phase !== "unknown") return;
     return settle(Math.floor(now() / 1000) - 600);
   }
 

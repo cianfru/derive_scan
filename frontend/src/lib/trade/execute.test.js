@@ -80,6 +80,56 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(1790949740000); localSto
 afterEach(() => vi.useRealTimers());
 
 describe("testnet fills", () => {
+  it("does not dispatch a queued execution after the ticket closes", async () => {
+    const { fake, t } = setup();
+    await quoted(t);
+    const confirming = t.confirm(t.state.check.total);
+    expect(fake.calls(EXECUTE)).toHaveLength(0);
+    const closing = t.close();
+    await vi.advanceTimersByTimeAsync(5);
+    await Promise.all([confirming, closing]);
+    expect(fake.calls(EXECUTE)).toHaveLength(0);
+  });
+
+  it("cannot execute a closed ticket while its cancellation is still pending", async () => {
+    let release;
+    const { fake, t, fills } = setup({ handlers: {
+      "private/cancel_rfq": () => new Promise((resolve) => { release = resolve; }),
+    } });
+    await quoted(t);
+    const total = t.state.check.total;
+    const closing = t.close();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fake.calls("private/cancel_rfq")).toHaveLength(1);
+    await t.confirm(total);
+    await t.start();
+    expect(fake.calls(EXECUTE)).toHaveLength(0);
+    expect(fake.calls("private/send_rfq")).toHaveLength(1);
+    expect(fills).toHaveLength(0);
+    release("ok");
+    await vi.advanceTimersByTimeAsync(1);
+    await closing;
+    expect(t.state.phase).toBe("closed");
+  });
+
+  it("still records an already-dispatched execution after the ticket closes", async () => {
+    let release;
+    const { fake, t, fills } = setup({ handlers: {
+      [EXECUTE]: () => new Promise((resolve) => { release = resolve; }),
+    } });
+    await quoted(t);
+    const confirming = t.confirm(t.state.check.total);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fake.calls(EXECUTE)).toHaveLength(1);
+    await t.close();
+    release(executed());
+    await vi.advanceTimersByTimeAsync(1);
+    await confirming;
+    expect(fills).toHaveLength(1);
+    expect(fills[0]).toMatchObject({ rfq_id: RFQ, complete: true });
+    expect(fake.calls(EXECUTE)).toHaveLength(1);
+  });
+
   it("fills on the tap and records the fill from Derive's trade history, exactly", async () => {
     const { fake, t, fills } = setup();
     await quoted(t);
@@ -93,7 +143,7 @@ describe("testnet fills", () => {
     expect(fake.calls("public/execute_quote_debug")).toHaveLength(0);
     expect(fake.calls("private/get_trade_history")[0].params).toEqual({ subaccount_id: SUB, quote_id: TAKER_QUOTE });
     const f = t.state.fill;
-    expect(f).toMatchObject({ source: "trade_history", rfq_id: RFQ, ts: 1790949750, premium: 0.95, fees: 0.65125, partial: false, pct: 1 });
+    expect(f).toMatchObject({ source: "trade_history", rfq_id: RFQ, ts: 1790949750.491, premium: 0.95, fees: 0.65125, partial: false, pct: 1 });
     expect(f.legs).toEqual([
       { name: "BTC-20261005-90000-C", act: "buy", planned: 0.01, qty: 0.01, signed_qty: 0.01, price: 121, fee: 0.65125, trade_ids: ["5980561c-3e33-4b4a-8a95-e9f27ffdc313"] },
       { name: "BTC-20261005-92000-C", act: "sell", planned: 0.01, qty: 0.01, signed_qty: -0.01, price: 26, fee: 0, trade_ids: ["6fdabd5d-0d0e-4992-b1ef-c8ea40ab6a26"] },
@@ -127,7 +177,7 @@ describe("testnet fills", () => {
     const { t } = setup({ handlers: { "private/get_trade_history": history([]) } });
     await quoted(t);
     await t.confirm(t.state.check.total);
-    expect(t.state.fill).toMatchObject({ source: "execute_quote", premium: 0.95, fees: 0.65125, trade_ids: [], ts: 1790949750 });
+    expect(t.state.fill).toMatchObject({ source: "execute_quote", premium: 0.95, fees: 0.65125, trade_ids: [], ts: 1790949750.491 });
   });
 
   it("says plainly when the quote has expired, was rejected, or Derive is busy, and never re-sends", async () => {
@@ -310,6 +360,21 @@ describe("selling back", () => {
 });
 
 describe("reading fills", () => {
+  it("keeps missing trade fees unknown instead of reporting an exact zero", () => {
+    const f = fillFromTrades(rec.taker.map(({ trade_fee, ...t }) => t), { rfqId: RFQ });
+    expect(f.premium).toBe(0.95);
+    expect(f.fees).toBeNull();
+    expect(f.legs.every((l) => l.fee === null)).toBe(true);
+  });
+  it("counts repeated trade ids once before aggregating contracts, premiums and fees", () => {
+    const once = fillFromTrades(rec.taker, { rfqId: RFQ });
+    const duplicated = fillFromTrades([...rec.taker, ...rec.taker], { rfqId: RFQ });
+    expect(duplicated).toEqual(once);
+    expect(duplicated.legs.map((l) => l.qty)).toEqual([0.01, 0.01]);
+    expect(duplicated.premium).toBe(0.95);
+    expect(duplicated.fees).toBe(0.65125);
+  });
+
   it("keeps the taker's rows of one RFQ and ignores the maker's", () => {
     const f = fillFromTrades([...rec.maker, ...rec.taker], { rfqId: RFQ });
     expect(f.premium).toBe(0.95);

@@ -20,6 +20,26 @@ const initial = () => {
 };
 let state = initial();
 const listeners = new Set();
+let generation = 0;
+const cancelled = () => Object.assign(new Error("Seat operation cancelled"), { name: "AbortError" });
+/** Each user operation owns its results. Ending or replacing the seat invalidates every older await. */
+function operation() {
+  const id = ++generation;
+  const active = () => id === generation;
+  const assertActive = () => { if (!active()) throw cancelled(); };
+  const run = async (step, action) => {
+    assertActive();
+    try { const result = await at(step, action()); assertActive(); return result; }
+    catch (e) { assertActive(); throw e; }
+  };
+  const client = (c) => ({
+    call: (method, params, opts = {}) => { assertActive(); return c.call(method, params, { ...opts, assertActive }); },
+    login: (wallet, sign) => { assertActive(); return c.login(wallet, sign, { assertActive }); },
+    logout: () => { assertActive(); c.logout(); },
+  });
+  return { active, assertActive, run, client, set: (patch) => { assertActive(); set(patch); },
+    fail: (e, step) => { if (active()) fail(e, step); } };
+}
 /** A new message replaces the old one's testing details. */
 const set = (patch) => {
   const p = "message" in patch && !("detail" in patch) ? { ...patch, detail: null } : patch;
@@ -33,8 +53,8 @@ export function useSeat() {
   return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => state, () => state);
 }
 /** Tests and local previews swap the wallet and the socket here. */
-export function _setSeatDeps(d) { deps = { ...deps, ...d }; unwatch(); resumed = false; state = initial(); pub?.close(); pub = null; listeners.forEach((l) => l()); }
-export function _setSeatState(s) { state = { ...initial(), ...s }; listeners.forEach((l) => l()); }
+export function _setSeatDeps(d) { generation += 1; state.client?.close(); deps = { ...deps, ...d }; unwatch(); resumed = false; state = initial(); pub?.close(); pub = null; listeners.forEach((l) => l()); }
+export function _setSeatState(s) { generation += 1; state = { ...initial(), ...s }; listeners.forEach((l) => l()); }
 
 /** A connection for public reads (the testnet's instrument list): the seat's own when it has one,
  * else one shared, never logged in. */
@@ -82,35 +102,41 @@ const keySign = (stored) => (ts) => keySigner(stored).signMessage(ts);
  * never switches network by itself). Added once per connection, removed on disconnect.
  */
 let watched = null;
-function watch(provider) {
-  if (watched?.provider === provider || typeof provider?.on !== "function") return;
+function watch(provider, pending = null) {
+  if ((watched?.provider === provider && !pending) || typeof provider?.on !== "function") return;
   unwatch();
   const accountsChanged = (accounts) => {
-    if (!state.wallet) return;
     const list = (accounts || []).map((a) => String(a).toLowerCase());
-    if (list.includes(state.wallet.toLowerCase())) return;
+    const wallet = state.wallet || (pending?.active() ? pending.wallet : null);
+    if (!wallet && pending?.active() && list.length) { pending.accounts = list; return; }
+    if (!wallet && !pending?.active()) return;
+    if (wallet && list.includes(wallet.toLowerCase())) return;
     if (list.length) remove(KEYS.lastWallet()); // another account: forget this one; none (locked): keep it
     end(null);
   };
   const chainChanged = (chainId) => {
-    if (!state.wallet || Number(chainId) === NETWORK.chainId) return;
+    if ((!state.wallet && !pending?.active()) || Number(chainId) === NETWORK.chainId) return;
     end("Your wallet switched network. Connect again on Sepolia.");
   };
   provider.on("accountsChanged", accountsChanged);
   provider.on("chainChanged", chainChanged);
-  watched = { provider, accountsChanged, chainChanged };
+  const disconnected = () => { if (state.wallet || pending?.active()) end("Your wallet disconnected. Connect again to continue."); };
+  provider.on("disconnect", disconnected);
+  watched = { provider, accountsChanged, chainChanged, disconnected };
 }
 function unwatch() {
   if (!watched) return;
-  const { provider, accountsChanged, chainChanged } = watched;
+  const { provider, accountsChanged, chainChanged, disconnected } = watched;
   watched = null;
   try {
     provider.removeListener?.("accountsChanged", accountsChanged);
     provider.removeListener?.("chainChanged", chainChanged);
+    provider.removeListener?.("disconnect", disconnected);
   } catch { /* the wallet went away */ }
 }
 /** Back to "disconnected" (the remembered wallet stays unless the caller forgot it), with a message. */
 function end(message) {
+  generation += 1;
   unwatch();
   state.client?.close();
   state = { ...initial(), message };
@@ -128,25 +154,29 @@ export async function resume() {
   resumed = true;
   const provider = deps.findProvider();
   const remembered = read(KEYS.lastWallet());
-  const quiet = () => { set({ resuming: false, busy: false }); return false; };
-  if (!provider || !remembered || state.wallet) return quiet();
-  set({ resuming: true, busy: true, remembered });
+  if (!provider || !remembered || state.wallet) { set({ resuming: false, busy: false }); return false; }
+  const flow = operation();
+  flow.wallet = remembered;
+  watch(provider, flow);
+  const quiet = () => { flow.set({ resuming: false, busy: false }); unwatch(); return false; };
+  flow.set({ resuming: true, busy: true, remembered });
   try {
-    const accounts = (await provider.request({ method: "eth_accounts" })) || [];
+    const accounts = (await flow.run("connect", () => provider.request({ method: "eth_accounts" }))) || [];
     if (!accounts.some((a) => String(a).toLowerCase() === remembered.toLowerCase())) return quiet();
-    if (Number(await provider.request({ method: "eth_chainId" })) !== NETWORK.chainId) return quiet();
+    if (Number(await flow.run("connect", () => provider.request({ method: "eth_chainId" }))) !== NETWORK.chainId) return quiet();
     const wallet = getAddress(remembered);
     if (!usableKey(wallet) || !termsAccepted()) return quiet();
     const client = deps.createClient({ url: NETWORK.wsUrl });
-    set({ provider, wallet, client, newAccount: false, loggedAs: null });
-    await load({ canPrompt: false });
-    watch(provider);
-    set({ resuming: false });
+    flow.set({ provider, wallet, client, newAccount: false, loggedAs: null });
+    await flow.run("sign in", () => load(flow, { canPrompt: false }));
+    flow.set({ resuming: false });
     return true;
   } catch (e) {
+    if (!flow.active()) return false;
     // A key Derive no longer takes is already dropped: the header offers "Reconnect", and that click
     // signs in as the owner and asks for a fresh approval.
     if (!e?.keyDropped) try { console.warn("[Cowboy] resume failed; connect again", e); } catch { /* no console */ }
+    unwatch();
     state.client?.close();
     state = { ...initial(), remembered };
     listeners.forEach((l) => l());
@@ -155,27 +185,45 @@ export async function resume() {
 }
 
 export async function connect() {
-  const provider = deps.findProvider();
-  if (!provider) return set({ stage: "no_wallet" });
   if (state.resuming) return undefined;
+  const provider = deps.findProvider();
   resumed = true;
-  set({ busy: true, message: null });
+  end(null);
+  if (!provider) return set({ stage: "no_wallet", busy: false, resuming: false });
+  const flow = operation();
+  watch(provider, flow);
+  // connectWallet has several requests before the seat knows its wallet. Stop between those requests,
+  // and reconcile an initial accountsChanged event with the account the access request returned.
+  const guardedProvider = { request: async (args) => {
+    const result = await flow.run("connect", () => provider.request(args));
+    if (args.method === "eth_requestAccounts" && result?.[0]) {
+      flow.wallet = String(result[0]);
+      if (flow.accounts && !flow.accounts.includes(flow.wallet.toLowerCase())) {
+        end(null); flow.assertActive();
+      }
+    }
+    return result;
+  } };
+  flow.set({ busy: true, message: null });
   try {
-    const wallet = await at("connect", connectWallet(provider));
-    state.client?.close();
+    const wallet = await flow.run("connect", () => connectWallet(guardedProvider));
     const client = deps.createClient({ url: NETWORK.wsUrl });
     write(KEYS.lastWallet(), wallet);
-    set({ provider, wallet, client, newAccount: false, loggedAs: null, remembered: wallet });
-    watch(provider);
-    if (!termsAccepted()) return set({ stage: "terms", busy: false });
-    await load();
-  } catch (e) { fail(e, "connect"); }
+    flow.set({ provider, wallet, client, newAccount: false, loggedAs: null, remembered: wallet });
+    if (!termsAccepted()) return flow.set({ stage: "terms", busy: false });
+    await flow.run("sign in", () => load(flow));
+  } catch (e) {
+    if (flow.active() && !state.wallet) unwatch();
+    flow.fail(e, "connect");
+  }
 }
 
 export async function acceptTerms() {
+  if (!state.wallet || !state.client || state.busy) return;
+  const flow = operation();
   write(KEYS.terms(), { at: Date.now() });
-  set({ busy: true });
-  try { await load(); } catch (e) { fail(e, "sign in"); }
+  flow.set({ busy: true });
+  try { await flow.run("sign in", () => load(flow)); } catch (e) { flow.fail(e, "sign in"); }
 }
 
 /**
@@ -183,17 +231,19 @@ export async function acceptTerms() {
  * account with its first deposit, so that is not a failure. Returns false then, and the connection
  * forgets the sign-in so later public calls do not repeat it.
  */
-async function ownerLogin() {
-  const { client, wallet, provider } = state;
+async function ownerLogin(flow) {
+  flow.assertActive();
+  const { wallet, provider } = state;
+  const client = flow.client(state.client);
   try {
-    await at("sign in", client.login(wallet, ownerSign(provider, wallet)));
+    await flow.run("sign in", () => client.login(wallet, ownerSign(provider, wallet)));
   } catch (e) {
     if (e?.code !== NO_ACCOUNT) throw e;
     client.logout();
-    set({ loggedAs: null, newAccount: true });
+    flow.set({ loggedAs: null, newAccount: true });
     return false;
   }
-  set({ loggedAs: "owner", newAccount: false });
+  flow.set({ loggedAs: "owner", newAccount: false });
   return true;
 }
 
@@ -205,46 +255,49 @@ const accountsPatch = (subs, saloon) => ({ subs, choices: fundedAccounts(subs), 
  * trades from: the key's own; else one labelled "Cowboy"; else the funded PRIME Standard subaccount
  * with the most USDC (approval labels it). The deposit step shows only when none holds USDC.
  */
-async function load({ canPrompt = true } = {}) {
-  const { client, wallet } = state;
+async function load(flow, { canPrompt = true } = {}) {
+  flow.assertActive();
+  const { wallet } = state;
+  const client = flow.client(state.client);
   let stored = usableKey(wallet);
   let sub = null;
   if (stored) {
     try {
-      await at("sign in", client.login(wallet, keySign(stored)));
-      sub = summarise(await at("find account", client.call("private/get_subaccount", { subaccount_id: stored.subaccount_id })));
+      await flow.run("sign in", () => client.login(wallet, keySign(stored)));
+      sub = summarise(await flow.run("find account", () => client.call("private/get_subaccount", { subaccount_id: stored.subaccount_id })));
     } catch (e) {
       if (!deriveKeyRejected(e, { login: true })) throw e;
       // Derive no longer takes this key (expired, revoked or unknown): drop it so it is never tried
       // again. On a click the owner signs in below and the approve step follows; on a reload, nothing
       // prompts and the seat stays disconnected.
-      forgetKey(wallet, client);
+      forgetKey(wallet, client, stored.address);
       stored = null;
       if (!canPrompt) throw Object.assign(new Error("Cowboy's key was rejected"), { keyDropped: true });
-      set({ message: plainError({ code: 14030 }) });
+      flow.set({ message: plainError({ code: 14030 }) });
     }
   }
   if (stored) {
-    set({ key: stored, loggedAs: "key", newAccount: false });
+    flow.set({ key: stored, loggedAs: "key", newAccount: false });
     // The other accounts, for "Change account": a read the key may not be allowed, so never in the way.
     let subs = [sub];
-    try { subs = await listSubaccounts(client, wallet); } catch { /* the key's own account is enough */ }
+    try { subs = await flow.run("find account", () => listSubaccounts(client, wallet)); }
+    catch { flow.assertActive(); /* the key's own account is enough */ }
     if (!subs.some((x) => x.id === sub.id)) subs = [sub, ...subs];
-    if (sub.usdc > 0) return set({ saloon: sub, ...accountsPatch(subs, sub), stage: "ready", busy: false });
+    if (sub.usdc > 0) return flow.set({ saloon: sub, ...accountsPatch(subs, sub), stage: "ready", busy: false });
     const funded = fundedAccounts(subs)[0];
-    if (funded) return set({ saloon: funded, ...accountsPatch(subs, funded), stage: "approve", busy: false });
-    set(accountsPatch(subs, sub));
-    return toFund(sub); // an emptied account still needs its deposit address
+    if (funded) return flow.set({ saloon: funded, ...accountsPatch(subs, funded), stage: "approve", busy: false });
+    flow.set(accountsPatch(subs, sub));
+    return toFund(flow, sub); // an emptied account still needs its deposit address
   }
-  if (!(await ownerLogin())) {
+  if (!(await flow.run("sign in", () => ownerLogin(flow)))) {
     // No Derive account yet: everything up to the first deposit uses public calls only.
-    return toFund(null);
+    return toFund(flow, null);
   }
-  const { saloon, subs } = await at("find account", findSaloon(client, wallet));
-  set(accountsPatch(subs, saloon));
-  if (!saloon || !(saloon.usdc > 0)) return toFund(saloon);
+  const { saloon, subs } = await flow.run("find account", () => findSaloon(client, wallet));
+  flow.set(accountsPatch(subs, saloon));
+  if (!saloon || !(saloon.usdc > 0)) return toFund(flow, saloon);
   remove(KEYS.sent(wallet));
-  set({ saloon, key: null, stage: "approve", busy: false });
+  flow.set({ saloon, key: null, stage: "approve", busy: false });
 }
 
 /**
@@ -255,14 +308,17 @@ export function pickAccount(id) {
   if (state.busy) return;
   const pick = (state.choices || []).find((c) => c.id === id);
   if (!pick) return;
+  generation += 1;
   const ready = state.key?.subaccount_id === pick.id;
   set({ saloon: pick, others: otherAccounts(state.subs || state.choices, pick.id), stage: ready ? "ready" : "approve", message: null });
 }
 
-async function toFund(saloon) {
-  const { client, wallet } = state;
-  const [address, arr] = await at("deposit address", Promise.all([depositAddress(client, wallet, saloon?.id || null), arriving(client, wallet)]));
-  set({ saloon, depositAddress: address, ...funding(arr, saloon), ...(saloon ? {} : sentPatch(wallet)), stage: "fund", busy: false });
+async function toFund(flow, saloon) {
+  flow.assertActive();
+  const { wallet } = state;
+  const client = flow.client(state.client);
+  const [address, arr] = await flow.run("deposit address", () => Promise.all([depositAddress(client, wallet, saloon?.id || null), arriving(client, wallet)]));
+  flow.set({ saloon, depositAddress: address, ...funding(arr, saloon), ...(saloon ? {} : sentPatch(wallet)), stage: "fund", busy: false });
 }
 
 /**
@@ -272,50 +328,62 @@ async function toFund(saloon) {
  * the account the deposit opened is found and labelled.
  */
 export async function refreshFunding() {
-  const { client, wallet } = state;
-  set({ busy: true, message: null });
+  if (!state.client || !state.wallet || state.busy) return;
+  const flow = operation();
+  const { wallet } = state;
+  const client = flow.client(state.client);
+  flow.set({ busy: true, message: null });
   try {
     let arr = null;
     if (state.newAccount) {
-      arr = await at("find account", arriving(client, wallet));
-      if (arr.count > 0) return set({ ...funding(arr, null), ...sentPatch(wallet), busy: false });
+      arr = await flow.run("find account", () => arriving(client, wallet));
+      if (arr.count > 0) return flow.set({ ...funding(arr, null), ...sentPatch(wallet), busy: false });
     }
-    if (state.loggedAs !== "owner" && !(await ownerLogin())) {
-      arr = arr || await at("find account", arriving(client, wallet));
-      return set({ saloon: null, ...funding(arr, null), ...sentPatch(wallet), busy: false });
+    if (state.loggedAs !== "owner" && !(await flow.run("sign in", () => ownerLogin(flow)))) {
+      arr = arr || await flow.run("find account", () => arriving(client, wallet));
+      return flow.set({ saloon: null, ...funding(arr, null), ...sentPatch(wallet), busy: false });
     }
     const had = state.saloon;
-    const { saloon, subs } = await at("find account", findSaloon(client, wallet, { prefer: had?.id ?? state.key?.subaccount_id ?? null }));
+    const { saloon, subs } = await flow.run("find account", () => findSaloon(client, wallet, { prefer: had?.id ?? state.key?.subaccount_id ?? null }));
     const accounts = accountsPatch(subs, saloon);
     if (saloon && saloon.usdc > 0) {
       remove(KEYS.sent(wallet));
       const ready = state.key?.subaccount_id === saloon.id;
-      return set({ saloon, ...accounts, opening: 0, sentTx: null, sentAmount: null, sentAt: null, stage: ready ? "ready" : "approve", busy: false });
+      return flow.set({ saloon, ...accounts, opening: 0, sentTx: null, sentAmount: null, sentAt: null, stage: ready ? "ready" : "approve", busy: false });
     }
     // An account that now exists takes its own deposit address (the new-account one would open another).
-    const address = saloon && saloon.id !== had?.id ? await at("deposit address", depositAddress(client, wallet, saloon.id)) : state.depositAddress;
-    arr = await at("find account", arriving(client, wallet));
-    set({ saloon, ...accounts, depositAddress: address, ...funding(arr, saloon), ...(saloon ? {} : sentPatch(wallet)), busy: false });
-  } catch (e) { fail(e, "find account"); }
+    const address = saloon && saloon.id !== had?.id ? await flow.run("deposit address", () => depositAddress(client, wallet, saloon.id)) : state.depositAddress;
+    arr = await flow.run("find account", () => arriving(client, wallet));
+    flow.set({ saloon, ...accounts, depositAddress: address, ...funding(arr, saloon), ...(saloon ? {} : sentPatch(wallet)), busy: false });
+  } catch (e) { flow.fail(e, "find account"); }
 }
 
 /** The wallet's own gas estimate for the deposit, in dollars (ETH priced from the Saloon's ETH board). */
 export async function depositGasUsd(dollars, ethUsd) {
+  const id = generation;
   const { provider, wallet, depositAddress: to } = state;
   if (!provider || !to || !ethUsd) return null;
-  try { return (await gasEth(provider, usdcTransfer(wallet, to, dollars))) * ethUsd; } catch { return null; }
+  try { const usd = (await gasEth(provider, usdcTransfer(wallet, to, dollars))) * ethUsd; return id === generation ? usd : null; } catch { return null; }
 }
 
 export async function deposit(dollars) {
   const { provider, wallet, depositAddress: to, saloon } = state;
-  if (holdSend(state)) return; // one deposit opens the account; a second would open another
-  set({ busy: true, message: null });
+  if (!provider || !wallet || !to || state.busy || holdSend(state)) return; // one deposit opens the account; a second would open another
+  const flow = operation();
+  flow.set({ busy: true, message: null });
+  const startedAt = Date.now();
   try {
+    flow.assertActive();
     const tx = await sendTransaction(provider, usdcTransfer(wallet, to, dollars));
     const sentAt = Date.now();
-    if (!saloon) write(KEYS.sent(wallet), { tx, amount: dollars, to, at: sentAt });
-    set({ busy: false, sentTx: tx, sentAmount: dollars, sentAt });
-  } catch (e) { fail(e, "deposit"); }
+    // The wallet may have broadcast even after Disconnect. Keep its receipt under the original
+    // wallet to prevent a second account-opening deposit, without restoring a cancelled seat.
+    const previous = read(KEYS.sent(wallet));
+    if (!saloon && (!previous || (previous.started_at ?? previous.at) <= startedAt)) {
+      write(KEYS.sent(wallet), { tx, amount: dollars, to, at: sentAt, started_at: startedAt });
+    }
+    if (flow.active()) flow.set({ busy: false, sentTx: tx, sentAmount: dollars, sentAt });
+  } catch (e) { flow.fail(e, "deposit"); }
 }
 
 /**
@@ -324,32 +392,35 @@ export async function deposit(dollars) {
  * declined signature leaves the user's account as it was.
  */
 export async function approve() {
-  const { client, provider, wallet, saloon } = state;
-  if (!saloon) return;
-  set({ busy: true, message: null });
+  const { provider, wallet, saloon } = state;
+  if (!saloon || !state.client || !wallet || state.busy) return;
+  const flow = operation();
+  const client = flow.client(state.client);
+  flow.set({ busy: true, message: null });
   try {
     if (state.loggedAs !== "owner") {
-      await at("sign in", client.login(wallet, ownerSign(provider, wallet)));
-      set({ loggedAs: "owner" });
+      await flow.run("sign in", () => client.login(wallet, ownerSign(provider, wallet)));
+      flow.set({ loggedAs: "owner" });
     }
-    const stored = await at("approve", approveCowboy({ client, provider, owner: wallet, subaccountId: saloon.id, ...(deps.newKey ? { newKey: deps.newKey } : {}) }));
+    const stored = await flow.run("approve", () => approveCowboy({ client, provider, owner: wallet, subaccountId: saloon.id, assertActive: flow.assertActive, ...(deps.newKey ? { newKey: deps.newKey } : {}) }));
     rememberAccount(wallet, saloon.id);
     let labelled = saloon;
     let subs = state.subs || [saloon];
     try {
-      labelled = await labelAccount(client, subs, saloon);
+      labelled = await flow.run("approve", () => labelAccount(client, subs, saloon));
       subs = subs.map((x) => (x.id === labelled.id ? labelled : x.label === SALOON_LABEL ? { ...x, label: "" } : x));
     } catch (e) {
+      flow.assertActive();
       try { console.warn("[Cowboy] the account label was not set; this browser remembers the account", e); } catch { /* no console */ }
     }
-    await at("sign in", client.login(wallet, keySign(stored))); // later calls sign in with the key, without wallet prompts
-    set({ key: stored, saloon: labelled, subs, choices: fundedAccounts(subs), loggedAs: "key", stage: "ready", busy: false });
-  } catch (e) { fail(e, "approve"); }
+    await flow.run("sign in", () => client.login(wallet, keySign(stored))); // later calls sign in with the key, without wallet prompts
+    flow.set({ key: stored, saloon: labelled, subs, choices: fundedAccounts(subs), loggedAs: "key", stage: "ready", busy: false });
+  } catch (e) { flow.fail(e, "approve"); }
 }
 
 /** This browser's copy of the key goes, and the connection stops signing in with it. */
-function forgetKey(wallet, client) {
-  if (wallet) clearKey(wallet);
+function forgetKey(wallet, client, address = null) {
+  if (wallet) clearKey(wallet, address);
   client?.logout();
 }
 
@@ -360,7 +431,8 @@ function forgetKey(wallet, client) {
  */
 export function dropKey(message = plainError({ code: 14030 })) {
   if (!state.wallet) return;
-  forgetKey(state.wallet, state.client);
+  generation += 1;
+  forgetKey(state.wallet, state.client, state.key?.address);
   set({ key: null, loggedAs: null, busy: false, stage: state.stage === "ready" ? "approve" : state.stage, message });
 }
 
@@ -376,20 +448,24 @@ export const SWITCHED_OFF = {
  * owner's signature, Derive is told to retire it; the message says separately whether it was.
  */
 export async function switchOff() {
-  const { client, provider, wallet, key } = state;
+  if (state.busy) return;
+  const flow = operation();
+  const { provider, wallet, key } = state;
+  const client = state.client && flow.client(state.client);
   remove(KEYS.lastWallet()); // nothing to resume without the key
-  if (wallet) clearKey(wallet);
-  set({ key: null, busy: true, message: null });
-  if (!key || !client) return set({ stage: state.saloon ? "approve" : state.stage, busy: false, message: SWITCHED_OFF.deleted });
+  if (wallet) clearKey(wallet, key?.address);
+  flow.set({ key: null, busy: true, message: null });
+  if (!key || !client) return flow.set({ stage: state.saloon ? "approve" : state.stage, busy: false, message: SWITCHED_OFF.deleted });
   try {
-    await at("sign in", client.login(wallet, ownerSign(provider, wallet)));
-    set({ loggedAs: "owner" });
-    await at("switch off", retireKey({ client, provider, owner: wallet, stored: key }));
-    set({ stage: "approve", busy: false, message: `Switched off. ${SWITCHED_OFF.deleted} ${SWITCHED_OFF.told}` });
+    await flow.run("sign in", () => client.login(wallet, ownerSign(provider, wallet)));
+    flow.set({ loggedAs: "owner" });
+    await flow.run("switch off", () => retireKey({ client, provider, owner: wallet, stored: key, assertActive: flow.assertActive }));
+    flow.set({ stage: "approve", busy: false, message: `Switched off. ${SWITCHED_OFF.deleted} ${SWITCHED_OFF.told}` });
   } catch (e) {
-    if (state.loggedAs !== "owner") { client.logout(); set({ loggedAs: null }); }
+    if (!flow.active()) return;
+    if (state.loggedAs !== "owner") { client.logout(); flow.set({ loggedAs: null }); }
     const f = failure(e, "switch off");
-    set({ stage: "approve", busy: false, message: `${SWITCHED_OFF.deleted} ${SWITCHED_OFF.untold} ${f.message}`, detail: f.detail });
+    flow.set({ stage: "approve", busy: false, message: `${SWITCHED_OFF.deleted} ${SWITCHED_OFF.untold} ${f.message}`, detail: f.detail });
   }
 }
 
