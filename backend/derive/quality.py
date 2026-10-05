@@ -29,7 +29,7 @@ def engine_status(row, now=None):
         return "missing"
     if row.get("signal_status") != "ready" or row.get("engine_errors"):
         return "unavailable"
-    if row.get("data_status") != "ready":
+    if row.get("data_status") not in ("ready", "warming up"):  # a young coin's signal counts (signals.usable_history)
         return row.get("data_status") or "unknown"
     if now is not None:
         status = snapshot_status(row.get("signal_bar_close_time"), now,

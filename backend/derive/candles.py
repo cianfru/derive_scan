@@ -51,15 +51,33 @@ class CandleCache:
     def _rows(p: Path) -> list[list[str]]:
         return list(csv.reader(p.open()))[1:] if p.exists() else []
 
+    def volume_path(self, und: str, tf: str) -> Path:
+        return self.root / und / f"{tf}.spot_volume.csv"
+
+    def spot_volume(self, und: str, tf: str) -> tuple[dict[int, float], str | None]:
+        """Spot volume kept for a thin perp, by bar open, and its source (one source per series)."""
+        rows = self._rows(self.volume_path(und, tf))
+        return {int(float(r[0])): float(r[1]) for r in rows}, (rows[0][2] if rows and len(rows[0]) > 2 else None)
+
+    def write_spot_volume(self, und: str, tf: str, vols: dict[int, float], source: str) -> None:
+        p = self.volume_path(und, tf)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("timestamp,volume,source\n" + "".join(f"{ts},{v},{source}\n" for ts, v in sorted(vols.items())))
+
     def load(self, und: str, tf: str) -> dict | None:
-        """Derive's bars, preceded by any backfilled bars older than Derive's first."""
+        """Derive's bars, preceded by any backfilled bars older than Derive's first. Where Derive's
+        perp volume is thin, the whole volume series comes from one spot market instead (see signal_once)."""
         rows = self._rows(self.path(und, tf))
         if not rows:
             return None
         first = float(rows[0][0])
         early = [r for r in self._rows(self.backfill_path(und, tf)) if float(r[0]) < first]
         arr = np.array(early + rows, dtype=np.float64)
-        return {f: arr[:, i] for i, f in enumerate(FIELDS)}
+        out = {f: arr[:, i] for i, f in enumerate(FIELDS)}
+        spot, _ = self.spot_volume(und, tf)
+        if spot:
+            out["volume"] = np.array([spot.get(int(t), 0.0) for t in out["timestamp"]], dtype=np.float64)
+        return out
 
     def counts(self, und: str, tf: str) -> tuple[int, int]:
         """(Derive bars, backfilled bars in use)."""

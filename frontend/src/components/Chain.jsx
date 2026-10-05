@@ -60,11 +60,16 @@ export const chainAgreed = (alignment, horizon) => agreedOf(chainReadings(alignm
 export function LayerTile({ alignment, horizon = "30d", kind, sub = null, tag = null, aligned = false, icon = true }) {
   const [, name] = LAYERS.find(([k]) => k === kind);
   const { label, state, why, row } = viewReading(alignment, horizon, kind);
+  // "detail": what the reading rests on, per layer (the regime; the positions counted; skew alone or with flow).
+  if (sub === "detail") sub = kind === "engine" ? "regime" : !state ? null
+    : kind === "wallets" ? (Number.isFinite(row?.positions) ? `${row.positions} ${row.positions === 1 ? "position" : "positions"}` : null)
+    : row?.status === "skew_only" ? "Skew only" : "Skew and flow";
   if (sub === "regime") sub = state && row?.regime ? REGIME[row.regime] || null : null;
   const word = (state && SHORT[kind]?.[state]) || label;
   const days = horizon === "7d" ? "7" : "30";
   const span = `, next ${days} days${kind === "engine" ? (horizon === "7d" ? " (4-hour bars)" : " (daily bars)") : ""}`;
-  const tip = `${name}${span}: ${label}${sub ? ` (${sub})` : ""}. ${why || HOVER[kind]}${aligned ? " All three layers point the same way for this window." : ""}`;
+  const young = kind === "engine" && state && row?.data_status === "warming up" ? " Young history: the engine damps its readings until the coin has about 500 bars." : "";
+  const tip = `${name}${span}: ${label}${sub ? ` (${sub})` : ""}. ${why || HOVER[kind]}${young}${aligned ? " All three layers point the same way for this window." : ""}`;
   return (
     <span className={`layer-tile ${state || "unknown"}${aligned ? " aligned" : ""}`} tabIndex={0} role="img" aria-label={tip} data-tip={tip}>
       {icon && <span className="lt-icon"><LayerIcon kind={kind} size={16} /></span>}
