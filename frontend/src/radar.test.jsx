@@ -138,8 +138,8 @@ describe("radar replay detail (review items 3 and 5)", () => {
     const wallets = reading("Wallets");
     expect(wallets.querySelector("b").textContent).toBe("Balanced delta");
     expect(wallets.querySelector("small").textContent).toBe("+11%");
-    expect(reading("Engine").querySelector("b").textContent).not.toBe("Leaning up");
-    expect(reading("Engine").querySelector("small")?.textContent).toBe("1.01σ");  // the stretch at that close
+    expect(reading("Regime").querySelector("b").textContent).not.toBe("Leaning up");
+    expect(reading("Regime").querySelector("small")?.textContent).toBe("1.01σ");  // the stretch at that close
     expect(reading("Options").querySelector("b").textContent).toBe("—");
     expect(rd().textContent).not.toMatch(/\+29%|Trending up|Leaning up/);
     // The price trace stops at that close.

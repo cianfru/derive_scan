@@ -1,0 +1,121 @@
+/* Flow uses the same calm panels as the Markets board. Only this page is affected. */
+.market-research-page.flow-page { --fl-pad: 24px; --fl-radius: 13px; }
+.market-research-page.flow-page > .plate { border: 1px solid var(--seam); border-radius: var(--fl-radius); background: var(--surface-1); box-shadow: none; }
+.market-research-page.flow-page > .plate > .panel-head { min-height: 64px; padding: 14px var(--fl-pad); border-bottom: 1px solid var(--seam); gap: 12px 24px; }
+.market-research-page.flow-page .panel-title { font: 600 18px/1.3 var(--font-display); letter-spacing: -.02em; color: var(--fg); }
+.market-research-page.flow-page > .plate > .plate-b.flush { padding: 0; }
+
+/* The overview retains every market, its premium split and the original scale. */
+.market-research-page.flow-page .fl-premium-panel .flow-briefing { border: 0; border-radius: 0 0 var(--fl-radius) var(--fl-radius); background: none; box-shadow: none; }
+.market-research-page.flow-page .flow-brief-head { padding: 22px var(--fl-pad); gap: 16px 28px; }
+.market-research-page.flow-page .flow-total { align-items: center; gap: 16px; flex-wrap: wrap; }
+.market-research-page.flow-page .flow-total strong { font: 500 32px/1.15 var(--font-mono); letter-spacing: -.03em; }
+.market-research-page.flow-page .flow-meta { font: 400 12px/1.5 var(--font-body); }
+.market-research-page.flow-page .flow-legend { gap: 10px 18px; }
+.market-research-page.flow-page .flow-legend > span { font: 400 12px/1.5 var(--font-body); }
+.market-research-page.flow-page .flow-legend i { width: 9px; height: 9px; }
+.market-research-page.flow-page .flow-market-row { grid-template-columns: 112px minmax(0, 1fr) 100px; gap: 24px; min-height: 56px; padding: 14px var(--fl-pad); border-bottom: 1px solid var(--seam); }
+.market-research-page.flow-page .flow-market-row:last-child { border-bottom: 0; border-radius: 0 0 calc(var(--fl-radius) - 1px) calc(var(--fl-radius) - 1px); }
+.market-research-page.flow-page .flow-market-row .asset { gap: 12px; }
+.market-research-page.flow-page .flow-market-row .asset-icon { width: 26px; height: 26px; }
+.market-research-page.flow-page .flow-market-row .asset b { font: 600 14px/1.3 var(--font-display); }
+.market-research-page.flow-page .flow-market-row > b { font: 500 13px/1.4 var(--font-mono); }
+.market-research-page.flow-page .premium-track { height: 12px; gap: 2px; }
+.market-research-page.flow-page .flow-market-row:hover { background: color-mix(in srgb, var(--surface-2) 65%, transparent); }
+.market-research-page.flow-page .flow-market-row[aria-pressed="true"] { background: color-mix(in srgb, var(--surface-2) 75%, transparent); box-shadow: inset 2px 0 var(--accent); }
+
+/* Filters apply to the recorded large-trade sample, not the overview or wallet list. */
+.market-research-page.flow-page .fl-trades-panel > .panel-head { padding-block: 0; }
+.market-research-page.flow-page .fl-trades-panel .tabs { gap: 26px; }
+.market-research-page.flow-page .fl-trades-panel .tabs button { min-height: 64px; padding-block: 20px 18px; font: 500 13px/1.3 var(--font-body); }
+.market-research-page.flow-page .text-control { min-height: 44px; font: 500 13px/1.4 var(--font-body); }
+.market-research-page.flow-page .fl-table-context { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 24px; padding: 14px var(--fl-pad); color: var(--muted); font: 400 12px/1.5 var(--font-body); border-bottom: 1px solid var(--seam); }
+.market-research-page.flow-page .fl-table-context b { color: var(--fg-2); font: 500 12px/1.5 var(--font-mono); }
+.market-research-page.flow-page .fl-scope { color: var(--muted); font: 400 12px/1.5 var(--font-body); }
+
+/* One aligned, complete table in each panel. */
+.market-research-page.flow-page table.grid.flow-table { width: 100%; min-width: 0; }
+.market-research-page.flow-page .flow-table th { padding: 13px 12px; background: color-mix(in srgb, var(--surface-2) 65%, transparent); font: 500 12px/1.4 var(--font-body); color: var(--muted); border-bottom: 1px solid var(--seam); }
+.market-research-page.flow-page .flow-table td { padding: 18px 12px; border-bottom: 1px solid var(--seam); font: 400 13px/1.45 var(--font-body); }
+.market-research-page.flow-page .flow-table th:first-child, .market-research-page.flow-page .flow-table td:first-child { padding-left: var(--fl-pad); }
+.market-research-page.flow-page .flow-table th:last-child, .market-research-page.flow-page .flow-table td:last-child { padding-right: var(--fl-pad); }
+.market-research-page.flow-page .flow-table td.num { font: 400 13px/1.45 var(--font-mono); }
+.market-research-page.flow-page .flow-table td.hero { font: 500 14px/1.45 var(--font-mono); letter-spacing: -.015em; }
+.market-research-page.flow-page .flow-table .ft-inst a { font: 400 13px/1.5 var(--font-mono); }
+.market-research-page.flow-page .ft-rfq { margin-left: 8px; font: 500 11px/1.4 var(--font-body); }
+.market-research-page.flow-page .flow-table .wtag { gap: 8px; }
+.market-research-page.flow-page .flow-table .wtag-name { font: 500 13px/1.5 var(--font-body); }
+.market-research-page.flow-page .flow-table .tier-tag, .market-research-page.flow-page .ft-kind > .dim, .market-research-page.flow-page .fw-kind > .dim { font: 500 12px/1.4 var(--font-body); }
+.market-research-page.flow-page .flow-table tbody tr:hover { background: color-mix(in srgb, var(--surface-2) 65%, transparent); }
+.market-research-page.flow-page .flow-table tbody tr:last-child td { border-bottom: 0; }
+.market-research-page.flow-page .flow-table .fl-empty { padding: 28px var(--fl-pad); text-align: center; }
+.market-research-page.flow-page .lb-more { display: flex; width: calc(100% - var(--fl-pad) * 2); min-height: 44px; margin: 16px var(--fl-pad); border: 1px solid var(--seam); border-radius: 8px; background: none; font: 500 13px/1.4 var(--font-body); }
+.market-research-page.flow-page .lb-more:hover { background: var(--surface-2); border-color: var(--seam-hi); }
+
+/* Compact rows keep every field visible rather than hiding time and wallet type. */
+@media (max-width: 1000px) {
+  .market-research-page.flow-page .flow-table { display: block; }
+  .market-research-page.flow-page .flow-table thead { display: table-header-group; position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .market-research-page.flow-page .flow-table tbody { display: block; }
+  .market-research-page.flow-page .flow-table tr.ft-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "inst inst" "side time" "notional prem" "who kind"; gap: 14px 24px; padding: 20px var(--fl-pad); border-bottom: 1px solid var(--seam); align-items: center; }
+  .market-research-page.flow-page .flow-table tr.fw-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "who kind" "perp opt" "net pnl"; gap: 16px 24px; padding: 20px var(--fl-pad); border-bottom: 1px solid var(--seam); align-items: center; }
+  .market-research-page.flow-page .flow-table tr.ft-row > td, .market-research-page.flow-page .flow-table tr.fw-row > td { display: block; min-width: 0; padding: 0 !important; border: 0; text-align: left; white-space: normal; font-size: 13px; }
+  .market-research-page.flow-page .flow-table td.ft-inst { grid-area: inst; overflow: visible; text-overflow: clip; }
+  .market-research-page.flow-page .flow-table .ft-inst a { overflow-wrap: anywhere; }
+  .market-research-page.flow-page .flow-table td.ft-side { grid-area: side; }
+  .market-research-page.flow-page .flow-table td.ft-time { grid-area: time; }
+  .market-research-page.flow-page .flow-table td.ft-notional { grid-area: notional; color: var(--fg-2); }
+  .market-research-page.flow-page .flow-table td.ft-prem { grid-area: prem; font-size: 15px; }
+  .market-research-page.flow-page .flow-table td.ft-who { grid-area: who; }
+  .market-research-page.flow-page .flow-table td.ft-kind { grid-area: kind; }
+  .market-research-page.flow-page .flow-table td.fw-who { grid-area: who; }
+  .market-research-page.flow-page .flow-table td.fw-kind { grid-area: kind; }
+  .market-research-page.flow-page .flow-table td.fw-perp { grid-area: perp; }
+  .market-research-page.flow-page .flow-table td.fw-opt { grid-area: opt; }
+  .market-research-page.flow-page .flow-table td.fw-net { grid-area: net; }
+  .market-research-page.flow-page .flow-table td.fw-pnl { grid-area: pnl; font-size: 15px; }
+  .market-research-page.flow-page .flow-table tr.ft-row > td.ft-time, .market-research-page.flow-page .flow-table tr.ft-row > td.ft-prem, .market-research-page.flow-page .flow-table tr.ft-row > td.ft-kind,
+  .market-research-page.flow-page .flow-table tr.fw-row > td.fw-kind, .market-research-page.flow-page .flow-table tr.fw-row > td.fw-opt, .market-research-page.flow-page .flow-table tr.fw-row > td.fw-pnl { text-align: right; }
+  .market-research-page.flow-page .flow-table td[data-k]::before { content: attr(data-k); display: block; margin-bottom: 4px; font: 400 11px/1.4 var(--font-body); color: var(--muted); }
+  .market-research-page.flow-page .flow-table .wtag-name { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+  .market-research-page.flow-page .ft-who a, .market-research-page.flow-page .fw-who a { display: inline-flex; align-items: center; min-height: 44px; }
+  .market-research-page.flow-page .flow-table tbody tr:last-child { border-bottom: 0; }
+  .market-research-page.flow-page .flow-table tbody tr:has(.fl-empty) { display: block; }
+  .market-research-page.flow-page .flow-table .fl-empty { display: block; }
+}
+
+@media (max-width: 680px) {
+  .market-research-page.flow-page { --fl-pad: 16px; }
+  .market-research-page.flow-page > .plate { margin-inline: -16px; border-inline: 0; border-radius: 0; }
+  .market-research-page.flow-page > .plate > .panel-head { min-height: 60px; padding-block: 14px; }
+  .market-research-page.flow-page .panel-title { font-size: 17px; }
+  .market-research-page.flow-page .fl-premium-panel .flow-briefing { border-radius: 0; }
+  .market-research-page.flow-page .flow-brief-head { padding-block: 18px; }
+  .market-research-page.flow-page .flow-total { justify-content: space-between; width: 100%; gap: 10px; }
+  .market-research-page.flow-page .flow-total strong { font-size: 28px; }
+  .market-research-page.flow-page .flow-legend { display: grid; grid-template-columns: max-content max-content 24px; align-items: center; gap: 8px 18px; }
+  .market-research-page.flow-page .flow-legend > span:nth-child(1) { grid-column: 1; grid-row: 1; }
+  .market-research-page.flow-page .flow-legend > span:nth-child(2) { grid-column: 1; grid-row: 2; }
+  .market-research-page.flow-page .flow-legend > span:nth-child(3) { grid-column: 2; grid-row: 1; }
+  .market-research-page.flow-page .flow-legend > span:nth-child(4) { grid-column: 2; grid-row: 2; }
+  .market-research-page.flow-page .flow-legend > .info { grid-column: 3; grid-row: 1 / span 2; }
+  .market-research-page.flow-page .flow-market-row { grid-template-columns: 76px minmax(0, 1fr) 76px; gap: 12px; min-height: 54px; padding-block: 13px; }
+  .market-research-page.flow-page .flow-market-row .asset { gap: 8px; }
+  .market-research-page.flow-page .flow-market-row .asset-icon { width: 24px; height: 24px; }
+  .market-research-page.flow-page .flow-market-row .asset b { font-size: 13px; }
+  .market-research-page.flow-page .flow-market-row > b { font-size: 12px; }
+  .market-research-page.flow-page .premium-track { height: 10px; }
+  .market-research-page.flow-page .flow-market-row:last-child { border-radius: 0; }
+  .market-research-page.flow-page .fl-trades-panel > .panel-head { display: block; padding-block: 0; }
+  .market-research-page.flow-page .fl-trades-panel .panel-title { min-height: 58px; }
+  .market-research-page.flow-page .fl-trades-panel .panel-right { margin-left: 0; gap: 20px; border-top: 1px solid var(--seam); justify-content: space-between; }
+  .market-research-page.flow-page .fl-trades-panel .tabs { gap: 26px; }
+  .market-research-page.flow-page .fl-trades-panel .tabs button { min-height: 48px; padding-block: 14px 13px; }
+  .market-research-page.flow-page .fl-wallets-panel .panel-head { gap: 8px 16px; }
+  .market-research-page.flow-page .fl-wallets-panel .panel-right { margin-left: 0; }
+  .market-research-page.flow-page .flow-table tr.ft-row, .market-research-page.flow-page .flow-table tr.fw-row { gap: 12px 16px; padding-block: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .market-research-page.flow-page .flow-market-row, .market-research-page.flow-page .flow-table tbody tr { transition: none; }
+}
