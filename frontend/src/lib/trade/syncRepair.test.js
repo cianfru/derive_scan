@@ -364,6 +364,39 @@ describe("recovery accounting", () => {
     expect(after.reduce((a, p) => a + p.exits[0].gross, 0)).toBeCloseTo(2.4, 12);
   });
 
+  it("keeps a sell back on the lot the user closed, though an older lot of the same answer is open", () => {
+    const list = saveBuys();
+    const older = list.find((p) => p.journal.fill.rfq_id === rec.rfq_id);
+    const newer = list.find((p) => p.key !== older.key);
+    expect(older.journal.fill.ts).toBeLessThan(newer.journal.fill.ts);
+    // The user pressed Close on the newer card: the ticket saved the sell back there.
+    closePosition(newer.key, exitFromFill(fillFromTrades(sellBack(1)), { savedTs: 1790960100 }), 1790960100, "testnet");
+    const fills = fillsByRfq(sellBack(1));
+    const after = apply(recoverFills(loadPositions("testnet"), fills, 1790960500, scope));
+    expect(remainingQty(after.find((p) => p.key === newer.key))).toBe(0);
+    expect(after.find((p) => p.key === newer.key).closed_at).toBeTruthy();
+    expect(remainingQty(after.find((p) => p.key === older.key))).toBe(0.01);
+    expect(after.find((p) => p.key === older.key).closed_at).toBeUndefined();
+    expect(recoverFills(after, fills, 1790960600, scope).repairs).toHaveLength(0);
+  });
+
+  it("moves only what its saved lot can no longer hold to the oldest open lot", () => {
+    const list = saveBuys();
+    const older = list.find((p) => p.journal.fill.rfq_id === rec.rfq_id);
+    const newer = list.find((p) => p.key !== older.key);
+    const rows = biggerClose(0.02);
+    // Saved by an older version: the whole 0.02 sell back on the newer lot, which holds 0.01.
+    savePositions([older, { ...newer, exits: [exitFromFill(fillFromTrades(rows), { savedTs: 1790960500 })] }], "testnet");
+    const after = apply(recoverFills(loadPositions("testnet"), fillsByRfq(rows), 1790960600, scope));
+    const newerExit = after.find((p) => p.key === newer.key).exits[0];
+    const olderExit = after.find((p) => p.key === older.key).exits[0];
+    expect([newerExit.qty, olderExit.qty]).toEqual([0.01, 0.01]);
+    expect([newerExit.allocation_offset, olderExit.allocation_offset]).toEqual([0, 0.01]);
+    expect(newerExit.gross + olderExit.gross).toBeCloseTo(2.4, 12);
+    expect(newerExit.fees + olderExit.fees).toBeCloseTo(0.62, 12);
+    expect(recoverFills(after, fillsByRfq(rows), 1790960700, scope).repairs).toHaveLength(0);
+  });
+
   it("reports cash and quantity beyond eligible inventory instead of attaching them to a smaller entry", () => {
     const list = saveBuys();
     const out = recoverFills(list, fillsByRfq(biggerClose(0.03)), 1790960500, scope);

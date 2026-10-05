@@ -156,7 +156,9 @@ const stableExit = (e) => JSON.stringify({ ...e, repaired_ts: undefined });
  *   added    a one-tap buy whose RFQ is in no record, as a new record (exact, from Derive; its key
  *            comes from its RFQ and legs)
  *   exits    a one-tap sell back allocated across the oldest eligible entry lots, with proportional
- *            proceeds and fees; every allocation consumes its contracts before the next RFQ
+ *            proceeds and fees; every allocation consumes its contracts before the next RFQ. A sell
+ *            back already saved stays on its lot (the card the user closed) while that lot holds the
+ *            contracts; only the rest moves to the oldest eligible lots
  *   repairs  a known RFQ whose saved fill is flagged incomplete or disagrees with Derive's complete
  *            trades (legs, premium, fees): the record rebuilt from Derive, its key and entry kept
  *   claims   older records without wallet or account that this account's trades name
@@ -215,15 +217,38 @@ export function recoverFills(records, fills, now = Date.now() / 1000, scope = {}
   const unmatched = [];
   for (const { fill: f, lab } of closes) {
     const qty = f.legs[0].qty;
-    let offset = 0;
-    const open = [...base.values()].filter((r) => r.exec === "rfq" && r.id === lab.id && r.side === lab.side
+    const eligible = (r) => !!r && r.exec === "rfq" && r.id === lab.id && r.side === lab.side
       && !incompleteEntryReceipt(r) && (left.get(r.key) || 0) > EPS
-      && (!Number.isFinite(r.journal?.fill?.ts) || !Number.isFinite(f.ts) || r.journal.fill.ts <= f.ts))
-      .sort((a, b) => (a.journal?.fill?.ts ?? a.at ?? 0) - (b.journal?.fill?.ts ?? b.at ?? 0));
+      && (!Number.isFinite(r.journal?.fill?.ts) || !Number.isFinite(f.ts) || r.journal.fill.ts <= f.ts);
     const refs = oldExits.get(f.rfq_id) || [];
-    for (const r of open) {
-      const take = round(Math.min(qty - offset, left.get(r.key)));
-      if (!(take > EPS)) break;
+    // Contracts of this sell back per entry lot, in the order they were placed.
+    const shares = new Map();
+    let placed = 0;
+    const place = (key, want) => {
+      const take = round(Math.min(want, qty - placed, left.get(key)));
+      if (!(take > EPS)) return;
+      shares.set(key, round((shares.get(key) || 0) + take));
+      left.set(key, round(left.get(key) - take));
+      placed = round(placed + take);
+    };
+    // A sell back stays on the lot it was saved on (the card the user closed) while that lot still has
+    // the contracts; only what no saved lot can hold goes to the oldest eligible lots.
+    const kept = [...refs].sort((a, b) => ((a.exit.allocation_offset ?? 0) - (b.exit.allocation_offset ?? 0)) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+    for (const { key, exit: old } of kept) {
+      if (qty - placed <= EPS) break;
+      if (eligible(base.get(key))) place(key, [old.qty, old.receipt_qty].find((v) => v > 0) ?? qty);
+    }
+    if (qty - placed > EPS) {
+      const open = [...base.values()].filter(eligible)
+        .sort((a, b) => (a.journal?.fill?.ts ?? a.at ?? 0) - (b.journal?.fill?.ts ?? b.at ?? 0));
+      for (const r of open) {
+        if (qty - placed <= EPS) break;
+        place(r.key, qty);
+      }
+    }
+    let offset = 0;
+    for (const [key, take] of shares) {
+      const r = base.get(key);
       const old = (refs.find((x) => x.key === r.key) || refs[0])?.exit;
       const markQty = old ? Math.max(old.qty || 0, ...(old.legs || []).map((l) => l.qty || 0)) : 0;
       const mark = old?.mark && markQty > 0 ? { ...old.mark, value: old.mark.value * take / markQty } : null;
@@ -234,9 +259,7 @@ export function recoverFills(records, fills, now = Date.now() / 1000, scope = {}
         if (!knownAllocations.has(r.key)) knownAllocations.set(r.key, []);
         knownAllocations.get(r.key).push(e);
       } else exits.push({ key: r.key, exit: e });
-      left.set(r.key, round(left.get(r.key) - take));
       offset = round(offset + take);
-      if (qty - offset <= EPS) break;
     }
     if (qty - offset > EPS) unmatched.push({ rfq_id: f.rfq_id, reason: "missing_entries",
       exit: exitFromFill({ ...f, complete: true }, { savedTs: Math.floor(now), qty: round(qty - offset), offset }) });

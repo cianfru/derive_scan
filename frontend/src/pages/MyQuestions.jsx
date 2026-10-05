@@ -292,7 +292,9 @@ function Card({ p, onRemove, onClose, sync = null, scope = null }) {
   const feeWhy = DERIVE_ENTRY_FEES;
   const ownAccount = !!p.wallet && p.subaccount_id != null && p.subaccount_id === scope?.subaccountId
     && String(p.wallet).toLowerCase() === String(scope?.wallet || "").toLowerCase();
-  const canSell = oneTap && ownAccount && !half;
+  // With no wallet connected, Close opens the panel's connect step (the panel itself refuses another
+  // wallet's or account's position); once connected, only this wallet's account sells back.
+  const canSell = oneTap && !half && (ownAccount || !scope?.wallet);
   useEffect(() => { if (!canSell && oneTap) setClosing(false); }, [canSell, oneTap]);
   const op = after || p.closed_at ? p : openPart(p);
   const t = found && !found.settled && !paused && !settling && !half && !p.closed_at

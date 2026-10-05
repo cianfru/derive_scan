@@ -76,6 +76,19 @@ describe("ownership before selling back", () => {
     expect(loadPositions("testnet")[0]).toMatchObject({ wallet: A, subaccount_id: 8101 });
   });
 
+  it("offers Close with no wallet connected; the panel connects first and opens no ticket", async () => {
+    addPosition(record(), NOW);
+    _setSeatState({ stage: "disconnected" });
+    page(<MyQuestions />);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Close" }));
+    const panel = await screen.findByRole("region", { name: /^Sell back/ });
+    expect(within(panel).getByRole("button", { name: "Connect wallet" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Get sell-back price" })).toBeNull();
+    expect(mock.reads).toHaveLength(0);
+    expect(mock.rfqs).toHaveLength(0);
+  });
+
   it.each(["unclaimed", "wallet", "account"])("blocks a direct sell ticket with %s ownership", (kind) => {
     const p = record(kind === "wallet" ? B : A, kind === "account" ? 8102 : 8101);
     if (kind === "unclaimed") { delete p.wallet; delete p.subaccount_id; }
