@@ -1,11 +1,29 @@
+import { useLayoutEffect, useRef, useState } from "react";
 import { money, cents, payAt } from "../lib/questions.js";
+
+/** The width the chart is drawn at, so lines, dot and labels keep their size on any screen. */
+function useWidth(ref, off) {
+  const [w, setW] = useState(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (off || !el || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(([e]) => setW(Math.round(e.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [off]);
+  return w;
+}
 
 /** The 0-to-$1 ramp over the settlement price: nothing on one side of the zone, $1 on the other,
  * a straight line between. It falls for Lower. The price now is the orange hairline; `mark` puts a
  * dot on the ramp at a settlement price (the outcome slider); `plain` drops the caption. */
 export default function PayZone({ lo, hi, side = "yes", index = null, compact = false, mark = null, plain = false }) {
-  const W = compact ? 64 : 320, H = compact ? 18 : 92;
-  const pad = compact ? 2 : 14, top = compact ? 2 : 10, base = compact ? H - 2 : H - 26;
+  const box = useRef(null);
+  const measured = useWidth(box, compact);
+  const W = compact ? 64 : measured || 320;
+  // Drawn at its real width: a fixed height band, never taller as the screen gets wider.
+  const H = compact ? 18 : Math.round(Math.min(150, Math.max(96, W * 0.3)));
+  const pad = compact ? 2 : 14, top = compact ? 2 : 12, base = compact ? H - 2 : H - 26;
   const span = hi - lo;
   const x0 = lo - span * 0.6, x1 = hi + span * 0.6;
   const x = (v) => pad + ((v - x0) / (x1 - x0)) * (W - 2 * pad);
@@ -25,8 +43,8 @@ export default function PayZone({ lo, hi, side = "yes", index = null, compact = 
     );
   }
   return (
-    <figure className="payzone-fig">
-      <svg className="payzone" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
+    <figure className="payzone-fig" ref={box}>
+      <svg className="payzone" width={measured ? W : undefined} height={measured ? H : undefined} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label}>
         <line x1={pad} x2={W - pad} y1={y(0)} y2={y(0)} className="pz-axis" />
         <line x1={pad} x2={W - pad} y1={y(1)} y2={y(1)} className="pz-axis faint" />
         <rect x={x(lo)} y={top} width={x(hi) - x(lo)} height={base - top} className="pz-zone" />

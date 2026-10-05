@@ -214,7 +214,7 @@ describe("the question page", () => {
     expect(at(83000)).toBe("BTC at $83,000: pays 0c per $1, you get $0.00, loss $100.00");
     expect(at(86000)).toBe("BTC at $86,000: pays 50c per $1, you get $128.31, profit $28.31");
     expect(at(89000)).toBe("BTC at $89,000: pays 100c per $1, you get $256.62, profit $156.62");
-    expect(container.querySelector(".op-read").textContent).toContain("If BTC settles at $89,000, this pays 100c per $1: you get $256.62");
+    expect(container.querySelector(".op-read").textContent).toBe("If BTC settles at$89,000Pays per $1100cYou get$256.62Profit+$156.62");
     wordcheck([container.textContent]);
   });
 

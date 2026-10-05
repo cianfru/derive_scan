@@ -30,12 +30,11 @@
 .md-boundaries > div + div { border-color: var(--up); }
 .md-boundaries span { font-size: 12px; color: var(--text-3); }
 .md-boundaries b { font-size: 14px; font-weight: 500; }
-.md-evidence .q-context { gap: 14px; }
+.md-evidence .q-context { gap: 12px; }
 .md-evidence .q-context .chain { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .md-evidence .q-context .chain-tile { padding: 12px; gap: 9px; }
 .md-evidence .q-context .chain-icon, .md-evidence .q-context .step-n { display: none; }
 .md-evidence .q-context .chain-text b { font-size: 13px; }
-.md-evidence .q-context > .text-link { justify-self: start; font-size: 13px; }
 .md-other { padding-top: 20px; border-top: 1px solid var(--border); display: grid; gap: 15px; }
 .md-other .q-other { justify-self: start; }
 .md-selection { grid-area: selection; position: sticky; top: 104px; min-width: 0; }
@@ -78,8 +77,8 @@
 .md-payoff-study { display: grid; gap: 18px; padding-bottom: 28px; border-bottom: 1px solid var(--border); }
 .md-payoff-study h2 { font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
 .md-payoff-study .op-sim, .md-payoff-study .op-ex { max-width: none; }
-.md-payoff-study .payzone { max-width: none; }
-.md-payoff-study .op-read { font-size: 14px; line-height: 1.7; }
+.md-payoff-study .payzone-fig, .md-payoff-study .op-range { max-width: none; }
+.md-payoff-study .op-read dd { font-size: 22px; }
 .md-payoff-study .op-ex { font-size: 13px; }
 .md-payoff-study .op-ex th, .md-payoff-study .op-ex td { padding-block: 10px; }
 .md-payoff-study .op-note { line-height: 1.6; }
@@ -119,9 +118,6 @@
   .md-preview .op-figs > div { gap: 12px; }
   .md-boundaries { gap: 10px; }
   .md-boundaries b { font-size: 12px; }
-  .md-evidence .q-context .chain { grid-template-columns: 1fr; }
-  .md-evidence .q-context .chain-tile { padding: 12px 14px; }
-  .md-evidence .q-context .chain-text { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
   .md-section-heading .q-time { max-width: 160px; margin-left: auto; width: auto; flex-wrap: wrap; justify-content: flex-end; text-align: right; }
   .md-ticket .q-legs li { grid-template-columns: 22px auto minmax(0, 1fr); grid-template-areas: "n act name" "n a l"; }
 }
@@ -134,3 +130,29 @@
   .md-detail .q-chart-head .tabs button { min-height: 44px; min-width: 44px; padding-inline: 10px; }
   .md-detail .q-chart-head .tabs button[aria-selected="true"] { border-bottom-color: transparent; background: linear-gradient(var(--accent), var(--accent)) no-repeat 50% 100% / calc(100% - 20px) 2px; }
 }
+
+/* Context, not advice: a large card into the coin's page, its three layers inside. */
+.q-context.md-context { display: grid; gap: 12px; }
+.md-context-title { display: inline-flex; align-items: center; margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+.md-coin-cta { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.6fr) auto; align-items: center; gap: 14px 18px; padding: 16px 20px;
+  border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--elev-fill); box-shadow: var(--elev-1); color: var(--text-1); text-decoration: none;
+  transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease), transform 160ms var(--ease); }
+.md-coin-cta:hover, .md-coin-cta:focus-visible { border-color: var(--accent); box-shadow: var(--elev-2); transform: translateY(var(--elev-lift, -2px)); }
+.md-coin-cta:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.md-coin-cta .asset-icon { width: 36px; height: 36px; }
+.md-coin-cta-text { display: grid; gap: 3px; min-width: 0; }
+.md-coin-cta-text b { font: 650 18px/1.2 var(--font-sans); letter-spacing: -.01em; }
+.md-coin-cta-text small { font-size: 13px; color: var(--text-2); }
+.md-coin-cta-chain { min-width: 0; }
+.md-coin-cta .chain { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.md-coin-cta .chain-tile { padding: 10px 12px; gap: 6px; }
+.md-coin-cta .chain-icon, .md-coin-cta .step-n { display: none; }
+.md-coin-cta .chain-text b { font-size: 13px; }
+.md-coin-cta-go { font-size: 22px; color: var(--accent-text); }
+@media (max-width: 760px) {
+  .md-coin-cta { grid-template-columns: auto minmax(0, 1fr) auto; padding: 14px 16px; }
+  .md-coin-cta-chain { grid-column: 1 / -1; grid-row: 2; }
+  .md-evidence .md-coin-cta .chain, .md-coin-cta .chain { grid-template-columns: 1fr; }
+  .md-evidence .md-coin-cta .chain-text, .md-coin-cta .chain-text { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .md-coin-cta { transition: none; } .md-coin-cta:hover, .md-coin-cta:focus-visible { transform: none; } }

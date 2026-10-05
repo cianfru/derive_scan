@@ -97,7 +97,7 @@
 .q-foot-zone { display: inline-flex; align-items: center; }
 
 /* Pay zone */
-.payzone { width: 100%; height: auto; max-width: 420px; display: block; }
+.payzone { width: 100%; height: auto; display: block; }
 .payzone.mini { width: 64px; height: 18px; flex: none; }
 .pz-line { fill: none; stroke: var(--text-1); stroke-width: 2; stroke-linejoin: round; }
 .payzone.mini .pz-line { stroke: var(--text-2); stroke-width: 1.5; }
@@ -107,8 +107,8 @@
 .pz-now { stroke: var(--accent); stroke-width: 1; }
 .pz-mark { fill: var(--text-1); stroke: var(--ground); stroke-width: 2; }
 .pz-mark-line { stroke: var(--text-2); stroke-width: 1; stroke-dasharray: 2 3; }
-.pz-t { fill: var(--text-3); font: 400 11px var(--font-mono); }
-.payzone-fig { margin: 0; display: grid; gap: 6px; }
+.pz-t { fill: var(--text-2); font: 400 12px var(--font-mono); }
+.payzone-fig { margin: 0; display: grid; gap: 6px; max-width: 420px; min-width: 0; }
 .pz-cap { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 13px; color: var(--text-2); }
 .pz-cap b { color: var(--text-1); font-weight: 500; }
 
@@ -246,10 +246,14 @@
 .op-figs .up, .op-ex .up, .op-read .up { color: var(--up); }
 .op-figs .down, .op-ex .down, .op-read .down { color: var(--down); }
 .op-sim { display: grid; gap: 6px; max-width: 420px; }
-.op-read { margin: 0; font-size: 14px; color: var(--text-2); min-height: 2.6em; }
-.op-read b { color: var(--text-1); font-weight: 500; }
+/* The slider's reading: four figures, label above value, large enough to follow while dragging. */
+.op-read { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px 18px; }
+.op-read > div { display: grid; gap: 3px; min-width: 0; }
+@media (max-width: 560px) { .op-read { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.op-read dt { font-size: 12px; color: var(--text-2); }
+.op-read dd { margin: 0; font-size: 18px; font-weight: 500; letter-spacing: -.02em; color: var(--text-1); white-space: nowrap; }
 .op-ramp { display: grid; }
-.op-range { width: calc(100% - 2 * (14 / 320 * 100%) + 18px); margin: -6px calc(14 / 320 * 100% - 9px) 0; height: 32px; background: none; accent-color: var(--accent); cursor: pointer; }
+.op-range { width: calc(100% - 10px); max-width: 410px; margin: -6px 5px 0; height: 32px; background: none; accent-color: var(--accent); cursor: pointer; }
 .op-range:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--r-sm); }
 .op-ex { width: 100%; max-width: 420px; border-collapse: collapse; font-size: 13px; }
 .op-ex th, .op-ex td { padding: 6px 0; border-bottom: 1px solid var(--border); text-align: right; font-weight: 400; }
