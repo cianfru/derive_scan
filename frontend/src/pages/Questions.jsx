@@ -12,7 +12,7 @@ import OutcomePreview, { OutcomeFigures, OutcomePayoffStudy } from "../component
 import SaloonHead from "../components/SaloonNotices.jsx";
 import { FollowButton, FollowLevel } from "../components/Follow.jsx";
 import { loadBudget } from "../lib/follows.js";
-import { TESTNET_FILLS } from "../lib/flags.js";
+import { TESTNET_FILLS, TRADE_ON } from "../lib/flags.js";
 import { NOT_ON_TESTNET, NOT_ON_TESTNET_WHY, missingLegs, useTestnetListing } from "../lib/testnetLevels.js";
 import {
   ANSWER, buyCents, cents, centsDown, countdown, dayLabel, findLevel, fullPay, gap, live, money, noPriceReason, parseId, priceAge,
@@ -280,7 +280,7 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
                 </> : <p className="status"><NoPrice level={level} side={sideKey} paused={paused} text={`No price now for ${ANSWER[sideKey]}`} /></p>}
                 {age.state === "stale" && <p className="q-note warn">Prices are {age.minutes} min old. Check Derive's screen before placing orders.</p>}
                 {offTestnet && <p className="q-note"><span className="q-noprice">{NOT_ON_TESTNET}<Info label={`Why ${ANSWER[sideKey]} at ${money(level.k)} is not on testnet`}>{NOT_ON_TESTNET_WHY}</Info></span></p>}
-                <div className="md-review-action"><button ref={opener} className="btn primary lg" disabled={!ready} onClick={place}>Review orders</button><small>Two orders, placed by you on Derive.</small></div>
+                <div className="md-review-action"><button ref={opener} className="btn primary lg" disabled={!ready} onClick={place}>Review orders</button><small>{TRADE_ON ? "One tap: both options at one price, or nothing." : "One-tap trading is coming. For now, two orders on Derive."}</small></div>
               </section>
               {sheet && ready && <div ref={sheetRef} className="q-sheet open md-ticket" role="dialog" aria-modal={typeof matchMedia !== "function" || matchMedia("(max-width: 1279px)").matches ? "true" : undefined} aria-label="Ticket">
                 <button className="text-control q-sheet-close" onClick={() => setSheet(false)}>Back to payout</button>

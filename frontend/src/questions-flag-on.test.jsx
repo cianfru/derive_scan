@@ -4,7 +4,7 @@ import { render, screen, cleanup, within, fireEvent } from "@testing-library/rea
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 
-vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: true, TESTNET_FILLS: false }));
+vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: true, TESTNET_FILLS: false, TRADE_ON: false }));
 import Shell from "./components/Shell.jsx";
 import Landing from "./pages/Landing.jsx";
 import { SaloonCta } from "./pages/Coin.jsx";
@@ -197,4 +197,11 @@ it("carries no Testnet marker in a build without testnet fills", () => {
   shellAt("/saloon");
   expect(document.querySelector(".hdr-testnet")).toBeNull();
   expect(document.querySelector("header").textContent).not.toMatch(/Testnet/);
+});
+
+it("never tells visitors to place trades on Derive themselves; before one tap it says one tap is coming (owner, 5 October 2026)", () => {
+  const { container } = shell(<Landing />);
+  expect(container.textContent).not.toMatch(/place any trade on Derive yourself|placed by you on Derive/);
+  expect(container.textContent).toMatch(/One-tap trading is coming/);
+  expect(container.textContent).toMatch(/Trades settle on Derive, in your own account\./);
 });

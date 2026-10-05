@@ -5,7 +5,7 @@ import WalletTag from "../components/WalletTag.jsx";
 import { Info } from "../components/ui.jsx";
 import { HatMark, NeonSign } from "../components/Brand.jsx";
 import { REGIME } from "../lib/format.js";
-import { QUESTIONS_ON } from "../lib/flags.js";
+import { QUESTIONS_ON, TRADE_ON } from "../lib/flags.js";
 import SaloonDemo from "../components/SaloonDemo.jsx";
 import "../landing.css";
 
@@ -293,7 +293,9 @@ function ResearchExplorer() {
 
 const FAQ = [
   ["What is Cowboy?", QUESTIONS_ON
-    ? "Cowboy makes Derive’s price outcomes easier to explore. The Saloon shows costs and settlement payouts, with separate research on price regimes, wallet positioning and options. You place any trade on Derive yourself."
+    ? "Cowboy makes Derive’s price outcomes easier to explore. The Saloon shows costs and settlement payouts, with separate research on price regimes, wallet positioning and options. " + (TRADE_ON
+      ? "You trade in one tap from Cowboy, with your own wallet; trades settle on Derive."
+      : "Trades settle on Derive, in your own account.")
     : "Independent research on Derive: price regimes, wallet positioning and options, read side by side."],
   [QUESTIONS_ON ? "Is a partial payout still a loss?" : "Do I need to trade options?", QUESTIONS_ON
     ? "It can be. Payout is the total returned at settlement. Profit or loss is that payout minus your total cost, including fees. A payout below your cost is a loss. Closing before settlement is valued differently."
@@ -301,7 +303,9 @@ const FAQ = [
   ["Where does the data come from?", "Derive’s public prices, option quotes and trades. Wider market context comes from public sources. The examples on this page are illustrations, not current market readings."],
   ["How often does it update?", "Options and flow every 15 minutes. The engine after each 4-hour and daily close. Wallet history once a day. Each research view shows its own time."],
   ["Does Cowboy trade for me?", QUESTIONS_ON
-    ? "No. The Saloon shows the two option orders for you to place on Derive. The completed position’s defined cost applies after both orders fill. While only the first has filled, the cash needed and loss can be larger."
+    ? (TRADE_ON
+      ? "No. You choose and confirm every trade. One tap sends it to Derive from your own wallet and account: both options fill together at one price, or nothing fills. Cowboy never holds your money or your keys."
+      : "Not yet: one-tap trading is coming. For now the Saloon lists the two option orders to place on Derive. The completed position’s defined cost applies after both orders fill. While only the first has filled, the cash needed and loss can be larger.")
     : "No. Cowboy reads public market data. Any trade is yours to place on Derive."],
   ["Are the readings trade advice?", "No. The three research layers are context and stay separate. The study of whether wallet positioning leads price is still underway. Nothing here is investment advice."],
 ];
@@ -322,7 +326,9 @@ function SaloonIntro() {
           <li><span>Understand the payout</span><small>Full, partial or none. Cost always counts.</small></li>
           <li><span>Check the context</span><small>Regime, wallets and options alongside.</small></li>
         </ol>
-        <p className="lp-execution-note">Two option orders, placed by you on Derive.<Info label="How the orders work">The demo describes a completed two-option position held to settlement. Both orders need to fill for its defined cost to apply. With only the first order filled, cash needed and loss can be larger. Closing early is valued differently.</Info></p>
+        {TRADE_ON
+          ? <p className="lp-execution-note">One tap: both options fill together at one price, or nothing fills.<Info label="How one tap works">The demo describes a position held to settlement. One tap sends the whole answer to Derive as one package from your own wallet and account, at one firm price you see first. Closing early is valued differently.</Info></p>
+          : <p className="lp-execution-note">One-tap trading is coming. For now, two option orders on Derive.<Info label="How the orders work">The demo describes a completed two-option position held to settlement. Both orders need to fill for its defined cost to apply. With only the first order filled, cash needed and loss can be larger. Closing early is valued differently.</Info></p>}
       </div>
       <SaloonDemo />
     </section>
