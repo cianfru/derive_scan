@@ -5,8 +5,9 @@
 // whether Derive's positions hold its legs. Settlement uses the testnet's own settlement price.
 import { parseInstrument } from "./package.js";
 import { fillFromTrades, packageComplete, tradesSince } from "./fills.js";
-import { buyRecord, exitFromFill, fillDiffers, knownRfqs, parseLabel, repairBuy } from "./record.js";
-import { remainingQty } from "../realized.js";
+import { buyRecord, exitFromFill, fillDiffers, knownRfqs, matchesPackage, parseLabel, repairBuy } from "./record.js";
+import { incompleteEntryReceipt, remainingQty } from "../realized.js";
+import { reconcileExits } from "../positions.js";
 
 const EPS = 1e-9;
 const round = (x, d = 8) => Math.round(x * 10 ** d) / 10 ** d;
@@ -133,8 +134,9 @@ export function accountRecords(records, fills, { wallet = null, subaccountId = n
   const here = new Set((fills || []).map((f) => f.rfq_id));
   const mine = [], claims = [];
   for (const r of list) {
-    if (r.subaccount_id != null || r.wallet) {
-      if (r.subaccount_id === subaccountId && sameWallet(r.wallet, wallet)) mine.push(r);
+    if ((r.wallet && !sameWallet(r.wallet, wallet)) || (r.subaccount_id != null && r.subaccount_id !== subaccountId)) continue;
+    if (r.subaccount_id != null && r.wallet) {
+      mine.push(r);
       continue;
     }
     if (r.exec === "rfq" && rfqsOf(r).some((id) => here.has(id))) {
@@ -145,49 +147,42 @@ export function accountRecords(records, fills, { wallet = null, subaccountId = n
   return { mine, claims };
 }
 
-/** A record with one recovered exit rebuilt from Derive's fill (its mark and saved time kept). */
-function repairExit(record, index, fill, now) {
-  const old = record.exits[index];
-  const exit = { ...exitFromFill(fill, { mark: old.mark, savedTs: old.saved_ts ?? Math.floor(now) }), repaired_ts: Math.floor(now) };
-  const exits = record.exits.map((e, i) => (i === index ? exit : e));
-  const q = { ...record, exits, updated_at: Math.floor(now) };
-  if (!q.closed_at) return q;
-  const nets = exits.filter((e) => e.kind === "close").map((e) => e.net);
-  return { ...q, proceeds: nets.every(Number.isFinite) ? nets.reduce((a, b) => a + b, 0) : null };
-}
+const stableRecord = (r) => JSON.stringify({ ...r, updated_at: undefined });
+const stableExit = (e) => JSON.stringify({ ...e, repaired_ts: undefined });
 
 /**
  * Bring the testnet journal in line with Derive's trade history for the account in use (`scope`:
  * { wallet, subaccountId }); records of other accounts are never matched.
  *   added    a one-tap buy whose RFQ is in no record, as a new record (exact, from Derive; its key
  *            comes from its RFQ and legs)
- *   exits    a one-tap sell back as an exact exit, each on one open record of that answer (oldest
- *            first) that still has the contracts, which it then consumes
+ *   exits    a one-tap sell back allocated across the oldest eligible entry lots, with proportional
+ *            proceeds and fees; every allocation consumes its contracts before the next RFQ. A sell
+ *            back already saved stays on its lot (the card the user closed) while that lot holds the
+ *            contracts; only the rest moves to the oldest eligible lots
  *   repairs  a known RFQ whose saved fill is flagged incomplete or disagrees with Derive's complete
  *            trades (legs, premium, fees): the record rebuilt from Derive, its key and entry kept
  *   claims   older records without wallet or account that this account's trades name
- * The caller saves them; after saving the added records, call it again so their sell backs land too.
+ * A close beyond the available recorded inventory returns its unassigned quantity and cash in
+ * `unmatched`, rather than silently charging the whole execution to a smaller lot. The caller saves
+ * records, then calls again so newly added buys can take their historical closes.
  */
 export function recoverFills(records, fills, now = Date.now() / 1000, scope = {}) {
   const all = records || [];
   const seen = knownRfqs(all);
   const { mine, claims } = accountRecords(all, fills, scope);
   const added = [], exits = [], repairs = [];
-  const repaired = new Map();
-  const left = new Map(mine.map((r) => [r.key, r.closed_at ? 0 : remainingQty(r)]));
+  const original = new Map(mine.map((r) => [r.key, r]));
+  const working = new Map(original);
   for (const f of fills) {
     const lab = parseLabel(f.label);
     if (seen.has(f.rfq_id)) {
-      // Known: repair it when Derive's trades are complete and the saved fill is not, or disagrees.
-      if (!packageComplete(f)) continue;
       for (const r of mine) {
-        const cur = repaired.get(r.key) || r;
-        if (cur.journal?.fill?.rfq_id === f.rfq_id && (cur.journal.fill.complete === false || fillDiffers(cur.journal.fill, f))) {
-          const fixed = repairBuy(cur, f, { now });
-          if (fixed) repaired.set(r.key, fixed);
+        const cur = working.get(r.key);
+        if (cur.journal?.fill?.rfq_id === f.rfq_id && matchesPackage(f, cur.id, cur.side)) {
+          const fixed = cur.journal.fill.complete === false || fillDiffers(cur.journal.fill, f)
+            ? repairBuy(cur, f, { now }) : reconcileExits(cur, now);
+          if (fixed) working.set(r.key, fixed);
         }
-        const i = (cur.exits || []).findIndex((e) => e.rfq_id === f.rfq_id && e.via === "rfq");
-        if (i >= 0 && fillDiffers(cur.exits[i], f)) repaired.set(r.key, repairExit(repaired.get(r.key) || cur, i, f, now));
       }
       continue;
     }
@@ -198,19 +193,82 @@ export function recoverFills(records, fills, now = Date.now() / 1000, scope = {}
       if (r) { added.push({ ...r, recovered: true }); seen.add(f.rfq_id); }
       continue;
     }
-    // Only saved records (with their keys) take exits; a record added in this pass gets its exit on the next.
-    const qty = f.legs[0]?.qty || 0;
-    const open = mine.filter((r) => r.id === lab.id && r.side === lab.side && (left.get(r.key) || 0) > EPS)
-      .sort((a, b) => (a.journal?.fill?.ts ?? a.at ?? 0) - (b.journal?.fill?.ts ?? b.at ?? 0));
-    const pick = open.find((r) => left.get(r.key) >= qty - 1e-9) || open[0];
-    if (pick) {
-      exits.push({ key: pick.key, exit: exitFromFill(f, { savedTs: Math.floor(now) }) });
-      left.set(pick.key, round(Math.max(0, left.get(pick.key) - qty)));
-      seen.add(f.rfq_id);
-    }
   }
-  for (const [key, record] of repaired) repairs.push({ key, record });
-  return { added, exits, repairs, claims };
+
+  // Replay authoritative close receipts, including ones previously clamped or saved one leg short.
+  const closes = (fills || []).map((fill) => {
+    const oldRecord = mine.find((r) => (r.exits || []).some((e) => e.via === "rfq" && e.rfq_id === fill.rfq_id));
+    const lab = parseLabel(fill.label) || (oldRecord ? { id: oldRecord.id, side: oldRecord.side, close: true } : null);
+    return { fill, lab };
+  }).filter(({ fill, lab }) => lab?.close && matchesPackage(fill, lab.id, lab.side, true))
+    .sort((a, b) => a.fill.ts - b.fill.ts);
+  const closeIds = new Set(closes.map(({ fill }) => fill.rfq_id));
+  const oldExits = new Map();
+  for (const r of working.values()) for (const e of r.exits || []) {
+    if (!closeIds.has(e.rfq_id) || e.via !== "rfq") continue;
+    if (!oldExits.has(e.rfq_id)) oldExits.set(e.rfq_id, []);
+    oldExits.get(e.rfq_id).push({ key: r.key, exit: e });
+  }
+  const base = new Map([...working].map(([key, r]) => [key, { ...r,
+    exits: (r.exits || []).filter((e) => e.via !== "rfq" || !closeIds.has(e.rfq_id)) }]));
+  const left = new Map([...base].map(([key, r]) => [key, Math.max(0, r.contracts
+    - (r.exits || []).filter((e) => e.kind === "close" && e.complete !== false).reduce((a, e) => a + (e.qty || 0), 0))]));
+  const knownAllocations = new Map();
+  const unmatched = [];
+  for (const { fill: f, lab } of closes) {
+    const qty = f.legs[0].qty;
+    const eligible = (r) => !!r && r.exec === "rfq" && r.id === lab.id && r.side === lab.side
+      && !incompleteEntryReceipt(r) && (left.get(r.key) || 0) > EPS
+      && (!Number.isFinite(r.journal?.fill?.ts) || !Number.isFinite(f.ts) || r.journal.fill.ts <= f.ts);
+    const refs = oldExits.get(f.rfq_id) || [];
+    // Contracts of this sell back per entry lot, in the order they were placed.
+    const shares = new Map();
+    let placed = 0;
+    const place = (key, want) => {
+      const take = round(Math.min(want, qty - placed, left.get(key)));
+      if (!(take > EPS)) return;
+      shares.set(key, round((shares.get(key) || 0) + take));
+      left.set(key, round(left.get(key) - take));
+      placed = round(placed + take);
+    };
+    // A sell back stays on the lot it was saved on (the card the user closed) while that lot still has
+    // the contracts; only what no saved lot can hold goes to the oldest eligible lots.
+    const kept = [...refs].sort((a, b) => ((a.exit.allocation_offset ?? 0) - (b.exit.allocation_offset ?? 0)) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+    for (const { key, exit: old } of kept) {
+      if (qty - placed <= EPS) break;
+      if (eligible(base.get(key))) place(key, [old.qty, old.receipt_qty].find((v) => v > 0) ?? qty);
+    }
+    if (qty - placed > EPS) {
+      const open = [...base.values()].filter(eligible)
+        .sort((a, b) => (a.journal?.fill?.ts ?? a.at ?? 0) - (b.journal?.fill?.ts ?? b.at ?? 0));
+      for (const r of open) {
+        if (qty - placed <= EPS) break;
+        place(r.key, qty);
+      }
+    }
+    let offset = 0;
+    for (const [key, take] of shares) {
+      const r = base.get(key);
+      const old = (refs.find((x) => x.key === r.key) || refs[0])?.exit;
+      const markQty = old ? Math.max(old.qty || 0, ...(old.legs || []).map((l) => l.qty || 0)) : 0;
+      const mark = old?.mark && markQty > 0 ? { ...old.mark, value: old.mark.value * take / markQty } : null;
+      let e = exitFromFill({ ...f, complete: true }, { savedTs: old?.saved_ts ?? Math.floor(now), mark, qty: take, offset });
+      if (old?.repaired_ts) e.repaired_ts = old.repaired_ts;
+      if (seen.has(f.rfq_id)) {
+        if (old && stableExit(old) !== stableExit(e)) e.repaired_ts = Math.floor(now);
+        if (!knownAllocations.has(r.key)) knownAllocations.set(r.key, []);
+        knownAllocations.get(r.key).push(e);
+      } else exits.push({ key: r.key, exit: e });
+      offset = round(offset + take);
+    }
+    if (qty - offset > EPS) unmatched.push({ rfq_id: f.rfq_id, reason: "missing_entries",
+      exit: exitFromFill({ ...f, complete: true }, { savedTs: Math.floor(now), qty: round(qty - offset), offset }) });
+  }
+  for (const [key, r] of base) {
+    const record = reconcileExits({ ...r, exits: [...r.exits, ...(knownAllocations.get(key) || [])] }, now);
+    if (stableRecord(record) !== stableRecord(original.get(key))) repairs.push({ key, record: { ...record, updated_at: Math.floor(now) } });
+  }
+  return { added, exits, repairs, claims, ...(unmatched.length ? { unmatched } : {}) };
 }
 
 /** One read of the Saloon account: open option positions and the trades since `sinceSec`. */

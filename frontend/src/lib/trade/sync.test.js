@@ -34,7 +34,7 @@ describe("exact journal records", () => {
       paid: 1.60125, legs: ["BTC-20261005-90000-C", "BTC-20261005-92000-C"], settle_ts: Date.UTC(2026, 9, 5, 8) / 1000 });
     const j = r.journal;
     expect(j).toMatchObject({ source: "derive", entered_by_you: [], network: "testnet" });
-    expect(j.fill).toMatchObject({ ts: 1790949750, complete: true, premium: 0.95, fees: 0.65125, fees_known: true, rfq_id: rec.rfq_id, filled_pct: 1, source: "trade_history" });
+    expect(j.fill).toMatchObject({ ts: 1790949750.491, complete: true, premium: 0.95, fees: 0.65125, fees_known: true, rfq_id: rec.rfq_id, filled_pct: 1, source: "trade_history" });
     expect(j.fill.trade_ids).toEqual(["5980561c-3e33-4b4a-8a95-e9f27ffdc313", "6fdabd5d-0d0e-4992-b1ef-c8ea40ab6a26"]);
     expect(j.fill.legs.map((l) => [l.name, l.signed_qty, l.price, l.fee])).toEqual([["BTC-20261005-90000-C", 0.01, 121, 0.65125], ["BTC-20261005-92000-C", -0.01, 26, 0]]);
     expect(j.cost).toMatchObject({ premium: 0.95, fees: 0.65125, fees_basis: "exact", total: 1.60125, breakeven_basis: "exact" });

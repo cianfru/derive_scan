@@ -90,11 +90,15 @@ describe("the helper", () => {
   });
 });
 
+// The trade chunk loads lazily and the listing comes from a simulated socket: under a full parallel
+// run that can take longer than the default one second.
+const LOAD = { timeout: 5000 };
+
 describe("a level the testnet does not list", () => {
   it("reads Not on testnet on the board, and the other answer stays open", async () => {
     setup({ instruments: listing([C88]), pagination: { num_pages: 1 } });
     show("/saloon");
-    const off = await screen.findAllByText("Not on testnet");
+    const off = await screen.findAllByText("Not on testnet", {}, LOAD);
     expect(off).toHaveLength(1);
     const card = off[0].closest(".bd-card");
     expect(within(card).queryByRole("link", { name: /Higher than \$85,000 on .*: see what it pays/ })).toBeNull();
@@ -106,10 +110,10 @@ describe("a level the testnet does not list", () => {
     setup({ instruments: listing([C88]), pagination: { num_pages: 1 } });
     const user = userEvent.setup();
     show(`/q/${H}?side=yes`);
-    await screen.findByText("Not on testnet");
+    await screen.findByText("Not on testnet", {}, LOAD);
     await user.click(screen.getByRole("button", { name: "Review orders" }));
-    const panel = await screen.findByRole("region", { name: "Higher through Derive" });
-    await within(panel).findByText("Derive's testnet doesn't list this level. Pick another level.");
+    const panel = await screen.findByRole("region", { name: "Higher through Derive" }, LOAD);
+    await within(panel).findByText("Derive's testnet doesn't list this level. Pick another level.", {}, LOAD);
     expect(within(panel).queryByRole("button", { name: "Connect wallet" })).toBeNull();
     expect(within(panel).queryByRole("button", { name: /Try again|Get price/ })).toBeNull();
     expect(within(panel).getAllByRole("button", { name: "Place by hand" })).toHaveLength(1);

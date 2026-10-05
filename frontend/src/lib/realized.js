@@ -21,6 +21,21 @@ const ok = Number.isFinite;
 const sum = (xs) => xs.reduce((a, b) => a + b, 0);
 const r2 = (v) => Math.round(v * 100) / 100;
 
+export const incompleteEntryReceipt = (p) => {
+  if (p.exec !== "rfq") return false;
+  const fill = p.journal?.fill;
+  const legs = fill?.legs;
+  if (fill?.complete === false || !Array.isArray(legs) || legs.length !== 2) return true;
+  const [a, b] = legs;
+  return legs.some((l) => !(l.qty > 0) || !ok(l.signed_qty))
+    || a.signed_qty * b.signed_qty >= 0
+    || Math.abs(a.qty - b.qty) > 1e-9 + 1e-6 * a.qty;
+};
+
+/** A one-tap entry or close whose full receipt is still being read. */
+export const incompleteReceipt = (p) => incompleteEntryReceipt(p)
+  || (p.exec === "rfq" && (p.exits || []).some((e) => e.via === "rfq" && e.complete === false));
+
 /** Contracts still open after the recorded exits. */
 export function remainingQty(p) {
   const out = sum((p.exits || []).map((e) => (ok(e.qty) ? e.qty : 0)));
@@ -67,22 +82,24 @@ export function legacyExit(p) {
 /** One realized portion's figures and its breakdown, or what is missing for one. */
 export function realizedPortion(p, e) {
   const j = p.journal;
+  const entryPending = incompleteEntryReceipt(p);
+  const exitPending = e.complete === false || (incompleteReceipt(p) && e.kind === "settle");
   const f = p.contracts > 0 ? e.qty / p.contracts : 0;
   const c = j?.cost || null;
   const entryFill = j?.fill?.ts ?? null;
   // Entry: premium and fees apart (journal), or one total with fees inside (older records).
-  const E = c && ok(c.premium) ? c.premium * f : null;
-  const Fe = c ? (ok(c.fees) ? c.fees * f : null) : null;
-  const entryTotal = c ? (E != null && Fe != null ? E + Fe : null) : ok(p.paid) ? p.paid * f : null;
-  const Fx = ok(e.fees) ? e.fees : null;
-  const X = ok(e.gross) ? e.gross : null;
-  const exitNet = ok(e.net) ? e.net : X != null && Fx != null ? X - Fx : null;
+  const E = !entryPending && c && ok(c.premium) ? c.premium * f : null;
+  const Fe = !entryPending && c && ok(c.fees) ? c.fees * f : null;
+  const entryTotal = entryPending ? null : c ? (E != null && Fe != null ? E + Fe : null) : ok(p.paid) ? p.paid * f : null;
+  const Fx = !exitPending && ok(e.fees) ? e.fees : null;
+  const X = !exitPending && ok(e.gross) ? e.gross : null;
+  const exitNet = exitPending ? null : ok(e.net) ? e.net : X != null && Fx != null ? X - Fx : null;
   const net = exitNet != null && entryTotal != null ? exitNet - entryTotal : null;
   // A package mark is for the whole answer: it does not value a lone option from a partial fill.
-  const whole = p.exec !== "hand_partial";
+  const whole = p.exec !== "hand_partial" && !entryPending;
   const Me = whole && j?.mark && markSuits(j.mark, entryFill) ? j.mark.value * f : null;
   const settled = e.kind === "settle";
-  const Mx = settled ? X : whole && markSuits(e.mark, e.ts) ? e.mark.value : null;
+  const Mx = settled ? X : whole && !exitPending && markSuits(e.mark, e.ts) ? e.mark.value : null;
   const missing = [];
   if (E == null) missing.push(c ? "premium" : "split");
   if (c && Fe == null) missing.push("entry_fees");
@@ -106,7 +123,7 @@ export function realizedPortion(p, e) {
   }
   return { kind: e.kind, qty: e.qty, ts: e.ts, saved_ts: e.saved_ts, settle_price: e.settle_price ?? null,
     entry: { premium: E, fees: Fe, total: entryTotal, mark: Me }, exit: { gross: X, fees: Fx, net: exitNet, mark: Mx },
-    net, parts, missing: parts ? [] : missing, basis, estimated, migrated: !!e.migrated };
+    net, parts, missing: entryPending || exitPending ? ["fill_pending"] : parts ? [] : missing, basis, estimated, migrated: !!e.migrated };
 }
 
 /** Every realized portion of a position and their total (null when any portion's net is unknown). */

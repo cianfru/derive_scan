@@ -10,10 +10,10 @@ import {
   ANSWER, cents, closeTicket, countdown, dayLabel, findLevel, fullPay, money, noPriceReason, parseId, priceAge, questionText, signed,
 } from "../lib/questions.js";
 import {
-  closePosition, exportPositions, forWallet, importPositions, loadPositions, openPart, partial, persistent, positionFigures, positionStatus, prune, removePosition,
+  closePosition, exportPositions, forWallet, importPositions, incompleteReceipt, loadPositions, openPart, partial, persistent, positionFigures, positionStatus, prune, removePosition,
   settlePosition,
 } from "../lib/positions.js";
-import { breakdownRows, closeEvent, realized, realizedSummary, remainingQty } from "../lib/realized.js";
+import { breakdownRows, closeEvent, incompleteEntryReceipt, realized, realizedSummary, remainingQty } from "../lib/realized.js";
 import { exposureGroups } from "../lib/exposure.js";
 import { compareReadings, hasJournal } from "../lib/journal.js";
 import { TESTNET_FILLS } from "../lib/flags.js";
@@ -31,6 +31,7 @@ const Board = lazy(() => import("./Board.jsx"));
 const AlsoOnDerive = TESTNET_FILLS ? lazy(() => import("../components/trade/TradePanel.jsx").then((m) => ({ default: m.AlsoOnDerive }))) : null;
 
 const usd = (v) => money(v, { cents: true });
+const DERIVE_ENTRY_FEES = "Derive's entry fees are not available yet. Total cost and profit or loss need those fees.";
 const sumNets = (r) => (r.portions.every((x) => x.exit.net != null) ? r.portions.reduce((a, x) => a + x.exit.net, 0) : null);
 
 /** A value Cowboy cannot show, in words, with the reason in an (i). */
@@ -117,7 +118,11 @@ function EntryRecord({ p }) {
     );
   }
   const f = j.fill || {};
+  const pendingEntry = incompleteEntryReceipt(p);
   const c = j.cost || {};
+  const deriveReceipt = TESTNET_FILLS && j.source === "derive";
+  const entryCostUnknown = deriveReceipt && !Number.isFinite(c.total);
+  const feeWhy = DERIVE_ENTRY_FEES;
   const m = j.mark;
   const e = j.board_estimate;
   const nr = <span className="q-noprice">Not entered</span>;
@@ -132,16 +137,16 @@ function EntryRecord({ p }) {
           <dd><ul>{(f.legs || []).map((l) => (
             <li key={l.name} className="mono">{l.signed_qty > 0 ? "+" : l.signed_qty < 0 ? "-" : ""}{Math.abs(l.signed_qty ?? 0)} {l.name}
               {l.qty < l.planned ? <small> of {l.planned}</small> : null}{l.price != null ? <small> at {usd(l.price)}</small> : null}</li>))}</ul></dd></div>
-        <div><dt>Filled amounts<By j={j} /></dt><dd>{f.complete ? (f.filled_pct != null && f.filled_pct < 1 ? `Whole package, ${Math.round(f.filled_pct * 100)}% of the size asked` : "Whole package") : <span className="warn-text">Not fully filled</span>}</dd></div>
+        <div><dt>Filled amounts<By j={j} /></dt><dd>{pendingEntry ? <span className="warn-text">Derive's records still being checked</span> : f.complete ? (f.filled_pct != null && f.filled_pct < 1 ? `Whole package, ${Math.round(f.filled_pct * 100)}% of the size asked` : "Whole package") : <span className="warn-text">Not fully filled</span>}</dd></div>
         {TESTNET_FILLS && f.trade_ids?.length > 0 && <div><dt>Derive trade ids</dt><dd className="mono q-trade-ids">{f.trade_ids.map((id) => <span key={id}>{id}</span>)}</dd></div>}
         <div><dt>Premium, before fees<By j={j} />{f.limitation === "package_total" && <small>one total; leg prices not entered</small>}</dt><dd className="mono">{usd(c.premium)}</dd></div>
-        <div><dt>Derive's fees{c.fees_basis === "entered" ? <You /> : TESTNET_FILLS && c.fees_basis === "exact" ? <By j={j} /> : <small>{c.fees_basis === "estimated" ? "not entered · estimated" : "not entered"}</small>}</dt>
-          <dd className="mono">{c.fees != null ? usd(c.fees) : nr}</dd></div>
-        <div className="q-lose"><dt>Total cost{c.fees_basis !== "entered" && c.fees_basis !== "exact" && <small>{c.fees_basis === "estimated" ? "with estimated fees" : "before fees"}</small>}</dt>
-          <dd className="mono">{usd(c.total ?? c.premium)} {f.currency && <small>{f.currency}</small>}</dd></div>
+        <div><dt>Derive's fees{c.fees_basis === "entered" ? <You /> : deriveReceipt ? <By j={j} /> : <small>{c.fees_basis === "estimated" ? "not entered · estimated" : "not entered"}</small>}</dt>
+          <dd className="mono">{c.fees != null ? usd(c.fees) : deriveReceipt ? <Missing text="Not available yet" label="Why no entry fees" why={feeWhy} /> : nr}</dd></div>
+        <div className="q-lose"><dt>Total cost{entryCostUnknown ? <small>Derive's fees unavailable</small> : c.fees_basis !== "entered" && c.fees_basis !== "exact" && <small>{c.fees_basis === "estimated" ? "with estimated fees" : "before fees"}</small>}</dt>
+          <dd className="mono">{entryCostUnknown ? <Missing text="Not available yet" label="Why no total entry cost" why={feeWhy} /> : usd(c.total ?? c.premium)} {f.currency && <small>{f.currency}</small>}</dd></div>
         <div><dt>Breakeven at settlement{c.breakeven_basis !== "exact" && c.breakeven != null && <small>estimated</small>}</dt>
-          <dd className="mono">{c.breakeven != null ? money(c.breakeven) : <Missing text="Not available yet" label="Why no breakeven"
-            why={f.complete ? "The cost is at or above the most the answer pays, so it has no breakeven." : "The package did not fully fill, so the answer has no breakeven."} />}</dd></div>
+          <dd className="mono">{!entryCostUnknown && c.breakeven != null ? money(c.breakeven) : <Missing text="Not available yet" label="Why no breakeven"
+            why={entryCostUnknown ? feeWhy : f.complete ? "The cost is at or above the most the answer pays, so it has no breakeven." : "The package did not fully fill, so the answer has no breakeven."} />}</dd></div>
         {e && <div><dt>Board estimate<small>from the Saloon's screen, not a fill</small></dt><dd className="mono">{usd(e.total)}{e.ts ? <small> · {when(e.ts)}</small> : null}</dd></div>}
         <div><dt>Derive's mark<Info label="About the mark">Derive's mark for the package from Cowboy's board: a valuation benchmark, separate from your fill prices and from the sell-back price.{m?.timing === "later" ? " Taken after your fill, or with no fill time entered." : ""}</Info></dt>
           <dd className="mono">{m ? <>{usd(m.value)}{m.ts ? <small> · {when(m.ts)}</small> : null}</> : <span className="q-noprice">Not available yet</span>}</dd></div>
@@ -158,6 +163,7 @@ const PART = {
   rounding: ["Rounding", "The parts are rounded to the cent; this line makes them add up to the result."],
 };
 const MISS = {
+  fill_pending: "Derive's trade records are still being checked.",
   split: "How what you paid splits into premium and fees: saved before Cowboy kept entry records.",
   premium: "The premium you paid, before fees.",
   entry_fees: "Derive's fees at entry: not entered and not estimable.",
@@ -173,25 +179,26 @@ const BASIS = { entered: "Entered by you", estimated: "Estimated", exact: "Exact
 
 /** One realized portion: the amounts, each with how it is known, then the breakdown against
  * Derive's mark that adds up to the result, or what is missing for one. */
-function Portion({ x, und }) {
-  const head = x.kind === "settle"
+function Portion({ x, und, deriveReceipt = false }) {
+  const checkingSettlement = x.kind === "settle" && x.missing.includes("fill_pending");
+  const head = checkingSettlement ? <>Settlement records still being checked</> : x.kind === "settle"
     ? <>Settled at {money(x.settle_price)}<small className="mono">{amountTextQ(x.qty)} contracts</small></>
     : <>Sold back {amountTextQ(x.qty)} contracts<small className="mono">{when(x.ts) ? `${when(x.ts)} · ${TESTNET_FILLS && x.basis.exit === "exact" ? "from Derive" : "entered by you"}` : "time not entered"}</small></>;
   const rows = breakdownRows(x);
   const row = (label, sub, v, cls = "") => (
     <div className={cls}><dt>{label}{sub && <small>{sub}</small>}</dt><dd className="mono">{v}</dd></div>
   );
-  const nr = <span className="q-noprice">Not entered</span>;
+  const nr = <span className="q-noprice">{deriveReceipt ? "Not available yet" : "Not entered"}</span>;
   return (
     <div className="q-real-p">
       <h4>{head}</h4>
       <dl className="q-figs">
         {x.entry.premium != null
-          ? row("Premium paid", TESTNET_FILLS && x.basis.entry_fees === "exact" ? "From Derive" : BASIS.entered, usd(x.entry.premium))
-          : row("Paid, fees included", BASIS.entered, x.entry.total != null ? usd(x.entry.total) : nr)}
-        {x.entry.premium != null && row("Entry fees", BASIS[x.basis.entry_fees] || "", x.entry.fees != null ? usd(x.entry.fees) : nr)}
+          ? row("Premium paid", deriveReceipt ? "From Derive" : BASIS.entered, usd(x.entry.premium))
+          : row("Paid, fees included", deriveReceipt ? "From Derive" : BASIS.entered, x.entry.total != null ? usd(x.entry.total) : nr)}
+        {x.entry.premium != null && row("Entry fees", deriveReceipt && x.basis.entry_fees === "unknown" ? "Derive's fee records unavailable" : BASIS[x.basis.entry_fees] || "", x.entry.fees != null ? usd(x.entry.fees) : nr)}
         {x.kind === "settle"
-          ? row("Settlement payout", `Exact, from Derive's settlement price for ${und}`, usd(x.exit.gross))
+          ? row("Settlement payout", checkingSettlement ? MISS.fill_pending : `Exact, from Derive's settlement price for ${und}`, x.exit.gross != null ? usd(x.exit.gross) : <span className="q-noprice">Not available yet</span>)
           : x.exit.gross != null ? row("Sell-back proceeds, before fees", BASIS[x.basis.exit], usd(x.exit.gross))
             : row("Got back, after fees", BASIS.entered, x.exit.net != null ? usd(x.exit.net) : nr)}
         {x.kind === "settle" ? row("Exit fees", "Derive's fee schedule lists no settlement fee", usd(0))
@@ -205,7 +212,7 @@ function Portion({ x, und }) {
       ) : (
         <>
           <p className="q-note">Not available yet: the split against Derive's mark needs<Info label="Why no breakdown">Cowboy does not invent the missing pieces; the result above uses only what is known.</Info></p>
-          <ul className="q-real-miss">{x.missing.map((k) => <li key={k}>{MISS[k]}</li>)}</ul>
+          <ul className="q-real-miss">{x.missing.map((k) => <li key={k}>{deriveReceipt && k === "entry_fees" ? DERIVE_ENTRY_FEES : MISS[k]}</li>)}</ul>
         </>
       )}
     </div>
@@ -220,7 +227,7 @@ function Realized({ p, und }) {
   return (
     <details className="q-real">
       <summary>Where the result came from</summary>
-      {r.portions.map((x, i) => <Portion key={i} x={x} und={und} />)}
+      {r.portions.map((x, i) => <Portion key={i} x={x} und={und} deriveReceipt={TESTNET_FILLS && p.journal?.source === "derive"} />)}
       {r.open > 0 && <p className="q-note">{amountTextQ(r.open)} contracts are still open and not counted here.</p>}
     </details>
   );
@@ -263,7 +270,7 @@ function SyncLine({ s }) {
   );
 }
 
-function Card({ p, onRemove, onClose, sync = null }) {
+function Card({ p, onRemove, onClose, sync = null, scope = null }) {
   const q = parseId(p.id);
   const { data: board } = useData(q ? `questions/${q.und}.json` : null);
   const { data: markets } = useData("markets.json");
@@ -279,12 +286,22 @@ function Card({ p, onRemove, onClose, sync = null }) {
   const settling = (!after && now >= settleTs - 1800) || (after && settle == null);
   const half = partial(p);
   const oneTap = TESTNET_FILLS && p.exec === "rfq";
+  const pendingReceipt = oneTap && incompleteReceipt(p);
+  const pendingEntry = oneTap && incompleteEntryReceipt(p);
+  const entryFeesUnknown = oneTap && !Number.isFinite(p.journal?.cost?.fees);
+  const feeWhy = DERIVE_ENTRY_FEES;
+  const ownAccount = !!p.wallet && p.subaccount_id != null && p.subaccount_id === scope?.subaccountId
+    && String(p.wallet).toLowerCase() === String(scope?.wallet || "").toLowerCase();
+  // With no wallet connected, Close opens the panel's connect step (the panel itself refuses another
+  // wallet's or account's position); once connected, only this wallet's account sells back.
+  const canSell = oneTap && !half && (ownAccount || !scope?.wallet);
+  useEffect(() => { if (!canSell && oneTap) setClosing(false); }, [canSell, oneTap]);
   const op = after || p.closed_at ? p : openPart(p);
   const t = found && !found.settled && !paused && !settling && !half && !p.closed_at
     ? closeTicket(found.level, p.side, op.contracts, board, p.legs) : null;
   const f = positionFigures(op, { found: paused ? null : found, settlePrice: settle, close: t, index: board?.index });
   const real = realized(p);
-  const settleExit = real.portions.find((x) => x.kind === "settle");
+  const settleExit = pendingReceipt ? null : real.portions.find((x) => x.kind === "settle");
   const sold = (sale) => {
     const lv = found?.level;
     const fair = lv && Number.isFinite(lv.fair) ? (p.side === "yes" ? lv.fair : 1 - lv.fair) : null;
@@ -298,7 +315,9 @@ function Card({ p, onRemove, onClose, sync = null }) {
     : f.otherLegs ? "Cowboy now builds this answer from other options than the ones you hold, so it has no sell-back price for yours. Sell back on Derive at its screen price."
       : settling ? "This date is settling: Derive averages the index from 07:30 to 08:00 UTC, and selling back has stopped."
         : noPriceReason(found.level, p.side, false);
-  const partWhy = "Cowboy prices the full answer only. With one option filled you hold that option alone; check it on Derive.";
+  const partWhy = pendingReceipt
+    ? "Derive's trade records are still being checked. Values and settlement need a complete fill."
+    : "Cowboy prices the full answer only. With one option filled you hold that option alone; check it on Derive.";
   const usdOr = (v) => (v == null ? null : usd(v));
   const pl = (v) => (v == null ? null : <span className={tone(v)}>{signed(v)}</span>);
   const na = (why, label) => <Missing text="Not available yet" label={label} why={why} />;
@@ -321,11 +340,18 @@ function Card({ p, onRemove, onClose, sync = null }) {
           : "You placed the orders on Derive yourself and told Cowboy what you paid. Cowboy cannot see your Derive account, so these figures are only as good as what you entered."}</Info>
       </p>
       <dl className="q-figs grid q-position-figures">
-        <Fig label="You paid" sub={p.journal?.cost?.fees_basis === "estimated" ? "estimated fees included" : p.journal?.cost?.fees_basis === "unknown" ? "fees not entered" : op !== p ? `fees included, for the ${amountTextQ(op.contracts)} still open` : "fees included"} value={usd(op.paid)} />
-        {f.closed || p.closed_at ? (
+        <Fig label="You paid" sub={pendingEntry ? "Derive's records still being checked" : entryFeesUnknown ? "Derive's fees unavailable" : p.journal?.cost?.fees_basis === "estimated" ? "estimated fees included" : p.journal?.cost?.fees_basis === "unknown" ? "fees not entered" : op !== p ? `fees included, for the ${amountTextQ(op.contracts)} still open` : "fees included"}
+          value={pendingEntry ? null : usdOr(f.paid)} missing={na(pendingEntry ? partWhy : entryFeesUnknown ? feeWhy : "The total entry cost was not recorded.", "Why no entry cost")} />
+        {pendingReceipt ? (
+          <>
+            <Fig label="Value now" missing={na(partWhy, "Why no value")} />
+            <Fig label="Profit / loss now" missing={na(partWhy, "Why no result")} />
+            <Fig label="Most it pays" missing={na(partWhy, "Why no payout")} />
+          </>
+        ) : f.closed || p.closed_at ? (
           <>
             <Fig label="Got back" sub="after fees" value={usdOr(real.portions.length ? sumNets(real) : f.got)} missing={na("Only part of what came back was entered.", "Why no amount")} />
-            <Fig label="Realized P/L" value={pl(real.portions.length ? real.net : f.pl)} className="q-pl" missing={na("A part of the result was not entered; see Where the result came from.", "Why no result")} />
+            <Fig label="Realized P/L" value={pl(real.portions.length ? real.net : f.pl)} className="q-pl" missing={na(entryFeesUnknown ? feeWhy : "A part of the result was not entered; see Where the result came from.", "Why no result")} />
           </>
         ) : f.settled || (after && settleExit) ? (
           <>
@@ -333,7 +359,7 @@ function Card({ p, onRemove, onClose, sync = null }) {
               ? <Fig label="Got back" sub="sold back in part, the rest settled, after fees" value={usdOr(sumNets(real))} missing={na("Only part of what came back was entered.", "Why no amount")} />
               : <Fig label="Got" sub={f.per != null ? `${cents(Math.round(f.per * 100))} per $1` : "at settlement"}
                 value={usdOr(settleExit ? settleExit.exit.gross : f.got)} missing={na(partWhy, "Why no amount")} />}
-            <Fig label="Realized P/L" value={pl(settleExit ? real.net : f.pl)} className="q-pl" missing={na("A part of the result was not entered; see Where the result came from.", "Why no result")} />
+            <Fig label="Realized P/L" value={pl(settleExit ? real.net : f.pl)} className="q-pl" missing={na(entryFeesUnknown ? feeWhy : "A part of the result was not entered; see Where the result came from.", "Why no result")} />
           </>
         ) : (
           <>
@@ -341,7 +367,7 @@ function Card({ p, onRemove, onClose, sync = null }) {
               info={f.mark != null && f.valueNow != null && <Info label="At Derive's mark">At Derive's mark: {usd(f.mark)}. Value now is Derive's sell-back price on its screen minus Derive's fees to sell back, about {usd(f.fees)}.</Info>}
               value={usdOr(f.valueNow)} missing={half ? na(partWhy, "Why no value") : noPrice} />
             <Fig label="Profit / loss now" sub="if sold back now" value={pl(f.plNow)} className="q-pl"
-              missing={half ? na("With only one option filled there is no result for the answer.", "Why no result") : na("There is a result once Derive shows a sell-back price, or at settlement.", "Why no result")} />
+              missing={entryFeesUnknown ? na(feeWhy, "Why no result") : half ? na("With only one option filled there is no result for the answer.", "Why no result") : na("There is a result once Derive shows a sell-back price, or at settlement.", "Why no result")} />
             <Fig label="Most it pays" sub="at settlement" value={usdOr(f.maxPayout)} missing={na(partWhy, "Why no payout")} />
           </>
         )}
@@ -349,7 +375,7 @@ function Card({ p, onRemove, onClose, sync = null }) {
           value={f.closed ? new Date(p.closed_at * 1000).toISOString().slice(0, 10) : q ? `${dayLabel(q.expiry)}, 08:00 UTC` : null}
           sub={!f.closed && !f.settled && !settling ? countdown(settleTs, now) : settling && !f.settled ? "settling now" : null} missing={na("No date saved.", "Why no date")} />
       </dl>
-      {oneTap && sync && <SyncLine s={sync} />}
+      {oneTap && sync && !pendingReceipt && <SyncLine s={sync} />}
       {real.portions.length > 0 && real.open > 0 && !after && (
         <p className="q-note q-position-realized">Realized so far: <b className={`mono ${tone(real.net ?? 0)}`}>{real.net != null ? signed(real.net) : "Not available yet"}</b> on {amountTextQ(p.contracts - real.open)} contracts sold back; the figures above are for the {amountTextQ(real.open)} still open.</p>
       )}
@@ -360,7 +386,7 @@ function Card({ p, onRemove, onClose, sync = null }) {
             {!f.closed && !f.settled && !p.closed_at && !(after && settleExit) && <dl className="q-figs grid q-position-extra">
               <Fig label="At 08:00 UTC, today's price" sub={f.expiryNow != null ? `pays ${usd(f.expiryNow)}` : null} value={pl(f.plExpiryNow)}
                 info={<Info label="About the payout at today's price">What the answer pays if {q?.und} settles at today's price, {money(board?.index)}, and the profit or loss after what you paid. Not a view of where it settles.</Info>}
-                missing={na(half ? partWhy : "Cowboy needs today's price from the board to show this.", "Why no payout at today's price")} />
+                missing={na(entryFeesUnknown ? feeWhy : half ? partWhy : "Cowboy needs today's price from the board to show this.", "Why no payout at today's price")} />
             </dl>}
             {q && !half && <PayZone lo={q.lo} hi={q.hi} side={p.side} index={settle ?? board?.index} compact />}
             <SinceStrip p={p} markets={markets} now={now} />
@@ -372,9 +398,9 @@ function Card({ p, onRemove, onClose, sync = null }) {
             </div>
           </div>
         </details>
-        {(oneTap ? !after && !settling && !p.closed_at && real.open > 0 : !!t) && <button className="btn q-position-close" onClick={() => setClosing((s) => !s)} aria-expanded={closing}>{closing ? "Keep it open" : "Close"}</button>}
+        {(oneTap ? canSell && !after && !settling && !p.closed_at && real.open > 0 : !!t) && <button className="btn q-position-close" onClick={() => setClosing((s) => !s)} aria-expanded={closing}>{closing ? "Keep it open" : "Close"}</button>}
       </div>
-      {closing && oneTap && (
+      {closing && canSell && (
         <Suspense fallback={null}>
           <OneTap und={q.und} question={question} answer={name} level={found?.level ?? null} sideKey={p.side} board={board}
             sell={{ position: p, paused, onExit: (exit) => { setClosing(false); onClose(p.key, exit); } }} />
@@ -396,9 +422,10 @@ export default function MyQuestions() {
   const setList = (l) => setListRaw(prune(l));
   const other = loadPositions(NET === "testnet" ? "mainnet" : "testnet").length;
   const [sync, setSync] = useState(null);
+  const [scope, setScope] = useState(null);
   // Testnet: with a wallet connected, its own one-tap records (and those naming no wallet); other
   // wallets' records stay saved and in Export.
-  const list = useMemo(() => forWallet(stored, sync?.wallet), [stored, sync?.wallet]);
+  const list = useMemo(() => forWallet(stored, scope?.wallet), [stored, scope?.wallet]);
   const [params, setParams] = useSearchParams();
   const tab = ["open", "closed", "following"].includes(params.get("tab")) ? params.get("tab") : "open";
   const setTab = (t) => setParams(t === "open" ? {} : { tab: t }, { replace: true });
@@ -408,10 +435,12 @@ export default function MyQuestions() {
   const settleOf = (p) => p.settle_ts || 0;
   const done = (p) => !!p.closed_at || now >= settleOf(p);
   const openCount = list.filter((p) => !done(p)).length;
-  const incompleteCount = list.filter((p) => !p.closed_at && partial(p)).length;
+  const incompleteCount = list.filter((p) => !p.closed_at && partial(p) && !incompleteReceipt(p)).length;
   const rows = useMemo(() => list.filter((p) => (tab === "open" ? !done(p) : done(p)))
     .sort((a, b) => settleOf(a) - settleOf(b)), [list, tab, now]);
-  const groups = useMemo(() => exposureGroups(list, now), [list]);
+  const pendingReceipts = list.filter(incompleteReceipt);
+  const unknownFeeEntries = list.filter((p) => p.exec === "rfq" && !done(p) && !incompleteReceipt(p) && !Number.isFinite(p.journal?.cost?.total));
+  const groups = useMemo(() => exposureGroups(list.filter((p) => !incompleteReceipt(p)), now), [list, now]);
   const summary = realizedSummary(list);
   const toSettle = list.filter((p) => !p.closed_at && settleOf(p) && now >= settleOf(p) && remainingQty(p) > 0 && !(p.exits || []).some((e) => e.kind === "settle"));
   const download = () => {
@@ -455,11 +484,14 @@ export default function MyQuestions() {
         <Tabs label="Positions" value={tab} onChange={setTab} items={[["open", "Open"], ["closed", "Closed"], ["following", "Following"]]} />
       </header>
       {NET === "mainnet" && toSettle.map((p) => <SettleWatch key={p.key} p={p} onSettle={(k, price) => setList(settlePosition(k, price))} />)}
-      {TESTNET_FILLS && <Suspense fallback={null}><DeriveSync onSynced={(r) => { setList(r.list); setSync(r); }} /></Suspense>}
+      {TESTNET_FILLS && <Suspense fallback={null}><DeriveSync onScope={(s) => { setScope(s); setSync(null); }}
+        onSynced={(r) => { setList(r.list); setSync(r); }} /></Suspense>}
       {tab === "following" ? <Suspense fallback={null}><Board followingOnly embedded /></Suspense> : <>
       {tab === "open" && <Exposure groups={groups} />}
+      {tab === "open" && pendingReceipts.length > 0 && <p className="q-note">Derive's trade records are still being checked. These positions are left out of the combined settlement figures.</p>}
+      {tab === "open" && unknownFeeEntries.length > 0 && <p className="q-note">Derive's entry fees are not available yet. These positions are left out of the combined settlement figures.</p>}
       {TESTNET_FILLS && tab === "open" && sync?.extra && <Suspense fallback={null}><AlsoOnDerive extra={sync.extra} /></Suspense>}
-      {rows.length ? rows.map((p) => <Card key={p.key} p={p} sync={sync?.statuses?.[p.key] ?? null} onRemove={(k) => setList(removePosition(k, NET))}
+      {rows.length ? rows.map((p) => <Card key={p.key} p={p} scope={scope} sync={sync?.statuses?.[p.key] ?? null} onRemove={(k) => setList(removePosition(k, NET))}
         onClose={(k, got) => setList(closePosition(k, got, Date.now() / 1000, NET))} />)
         : list.length ? (
           <section className="q-empty-card q-empty-tab" aria-label={tab === "open" ? "Nothing open" : "Nothing closed"}>

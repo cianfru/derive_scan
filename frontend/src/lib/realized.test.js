@@ -106,6 +106,52 @@ describe("J2: realized P/L and its parts", () => {
     expect(x.missing).toContain("mark_partial");
     expect(x.net).toBeCloseTo(280 - 92, 9);
   });
+
+  it("withholds an incomplete one-tap entry's result until its receipt is complete", () => {
+    const p = base({ exec: "rfq", journal: { ...base().journal,
+      fill: { ...base().journal.fill, complete: false },
+      cost: { premium: -0.26, fees: 0, fees_basis: "exact", total: -0.26 },
+    } });
+    const exit = settleEvent({ qty: p.contracts, settleTs: S9, savedTs: S9 + 60, settlePrice: 86000, payout: 120 });
+    const pending = realizedPortion(p, exit);
+    expect(pending.net).toBeNull();
+    expect(pending.parts).toBeNull();
+    expect(pending.entry.total).toBeNull();
+    expect(pending.exit).toMatchObject({ gross: null, net: null });
+    expect(pending.missing).toEqual(["fill_pending"]);
+    expect(realizedSummary([{ ...p, exits: [exit] }])).toMatchObject({ total: 0, unknown: 1, wins: 0, losses: 0 });
+
+    const legacy = { ...p, journal: { ...p.journal, fill: { ...p.journal.fill, complete: true, legs: [p.journal.fill.legs[0]] } } };
+    expect(realizedPortion(legacy, exit).net).toBeNull();
+    expect(realizedPortion(legacy, exit).missing).toEqual(["fill_pending"]);
+
+    const verified = base({ exec: "rfq", journal: { ...base().journal, fill: { ...base().journal.fill, complete: true } } });
+    expect(realizedPortion(verified, exit).net).toBeCloseTo(28, 9);
+  });
+
+  it("withholds a one-tap exit's result while its receipt is incomplete", () => {
+    const exit = { ...closeEvent({ qty: 0.04, ts: SELL, savedTs: SELL, gross: 120, fees: 2, feesKnown: true }), complete: false };
+    const x = realizedPortion(base({ exec: "rfq" }), exit);
+    expect(x.net).toBeNull();
+    expect(x.exit).toMatchObject({ gross: null, fees: null, net: null });
+    expect(x.parts).toBeNull();
+    expect(x.missing).toEqual(["fill_pending"]);
+    expect(realizedPortion(base({ exec: "rfq" }), { ...exit, complete: true }).net).toBeCloseTo(26, 9);
+  });
+
+  it("withholds a saved settlement while a pending historical close changes its remaining quantity", () => {
+    const closed = closeEvent({ qty: 0.01, ts: SELL, savedTs: SELL, gross: 30, fees: 1, feesKnown: true });
+    const pending = { ...closed, qty: 0, receipt_qty: 0.01, via: "rfq", complete: false };
+    const settlement = settleEvent({ qty: 0.03, settleTs: S9, savedTs: S9 + 60, settlePrice: 86000, payout: 90 });
+    const p = base({ exec: "rfq", exits: [closed, pending, settlement] });
+    const result = realized(p);
+    expect(result.portions[0].net).toBeCloseTo(6, 9);
+    expect(result.portions[1].net).toBeNull();
+    expect(result.portions[2].net).toBeNull();
+    expect(result.portions[2].exit.gross).toBeNull();
+    expect(result.portions[2].missing).toEqual(["fill_pending"]);
+    expect(realizedSummary([p])).toMatchObject({ total: 6, unknown: 2, wins: 1 });
+  });
 });
 
 describe("J2: partial closes, the summary and the store", () => {

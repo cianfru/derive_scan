@@ -33,7 +33,11 @@ export function echoMatches(res, grant) {
 }
 
 export const loadKey = (wallet) => read(KEYS.key(wallet));
-export const clearKey = (wallet) => remove(KEYS.key(wallet));
+/** A delayed retirement can delete only its own key, never a replacement approval. */
+export function clearKey(wallet, address = null) {
+  if (address && loadKey(wallet)?.address?.toLowerCase() !== address.toLowerCase()) return;
+  remove(KEYS.key(wallet));
+}
 /** The browser's key, usable while it has more than a minute left. */
 export function usableKey(wallet, now = nowSec()) {
   const k = loadKey(wallet);
@@ -45,15 +49,19 @@ export const keySigner = (stored) => keyFromSecret(stored.secret);
  * Approve Cowboy: make a key, have the wallet sign the grant (after the plain-English panel), send it
  * to Derive and keep the key only if Derive echoes exactly that grant.
  */
-export async function approveCowboy({ client, provider, owner, subaccountId, now = nowSec(), newKey = makeKey, chainId = NETWORK.chainId }) {
+export async function approveCowboy({ client, provider, owner, subaccountId, now = nowSec(), newKey = makeKey, chainId = NETWORK.chainId, assertActive = () => {} }) {
+  assertActive();
   const grant = grantFor(subaccountId, now);
   assertGrant(grant, now);
   const key = newKey();
   const built = buildSetSessionKey({ owner, sessionKey: key.address, grant, nonce: randomNonce(now * 1000), signatureExpirySec: now + 600, chainId });
   const signature = await signTypedData(provider, owner, built.typedData);
-  const res = await client.call("private/set_session_key", built.params(signature), { safe: false });
+  assertActive();
+  const res = await client.call("private/set_session_key", built.params(signature), { safe: false, assertActive });
+  assertActive();
   if (!echoMatches(res, grant)) {
-    await retire({ client, provider, owner, address: key.address, grant, now }).catch(() => {});
+    await retire({ client, provider, owner, address: key.address, grant, now, assertActive }).catch(() => {});
+    assertActive();
     throw Object.assign(new Error("Derive registered a different grant"), { code: "grant_mismatch" });
   }
   const stored = { address: key.address, secret: key.privateKey, wallet: owner, subaccount_id: subaccountId, expiry_sec: res.expiry_sec || grant.expiry_sec, network: NETWORK.name };
@@ -61,11 +69,15 @@ export async function approveCowboy({ client, provider, owner, subaccountId, now
   return stored;
 }
 
-async function retire({ client, provider, owner, address, grant, now }) {
+async function retire({ client, provider, owner, address, grant, now, assertActive = () => {} }) {
+  assertActive();
   const near = { ...grant, expiry_sec: now + SWITCH_OFF_SEC };
   const built = buildSetSessionKey({ owner, sessionKey: address, grant: near, nonce: randomNonce(now * 1000 + 1), signatureExpirySec: now + 600, chainId: NETWORK.chainId });
   const signature = await signTypedData(provider, owner, built.typedData);
-  return client.call("private/set_session_key", built.params(signature), { safe: false });
+  assertActive();
+  const result = await client.call("private/set_session_key", built.params(signature), { safe: false, assertActive });
+  assertActive();
+  return result;
 }
 
 /** Derive's list of this wallet's keys; Cowboy's own is the one labelled "Cowboy Saloon" at the stored address. */
@@ -81,11 +93,13 @@ export function findOnDerive(keys, stored) {
  * Switch off: set the same key again with an expiry just past Derive's 5-minute minimum, and delete
  * the browser's copy whatever Derive answers. Needs an owner login on `client`.
  */
-export async function switchOff({ client, provider, owner, stored, now = nowSec() }) {
+export async function switchOff({ client, provider, owner, stored, now = nowSec(), assertActive = () => {} }) {
   try {
+    assertActive();
     const grant = { ...grantFor(stored.subaccount_id, now), subaccount_ids: [stored.subaccount_id] };
-    return await retire({ client, provider, owner, address: stored.address, grant, now });
+    return await retire({ client, provider, owner, address: stored.address, grant, now, assertActive });
   } finally {
-    clearKey(owner);
+    assertActive();
+    clearKey(owner, stored.address);
   }
 }

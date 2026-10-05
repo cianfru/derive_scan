@@ -54,6 +54,7 @@ export async function connectWallet(provider, { chainId = NETWORK.chainId, net =
   try {
     code = await provider.request({ method: "eth_getCode", params: [address, "latest"] });
   } catch (e) {
+    if (e?.name === "AbortError") throw e;
     try { console.warn("[Cowboy] check wallet type failed; taken as an ordinary wallet", e); } catch { /* no console */ }
   }
   if (code && code !== "0x") throw new WalletError("contract_wallet", "contract wallet", null, "check wallet type");
