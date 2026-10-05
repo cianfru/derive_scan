@@ -3,13 +3,13 @@ import { useEffect } from "react";
 import { useOutletContext, useParams, useLocation } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { price, chg, pct, usd, title, utc, dayTime, strike, DASH } from "../lib/format.js";
-import { Plate, Loading, Failed, Lead } from "../components/ui.jsx";
+import { Arrow, Plate, Loading, Failed, Lead } from "../components/ui.jsx";
 import { coinLead } from "../lib/takeaway.js";
 import CandleChart from "../components/CandleChart.jsx";
-import { Asset } from "../components/MarketVisuals.jsx";
+import { CoinIcon } from "../components/MarketVisuals.jsx";
 import EngineComparison from "../components/EngineComparison.jsx";
 import OptionsWorkspace from "../components/OptionsWorkspace.jsx";
-import Chain, { LayerIcon, chainReadings } from "../components/Chain.jsx";
+import { LAYERS, LayerIcon, LayerTile, chainAgreed } from "../components/Chain.jsx";
 import CoinWallets from "../components/CoinWallets.jsx";
 import MetricHistory from "../components/MetricHistory.jsx";
 import { currentEngine } from "../lib/research.js";
@@ -18,6 +18,8 @@ import { RegimeHeader, Readings, Checks } from "../components/RegimePanel.jsx";
 import { Link } from "react-router-dom";
 import { QUESTIONS_ON } from "../lib/flags.js";
 import { HatMark } from "../components/Brand.jsx";
+import { ASSET_NAMES } from "../lib/presentation.js";
+import "../coin-detail.css";
 
 // The chart shows the priced range for the next 30 days only, so candles keep most of the width.
 const CONE_DAYS = 30;
@@ -54,35 +56,36 @@ function chartInfo(opts, backfilled) {
 
 function Step({ id, n, kind, title, right, children }) {
   return (
-    <section id={id} className="step">
-      <div className="step-head">
+    <section id={id} className="step cd-section" aria-labelledby={`${id}-heading`}>
+      <div className="step-head cd-section-heading">
         <span className="num">0{n}</span>
         <span className="ico"><LayerIcon kind={kind} size={20} /></span>
-        <h2>{title}</h2>
+        <h2 id={`${id}-heading`}>{title}</h2>
         {right && <span className="step-right">{right}</span>}
       </div>
-      {children}
+      <div className="cd-section-body">{children}</div>
     </section>
   );
 }
 
-/** The three layers in one compact row: one row when both horizons read the same, otherwise 7D and 30D side by side. */
-function JourneyStrip({ alignment }) {
+/** Both windows keep their engine cadence visible, even when their current readings match. */
+function JourneyStrip({ alignment, und }) {
   if (!alignment) return null;
-  const [r7, r30] = ["7d", "30d"].map((h) => chainReadings(alignment, h));
-  const same = r7.every((x, i) => x.text === r30[i].text && x.state === r30[i].state);
-  const rows = same ? [["7D · 30D", "30d"]] : [["7D", "7d"], ["30D", "30d"]];
   return (
-    <nav className={`journey-strip${same ? " single" : ""}`} aria-label="Three layers">
-      {rows.map(([label, h]) => {
-        const r = h === "7d" ? r7 : r30;
-        const agreed = r[0].state && r[0].state !== "neutral" && r.every((x) => x.state === r[0].state);
+    <nav className="journey-strip cd-overview" aria-label="Three layers">
+      <div className="cd-overview-head">
+        <span>Window</span>
+        {LAYERS.map(([kind, name, anchor]) => <Link key={kind} className="cd-layer-link" to={`/coin/${und}#${anchor}`}><LayerIcon kind={kind} size={15} />{name}<Arrow /></Link>)}
+      </div>
+      {["7d", "30d"].map((h) => {
+        const agreed = chainAgreed(alignment, h);
         return (
-          <div key={h} className={`journey-row${agreed ? " agreed" : ""}`}>
-            <span className="mono">{label}</span>
-            <Chain alignment={alignment} horizon={h} compact />
+          <div key={h} className={`journey-row cd-overview-row${agreed ? " agreed" : ""}`}>
+            <div className="cd-window"><span>{h === "7d" ? "7 days" : "30 days"}</span><small>{h === "7d" ? "4H engine" : "1D engine"}</small>{agreed && <small className="cd-agreement">All agree</small>}</div>
+            {LAYERS.map(([kind]) => <LayerTile key={kind} alignment={alignment} horizon={h} kind={kind} sub="detail" icon={false} />)}
           </div>);
       })}
+      <div className="cd-overview-footer"><span>Context, not a signal</span><Link to={`/coin/${und}#metric-history`}>Explore history<Arrow /></Link></div>
     </nav>
   );
 }
@@ -108,7 +111,7 @@ export function SaloonCta({ und, live }) {
     <Link className="saloon-cta" to={`/saloon/${und}`}>
       <HatMark size={22} />
       <span><b>{und} in the Saloon</b><small>Higher or lower on {und}'s price, priced from Derive options</small></span>
-      <span className="saloon-cta-go" aria-hidden="true">→</span>
+      <span className="saloon-cta-go" aria-hidden="true"><Arrow /></span>
     </Link>
   );
 }
@@ -139,16 +142,21 @@ export default function Coin() {
   const closed = row?.signal_bar_close_time ?? (last ? last[0] + 86400 : null);
   const history = <MetricHistory key={und} history={data.history} collapsible />;
   return (
-    <div className="wrap page coin-page">
+    <div className="wrap page coin-page coin-detail">
       <RefreshNotice error={error} />
       <header className="coin-heading">
-        <h1><Asset und={und} compact /></h1>
-        <span className="coin-price mono">{price(last?.[4])}</span>
-        <span className={`coin-chg mono ${dayChg > 0 ? "up" : dayChg < 0 ? "down" : "dim"}`}>{chg(dayChg)}</span>
-        {closed && <span className="coin-stamp mono">Closed {dayTime(closed)}</span>}
+        <div className="cd-identity">
+          <Link className="cd-back" to="/markets"><Arrow />Markets</Link>
+          <div className="cd-title"><CoinIcon und={und} /><h1>{ASSET_NAMES[und] || und}</h1><span className="cd-symbol">{und}</span></div>
+        </div>
+        <div className="cd-price-block">
+          <span className="cd-price-label">Daily index close</span>
+          <div className="cd-price-line"><span className="coin-price mono">{last?.[4] != null ? `$${price(last[4])}` : DASH}</span><span className={`coin-chg mono ${dayChg > 0 ? "up" : dayChg < 0 ? "down" : "dim"}`}>{chg(dayChg)}</span></div>
+          {closed && <time className="coin-stamp mono" dateTime={new Date(closed * 1000).toISOString()}>Closed {dayTime(closed)}</time>}
+        </div>
       </header>
       <Lead lead={coinLead(und, data)} />
-      <JourneyStrip alignment={data.alignment} />
+      <JourneyStrip alignment={data.alignment} und={und} />
       <SaloonCta und={und} live={data.questions === true} />
 
       <Step id="regime" n={1} kind="engine" title="Regime">
@@ -178,7 +186,7 @@ export default function Coin() {
             <CoinWallets und={und} alignment={data.alignment} />
           </Step>
           <Step id="options" n={3} kind="options" title="Options"
-            right={<span className="step-stamp mono">{dayTime(data.options.ts)}</span>}>
+            right={<span className="step-stamp mono">Snapshot {dayTime(data.options.ts)}</span>}>
             <OptionsWorkspace key={und} opts={data.options} und={und} flow={data.taker_flow} hasSurface={data.has_surface === true} embedded />
           </Step>
         </>
