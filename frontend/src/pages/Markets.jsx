@@ -3,13 +3,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { price, chg, pct, usd, z, title, dayTime, clock, SIGNAL_RANK, REGIME } from "../lib/format.js";
 import { openMarketRow } from "../lib/explain.js";
-import { Signal, Tabs, Loading, Failed, Info, PageHead, Empty, Lead } from "../components/ui.jsx";
+import { Tabs, Loading, Failed, Info, PageHead, Empty, Lead } from "../components/ui.jsx";
 import { marketsLead } from "../lib/takeaway.js";
 import { Asset, MarketTrace } from "../components/MarketVisuals.jsx";
 import { EnginePair, Convergence, CONVERGENCE_HELP } from "../components/EngineComparison.jsx";
 import { currentEngine } from "../lib/research.js";
 import StructureBand, { isSignal } from "../components/StructureBand.jsx";
-import { ChainMini, ChainLegend, chainReadings } from "../components/Chain.jsx";
+import { ChainLegend, LayerIcon, LayerTile, chainAgreed, chainReadings } from "../components/Chain.jsx";
 
 const SCOPE = { options: "options markets", entries: "daily entries", perps: "perps only" };
 const inView = (c, view) => (view === "perps" ? !c.has_options : c.has_options) && (view !== "entries" || (SIGNAL_RANK[c.signal_1d] ?? 0) >= 3);
@@ -24,7 +24,7 @@ function agreement(c, horizon) {
   return states.slice(1).reduce((n, s) => n + (s === dir ? 1 : s && s !== "neutral" ? -1 : 0), 0);
 }
 
-const BOARD_HELP = "Each market is read in three steps, always in this order: 1 Regime (the daily engine), 2 Wallets (what Derive's best options traders hold on expiries in the window), 3 Options (what option prices lean towards). A framed chain means all three point the same way: context side by side, not a combined signal. Price is the latest options index where available; the daily change compares the two latest completed UTC days.";
+const BOARD_HELP = "Each market is read in three steps, always in this order: 1 Regime (the daily engine), 2 Wallets (what Derive's best options traders hold on expiries in the window), 3 Options (what option prices lean towards). Wallets and Options are shown for the next 7 and 30 days; an orange frame means all three point the same way for that window: context side by side, not a combined signal. Hover any tile for what it reads. Price is the latest options index where available; the daily change compares the two latest completed UTC days.";
 
 export default function Markets() {
   const { data, error } = useData("markets.json");
@@ -90,22 +90,22 @@ export default function Markets() {
             </label>
           </div>
           {overview && rows.length > 0 && <div className="board-mini-key"><ChainLegend /></div>}
-          {overview && rows.length > 0 && <div className="board-mini-head" aria-hidden="true"><span /><span>7D</span><span>30D</span></div>}
+          {overview && rows.length > 0 && <div className="board-mini-head" aria-hidden="true"><span><LayerIcon kind="wallets" size={13} />Wallets <small>7D · 30D</small></span><span><LayerIcon kind="options" size={13} />Options <small>7D · 30D</small></span></div>}
           <div className={overview ? "board-rows" : "table-wrap"}>
             <table className={`grid market-grid${overview ? " overview" : ""}`}>
               {overview && (
-                <colgroup><col style={{ width: "22%" }} /><col className="hide-md" style={{ width: "16%" }} /><col style={{ width: "18%" }} /><col style={{ width: "22%" }} /><col style={{ width: "22%" }} /></colgroup>)}
+                <colgroup><col style={{ width: "17%" }} /><col className="hide-md" style={{ width: "15%" }} /><col style={{ width: "22%" }} /><col style={{ width: "23%" }} /><col style={{ width: "23%" }} /></colgroup>)}
               <thead>
                 {overview && (
-                  <tr className="legend-row"><th /><th className="hide-md" /><th /><th colSpan={2} className="legend-th"><ChainLegend /></th></tr>)}
+                  <tr className="layer-head-row"><th /><th className="hide-md" /><th className="layer-th">Regime</th><th className="layer-th">Wallets</th><th className="layer-th">Options</th></tr>)}
                 <tr>
                   {sortHead("und", "Market")}
-                  <th className="hide-md">60D</th>
+                  <th className="hide-md">60 days</th>
                   {overview ? (
                     <>
-                      <th>Regime</th>
-                      {sortHead("a7", "7D", "chain-th")}
-                      {sortHead("a30", "30D", "chain-th")}
+                      <th className="layer-sub">Daily engine</th>
+                      <th className="layer-sub"><span>7D</span><span>30D</span></th>
+                      <th className="layer-sub"><span>7D</span><span>30D</span></th>
                     </>
                   ) : (
                     <>
@@ -134,13 +134,17 @@ export default function Markets() {
                     </td>
                     {overview ? (
                       <>
-                        <td className="regime-td two-line">
+                        <td className="regime-td">
                           {currentEngine(c.engine_comparison?.["1d"])
-                            ? <div className="regime-cell"><Signal s={c.signal_1d} explain={false} /><small>{REGIME[c.regime_1d] || title(c.regime_1d)}</small></div>
+                            ? <LayerTile alignment={c.align} kind="engine" sub={REGIME[c.regime_1d] || title(c.regime_1d)} aligned={!!(chainAgreed(c.align, "7d") || chainAgreed(c.align, "30d"))} />
                             : <Empty label="Short history" />}
                         </td>
-                        <td className="chain-td"><ChainMini alignment={c.align} horizon="7d" /></td>
-                        <td className="chain-td"><ChainMini alignment={c.align} horizon="30d" /></td>
+                        {["wallets", "options"].map((kind) => (
+                          <td key={kind} className={`layer-td ${kind}`}>
+                            <div className="layer-pair">
+                              {["7d", "30d"].map((h) => <LayerTile key={h} alignment={c.align} kind={kind} horizon={h} tag={h.toUpperCase()} aligned={!!chainAgreed(c.align, h)} />)}
+                            </div>
+                          </td>))}
                       </>
                     ) : (
                       <>

@@ -44,6 +44,32 @@ export function ChainMini({ alignment, horizon = "30d" }) {
   );
 }
 
+const SHORT = { wallets: { up: "Long", defensive: "Short", neutral: "Balanced" }, options: { up: "Upward", defensive: "Defensive", neutral: "Balanced" } };
+const HOVER = {
+  engine: "The daily engine's reading. It is the same for 7 and 30 days.",
+  wallets: "How Derive's Smart wallets hold options expiring in the window: long or short delta overall.",
+  options: "What option prices lean towards: skew against its own range and the direction of taker flow.",
+};
+
+/** Is every layer pointing the same way for this window (and not balanced)? */
+export const chainAgreed = (alignment, horizon) => agreedOf(chainReadings(alignment, horizon));
+
+/** One layer as a wide tile: its icon and reading in words, coloured by state, with the explanation on
+ * hover or focus. `aligned` frames it in orange when all three layers agree for its window. */
+export function LayerTile({ alignment, horizon = "30d", kind, sub = null, tag = null, aligned = false }) {
+  const [, name] = LAYERS.find(([k]) => k === kind);
+  const { label, state, why } = viewReading(alignment, horizon, kind);
+  const word = (state && SHORT[kind]?.[state]) || label;
+  const span = kind === "engine" ? "" : `, next ${horizon === "7d" ? "7" : "30"} days`;
+  const tip = `${name}${span}: ${label}${sub ? ` (${sub})` : ""}. ${why || HOVER[kind]}${aligned ? " All three layers point the same way for this window." : ""}`;
+  return (
+    <span className={`layer-tile ${state || "unknown"}${aligned ? " aligned" : ""}`} tabIndex={0} role="img" aria-label={tip} data-tip={tip}>
+      <span className="lt-icon"><LayerIcon kind={kind} size={16} /></span>
+      <span className="lt-text">{tag && <small className="lt-tag">{tag}</small>}<b>{word}</b>{sub && <small>{sub}</small>}</span>
+    </span>
+  );
+}
+
 /** Full: the three layers with their reading in words; each links to its section on the coin page. */
 export default function Chain({ alignment, horizon = "30d", linked = true, compact = false }) {
   const r = chainReadings(alignment, horizon);
