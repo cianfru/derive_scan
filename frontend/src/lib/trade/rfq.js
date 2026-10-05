@@ -177,7 +177,9 @@ export function createTicket({
     if (!check.ok) {
       await cancel();
       // Derive's own reason (free text) goes to the testnet build's (i); the screen says it plainly.
-      const detail = check.reason === "invalid" ? { step: "price", source: "Derive", code: "quote_not_valid", message: check.detail || "", data: "" } : null;
+      const detail = check.reason === "invalid" ? { step: "price", source: "Derive", code: "quote_not_valid", message: check.detail || "", data: "" }
+        : check.reason === "margin" ? { step: "price", source: "Cowboy", code: "margin_check", message: "initial margin used beyond price and fee",
+          data: JSON.stringify({ ...check.margin, total: check.total, fee: check.fee, max_fee: check.maxFee }) } : null;
       return set({ phase: check.reason === "beyond" ? "beyond" : "blocked", check, quote: best, message: null, detail });
     }
     const fresh = best.quote_id !== state.quote?.quote_id;
