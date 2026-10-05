@@ -284,6 +284,34 @@ def test_kill_switch_in_the_index(tmp_path, chain14, monkeypatch):
     assert doc["trading"] == "off" and doc["paused"] is True
 
 
+def test_mainnet_kill_switch_apart_and_off_by_default(tmp_path, chain14, monkeypatch):
+    """Real-money one tap has its own switch, `trading_mainnet` from QUESTIONS_TRADING_MAINNET: unset,
+    empty or unknown means off, whatever the testnet's switch says, and it changes at the next publish."""
+    monkeypatch.delenv("QUESTIONS_TRADING", raising=False)
+    monkeypatch.delenv("QUESTIONS_TRADING_MAINNET", raising=False)
+    assert qj.trading_mainnet_state() == "off"
+    for v, want in (("on", "on"), (" Sell_Only ", "sell_only"), ("off", "off"), ("yes", "off"), ("", "off")):
+        monkeypatch.setenv("QUESTIONS_TRADING_MAINNET", v)
+        assert qj.trading_mainnet_state() == want
+    monkeypatch.delenv("QUESTIONS_TRADING_MAINNET", raising=False)
+    _, site, _ = _job(tmp_path, chain14, publish=True)
+    idx = site / "questions" / "index.json"
+    doc = json.loads(idx.read_text())
+    assert doc["trading"] == "on" and doc["trading_mainnet"] == "off"
+    monkeypatch.setenv("QUESTIONS_TRADING_MAINNET", "on")
+    qj.mark_paused(site, T14 + 60 * 60)
+    doc = json.loads(idx.read_text())
+    assert doc["trading_mainnet"] == "on" and doc["trading"] == "on"
+    monkeypatch.setenv("QUESTIONS_TRADING", "off")
+    monkeypatch.setenv("QUESTIONS_TRADING_MAINNET", "sell_only")
+    qj.mark_paused(site, T14 + 61 * 60)
+    doc = json.loads(idx.read_text())
+    assert doc["trading"] == "off" and doc["trading_mainnet"] == "sell_only"
+    monkeypatch.delenv("QUESTIONS_TRADING_MAINNET", raising=False)
+    qj.mark_paused(site, T14 + 62 * 60)
+    assert json.loads(idx.read_text())["trading_mainnet"] == "off"
+
+
 def test_pending_settlements_and_merge(tmp_path, chain14):
     root, _, _ = _job(tmp_path, chain14, publish=False)
     state = qj.load_state(root)

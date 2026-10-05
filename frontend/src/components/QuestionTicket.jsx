@@ -131,7 +131,7 @@ function Sold({ t, paid, feesFor, onSave }) {
 /** Stage 1: a summary of the answer, the orders to place on Derive by hand inside Order details
  * (the bought leg first, or, selling back, the short leg bought back first), Open Derive, and then
  * "I placed it", which asks what filled. */
-function QuestionTicket({ und, question, answer, level, sideKey, t, board, pricesTs, settleTs, stale, closing = false, onPlaced, onSold, expiry, paid = null, holdPayout = null }) {
+function QuestionTicket({ und, question, answer, level, sideKey, t, board, pricesTs, settleTs, stale, closing = false, onPlaced, onSold, expiry, paid = null, holdPayout = null, oneTapComing = false }) {
   const feesFor = (q) => closeTicket(level, sideKey, q, board)?.fees ?? null;
   const [step, setStep] = useState(null);
   const close = closing && paid != null ? closeSummary(t, paid, holdPayout) : null;
@@ -143,7 +143,7 @@ function QuestionTicket({ und, question, answer, level, sideKey, t, board, price
   const text = copyText({ question, answer, legs, contracts: t.contracts, tick, settleTs });
   return (
     <section className="q-ticket" aria-label={closing ? "Sell back on Derive" : "Place on Derive"}>
-      {!TRADE_ON && !closing && (
+      {(!TRADE_ON || oneTapComing) && !closing && (
         // Builds without one-tap (production today): say once, plainly, why there are two orders to place.
         <p className="q-onetap-note">One-tap trading is coming to Cowboy. For now, place the two orders on Derive yourself.
           <Info label="Why two orders">A Higher or Lower answer is two options traded together: one bought and one sold, across the zone where it pays in part. Derive's order book takes each option as its own order, so by hand you place both, one after the other.</Info>

@@ -3,13 +3,17 @@
 // deposits in the Saloon account.
 import { TRADE_LIMITS, capCheck } from "./package.js";
 import { KEYS, read, write } from "./store.js";
+import { MODE, NETWORK } from "./config.js";
+import { mainnetSwitch } from "./live.js";
 
 /** The kill switch, from `trading` in the published questions/index.json (set from the Action's
  * QUESTIONS_TRADING). "on" buys and sells; "sell_only" only sells back; "off" neither. A file without
  * the field reads "on" (the testnet default); an unknown value reads "off"; no file yet reads
  * "loading", which allows nothing. */
 export const TRADING = ["on", "sell_only", "off"];
-export function tradingState(index) {
+export function tradingState(index, mode = MODE) {
+  // Real money has its own switch, `trading_mainnet`, closed unless set (lib/trade/live.js).
+  if (mode === "mainnet") return mainnetSwitch(index);
   if (!index) return "loading";
   const v = index.trading;
   if (v == null || v === "") return "on";
@@ -42,7 +46,7 @@ export function addSpent(wallet, amount, now = Date.now()) {
 /** The caps for one buy: $250 most-you-can-lose per answer, $1,000 a day per wallet. */
 export function capGate(mostLose, wallet, now = Date.now()) {
   if (!Number.isFinite(mostLose)) return { ok: true };
-  return capCheck(mostLose, { boughtToday: spentToday(wallet, now), testnet: true });
+  return capCheck(mostLose, { boughtToday: spentToday(wallet, now), testnet: !NETWORK.real });
 }
 
 const usd = (x) => `$${Number(x).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;

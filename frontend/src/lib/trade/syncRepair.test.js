@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import rec from "../../fixtures/trade/testnet_rfq_trades.json";
 
-vi.mock("../flags.js", () => ({ QUESTIONS_ON: true, TRADE_ON: true, TESTNET_FILLS: true, tradeMode: () => "testnet" }));
+vi.mock("../flags.js", () => ({ QUESTIONS_ON: true, TRADE_ON: true, TESTNET_FILLS: true, MAINNET_FILLS: false, ONE_TAP_FILLS: true, tradeMode: () => "testnet" }));
 import { fillFromTrades } from "./fills.js";
 import { buyRecord, exitFromFill, oneTapKey } from "./record.js";
 import { fillsByRfq, recoverFills } from "./sync.js";

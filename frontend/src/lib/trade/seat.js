@@ -2,7 +2,8 @@
 // the Saloon account and Cowboy's approval. One store per page, shared by every ticket.
 import { useSyncExternalStore } from "react";
 import { getAddress } from "ethers";
-import { NETWORK, SALOON_LABEL, SENT_HOLD_MS, TRADE_COINS } from "./config.js";
+import { MODE, NETWORK, SALOON_LABEL, SENT_HOLD_MS, TRADE_COINS } from "./config.js";
+import { forgetPilotInvite, isPilot } from "../pilot.js";
 import { NO_ACCOUNT, at, createClient, deriveKeyRejected, failure, plainError } from "./derive.js";
 import { arriving, depositAddress, findSaloon, fundedAccounts, labelAccount, listSubaccounts, otherAccounts, rememberAccount, summarise } from "./account.js";
 import { connectWallet, findProvider, gasEth, personalSign, sendTransaction, usdcTransfer } from "./wallet.js";
@@ -65,6 +66,10 @@ export function publicClient() {
   return pub;
 }
 
+/** Real money (mainnet builds): only the pilot's wallets take a seat. Other builds: every wallet. */
+export const pilotAllows = (wallet) => MODE !== "mainnet" || isPilot(wallet);
+export const NOT_PILOT = "One-tap trading is open to a few test wallets for now. Place the orders by hand on Derive.";
+
 export const canTrade = (und) => typeof und === "string" && /^[A-Z0-9]+$/.test(und) && (TRADE_COINS === "all" || TRADE_COINS.includes(und));
 export const termsAccepted = () => !!read(KEYS.terms());
 
@@ -116,7 +121,7 @@ function watch(provider, pending = null) {
   };
   const chainChanged = (chainId) => {
     if ((!state.wallet && !pending?.active()) || Number(chainId) === NETWORK.chainId) return;
-    end("Your wallet switched network. Connect again on Sepolia.");
+    end(`Your wallet switched network. Connect again on ${NETWORK.chainName}.`);
   };
   provider.on("accountsChanged", accountsChanged);
   provider.on("chainChanged", chainChanged);
@@ -154,7 +159,7 @@ export async function resume() {
   resumed = true;
   const provider = deps.findProvider();
   const remembered = read(KEYS.lastWallet());
-  if (!provider || !remembered || state.wallet) { set({ resuming: false, busy: false }); return false; }
+  if (!provider || !remembered || state.wallet || !pilotAllows(remembered)) { set({ resuming: false, busy: false }); return false; }
   const flow = operation();
   flow.wallet = remembered;
   watch(provider, flow);
@@ -207,6 +212,14 @@ export async function connect() {
   flow.set({ busy: true, message: null });
   try {
     const wallet = await flow.run("connect", () => connectWallet(guardedProvider));
+    if (!pilotAllows(wallet)) {
+      // Real money: one tap is open only to the pilot's wallets. Nothing is signed or remembered, and
+      // this browser goes back to placing orders by hand.
+      forgetPilotInvite();
+      remove(KEYS.lastWallet());
+      unwatch();
+      return flow.set({ stage: "not_pilot", busy: false, wallet: null, message: NOT_PILOT });
+    }
     const client = deps.createClient({ url: NETWORK.wsUrl });
     write(KEYS.lastWallet(), wallet);
     flow.set({ provider, wallet, client, newAccount: false, loggedAs: null, remembered: wallet });

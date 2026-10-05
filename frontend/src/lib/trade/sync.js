@@ -2,7 +2,9 @@
 // and trades are read over the user's own authenticated WebSocket and matched to Saloon answers by
 // their legs. Derive is the record: one-tap fills missing from this browser are added from Derive's
 // trade history (by the RFQ label), one-tap sell backs become exact exits, and each record says
-// whether Derive's positions hold its legs. Settlement uses the testnet's own settlement price.
+// whether Derive's positions hold its legs. Settlement uses the network's own settlement price. A
+// mainnet build does the same on mainnet, under the mainnet journal key.
+import { NETWORK } from "./config.js";
 import { parseInstrument } from "./package.js";
 import { fillFromTrades, packageComplete, tradesSince } from "./fills.js";
 import { buyRecord, exitFromFill, fillDiffers, knownRfqs, matchesPackage, parseLabel, repairBuy } from "./record.js";
@@ -188,7 +190,7 @@ export function recoverFills(records, fills, now = Date.now() / 1000, scope = {}
     }
     if (!lab) continue;
     if (!lab.close) {
-      const r = buyRecord({ fill: { ...f, pct: 1, complete: packageComplete(f) }, id: lab.id, side: lab.side, network: "testnet", savedTs: Math.floor(now),
+      const r = buyRecord({ fill: { ...f, pct: 1, complete: packageComplete(f) }, id: lab.id, side: lab.side, network: NETWORK.name, savedTs: Math.floor(now),
         wallet: scope.wallet || null, subaccountId: scope.subaccountId ?? null });
       if (r) { added.push({ ...r, recovered: true }); seen.add(f.rfq_id); }
       continue;

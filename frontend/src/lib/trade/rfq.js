@@ -6,16 +6,27 @@
 //   P6, testnet fills ("testnet" builds, owner's approval 4 October 2026): the signed execution goes
 //   to private/execute_quote on Derive's V3 testnet, never anywhere else (fillsAllowed here, and the
 //   client refuses it on any other endpoint). The fill is read back from Derive's trade history.
+//   P8, real money ("mainnet" builds): the same path on Derive's V3 mainnet, open only to pilot
+//   wallets while the published mainnet switch allows it; the switch is read again, fresh, right
+//   before the fill, and an unreadable switch counts as off.
 // The kill switch and the caps are checked before the RFQ and again before the fill. A tap with no
 // clear answer is never re-sent: the RFQ is re-read until Derive says what happened.
 import {
   BOOK_ASKS, CHECK_MS, CHECK_TRIES, EXTRA_FEE, FIRM_MS, MODE, NETWORK, PARTIAL_FILL_STEP, POLL_MS, QUOTE_WAIT_MS, REFERRAL, fillsAllowed,
 } from "./config.js";
 import { TRADE_LIMITS, checkQuote, packageCost } from "./package.js";
-import { buildExecute, debugMatches, randomNonce } from "./sign.js";
+import { buildExecute, debugMatches, domainSeparator, randomNonce } from "./sign.js";
 import { CANCEL_PLAIN, EXECUTE, MAINNET_GUARD, SOCKET_CLOSED, TIMEOUT, checkIncidents, deriveKeyRejected, errorDetail, failure, plainError } from "./derive.js";
 import { fillComplete, fillFromExecute, fillFromTrades, tradesOf, userSide } from "./fills.js";
 import { TRADING_NOTICE, addSpent, capGate, capMessage, tradingAllows } from "./limits.js";
+import { mainnetOpen, setMainnetSwitch } from "./live.js";
+import { MAINNET_FILLS } from "../flags.js";
+import { isPilot } from "../pilot.js";
+
+/** Fills go only where this build points: the right mode, network, endpoint and signing domain. */
+const FILL_MODES = ["testnet", "mainnet"];
+/** Real money, a wallet outside the pilot: never a request. */
+export const PILOT_ONLY = "One-tap trading is open to a few test wallets for now. Place the orders by hand on Derive.";
 
 const secs = (t) => (t > 1e12 ? Math.floor(t / 1000) : Math.floor(t)); // Derive times can be ms
 
@@ -34,7 +45,7 @@ export const OUTCOME = {
 };
 /** A leg the network does not list (Derive's 12001 "Instrument not found"). */
 export const NOT_FOUND = 12001;
-export const NOT_LISTED = "Derive's testnet doesn't list this level. Pick another level.";
+export const NOT_LISTED = MAINNET_FILLS ? "Derive doesn't list this level. Pick another level." : "Derive's testnet doesn't list this level. Pick another level.";
 const EXPIRED_CODES = new Set([11104, 11102, 11011]);
 const BUSY_CODES = new Set([-32000, 9002, -32100]);
 const UNKNOWN_CODES = new Set([TIMEOUT, SOCKET_CLOSED, 9000, 9001]);
@@ -46,11 +57,13 @@ const UNKNOWN_CODES = new Set([TIMEOUT, SOCKET_CLOSED, 9000, 9001]);
  * from Derive's mark. `estimate` is the board's most-you-can-lose, for the caps before any RFQ.
  * `trading()` reads the kill switch. `onFill(fill)` gets every fill once, before the screen changes.
  * `onKeyRejected()` is called when Derive no longer takes the Saloon key (the seat drops it and asks
- * for a fresh approval).
+ * for a fresh approval). On mainnet, `readSwitch()` reads the published mainnet switch afresh right
+ * before the fill (a failed read counts as off), and only pilot wallets get as far as a request.
  */
 export function createTicket({
   client, getInstrument, subaccountId, owner, wallet = owner, key, legs, direction, limit, payout, feeEstimate, label,
   estimate = null, tolerance = TRADE_LIMITS.tolerance.major, mode = MODE, network = NETWORK, trading = () => "on", onFill = () => {}, onKeyRejected = () => {},
+  readSwitch = async () => "off",
   referral = REFERRAL, chainId = network?.chainId ?? NETWORK.chainId, onChange = () => {}, now = () => Date.now(),
   schedule = (fn, ms) => setTimeout(fn, ms), unschedule = (t) => clearTimeout(t), makeNonce = randomNonce,
   sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -82,6 +95,7 @@ export function createTicket({
 
   /** The kill switch and, for a buy, the caps. Returns a state patch when blocked. */
   function gate(mostLose) {
+    if (mode === "mainnet" && !isPilot(wallet)) return { phase: "paused", message: PILOT_ONLY };
     const t = trading();
     if (!tradingAllows(t, direction)) return { phase: "paused", message: TRADING_NOTICE[t] || TRADING_NOTICE.off };
     if (direction === "buy" && mostLose != null) {
@@ -114,7 +128,7 @@ export function createTicket({
       if (closed) return;
       const e = facts.find((f) => f.status === "rejected").reason;
       return set({ phase: "not_listed", message: NOT_LISTED, missing,
-        detail: { ...failure(e, "price").detail, message: `Not listed on testnet: ${missing.join(", ")}` } });
+        detail: { ...failure(e, "price").detail, message: `Not listed on ${NETWORK.name}: ${missing.join(", ")}` } });
     }
     const bad = facts.find((f) => f.status === "rejected");
     if (bad) return set({ phase: "no_quote", message: "No price from Derive right now.", detail: failure(bad.reason, "price").detail });
@@ -227,14 +241,15 @@ export function createTicket({
    * The user's tap, carrying the exact total they saw. If the quote changed since, nothing is signed
    * and the new number waits for a fresh tap. Otherwise the execution is signed with the Saloon key:
    * in a dry run it goes to public/execute_quote_debug and nothing fills; in a testnet build it goes
-   * to private/execute_quote on the testnet.
+   * to private/execute_quote on the testnet; in a mainnet build, to private/execute_quote on mainnet
+   * once the fresh switch read allows it.
    */
   async function confirm(shownTotal) {
     if (closed) return;
     if (state.phase !== "quoted" || now() >= state.firmUntil) return lapse();
     if (Math.abs(state.check.total - shownTotal) > 0.005) return set({ changed: true });
     stop();
-    if (mode === "testnet") return execute();
+    if (FILL_MODES.includes(mode)) return execute();
     set({ phase: "checking" });
     try {
       const built = sign();
@@ -250,8 +265,24 @@ export function createTicket({
 
   async function execute() {
     if (closed) return;
-    // The mainnet guard: nothing is signed or sent unless this is a testnet build on the testnet.
-    if (!fillsAllowed(network, mode)) {
+    let live = false;
+    if (mode === "mainnet") {
+      // Real money: the published switch is read again now, not from the page's copy, and a read
+      // that fails counts as off. Then only a pilot wallet, in a direction the switch allows.
+      set({ phase: "executing" });
+      let s = "off";
+      try { s = await readSwitch(); } catch { s = "off"; }
+      const now_ = setMainnetSwitch(s);
+      if (closed) return;
+      if (!mainnetOpen(wallet, direction)) {
+        await cancel();
+        return set({ phase: "paused", message: isPilot(wallet) ? (TRADING_NOTICE[now_] || TRADING_NOTICE.off) : PILOT_ONLY });
+      }
+      live = true;
+    }
+    // The fill guard: nothing is signed or sent unless this build's mode, network, endpoint and signing
+    // domain all agree (a testnet build on the testnet; a mainnet build on mainnet, switch on).
+    if (!fillsAllowed(network, mode, live) || chainId !== network.chainId || domainSeparator(chainId) !== network.domainSeparator) {
       await cancel();
       return set({ phase: "error", ...failure({ code: MAINNET_GUARD, source: "Cowboy" }, tapStep) });
     }

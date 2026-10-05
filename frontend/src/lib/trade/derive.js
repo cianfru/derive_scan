@@ -2,7 +2,8 @@
 // over WebSocket"). One connection per page; calls correlate by id. Reads that Derive marks as safe to
 // repeat (9002 backend unavailable, -32000 rate limit) are retried with a growing pause; a dropped
 // socket reconnects on the next call and logs in again. Nothing here holds or sends a wallet key.
-import { NETWORK, TESTNET_WS } from "./config.js";
+import { NETWORK, executeAllowed } from "./config.js";
+import { MAINNET_FILLS } from "../flags.js";
 
 export class DeriveError extends Error {
   constructor(code, message, data) {
@@ -18,7 +19,8 @@ export const RETRYABLE = new Set([9002, -32000]);
 export const SOCKET_CLOSED = "socket_closed";
 export const TIMEOUT = "timeout";
 export const MAINNET_GUARD = "mainnet_guard";
-/** The only signed fill call. The client refuses it on any endpoint but the testnet's. */
+/** The only signed fill call. The client refuses it on any endpoint but its build's own, and on
+ * mainnet unless the published switch allows it for a pilot wallet (config.js executeAllowed). */
 export const EXECUTE = "private/execute_quote";
 
 /** Plain messages for what can go wrong (design 2.4). No codes on screen. */
@@ -53,7 +55,7 @@ const PLAIN = {
   403: "Derive is not available here.",
   4001: "You declined in your wallet.",
   [SOCKET_CLOSED]: "Derive isn't taking orders right now.",
-  [MAINNET_GUARD]: "One tap works on Derive's testnet only.",
+  [MAINNET_GUARD]: MAINNET_FILLS ? "One-tap trading is closed right now. Nothing was bought or sold." : "One tap works on Derive's testnet only.",
   11102: "That price is no longer open. Get a new price.",
   11023: "Derive's fee is higher than usual right now.",
   11011: "That price is no longer open. Get a new price.",
@@ -97,7 +99,9 @@ export const WALLET_PLAIN = {
   4200: "Your wallet can't do this step.",
   4900: "Your wallet is disconnected from the network.",
   4901: "Your wallet is disconnected from the network.",
-  4902: "Your wallet doesn't have the Sepolia test network yet. Turn on test networks in your wallet (MetaMask: Settings, then Advanced, then Show test networks), then try again.",
+  4902: !MAINNET_FILLS
+    ? `Your wallet doesn't have the ${NETWORK.chainName} test network yet. Turn on test networks in your wallet (MetaMask: Settings, then Advanced, then Show test networks), then try again.`
+    : `Your wallet doesn't have the ${NETWORK.chainName} network. Add it in your wallet, then try again.`,
   "-32002": "Your wallet already has a request waiting. Open your wallet to finish or close it.",
   contract_wallet: "Use an ordinary wallet for the Saloon for now.",
   wrong_signer: "Your wallet signed with another account. Switch to the connected account and try again.",
@@ -281,14 +285,22 @@ export function createClient({
 
   /** One call. `safe` (default true) allows Derive's retryable errors to be retried. */
   async function call(method, params, { safe = true, assertActive = () => {}, beforeSend = () => {} } = {}) {
-    // The mainnet guard, at the last step before the wire: a fill goes nowhere but the testnet.
-    if (method === EXECUTE && url !== TESTNET_WS) throw new DeriveError(MAINNET_GUARD, PLAIN[MAINNET_GUARD]);
+    // The fill guard, before anything and again at the last step before the wire: a fill goes only to
+    // this build's own network, and on mainnet only while the published switch allows it for the
+    // signed-in pilot wallet.
+    const guard = () => {
+      if (method === EXECUTE && !executeAllowed(url, { wallet: login?.wallet ?? null, direction: params?.direction ?? null })) {
+        throw new DeriveError(MAINNET_GUARD, PLAIN[MAINNET_GUARD]);
+      }
+    };
+    guard();
     let attempt = 0;
     for (;;) {
       try {
         assertOpen(); assertActive();
         await ensure();
         assertOpen(); assertActive();
+        guard();
         beforeSend(); // no await between this boundary and the wire; sent calls still return their result
         const result = await sendOnce(method, params);
         assertOpen(); assertActive();

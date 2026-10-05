@@ -2,7 +2,7 @@ import { payAt, sameLegs } from "./questions.js";
 import { incompleteReceipt, legacyExit, remainingQty, settleEvent } from "./realized.js";
 export { incompleteReceipt } from "./realized.js";
 import { payoutAt, positionExposure } from "./exposure.js";
-import { TESTNET_FILLS } from "./flags.js";
+import { ONE_TAP_FILLS } from "./flags.js";
 
 // Positions and the trade journal: what the user says they placed on Derive, kept in this browser
 // only. Nothing is sent anywhere. Storage can be blocked or cleared, so every read and write falls
@@ -329,10 +329,10 @@ export function valuePosition(p, found, settlePrice = null, exitFees = null) {
 
 /** How a position was placed and where it stands, in plain words for its status line. */
 export function positionStatus(p, { settled = false, settling = false } = {}) {
-  // One-tap wording exists only in testnet builds (production shows no hint of one tap).
-  const oneTap = TESTNET_FILLS && p.exec === "rfq";
+  // One-tap wording exists only in builds with fills (production without them shows no hint of one tap).
+  const oneTap = ONE_TAP_FILLS && p.exec === "rfq";
   if (oneTap && incompleteReceipt(p)) return { key: "checking", warn: true, text: "Bought in one tap · Derive's records still being checked" };
-  if (p.closed_at) return { key: "closed", text: TESTNET_FILLS && (p.exits || []).some((e) => e.via === "rfq") ? "Closed · sold back in one tap" : "Closed · sold back by hand" };
+  if (p.closed_at) return { key: "closed", text: ONE_TAP_FILLS && (p.exits || []).some((e) => e.via === "rfq") ? "Closed · sold back in one tap" : "Closed · sold back by hand" };
   if (settled && !partial(p)) return { key: "settled", text: "Settled" };
   if (partial(p)) return { key: "partial", warn: true, text: p.journal?.fill?.legs?.[1]?.qty > 0
     ? "Placed by hand · not fully filled" : "Placed by hand · only the first filled" };
