@@ -47,10 +47,8 @@ export function capGate(mostLose, wallet, now = Date.now()) {
 
 const usd = (x) => `$${Number(x).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 export function capMessage(c) {
-  if (!c || c.ok) return null;
-  if (c.reason === "per_answer") return `Most you can lose is over the ${usd(c.cap)} limit per answer. Choose a smaller amount.`;
-  if (c.reason === "per_day") return c.left > 0
-    ? `That would pass the ${usd(TRADE_LIMITS.perDay)} limit per day. ${usd(Math.floor(c.left))} is left for today (UTC).`
-    : `You have reached the ${usd(TRADE_LIMITS.perDay)} limit per day. Buying opens again after 00:00 UTC.`;
+  if (!c?.warn) return null;
+  if (c.warn === "per_answer") return `Large trade: you can lose up to $${Number(c.mostLose).toFixed(2)} on this answer. Check the amount before you tap.`;
+  if (c.warn === "per_day") return `With this trade you have put $${Number(c.today).toFixed(2)} into answers today (UTC), over ${usd(TRADE_LIMITS.perDay)}.`;
   return null;
 }

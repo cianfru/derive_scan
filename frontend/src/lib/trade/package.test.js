@@ -120,11 +120,11 @@ describe("quote checks", () => {
 });
 
 describe("caps", () => {
-  it("are $250 per answer on mainnet, $1,000 on testnet, $1,000 a day", () => {
-    expect(capCheck(260, { testnet: false })).toMatchObject({ ok: false, reason: "per_answer", cap: 250 });
-    expect(capCheck(260, { testnet: true })).toMatchObject({ ok: false, reason: "per_answer", cap: 250 });
-    expect(capCheck(240, { testnet: true }).ok).toBe(true);
-    expect(capCheck(200, { boughtToday: 900, testnet: false })).toMatchObject({ ok: false, reason: "per_day", left: 100 });
+  it("warn above $250 per answer and past $1,000 a day, and never block (owner, 5 October 2026)", () => {
+    expect(capCheck(260, { testnet: false })).toMatchObject({ ok: true, warn: "per_answer", cap: 250 });
+    expect(capCheck(260, { testnet: true })).toMatchObject({ ok: true, warn: "per_answer", cap: 250 });
+    expect(capCheck(240, { testnet: true })).toMatchObject({ ok: true, warn: null });
+    expect(capCheck(200, { boughtToday: 900, testnet: false })).toMatchObject({ ok: true, warn: "per_day", today: 1100 });
     expect(TRADE_LIMITS.perDay).toBe(1000);
   });
 });
