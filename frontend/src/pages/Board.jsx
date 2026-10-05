@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { useFeeds } from "../components/Feeds.jsx";
 import { Info, Loading, Failed, Tabs } from "../components/ui.jsx";
 import { Asset, CoinIcon } from "../components/MarketVisuals.jsx";
-import { ChainMini } from "../components/Chain.jsx";
+import { ChainMini, HORIZON_LABEL, LAYERS, LayerTile } from "../components/Chain.jsx";
 import { ASSET_NAMES } from "../lib/presentation.js";
 import SaloonHead from "../components/SaloonNotices.jsx";
 import { FollowButton, FollowLevel } from "../components/Follow.jsx";
@@ -97,9 +97,9 @@ function outcomeGroups(rows, unavailable, includeMissing = () => false) {
   return [...groups.values()];
 }
 
-/** One level as a raised row: the level and its pays-in-part zone, then Higher and Lower side by side.
+/** One level: the level and its pays-in-part zone, then Higher and Lower side by side.
  * In the date rows (`inRow`) the row header carries the coin and the date, so the row leaves them out. */
-function OutcomeCard({ outcome: r, align, budget, inRow = false }) {
+function OutcomeCard({ outcome: r, align, budget, inRow = false, boardStyle = false }) {
   const [expanded, setExpanded] = useState(false);
   const answers = [r.answers.yes, r.answers.no].filter(Boolean);
   const Heading = inRow ? "h3" : "h2";
@@ -118,7 +118,8 @@ function OutcomeCard({ outcome: r, align, budget, inRow = false }) {
         {expanded && <>
         <div className="bd-comparison-grid">{answers.map((a) => <Comparison key={a.side} r={a} />)}</div>
         <p className="bd-comparison-help">Cost over mark and exit cost are per $1 of maximum payout, before fees.<Info label={`About ${r.und} comparison at ${money(r.k)}`}>Cost over mark is the buy price minus Derive's mark from the same price read. Exit cost is that mark minus the published sell-back price. A missing or stale mark is not compared. Payout size is what Derive's screen offers at this price; a larger amount can cost more.</Info></p>
-        <div className="bd-ctx"><span>Research context<Info label={`About ${r.und} research context`}>Regime, Wallets, Options, in that order. The daily regime is paired with {contextHorizon(r.settleTs) === "7d" ? "7-day" : "30-day"} wallet and options context. These independent readings do not change the order of the board.</Info></span>{align ? <ChainMini alignment={align} horizon={contextHorizon(r.settleTs)} /> : <span className="dim">Unavailable</span>}</div>
+        <div className="bd-ctx"><span>Research context<Info label={`About ${r.und} research context`}>Regime, Wallets, Options, in that order. The {contextHorizon(r.settleTs) === "7d" ? "4-hour regime is paired with 7-day" : "daily regime is paired with 30-day"} wallet and options context. These independent readings do not change the order of the board.</Info></span>{boardStyle ? <span>{HORIZON_LABEL[contextHorizon(r.settleTs)]} · Context, not a signal</span> : align ? <ChainMini alignment={align} horizon={contextHorizon(r.settleTs)} /> : <span className="dim">Unavailable</span>}</div>
+        {boardStyle && <div className="bd-research-layers">{LAYERS.map(([kind, name]) => <div key={kind}><span className="label">{name}</span><LayerTile alignment={align} horizon={contextHorizon(r.settleTs)} kind={kind} sub="detail" icon={false} /></div>)}</div>}
         </>}
       </details>
     </li>
@@ -136,11 +137,11 @@ function LadderKey() {
 }
 
 /** One coin and settlement date: a header, then its levels from low to high with the index marked. */
-function DateRow({ row, align, budget }) {
+function DateRow({ row, align, budget, boardStyle = false }) {
   const name = ASSET_NAMES[row.und] || row.und;
   const when = `${dayLabel(row.expiry)}, 08:00 UTC`;
   const n = row.items.length;
-  const cards = row.items.map((g) => <OutcomeCard key={g.id} outcome={g} align={align} budget={budget} inRow />);
+  const cards = row.items.map((g) => <OutcomeCard key={g.id} outcome={g} align={align} budget={budget} inRow boardStyle={boardStyle} />);
   if (row.nowAt != null) cards.splice(row.nowAt, 0, <NowMark key="now" und={row.und} index={row.index} />);
   return (
     <section className="bd-row" aria-label={`${name}, settles ${when}`}>
@@ -259,6 +260,14 @@ export default function Board({ followingOnly = false, embedded = false }) {
   const alignOf = Object.fromEntries((markets?.coins || []).map((c) => [c.und, c.align]));
   useEffect(() => { setShown(PAGE); }, [coin, range, side, sort, budget, search, followingOnly]);
 
+  // Keep the embedded Following layout; the public browser uses the same board frame as Markets.
+  const BoardContainer = embedded ? Fragment : "section";
+  const coinTabs = <Tabs label="Coin" value={coin} onChange={setCoin} items={[["all", "All coins"], ...coins.map((u) => [u, u])]} />;
+  const scope = <span className="bd-count-main"><span className="mono">{groups.length}</span> {groups.length === 1 ? "outcome" : "outcomes"}{byDate && <> on <span className="mono">{rowsByDate.length}</span> {rowsByDate.length === 1 ? "date" : "dates"}</>}<span className="bd-answer-count"> · {list.length} {list.length === 1 ? "answer" : "answers"}</span></span>;
+  const listGuide = <>{byDate
+    ? "Each group is one coin and settlement date, soonest first; on the same date Bitcoin comes first, then Ethereum, then the other coins. Inside a group the levels run from low to high, and the line shows where the coin's index is now."
+    : "Answers are grouped by coin, price level and settlement date. Each row takes the position of its first answer in your selected order. Missing comparison figures go last."} Each answer shows its price per $1 of maximum payout before fees. Most you make is the maximum profit as a share of the total you pay, including Derive fees, for a {usd(REF)} total. Fixed fees and available size can change that percentage at another amount. Open an outcome to choose your amount and see its full payout curve. Order by date, cost over Derive's mark, closeness to the coin's price, settlement or size. Research is context and does not change this order. Answers that fail Cowboy's checks are left out; answers with no price have a reason below.</>;
+
   if (embedded && followingOnly && !doc.follows.length) return (
     // Following, as a tab in Positions, before anything is followed: a short way in, no empty board.
     <section className="q-empty-card q-empty-tab" aria-label="Nothing followed yet">
@@ -269,13 +278,14 @@ export default function Board({ followingOnly = false, embedded = false }) {
   );
   if (error && !index) return <div className={embedded ? "" : "wrap page"}><Failed error={error} /></div>;
   return (
-    <div className={embedded ? "bd-page bd-embedded" : "wrap page q-page bd-page"}>
-      {!embedded && <SaloonHead view={followingOnly ? "following" : "browse"} />}
+    <div className={embedded ? "bd-page bd-embedded" : "wrap page q-page bd-page bd-browser"}>
+      {!embedded && <SaloonHead view={followingOnly ? "following" : "browse"} board quoteTs={index?.prices_ts} paused={paused} />}
       {feeds}
+      <BoardContainer {...(embedded ? {} : { className: "bd-board", "aria-label": "Outcome board" })}>
       <section className="bd-controls" aria-label="Search, filters and order">
-        <div className="bd-control-top"><label className="bd-search"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg><input type="search" aria-label="Search outcomes" placeholder="Search coin or price" value={search} onChange={(e) => setSearch(e.target.value)} /></label></div>
-        <div className="bd-filters">
-          <Tabs label="Coin" value={coin} onChange={setCoin} items={[["all", "All coins"], ...coins.map((u) => [u, u])]} />
+        <div className={`bd-control-top${embedded ? "" : " bd-toolbar"}`}>{!embedded && coinTabs}<label className="bd-search"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg><input type="search" aria-label="Search outcomes" placeholder="Search coin or price" value={search} onChange={(e) => setSearch(e.target.value)} /></label></div>
+        <div className={`bd-filters${embedded ? "" : " bd-context"}`}>
+          {embedded ? coinTabs : <p className="bd-count status" aria-live="polite">{!index || !ready ? "Loading outcomes…" : scope}</p>}
           <button className="bd-filter-toggle" aria-expanded={showFilters} aria-controls="bd-advanced-filters" onClick={() => setShowFilters((open) => !open)}>
             <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2 5h14M2 13h14M6 2v6M12 10v6" /></svg>Filters{activeFilters > 0 && <span className="mono">{activeFilters}</span>}
           </button>
@@ -292,23 +302,21 @@ export default function Board({ followingOnly = false, embedded = false }) {
       {followingOnly && <Following />}
       {!index || !ready ? <Loading /> : (
         <>
-          <p className="bd-count status" aria-live="polite">
-            <span className="bd-count-main"><span className="mono">{groups.length}</span> {groups.length === 1 ? "outcome" : "outcomes"}{byDate && <> on <span className="mono">{rowsByDate.length}</span> {rowsByDate.length === 1 ? "date" : "dates"}</>}<span className="bd-answer-count"> · {list.length} {list.length === 1 ? "answer" : "answers"}</span></span>
+          {embedded && <p className="bd-count status" aria-live="polite">
+            {scope}
             <span className="bd-count-time">
             <span>{paused ? "Prices paused" : index?.prices_ts ? `Derive prices ${new Date(index.prices_ts * 1000).toISOString().slice(11, 16)} UTC` : "Derive prices"} · Fees included · Defined cost</span>
-            <Info label="About this list">{byDate
-              ? "Each row is one coin and settlement date, soonest first; on the same date Bitcoin comes first, then Ethereum, then the other coins. Inside a row the levels run from low to high, and the lit line shows where the coin's index is now. Each answer shows its price per $1 of payout before fees and the most it makes as a share of what you pay, fees included; open an outcome to choose your amount and see the full picture. Choose another order under Filters to see one list ranked by cost over Derive's mark, closeness to the price, settlement or size."
-              : "Answers are grouped by coin, price level and settlement date. Each row takes the position of its first answer in your selected order: cost over Derive's mark before fees, closeness to the coin's price, settlement or size. Missing comparison figures go last."} Research is separate from this order. Answers that fail Cowboy's checks are left out; answers with no price have a reason below.</Info></span>
-          </p>
+            <Info label="About this list">{listGuide}</Info></span>
+          </p>}
           {list.length ? (
             <div className="bd-marketplace" role="region" aria-label="Outcomes">
               {byDate ? <>
-                <div className="bd-rows">{shownRows.map((row) => <DateRow key={row.key} row={row} align={alignOf[row.und]} budget={budget} />)}</div>
+                <div className="bd-rows">{shownRows.map((row) => <DateRow key={row.key} row={row} align={alignOf[row.und]} budget={budget} boardStyle={!embedded} />)}</div>
                 {rowsByDate.length > shownRows.length && <button className="text-control bd-more" onClick={() => setShown(shownCards + PAGE)}>Show later dates</button>}
               </> : <>
                 <LadderKey />
                 <ol className="bd-grid">
-                  {groups.slice(0, shown).map((r) => <OutcomeCard key={r.id} outcome={r} align={alignOf[r.und]} budget={budget} />)}
+                  {groups.slice(0, shown).map((r) => <OutcomeCard key={r.id} outcome={r} align={alignOf[r.und]} budget={budget} boardStyle={!embedded} />)}
                 </ol>
                 {groups.length > shown && <button className="text-control bd-more" onClick={() => setShown((n) => n + PAGE)}>Show {Math.min(PAGE, groups.length - shown)} more outcomes</button>}
               </>}
@@ -317,6 +325,8 @@ export default function Board({ followingOnly = false, embedded = false }) {
           <NoPriceList list={off} />
         </>
       )}
+      {!embedded && <footer className="bd-footer"><span>Prices before fees · Returns include fees, for a {usd(REF)} total</span><details><summary>How to read this board</summary><p>{listGuide}</p></details></footer>}
+      </BoardContainer>
     </div>
   );
 }
