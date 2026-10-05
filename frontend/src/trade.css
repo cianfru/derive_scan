@@ -54,3 +54,13 @@
 .tr-detail { display: grid; gap: 4px; font-size: 12px; line-height: 1.4; }
 .tr-detail-row { display: grid; grid-template-columns: 64px 1fr; gap: 8px; overflow-wrap: anywhere; }
 .tr-detail-row > span:first-child { color: var(--text-2); }
+.tr-accounts { display: grid; gap: 4px; font-size: 12px; }
+.tr-accounts > .text-control { width: fit-content; text-decoration: underline; text-decoration-color: var(--seam-hi); }
+.tr-account-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.tr-account-list .text-control { padding: 4px 0; text-decoration: underline; text-decoration-color: var(--seam-hi); }
+.tr-account-list [aria-current] { display: inline-block; padding: 4px 0; color: var(--text-2); }
+.tr-account-list b { color: var(--text-1); font-weight: 500; }
+.tr-seat .tr-seat-change { margin-left: auto; }
+.tr-seat .tr-seat-change + .text-control { margin-left: 0; }
+@media (pointer: coarse) { .tr-accounts .text-control { min-height: 44px; } }
+.tr-seat .tr-accounts .text-control { margin-left: 0; }

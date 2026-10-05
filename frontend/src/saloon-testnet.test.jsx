@@ -122,7 +122,7 @@ describe("one tap on Derive's testnet", () => {
     await user.click(within(panel).getByRole("button", { name: "Connect wallet" }));
     await user.click(await within(panel).findByRole("checkbox"));
     await user.click(within(panel).getByRole("button", { name: "Continue" }));
-    await user.click(await within(panel).findByRole("button", { name: "Approve in wallet" }));
+    await user.click(await within(panel).findByRole("button", { name: "Approve Cowboy" }));
     await within(panel).findByText(/Cowboy approved until/);
 
     await user.click(within(panel).getByRole("button", { name: "Get price" }));
@@ -267,29 +267,29 @@ describe("the wallet in the header", () => {
     const again = await within(header()).findByRole("group", { name: "Your wallet" });
     await user.click(within(again).getByRole("checkbox"));
     await user.click(within(again).getByRole("button", { name: "Continue" }));
-    const account = await within(again).findByRole("link", { name: /Saloon account/ });
+    const account = await within(again).findByRole("link", { name: /Derive account/ });
     expect(account.getAttribute("href")).toBe("/saloon/mine");
     await waitFor(() => expect(document.activeElement).toBe(account));
     expect(account.textContent).toMatch(/Approval needed\$240\.50/);
     expect(within(again).queryByRole("button", { name: "Switch off Cowboy" })).toBeNull();
-    await within(panel).findByRole("button", { name: "Approve in wallet" });
+    await within(panel).findByRole("button", { name: "Approve Cowboy" });
 
     // Approving in the ticket (a tap outside closes the header's menu) shows as ready in the header.
-    await user.click(within(panel).getByRole("button", { name: "Approve in wallet" }));
+    await user.click(within(panel).getByRole("button", { name: "Approve Cowboy" }));
     expect(within(header()).queryByRole("group", { name: "Your wallet" })).toBeNull();
     await within(panel).findByText(/Cowboy approved until/);
     await user.click(within(header()).getByRole("button", { name: /^Wallet 0x/ }));
     const ready = within(header()).getByRole("group", { name: "Your wallet" });
-    expect(within(ready).getByRole("link", { name: /Saloon account/ }).textContent).toMatch(/Ready\$240\.50/);
+    expect(within(ready).getByRole("link", { name: /Derive account/ }).textContent).toMatch(/Ready\$240\.50/);
     expect(within(ready).getByText(/Cowboy approved until/)).toBeTruthy();
 
     // Switching off in the header takes the ticket back to the approval.
     await user.click(within(ready).getByRole("button", { name: "Switch off Cowboy" }));
     await within(ready).findByText(/Switched off/);
     expect(fake.calls("private/set_session_key")).toHaveLength(2);
-    expect(within(ready).getByRole("link", { name: /Saloon account/ }).textContent).toMatch(/Approval needed/);
+    expect(within(ready).getByRole("link", { name: /Derive account/ }).textContent).toMatch(/Approval needed/);
     expect(within(ready).queryByRole("button", { name: "Switch off Cowboy" })).toBeNull();
-    await within(panel).findByRole("button", { name: "Approve in wallet" });
+    await within(panel).findByRole("button", { name: "Approve Cowboy" });
 
     // Disconnect: both go back to "Connect wallet", focus returns to the header's button.
     await user.click(within(ready).getByRole("button", { name: "Disconnect" }));
@@ -309,19 +309,19 @@ describe("the wallet in the header", () => {
     await user.click(screen.getByRole("button", { name: "Review orders" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     await user.click(within(panel).getByRole("button", { name: "Connect wallet" }));
-    await within(panel).findByRole("button", { name: "Approve in wallet" });
+    await within(panel).findByRole("button", { name: "Approve Cowboy" });
     const btn = within(header()).getByRole("button", { name: /^Wallet 0x/ });
     expect(btn.getAttribute("aria-expanded")).toBe("false");
     await user.click(btn);
     const menu = within(header()).getByRole("group", { name: "Your wallet" });
     expect(btn.getAttribute("aria-expanded")).toBe("true");
-    expect(document.activeElement).toBe(within(menu).getByRole("link", { name: /Saloon account/ }));
+    expect(document.activeElement).toBe(within(menu).getByRole("link", { name: /Derive account/ }));
     await user.keyboard("{Escape}");
     expect(within(header()).queryByRole("group", { name: "Your wallet" })).toBeNull();
     expect(document.activeElement).toBe(btn);
     // The Saloon account link opens Positions, which reads the same connection.
     await user.click(btn);
-    await user.click(within(header()).getByRole("link", { name: /Saloon account/ }));
+    await user.click(within(header()).getByRole("link", { name: /Derive account/ }));
     const sync = await screen.findByRole("region", { name: "Your Saloon account on Derive" });
     expect(within(header()).queryByRole("group", { name: "Your wallet" })).toBeNull();
     await within(sync).findByRole("button", { name: "Check again" });

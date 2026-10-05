@@ -1,6 +1,7 @@
-// Saloon stage 2, P3: the user's Saloon account on Derive. It is a subaccount of the user's own
-// wallet under PRIME's Standard manager, created by the first deposit through Cowboy and labelled
-// "Cowboy", so Saloon money stays apart from anything else the user holds on Derive.
+// Saloon stage 2, P3: the Derive account Cowboy trades from. It is a subaccount of the user's own
+// wallet under PRIME's Standard manager: one already funded (for example from Derive's faucet), chosen
+// by the user, or the one the first deposit through Cowboy opens. It is labelled "Cowboy" once the user
+// approves Cowboy for it.
 import { CONFIRMED_STALE_MS, DEPOSIT_MIN, DEPOSIT_SUGGESTED, GAS_WARN_SHARE, NETWORK, PRIME_STANDARD, SALOON_LABEL } from "./config.js";
 import { KEYS, read, write } from "./store.js";
 
@@ -27,60 +28,64 @@ export function pickSaloon(subs) {
   return subs.filter((s) => s.label === SALOON_LABEL && s.manager === PRIME_STANDARD).sort((a, b) => a.id - b.id)[0] || null;
 }
 
-/**
- * The wallet's subaccounts from before its first deposit through Cowboy: `{ ids, at }` (ms), or null
- * when never recorded. A plain array (the first version, which could be written after the deposit
- * and so name the account it opened) reads as never recorded.
- */
-const asKnown = (k) => (k == null || Array.isArray(k) ? null : { ids: k.ids || [], at: k.at ?? 0 });
-export const rememberKnown = (wallet, subs, at = Date.now()) => write(KEYS.known(wallet), { ids: subs.map((s) => s.id), at });
-export const knownList = (wallet) => asKnown(read(KEYS.known(wallet)));
-
-/**
- * New, unlabelled PRIME Standard subaccounts: not in the known list, or holding USDC that arrived after
- * the list was taken (a list written after the deposit must not hide the account it opened).
- */
-const freshSubs = (subs, known) => {
-  const k = asKnown(known);
-  const ids = new Set(k?.ids || []);
-  return subs.filter((s) => s.manager === PRIME_STANDARD && !s.label
-    && (!ids.has(s.id) || (s.usdc > 0 && s.usdcSince != null && s.usdcSince > k.at)));
-};
-
-/**
- * After the first deposit: the new, unlabelled PRIME Standard subaccount. When there are several (two
- * deposits to the new-account address each open one), the lowest id that holds USDC; subaccounts the
- * wallet had before are never claimed.
- */
-export function findNew(subs, known) {
-  const fresh = freshSubs(subs, known);
-  if (fresh.length === 1) return fresh[0];
-  return fresh.filter((s) => s.usdc > 0).sort((a, b) => a.id - b.id)[0] || null;
+/** PRIME Standard subaccounts holding USDC, most USDC first (ties: the lowest id). */
+export function fundedAccounts(subs) {
+  return subs.filter((s) => s.manager === PRIME_STANDARD && s.usdc > 0).sort((a, b) => b.usdc - a.usdc || a.id - b.id);
 }
 
-/** Other new, unlabelled PRIME Standard subaccounts holding USDC besides the Saloon account (no funds move). */
-export function otherAccounts(subs, known, saloonId) {
-  const rest = freshSubs(subs, known).filter((s) => s.id !== saloonId && s.usdc > 0);
+/**
+ * The account Cowboy trades from, in this order: the one asked for (`prefer`: the account in view or
+ * the browser key's), the one labelled "Cowboy", the one this browser approved last (`remembered`),
+ * then the PRIME Standard subaccount with the most USDC, each while it holds USDC. With none funded,
+ * the same order picks the account a deposit goes to, else the lowest-id PRIME Standard subaccount;
+ * null when the wallet has none (a deposit then opens one).
+ */
+export function chooseAccount(subs, { prefer = null, remembered = null } = {}) {
+  const prime = subs.filter((s) => s.manager === PRIME_STANDARD);
+  const byId = (id) => (id == null ? null : prime.find((s) => s.id === id) || null);
+  const order = [byId(prefer), pickSaloon(prime), byId(remembered)].filter(Boolean);
+  const funded = fundedAccounts(prime);
+  return order.find((s) => s.usdc > 0) || funded[0] || order[0] || [...prime].sort((a, b) => a.id - b.id)[0] || null;
+}
+
+/** Other PRIME Standard subaccounts holding USDC besides the one Cowboy uses (no funds move). */
+export function otherAccounts(subs, saloonId) {
+  const rest = fundedAccounts(subs).filter((s) => s.id !== saloonId);
   return rest.length ? { count: rest.length, usdc: rest.reduce((a, s) => a + s.usdc, 0), ids: rest.map((s) => s.id) } : null;
 }
 
-/** Find the Saloon account, labelling a newly funded one "Cowboy" (an owner-login call). */
-export async function findSaloon(client, wallet) {
+/** The subaccount this browser approved Cowboy for last (a fallback when its label could not be set). */
+export const rememberAccount = (wallet, id) => write(KEYS.account(wallet), { id, at: Date.now() });
+export const rememberedAccount = (wallet) => read(KEYS.account(wallet))?.id ?? null;
+
+/**
+ * Read the wallet's subaccounts and pick the one Cowboy uses (an owner-login call). Nothing is
+ * labelled here: the label is set only once the user has approved Cowboy for that account.
+ * `choices` are the funded PRIME Standard subaccounts the user can pick from.
+ */
+export async function findSaloon(client, wallet, { prefer = null } = {}) {
   const subs = await listSubaccounts(client, wallet);
-  const known = knownList(wallet);
-  const saloon = pickSaloon(subs);
-  if (saloon) return { saloon, subs, others: otherAccounts(subs, known, saloon.id) };
-  const fresh = findNew(subs, known);
-  if (fresh) {
-    await client.call("private/change_subaccount_label", { subaccount_id: fresh.id, label: SALOON_LABEL });
-    return { saloon: { ...fresh, label: SALOON_LABEL }, subs, others: otherAccounts(subs, known, fresh.id) };
-  }
-  return { saloon: null, subs, others: null };
+  const saloon = chooseAccount(subs, { prefer, remembered: rememberedAccount(wallet) });
+  return { saloon, subs, choices: fundedAccounts(subs), others: saloon ? otherAccounts(subs, saloon.id) : null };
 }
 
 /**
- * Derive's deposit address for the Saloon account. Before the account exists it creates a new
- * subaccount under PRIME Standard (subaccount 0); afterwards it tops up the Saloon account.
+ * After the approval: label the chosen subaccount "Cowboy" when it has no label of its own, and take
+ * the label off any other subaccount Cowboy used before. A label the user gave stays. Needs an owner
+ * login. Returns the chosen account as labelled.
+ */
+export async function labelAccount(client, subs, chosen) {
+  for (const s of subs) {
+    if (s.id !== chosen.id && s.label === SALOON_LABEL) await client.call("private/change_subaccount_label", { subaccount_id: s.id, label: "" });
+  }
+  if (chosen.label) return chosen;
+  await client.call("private/change_subaccount_label", { subaccount_id: chosen.id, label: SALOON_LABEL });
+  return { ...chosen, label: SALOON_LABEL };
+}
+
+/**
+ * Derive's deposit address. With no PRIME Standard subaccount it creates a new one (subaccount 0);
+ * otherwise it tops up the account Cowboy uses.
  */
 export function depositParams(wallet, saloonId = null) {
   return saloonId ? { wallet, subaccount_id: saloonId } : { wallet, subaccount_id: 0, manager_id: PRIME_STANDARD };

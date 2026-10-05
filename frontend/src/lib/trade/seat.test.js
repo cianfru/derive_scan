@@ -8,7 +8,7 @@ import { fakeDerive, deriveError } from "./fakeSocket.js";
 import { fakeWallet } from "./fakeWallet.js";
 import { TESTNET_WS } from "./config.js";
 import { KEYS, read, write } from "./store.js";
-import { _setSeatDeps, connect, deposit, disconnect, holdSend, refreshFunding, resume, seatState, switchOff } from "./seat.js";
+import { _setSeatDeps, approve, connect, deposit, disconnect, holdSend, pickAccount, refreshFunding, resume, seatState, switchOff } from "./seat.js";
 import { keyFromSecret } from "./sign.js";
 import { keccak256, toUtf8Bytes } from "ethers";
 import { _resetAssets } from "./account.js";
@@ -16,7 +16,9 @@ import { _resetAssets } from "./account.js";
 const ADDR = "0x9a3c5be1b0e4d0f7c6d2a8e1f3b4c5d6e7f80912";
 const NEW_SUB = 120001, FALLBACK_SUB = 120000;
 
-function setup() {
+const newKey = () => keyFromSecret(keccak256(toUtf8Bytes("cowboy test session key")));
+
+function setup({ reject = new Set() } = {}) {
   const derive = { account: false, pending: [], subs: {} };
   const fake = fakeDerive({
     handlers: {
@@ -26,10 +28,12 @@ function setup() {
       "private/get_subaccounts": ({ wallet }) => ({ wallet, subaccount_ids: Object.keys(derive.subs).map(Number) }),
       "private/get_subaccount": ({ subaccount_id }) => derive.subs[subaccount_id],
       "private/change_subaccount_label": ({ subaccount_id, label }) => { derive.subs[subaccount_id].label = label; return { subaccount_id, label }; },
+      "private/set_session_key": (p) => ({ public_session_key: p.public_session_key, protocol_scopes: p.protocol_scopes, offchain_scopes: p.offchain_scopes,
+        subaccount_ids: p.subaccount_ids, expiry_sec: p.expiry_sec, label: p.label, ip_whitelist: [] }),
     },
   });
-  const wallet = fakeWallet();
-  _setSeatDeps({ findProvider: () => wallet, createClient: () => createClient({ url: TESTNET_WS, WebSocketImpl: fake.WebSocketImpl, sleep: async () => {} }) });
+  const wallet = fakeWallet({ reject });
+  _setSeatDeps({ findProvider: () => wallet, newKey, createClient: () => createClient({ url: TESTNET_WS, WebSocketImpl: fake.WebSocketImpl, sleep: async () => {} }) });
   return { fake, wallet, derive };
 }
 
@@ -55,7 +59,6 @@ describe("a wallet with no Derive account", () => {
     // A new subaccount under PRIME Standard, and nothing private was asked.
     expect(fake.calls("public/register_deposit_address")[0].params).toEqual({ wallet: wallet.address, subaccount_id: 0, manager_id: 1 });
     expect(fake.log.filter((m) => m.method.startsWith("private/"))).toHaveLength(0);
-    expect(read(KEYS.known(wallet.address))).toMatchObject({ ids: [] });
 
     // The deposit is on its way: public pending deposits show it, without a wallet prompt.
     derive.pending = [{ ...shapes["public/get_pending_deposits"].pending_deposits[0], amount: "50000000", status: "pending" }];
@@ -77,7 +80,10 @@ describe("a wallet with no Derive account", () => {
     await refreshFunding();
     s = seatState();
     expect(s).toMatchObject({ stage: "approve", newAccount: false, loggedAs: "owner", message: null });
-    expect(s.saloon).toMatchObject({ id: NEW_SUB, label: "Cowboy", usdc: 50 });
+    expect(s.saloon).toMatchObject({ id: NEW_SUB, label: "", usdc: 50 });
+    expect(fake.calls("private/change_subaccount_label")).toHaveLength(0); // labelled only after approval
+    await approve();
+    expect(seatState()).toMatchObject({ stage: "ready", saloon: { id: NEW_SUB, label: "Cowboy" } });
     expect(fake.calls("private/change_subaccount_label").map((m) => m.params)).toEqual([{ subaccount_id: NEW_SUB, label: "Cowboy" }]);
   });
 
@@ -87,7 +93,7 @@ describe("a wallet with no Derive account", () => {
     derive.account = true;
     derive.subs = { [NEW_SUB]: sub(NEW_SUB, 1, 0) };
     await refreshFunding();
-    expect(seatState()).toMatchObject({ stage: "fund", saloon: { id: NEW_SUB, label: "Cowboy" } });
+    expect(seatState()).toMatchObject({ stage: "fund", saloon: { id: NEW_SUB } });
     expect(fake.calls("public/register_deposit_address").at(-1).params).toEqual({ wallet: seatState().wallet, subaccount_id: NEW_SUB });
   });
 
@@ -144,11 +150,11 @@ describe("one deposit opens one account", () => {
     derive.subs = { [FALLBACK_SUB]: sub(FALLBACK_SUB, 0, 0), [NEW_SUB]: sub(NEW_SUB, 1, 10) };
     await refreshFunding();
     const s = seatState();
-    expect(s).toMatchObject({ stage: "approve", saloon: { id: NEW_SUB, label: "Cowboy", usdc: 10 } });
+    expect(s).toMatchObject({ stage: "approve", saloon: { id: NEW_SUB, usdc: 10 } });
     expect(holdSend(s)).toBe(false);
   });
 
-  it("after two deposits opened two accounts, uses the lowest funded one and notes the other", async () => {
+  it("after two deposits opened two accounts, proposes the lowest funded one and notes the other", async () => {
     const { fake, derive } = setup();
     await connect();
     derive.pending = [row("confirmed"), row("confirmed", { action_id: 562 })];
@@ -156,8 +162,127 @@ describe("one deposit opens one account", () => {
     derive.subs = { [FALLBACK_SUB]: sub(FALLBACK_SUB, 0, 0), [NEW_SUB]: sub(NEW_SUB, 1, 10), [NEW_SUB + 2]: sub(NEW_SUB + 2, 1, 10) };
     await refreshFunding();
     const s = seatState();
-    expect(s).toMatchObject({ stage: "approve", saloon: { id: NEW_SUB, label: "Cowboy" }, others: { count: 1, usdc: 10 } });
-    expect(fake.calls("private/change_subaccount_label").map((m) => m.params)).toEqual([{ subaccount_id: NEW_SUB, label: "Cowboy" }]);
+    expect(s).toMatchObject({ stage: "approve", saloon: { id: NEW_SUB }, others: { count: 1, usdc: 10 } });
+    expect(s.choices.map((c) => c.id)).toEqual([NEW_SUB, NEW_SUB + 2]);
+    expect(fake.calls("private/change_subaccount_label")).toHaveLength(0);
+  });
+});
+
+describe("a wallet already funded on Derive (from Derive's faucet)", () => {
+  const prompts = (wallet, method) => wallet.calls.filter((c) => c.method === method).length;
+  const FAUCET = 130001, OTHER = 130002;
+  const labels = (fake) => fake.calls("private/change_subaccount_label").map((m) => m.params);
+
+  it("proposes the one funded account, asks for no deposit, and labels it only after the approval", async () => {
+    const { fake, wallet, derive } = setup();
+    derive.account = true;
+    derive.subs = { [FALLBACK_SUB]: sub(FALLBACK_SUB, 0, 0), [FAUCET]: sub(FAUCET, 1, 1000) };
+    await connect();
+    let s = seatState();
+    expect(s).toMatchObject({ stage: "approve", saloon: { id: FAUCET, usdc: 1000, label: "" }, others: null, message: null });
+    expect(fake.calls("public/register_deposit_address")).toHaveLength(0);
+    expect(labels(fake)).toHaveLength(0);
+    expect(prompts(wallet, "personal_sign")).toBe(1);
+    await approve();
+    s = seatState();
+    expect(s).toMatchObject({ stage: "ready", saloon: { id: FAUCET, label: "Cowboy" }, loggedAs: "key", message: null });
+    // One signature for the grant, no second sign-in; the label follows Derive's acceptance.
+    expect(prompts(wallet, "eth_signTypedData_v4")).toBe(1);
+    expect(prompts(wallet, "personal_sign")).toBe(1);
+    const order = fake.log.map((m) => m.method);
+    expect(order.indexOf("private/set_session_key")).toBeLessThan(order.indexOf("private/change_subaccount_label"));
+    expect(fake.calls("private/set_session_key")[0].params.subaccount_ids).toEqual([FAUCET]);
+    expect(labels(fake)).toEqual([{ subaccount_id: FAUCET, label: "Cowboy" }]);
+    expect(read(KEYS.key(wallet.address))).toMatchObject({ subaccount_id: FAUCET });
+  });
+
+  it("proposes the larger of two funded accounts, and the user can pick the other without a wallet prompt", async () => {
+    const { fake, wallet, derive } = setup();
+    derive.account = true;
+    derive.subs = { [FAUCET]: sub(FAUCET, 1, 40), [OTHER]: sub(OTHER, 1, 900) };
+    await connect();
+    expect(seatState()).toMatchObject({ stage: "approve", saloon: { id: OTHER, usdc: 900 }, others: { count: 1, usdc: 40, ids: [FAUCET] } });
+    expect(seatState().choices.map((c) => [c.id, c.usdc])).toEqual([[OTHER, 900], [FAUCET, 40]]);
+    const before = wallet.calls.length;
+    pickAccount(FAUCET);
+    expect(wallet.calls.length).toBe(before);
+    expect(seatState()).toMatchObject({ stage: "approve", saloon: { id: FAUCET, usdc: 40 }, others: { count: 1, usdc: 900, ids: [OTHER] } });
+    await approve();
+    expect(fake.calls("private/set_session_key")[0].params.subaccount_ids).toEqual([FAUCET]);
+    expect(labels(fake)).toEqual([{ subaccount_id: FAUCET, label: "Cowboy" }]);
+    expect(derive.subs[OTHER].label).toBe("");
+    // Switch off retires the key for the chosen account.
+    await switchOff();
+    expect(fake.calls("private/set_session_key")[1].params.subaccount_ids).toEqual([FAUCET]);
+    expect(seatState()).toMatchObject({ stage: "approve", key: null });
+  });
+
+  it("uses an account already labelled Cowboy, even beside a larger one, and labels nothing", async () => {
+    const { fake, derive } = setup();
+    derive.account = true;
+    derive.subs = { [FAUCET]: sub(FAUCET, 1, 900), [OTHER]: sub(OTHER, 1, 25, "Cowboy") };
+    await connect();
+    expect(seatState()).toMatchObject({ stage: "approve", saloon: { id: OTHER, label: "Cowboy" }, others: { count: 1, usdc: 900 } });
+    await approve();
+    expect(seatState()).toMatchObject({ stage: "ready", saloon: { id: OTHER } });
+    expect(labels(fake)).toHaveLength(0);
+  });
+
+  it("leaves the account unlabelled when the wallet declines the approval", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { fake, wallet, derive } = setup({ reject: new Set(["eth_signTypedData_v4"]) });
+    derive.account = true;
+    derive.subs = { [FAUCET]: sub(FAUCET, 1, 1000) };
+    await connect();
+    await approve();
+    warn.mockRestore();
+    expect(seatState()).toMatchObject({ stage: "approve", saloon: { id: FAUCET, label: "" }, busy: false });
+    expect(seatState().message).toBeTruthy();
+    expect(seatState().key).toBeFalsy();
+    expect(fake.calls("private/set_session_key")).toHaveLength(0);
+    expect(labels(fake)).toHaveLength(0);
+    expect(derive.subs[FAUCET].label).toBe("");
+    expect(read(KEYS.key(wallet.address))).toBeNull();
+    expect(read(KEYS.account(wallet.address))).toBeNull();
+  });
+
+  it("with nothing funded, sends the deposit to the existing empty account", async () => {
+    const { fake, wallet, derive } = setup();
+    derive.account = true;
+    derive.subs = { [FALLBACK_SUB]: sub(FALLBACK_SUB, 0, 0), [OTHER]: sub(OTHER, 1, 0), [FAUCET]: sub(FAUCET, 1, 0) };
+    await connect();
+    expect(seatState()).toMatchObject({ stage: "fund", saloon: { id: FAUCET }, depositAddress: ADDR });
+    expect(fake.calls("public/register_deposit_address").at(-1).params).toEqual({ wallet: wallet.address, subaccount_id: FAUCET });
+    expect(holdSend(seatState())).toBe(false);
+    // Funded on Derive meanwhile: Check again moves on to the approval for it.
+    derive.subs[FAUCET] = sub(FAUCET, 1, 75);
+    await refreshFunding();
+    expect(seatState()).toMatchObject({ stage: "approve", saloon: { id: FAUCET, usdc: 75 } });
+    expect(labels(fake)).toHaveLength(0);
+  });
+
+  it("with no PRIME Standard account at all, the deposit opens a new one", async () => {
+    const { fake, wallet, derive } = setup();
+    derive.account = true;
+    derive.subs = { [FALLBACK_SUB]: sub(FALLBACK_SUB, 0, 0) };
+    await connect();
+    expect(seatState()).toMatchObject({ stage: "fund", saloon: null, depositAddress: ADDR });
+    expect(fake.calls("public/register_deposit_address").at(-1).params).toEqual({ wallet: wallet.address, subaccount_id: 0, manager_id: 1 });
+  });
+
+  it("on reload, resumes on the approved account and still offers the other", async () => {
+    const { fake, wallet, derive } = setup();
+    derive.account = true;
+    derive.subs = { [FAUCET]: sub(FAUCET, 1, 40), [OTHER]: sub(OTHER, 1, 900) };
+    await connect();
+    pickAccount(FAUCET);
+    await approve();
+    _setSeatDeps({ findProvider: () => wallet, createClient: () => createClient({ url: TESTNET_WS, WebSocketImpl: fake.WebSocketImpl, sleep: async () => {} }) });
+    wallet.calls.length = 0;
+    expect(await resume()).toBe(true);
+    expect(wallet.calls.map((c) => c.method)).toEqual(["eth_accounts", "eth_chainId"]);
+    expect(seatState()).toMatchObject({ stage: "ready", saloon: { id: FAUCET }, loggedAs: "key" });
+    expect(seatState().choices.map((c) => c.id)).toEqual([OTHER, FAUCET]);
   });
 });
 

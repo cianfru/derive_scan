@@ -61,3 +61,4 @@
   .hdr.hdr-wallet .tools { gap: 2px; }
   .hdr.hdr-marketplace.hdr-wallet .logo svg { height: 20px; }
 }
+.hw-accounts { padding: 0 10px 6px; }
