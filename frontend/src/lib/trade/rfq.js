@@ -176,7 +176,9 @@ export function createTicket({
     const check = checkQuote(res, { direction, payout, limit: floor, feeEstimate });
     if (!check.ok) {
       await cancel();
-      return set({ phase: check.reason === "beyond" ? "beyond" : "blocked", check, quote: best, message: null });
+      // Derive's own reason (free text) goes to the testnet build's (i); the screen says it plainly.
+      const detail = check.reason === "invalid" ? { step: "price", source: "Derive", code: "quote_not_valid", message: check.detail || "", data: "" } : null;
+      return set({ phase: check.reason === "beyond" ? "beyond" : "blocked", check, quote: best, message: null, detail });
     }
     const fresh = best.quote_id !== state.quote?.quote_id;
     set({ phase: "quoted", quote: best, check, best: res, firmUntil: fresh ? t + FIRM_MS : state.firmUntil, changed: fresh && !!state.quote });

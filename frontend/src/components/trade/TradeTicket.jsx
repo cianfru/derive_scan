@@ -17,6 +17,8 @@ import { partial } from "../../lib/positions.js";
 import ErrorDetail from "./ErrorDetail.jsx";
 
 const perDollar = (x) => cents(Math.round(x * 100));
+/** Derive's invalid-quote reasons that mean the account cannot carry the package. */
+const SHORT_FUNDS = /buying power|insufficient|not enough|balance|collateral|margin/i;
 const qty = (v) => String(Number((v ?? 0).toFixed(8)));
 
 /** What the ticket shows for an amount before asking Derive: the board's numbers, marked "about". */
@@ -125,6 +127,9 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE 
   const fills = mode === "testnet";
   const allowed = tradingAllows(trading, plan.direction);
   const preCap = buy ? capGate(plan.aboutLose, seat.wallet) : { ok: true };
+  // A buy the account cannot pay for is never sent: Derive would only refuse the quote.
+  const balance = seat.saloon?.usdc;
+  const short = buy && Number.isFinite(balance) && Number.isFinite(plan.aboutLose) && plan.aboutLose > balance + 1e-9;
   const ask = () => {
     const scope = { wallet: seat.wallet, subaccountId: seat.saloon?.id, client: seat.client, key: seat.key };
     if (!sameSeat(scope) || !tradingAllows(tradingRef.current, plan.direction)) return;
@@ -171,9 +176,9 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE 
       </dl>
 
       {!allowed && <p className="tr-msg" role="status">{TRADING_NOTICE[trading] || TRADING_NOTICE.off}</p>}
-      {allowed && st.phase === "idle" && (preCap.ok
-        ? <button className="btn primary lg tr-go" onClick={ask}>{buy ? "Get price" : "Get sell-back price"}</button>
-        : <p className="tr-msg">{capMessage(preCap)}</p>)}
+      {allowed && st.phase === "idle" && (!preCap.ok ? <p className="tr-msg">{capMessage(preCap)}</p>
+        : short ? <p className="tr-msg">Your Derive account holds {money(balance, { cents: true })}; this costs about {money(plan.aboutLose, { cents: true })} with fees. Choose a smaller amount.</p>
+          : <button className="btn primary lg tr-go" onClick={ask}>{buy ? "Get price" : "Get sell-back price"}</button>)}
       {busy && <p className="tr-wait"><span className="spin" aria-hidden="true" />{waitText}</p>}
       {quoted && (
         <>
@@ -200,7 +205,8 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE 
         <>
           <p className="tr-msg">{c?.reason === "fee" ? "Derive's fee is higher than usual right now."
             : c?.reason === "margin" ? "On Derive this package would hold more than its price, so Cowboy does not offer it."
-              : "Derive did not accept this package."}</p>
+              : c?.reason === "invalid" && SHORT_FUNDS.test(c.detail || "") ? "Your Derive account doesn't hold enough for this. Try a smaller amount."
+                : "Derive did not accept this package."}<ErrorDetail detail={st.detail} /></p>
           {again("Ask again")}
         </>
       )}
