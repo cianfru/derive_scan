@@ -9,7 +9,7 @@ import index from "./fixtures/questions/index.json";
 
 const docs = vi.hoisted(() => ({ current: {} }));
 vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.current[path] ?? null : null, error: null }) }));
-import Board from "./pages/Board.jsx";
+import Board, { returnText } from "./pages/Board.jsx";
 import { SaloonNotices } from "./components/SaloonNotices.jsx";
 import { BANNED, ticket } from "./lib/questions.js";
 import { DEFAULT_SORT, SORTS, boardRows, budgetTicket, cleanBudget, coinRank, costOverMark, dateRows, exitCost, filterRows, markFor, sortRows } from "./lib/board.js";
@@ -190,13 +190,16 @@ describe("the board page", () => {
     const first = order();
     const want = [...new Set(sortRows(boardRows([btc, hype], 100, { now: NOW }).rows, "mark").map((r) => `/q/${r.id}`))].slice(0, 24);
     expect(first).toEqual(want);
-    expect(screen.getByText(/answers for/).textContent).toMatch(/\$100\.00/);
+    expect(screen.queryByRole("button", { name: "$500" })).toBeNull(); // the amount is chosen on the outcome page
     const card = [...container.querySelectorAll(".bd-card")].find((c) => c.querySelectorAll("a.bd-choice").length === 2);
     const href = card.querySelector(".bd-question").getAttribute("href");
     expect(within(card).getAllByRole("link", { name: /see what it pays/ }).map((a) => a.getAttribute("href"))).toEqual([`${href}?side=yes`, `${href}?side=no`]);
     expect(card.textContent).toMatch(/Pays in part\$[\d,]+–\$[\d,]+/);
-    expect(card.textContent).toMatch(/most you make/);
-    expect(container.querySelector(".bd-key").textContent).toMatch(/Price per \$1 · most you make with \$100\.00/);
+    expect(card.textContent).toMatch(/\+[\d,.]+%most you make/);
+    expect(container.querySelector(".bd-key").textContent).toMatch(/Price per \$1 · most you make, as a share of what you pay/);
+    // The share is the $100 ticket's most you can make over its total, fees included.
+    const r = boardRows([btc, hype], 100, { now: NOW }).rows.find((x) => `/q/${x.id}` === href && x.side === "yes");
+    expect(card.querySelector("a.bd-choice.yes .bd-choice-out b").textContent).toBe(returnText(r.make, r.total));
     cleanup();
     docs.current = { ...docs.current, "markets.json": markets("defensive") }; show(); expect(order()).toEqual(byDate); await pick(); expect(order()).toEqual(first);
     cleanup();
@@ -221,12 +224,9 @@ describe("the board page", () => {
     expect(staleCard.querySelectorAll(".bd-over .bd-notyet").length).toBe(staleCard.querySelectorAll("a.bd-choice").length);
     expect(stale.textContent).not.toMatch(BANNED);
   });
-  it("keeps budget and side filtering, and searches coin names or unformatted prices", async () => {
+  it("keeps side filtering, and searches coin names or unformatted prices", async () => {
     const u = userEvent.setup({ advanceTimers: () => {} });
     const { container } = show();
-    await u.click(screen.getByRole("button", { name: "$500" }));
-    expect(loadBudget()).toBe(500);
-    expect(screen.getByText(/answers for/).textContent).toMatch(/\$500\.00/);
     await u.click(screen.getByRole("tab", { name: "HYPE" }));
     expect(order().every((n) => n.startsWith("/q/HYPE"))).toBe(true);
     expect(container.textContent).toMatch(/Thin book/);
@@ -240,14 +240,13 @@ describe("the board page", () => {
     expect(container.textContent).not.toMatch(BANNED);
     expect(container.textContent).not.toMatch(/\b(hot|trending|best|top pick)\b/i);
   });
-  it("opens a question with no side, and passes a side and budget only on an explicit choice", async () => {
+  it("opens a question with no side, passes a side only on an explicit choice, and leaves the amount to the outcome page", async () => {
     const u = userEvent.setup({ advanceTimers: () => {} }); show();
-    await u.click(screen.getByRole("button", { name: "$500" }));
     await u.click(screen.getAllByRole("link", { name: /view outcome/ })[0]);
-    expect(screen.getByText("question page no side budget 500")).toBeTruthy();
+    expect(screen.getByText("question page no side budget")).toBeTruthy();
     cleanup(); show();
     await u.click(screen.getAllByRole("link", { name: / Lower .*see what it pays/ })[0]);
-    expect(screen.getByText("question page ?side=no budget 500")).toBeTruthy();
+    expect(screen.getByText("question page ?side=no budget")).toBeTruthy();
   });
   it("collapses phone filters without clearing their values, and marks nondefault settings", async () => {
     const u = userEvent.setup({ advanceTimers: () => {} }); show();

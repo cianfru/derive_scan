@@ -8,8 +8,8 @@ import { ChainMini } from "../components/Chain.jsx";
 import { ASSET_NAMES } from "../lib/presentation.js";
 import SaloonHead from "../components/SaloonNotices.jsx";
 import { FollowButton, FollowLevel } from "../components/Follow.jsx";
-import { DEFAULT_SORT, RANGES, SIDES, SORTS, boardRows, cleanBudget, contextHorizon, dateRows, filterRows, sortRows } from "../lib/board.js";
-import { exportFollows, importFollows, saveBudget, unfollow, useFollowsDoc } from "../lib/follows.js";
+import { DEFAULT_SORT, RANGES, SIDES, SORTS, boardRows, contextHorizon, dateRows, filterRows, sortRows } from "../lib/board.js";
+import { exportFollows, importFollows, unfollow, useFollowsDoc } from "../lib/follows.js";
 import { TESTNET_FILLS } from "../lib/flags.js";
 import { NOT_ON_TESTNET, NOT_ON_TESTNET_WHY, missingLegs, useTestnetListing } from "../lib/testnetLevels.js";
 import { ANSWER, countdown, dayLabel, fullPay, money, noPriceReason, priceAge, signed } from "../lib/questions.js";
@@ -21,37 +21,21 @@ const usd = (v) => money(v, { cents: true });
 const perText = (v, plus = true) => `${v < 0 ? "-" : plus ? "+" : ""}${Math.abs(v * 100).toFixed(1)}c`;
 const clock = (t) => `${new Date(t * 1000).toISOString().slice(11, 16)} UTC`;
 
-const PRESETS = [25, 100, 500];
-
-/** One budget control: three amounts, or Other for any amount. */
-function Budget({ value }) {
-  const custom = !PRESETS.includes(value);
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(String(value));
-  useEffect(() => { setText(String(value)); }, [value]);
-  const commit = () => { setText(String(saveBudget(text))); setEditing(false); };
-  return (
-    <div className="bd-budget">
-      <span className="label" id="bd-budget-label">Budget
-        <Info label="About the budget">This is the total you spend, Derive's fees included: Cowboy sizes each answer so its price plus fees fit it. Each answer shows the most you can make with it. It is kept in this browser and carries through when you open an outcome.</Info>
-      </span>
-      <span className="bd-presets" role="group" aria-labelledby="bd-budget-label">
-        {PRESETS.map((v) => <button key={v} className="text-control bd-preset" aria-pressed={value === v} onClick={() => { saveBudget(v); setEditing(false); }}>${v}</button>)}
-        {editing ? <span className="q-dollar-field"><span>$</span>
-          <input id="bd-budget" aria-label="Other budget" inputMode="decimal" autoFocus value={text} onChange={(e) => setText(e.target.value.replace(/[^\d.]/g, ""))}
-            onBlur={commit} onKeyDown={(e) => { if (e.key === "Enter") commit(); if (e.key === "Escape") setEditing(false); }} />
-        </span>
-          : <button className="text-control bd-preset" aria-pressed={custom} onClick={() => setEditing(true)}>{custom ? <span className="mono">${value}</span> : "Other"}</button>}
-      </span>
-    </div>
-  );
+// The board prices every answer for one amount, so answers compare like for like; the amount itself is
+// chosen on the outcome page.
+const REF = 100;
+/** The most an answer makes as a share of what it costs, fees included. */
+export function returnText(make, total) {
+  if (!(make > 0) || !(total > 0)) return "None";
+  const pct = (make / total) * 100;
+  return `+${pct >= 100 ? Math.round(pct).toLocaleString("en-US") : pct.toFixed(1)}%`;
 }
 
 function NotYet({ label, why }) {
   return <span className="q-noprice bd-notyet">Not available yet<Info label={label}>{why}</Info></span>;
 }
 
-/** One answer in a level's row: its price per $1 and the most the budget can make, the tile opens the
+/** One answer in a level's row: its price per $1 and the most it makes as a share of its cost; the tile opens the
  * outcome at that answer; the bookmark beside it follows the answer. */
 function AnswerChoice({ r, budget }) {
   const listed = useTestnetListing(TESTNET_FILLS && !r.reason ? r.und : null);
@@ -62,13 +46,13 @@ function AnswerChoice({ r, budget }) {
   return (
     <div className={`bd-answer ${r.side}${available ? "" : " off"}`}>
       {offTestnet ? <div className="bd-choice off">{side}<span className="q-noprice">{NOT_ON_TESTNET}<Info label={`Why ${name} is not on testnet`}>{NOT_ON_TESTNET_WHY}</Info></span></div>
-        : available ? <Link to={`/q/${r.id}?side=${r.side}`} state={{ step: "preview", dollars: budget }} className={`bd-choice ${r.side}`} aria-label={`${name}: see what it pays`}>
+        : available ? <Link to={`/q/${r.id}?side=${r.side}`} state={{ step: "preview" }} className={`bd-choice ${r.side}`} aria-label={`${name}: see what it pays`}>
           <span className="bd-choice-side">{side}<b className="mono">{r.buyCents}<small>¢</small></b></span>
-          <span className="bd-choice-out"><b className="mono">{r.make > 0 ? signed(r.make) : "None"}</b><small>most you make</small></span>
+          <span className="bd-choice-out"><b className="mono">{returnText(r.make, r.total)}</b><small>most you make</small></span>
         </Link>
         : <div className="bd-choice off">{side}<span className="q-noprice">No price now<Info label={`Why ${name} has no price`}>{r.reason}</Info></span></div>}
       <FollowButton id={r.id} side={r.side} k={r.k} board={r.board} compact />
-      {available && r.capped && <small className="bd-capped">Size at this price limits you to {usd(r.total)}</small>}
+      {available && r.capped && <small className="bd-capped">Small size at this price</small>}
     </div>
   );
 }
@@ -78,7 +62,7 @@ function Comparison({ r }) {
   return <div className="bd-comparison-side">
     <h4 className={r.side === "yes" ? "up" : "down"}>{ANSWER[r.side]}</h4>
     <dl className="bd-figs">
-        <div><dt>You pay</dt><dd className="mono">{usd(r.total)}</dd></div>
+        <div><dt>You pay, for {usd(REF)}</dt><dd className="mono">{usd(r.total)}</dd></div>
         <div><dt>Most it pays</dt><dd className="mono">{usd(r.payout)}</dd></div>
         <div><dt>Full payout</dt><dd>{fullPay(r.level, r.side)}</dd></div>
         <div><dt>Derive fees included</dt><dd className="mono">{usd(r.fees)}</dd></div>
@@ -123,7 +107,7 @@ function OutcomeCard({ outcome: r, align, budget, inRow = false }) {
     <li className={`bd-card${inRow ? " in-row" : ""}${answers.length === 1 ? " single" : ""}`}>
       <div className="bd-level">
         {!inRow && <div className="bd-card-top"><Asset und={r.und} /><span className="bd-settle">{dayLabel(r.expiry)}<small>08:00 UTC · {countdown(r.settleTs)}</small></span></div>}
-        <Heading className="bd-card-q"><Link className="bd-question" to={`/q/${r.id}`} state={{ dollars: budget }} aria-label={`${r.und} at ${money(r.k)} on ${dayLabel(r.expiry)}: view outcome`}>
+        <Heading className="bd-card-q"><Link className="bd-question" to={`/q/${r.id}`}  aria-label={`${r.und} at ${money(r.k)} on ${dayLabel(r.expiry)}: view outcome`}>
           <span className="bd-q-text">Higher or lower than</span> <strong className="mono">{money(r.k)}</strong><span className="bd-q-text">?</span>
         </Link></Heading>
         <div className="bd-partial"><span>Pays in part</span><b className="mono">{money(r.lo)}–{money(r.hi)}</b><Info label={`About partial payout for ${r.und} at ${money(r.k)}`}>Between these prices, the spread pays part of its maximum, in a straight line. Higher reaches full payout at the upper price; Lower reaches full payout at the lower price. Opening an outcome shows the complete payout curve.</Info>{r.thin && <span className="bd-thin">Thin book</span>}</div>
@@ -147,8 +131,8 @@ function NowMark({ und, index }) {
 }
 
 /** The key over a ladder: what each answer's two figures are. */
-function LadderKey({ budget }) {
-  return <div className="bd-key" aria-hidden="true"><span>Level</span><span>Price per $1 · most you make with <b className="mono">{usd(budget)}</b></span></div>;
+function LadderKey() {
+  return <div className="bd-key"><span aria-hidden="true">Level</span><span>Price per $1 · most you make, as a share of what you pay<Info label="About these figures">The price is the cost per $1 of maximum payout, before fees. Most you make is the profit if the answer pays in full, as a share of the total you pay, Derive's fees included, worked out for {usd(REF)}. Derive charges a small fixed fee per option, so smaller amounts make a little less and larger ones a little more. Choose your amount when you open an outcome.</Info></span></div>;
 }
 
 /** One coin and settlement date: a header, then its levels from low to high with the index marked. */
@@ -164,7 +148,7 @@ function DateRow({ row, align, budget }) {
         <h2><CoinIcon und={row.und} /><span className="bd-row-name">{name}</span><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-date">{when}</span>{countdown(row.settleTs) && <><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-in mono">{countdown(row.settleTs)}</span></>}</h2>
         <span className="bd-row-meta"><span className="bd-row-n">{n} {n === 1 ? "level" : "levels"}</span>{row.index != null && <span className="bd-row-index mono">now {money(row.index)}</span>}</span>
       </header>
-      <LadderKey budget={budget} />
+      <LadderKey />
       <ol className="bd-row-cards" aria-label={`${name} levels on ${dayLabel(row.expiry)}, low to high`}>{cards}</ol>
     </section>
   );
@@ -230,13 +214,13 @@ function Following() {
   );
 }
 
-/** Browse: every live answer across coins and dates, priced for the user's budget, in the order the
+/** Browse: every live answer across coins and dates, priced for one amount, in the order the
  * user picks. Ordered by facts about the price only; the three layers sit on each row as context. */
 export default function Board({ followingOnly = false, embedded = false }) {
   const { data: index, error } = useData("questions/index.json");
   const { data: markets } = useData("markets.json");
   const doc = useFollowsDoc();
-  const budget = cleanBudget(doc.budget);
+  const budget = REF;
   const coins = (index?.coins || []).map((c) => c.und);
   const [feeds, files, ready] = useFeeds(coins.map((u) => `questions/${u}.json`));
   const [coin, setCoin] = useState("all");
@@ -288,8 +272,8 @@ export default function Board({ followingOnly = false, embedded = false }) {
     <div className={embedded ? "bd-page bd-embedded" : "wrap page q-page bd-page"}>
       {!embedded && <SaloonHead view={followingOnly ? "following" : "browse"} />}
       {feeds}
-      <section className="bd-controls" aria-label="Budget, filters and order">
-        <div className="bd-control-top"><Budget value={budget} /><label className="bd-search"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg><input type="search" aria-label="Search outcomes" placeholder="Search coin or price" value={search} onChange={(e) => setSearch(e.target.value)} /></label></div>
+      <section className="bd-controls" aria-label="Search, filters and order">
+        <div className="bd-control-top"><label className="bd-search"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg><input type="search" aria-label="Search outcomes" placeholder="Search coin or price" value={search} onChange={(e) => setSearch(e.target.value)} /></label></div>
         <div className="bd-filters">
           <Tabs label="Coin" value={coin} onChange={setCoin} items={[["all", "All coins"], ...coins.map((u) => [u, u])]} />
           <button className="bd-filter-toggle" aria-expanded={showFilters} aria-controls="bd-advanced-filters" onClick={() => setShowFilters((open) => !open)}>
@@ -309,11 +293,11 @@ export default function Board({ followingOnly = false, embedded = false }) {
       {!index || !ready ? <Loading /> : (
         <>
           <p className="bd-count status" aria-live="polite">
-            <span className="bd-count-main"><span className="mono">{groups.length}</span> {groups.length === 1 ? "outcome" : "outcomes"}{byDate && <> on <span className="mono">{rowsByDate.length}</span> {rowsByDate.length === 1 ? "date" : "dates"}</>}<span className="bd-answer-count"> · {list.length} {list.length === 1 ? "answer" : "answers"} for <span className="mono">{usd(budget)}</span></span></span>
+            <span className="bd-count-main"><span className="mono">{groups.length}</span> {groups.length === 1 ? "outcome" : "outcomes"}{byDate && <> on <span className="mono">{rowsByDate.length}</span> {rowsByDate.length === 1 ? "date" : "dates"}</>}<span className="bd-answer-count"> · {list.length} {list.length === 1 ? "answer" : "answers"}</span></span>
             <span className="bd-count-time">
             <span>{paused ? "Prices paused" : index?.prices_ts ? `Derive prices ${new Date(index.prices_ts * 1000).toISOString().slice(11, 16)} UTC` : "Derive prices"} · Fees included · Defined cost</span>
             <Info label="About this list">{byDate
-              ? "Each row is one coin and settlement date, soonest first; on the same date Bitcoin comes first, then Ethereum, then the other coins. Inside a row the levels run from low to high, and the lit line shows where the coin's index is now. Each answer shows its price per $1 of payout before fees and the most your budget can make, fees included; open an outcome for the full picture. Choose another order under Filters to see one list ranked by cost over Derive's mark, closeness to the price, settlement or size."
+              ? "Each row is one coin and settlement date, soonest first; on the same date Bitcoin comes first, then Ethereum, then the other coins. Inside a row the levels run from low to high, and the lit line shows where the coin's index is now. Each answer shows its price per $1 of payout before fees and the most it makes as a share of what you pay, fees included; open an outcome to choose your amount and see the full picture. Choose another order under Filters to see one list ranked by cost over Derive's mark, closeness to the price, settlement or size."
               : "Answers are grouped by coin, price level and settlement date. Each row takes the position of its first answer in your selected order: cost over Derive's mark before fees, closeness to the coin's price, settlement or size. Missing comparison figures go last."} Research is separate from this order. Answers that fail Cowboy's checks are left out; answers with no price have a reason below.</Info></span>
           </p>
           {list.length ? (
@@ -322,7 +306,7 @@ export default function Board({ followingOnly = false, embedded = false }) {
                 <div className="bd-rows">{shownRows.map((row) => <DateRow key={row.key} row={row} align={alignOf[row.und]} budget={budget} />)}</div>
                 {rowsByDate.length > shownRows.length && <button className="text-control bd-more" onClick={() => setShown(shownCards + PAGE)}>Show later dates</button>}
               </> : <>
-                <LadderKey budget={budget} />
+                <LadderKey />
                 <ol className="bd-grid">
                   {groups.slice(0, shown).map((r) => <OutcomeCard key={r.id} outcome={r} align={alignOf[r.und]} budget={budget} />)}
                 </ol>
