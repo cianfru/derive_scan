@@ -1,5 +1,6 @@
 import { Info, Empty } from "./ui.jsx";
 import { utc } from "../lib/format.js";
+import "../fear-greed.css";
 const BANDS = ["Extreme fear", "Fear", "Neutral", "Greed", "Extreme greed"];
 const ARCS = [
   "M24,110 A86,86 0 0 1 39.25,61.10",
@@ -18,11 +19,14 @@ export default function FearGreed({ sentiment, at }) {
   const stale = !at || Date.now() / 1000 - at > 86400 + 1200;
   const name = valid ? `${raw} out of 100, ${BANDS[band]}` : "Sentiment unavailable";
   return (
-    <div className={`fg-compact${stale ? " stale" : ""}`}>
-      <svg className="fg-dial" viewBox="14 20 192 100" role="img" aria-label={name}>
-        {ARCS.map((d, i) => <path key={d} d={d} fill="none" strokeWidth="14" className={i === band ? "on" : undefined} />)}
-        {valid && <g transform={`rotate(${-90 + raw * 1.8} 110 110)`}><path d="M110 40 106 110 114 110Z" className="needle" /></g>}
-        <circle cx="110" cy="110" r="7" className="hub" />
+    <div className={`fg-compact fg-band-${band}${stale ? " stale" : ""}`}>
+      <svg className="fg-dial" viewBox="14 17 192 101" role="img" aria-label={name}>
+        {ARCS.map((d, i) => <path key={d} d={d} className={`fg-arc fg-arc-${i}${i === band ? " on" : ""}`} />)}
+        {valid && <g transform={`rotate(${-90 + raw * 1.8} 110 110)`}>
+          <path d="M110 29 110 110" className="fg-needle" />
+          <circle cx="110" cy="24" r="5.5" className="fg-marker" />
+        </g>}
+        <circle cx="110" cy="110" r="5" className="fg-hub" />
       </svg>
       <div className="fg-read">
         <span className="fg-label">

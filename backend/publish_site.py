@@ -256,7 +256,8 @@ def metric_history(data: Path, cache: CandleCache, und: str, now: float, recorde
     return {"engine": engine, "coverage": {"engine": coverage, "options": options_coverage}}
 
 
-def count_breadth(breadth: dict, rows: list[dict]) -> None:
+def count_breadth(breadth: dict, rows: list[dict], *, und: str | None = None,
+                  members: dict | None = None) -> None:
     """Adds one coin's ready daily regimes to breadth[ts][regime].
 
     A saved close filled from a ready replay counts like the replayed closes before it, so a coin
@@ -266,11 +267,19 @@ def count_breadth(breadth: dict, rows: list[dict]) -> None:
         ready = r.get("status") == "ready" or "regime" in (r.get("filled_from_replay") or ())
         if not ready or (r.get("metric_status") or {}).get("regime") != "ready" or not r.get("regime"):
             continue
-        breadth[int(r["ts"])][r["regime"] if r["regime"] in BREADTH_COLS else "FLAT"] += 1
+        ts = int(r["ts"])
+        regime = r["regime"] if r["regime"] in BREADTH_COLS else "FLAT"
+        breadth[ts][regime] += 1
+        if members is not None and und is not None:
+            members.setdefault(ts, {}).setdefault(regime, []).append(und)
 
 
-def breadth_table(breadth: dict) -> dict:
-    return {"cols": list(BREADTH_COLS), "rows": [[ts, *(breadth[ts][c] for c in BREADTH_COLS)] for ts in sorted(breadth)]}
+def breadth_table(breadth: dict, members: dict | None = None) -> dict:
+    timestamps = sorted(breadth)
+    table = {"cols": list(BREADTH_COLS), "rows": [[ts, *(breadth[ts][c] for c in BREADTH_COLS)] for ts in timestamps]}
+    if members is not None:
+        table["members"] = [[sorted(members.get(ts, {}).get(c, [])) for c in BREADTH_COLS] for ts in timestamps]
+    return table
 
 
 def ribbon_chars(trail: dict, bars: list) -> str:
@@ -799,6 +808,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     q_coins = question_coins(site, now)
     q_flag = {} if q_coins is None else None  # with Questions off, no field is added at all
     breadth: dict = defaultdict(Counter)
+    breadth_members: dict = {}
     engine_1d: dict = {}
     for sym in sig.get("universe", []):
         und = sym.split("-")[0]
@@ -869,7 +879,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             **(q_flag if q_flag is not None else {"questions": und in q_coins}),
         })
         tracking = metric_history(data, cache, und, now, metrics.get(und, {}))
-        count_breadth(breadth, tracking["engine"]["1d"])
+        count_breadth(breadth, tracking["engine"]["1d"], und=und, members=breadth_members)
         engine_1d[und] = tracking["engine"]["1d"]
         tracking["coverage"]["wallets"] = coverage
         _write(site / "coins" / f"{und}.json", {
@@ -881,7 +891,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
             "has_surface": has_surface, "taker_flow": coin_flows, "alignment": align,
             **(q_flag if q_flag is not None else {"questions": und in q_coins}),
         })
-    meta["breadth_1d"] = breadth_table(breadth)
+    meta["breadth_1d"] = breadth_table(breadth, breadth_members)
     _write(site / "markets.json", {**meta, "coins": markets})
     radar = radar_block(data, engine_1d, [m["und"] for m in markets if m["has_options"]], now, metrics)
     if radar:

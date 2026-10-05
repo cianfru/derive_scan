@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, it, expect, vi } from "vitest";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 
@@ -91,4 +91,64 @@ it("takes the strip's last column from the board's own readings", () => {
   expect(stripColumns(breadth, { MARKUP: 5 }, 200).map((c) => c.n)).toEqual([{ MARKUP: 4, REACC: 1 }, { MARKUP: 5 }]);
   expect(stripColumns(breadth, { MARKUP: 5 }, 300).map((c) => c.ts)).toEqual([100, 200, 300]);
   expect(stripColumns(breadth, {}, 300)).toHaveLength(2);
+});
+
+it("shows each hovered day's exact coin groups and uses the board's current coins for the latest close", () => {
+  const stale = { ...coin("OLD", true), engine_comparison: { "1d": { status: "ready", timeframe: "1d", observed_at: now - 3 * 86400 } } };
+  fixture.current = markets([coin("AAA", true), coin("BBB", true), stale]);
+  fixture.current.breadth_1d.members = [
+    [["BTC", "ETH"], [], ["SOL"], [], [], [], []],
+    [["PAST", "OLD"], [], ["SOL"], [], [], [], []],
+  ];
+  show();
+  const history = band().getByRole("slider", { name: /Daily regime mix/ });
+  const plot = history.querySelector("svg");
+  plot.getBoundingClientRect = () => ({ left: 100, width: 200 });
+  fireEvent(plot, new MouseEvent("pointermove", { bubbles: true, clientX: 125 }));
+  const tooltip = screen.getByRole("tooltip");
+  expect(within(tooltip).getByText("BTC, ETH")).toBeTruthy();
+  expect(within(tooltip).getByText("SOL")).toBeTruthy();
+  expect(tooltip.textContent).toContain(new Date((bar - 86400) * 1000).getUTCFullYear().toString());
+  expect(tooltip.textContent).toContain("Daily close · UTC");
+  fireEvent.keyDown(history, { key: "End" });
+  expect(within(tooltip).getByText("AAA, BBB")).toBeTruthy();
+  expect(tooltip.textContent).not.toMatch(/PAST|OLD|SOL/);
+  expect(history.getAttribute("aria-valuetext")).toContain("AAA, BBB");
+  fireEvent.keyDown(history, { key: "Escape" });
+  expect(screen.queryByRole("tooltip")).toBeNull();
+});
+
+it("keeps historical names unavailable in older count-only data instead of borrowing today's coins", () => {
+  fixture.current = markets([coin("AAA", true), coin("BBB", true)]);
+  show();
+  const history = band().getByRole("slider", { name: /Daily regime mix/ });
+  fireEvent.focus(history);
+  expect(screen.getByRole("tooltip").textContent).toContain("AAA, BBB");
+  fireEvent.keyDown(history, { key: "Home" });
+  const tooltip = screen.getByRole("tooltip");
+  expect(within(tooltip).getAllByText("Coin names unavailable")).toHaveLength(2);
+  expect(tooltip.textContent).not.toContain("AAA");
+  expect(history.getAttribute("aria-valuenow")).toBe("0");
+  fireEvent.blur(history);
+  expect(screen.queryByRole("tooltip")).toBeNull();
+});
+
+it("lets pointer and keyboard inspection identify a missing daily close without snapping to a neighbour", () => {
+  fixture.current = markets([coin("AAA", true)]);
+  fixture.current.breadth_1d.rows[0][0] = bar - 2 * 86400;
+  show();
+  const history = band().getByRole("slider", { name: /Daily regime mix/ });
+  fireEvent.focus(history);
+  fireEvent.keyDown(history, { key: "Home" });
+  fireEvent.keyDown(history, { key: "ArrowRight" });
+  expect(screen.getByRole("tooltip").textContent).toContain("No reading");
+  expect(history.getAttribute("aria-valuetext")).toContain(new Date((bar - 86400) * 1000).toLocaleDateString("en-GB", {
+    day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
+  }));
+  const plot = history.querySelector("svg");
+  plot.getBoundingClientRect = () => ({ left: 0, width: 300 });
+  fireEvent(plot, new MouseEvent("pointermove", { bubbles: true, clientX: 150 }));
+  expect(screen.getByRole("tooltip").textContent).toContain("No reading");
+  fireEvent(plot, new MouseEvent("pointermove", { bubbles: true, clientX: 299 }));
+  expect(screen.getByRole("tooltip").textContent).toContain("AAA");
 });
