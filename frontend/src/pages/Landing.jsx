@@ -347,7 +347,7 @@ export default function Landing() {
             <h1 id="lp-hero">Know where<br />the herd stands.{QUESTIONS_ON && <span className="hero-then"> Then pick your side.</span>}</h1>
             <div className="hero-side">
               <p className="hero-description">{QUESTIONS_ON
-                ? `Our engine names each coin's regime. Cowboy shows where Derive's profitable traders are positioned and what options are pricing. When you have a view, take higher or lower ${oneTapOffered() ? "in one tap" : "on Derive"}, with the full cost shown first.${oneTapOffered() ? "" : " One-tap trading is coming."}`
+                ? `The regime, the traders and the options at a glance. Then higher or lower ${oneTapOffered() ? "in one tap" : "on Derive"}, cost shown first.`
                 : "Understand the price cycle, follow wallet positioning and see what the options market prices in."}</p>
               <div className="hero-cta">
                 <EntryButton />
