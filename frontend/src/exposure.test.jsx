@@ -57,35 +57,99 @@ const show = (path) => render(
 const fig = (root, name) => within(root).getByText(name).closest("div").querySelector("dd").textContent;
 
 describe("combined exposure on Positions", () => {
-  it("groups two tickets on one date into one payoff, with the combined worst case and the total", () => {
+  it("groups two tickets on one date into one card with one payoff, the combined worst case, the total and a Close per line", async () => {
     localStorage.setItem("cowboy-questions", JSON.stringify([HIGHER, LOWER]));
     const { container } = show("/saloon/mine");
-    const sec = screen.getByRole("region", { name: "At settlement" });
-    const groups = sec.querySelectorAll(".q-exp-g");
-    expect(groups).toHaveLength(1);
-    const g = groups[0];
-    expect(g.querySelector("h3").textContent).toBe("BTC · Fri 9 Oct, 08:00 UTC");
-    expect(g.textContent).toContain("2 positions");
+    const cards = container.querySelectorAll(".q-group");
+    expect(cards).toHaveLength(1);
+    const g = cards[0];
+    expect(g.querySelector("h2").textContent).toBe("BTC · Fri 9 Oct, 08:00 UTC");
+    expect(g.querySelector(".q-group-meta").textContent).toMatch(/^in 5d 18hnow \$84,8232 positions/);
+    const chart = within(g).getByRole("region", { name: "At settlement, BTC on Fri 9 Oct" });
+    expect(chart.querySelector("svg.ex-chart")).not.toBeNull();
+    expect(chart.querySelector("line.pz-now")).not.toBeNull(); // today's index marked
+    const figs = g.querySelector(".q-position-figures");
     // At 86,000 Lower pays nothing and Higher half its width: $191.60 - $128.31.
-    expect(fig(g, "Most you can lose")).toMatch(/^\$63\.29 · tickets one by one \$191\.60/);
-    expect(fig(g, "Most it pays")).toBe("$300.00");
-    expect(fig(g, "Breakeven")).toMatch(/^\$\d{2},\d{3} and \$\d{2},\d{3}$/);
-    expect(sec.querySelector(".q-exp-total").textContent).toContain("$63.29");
-    expect(g.querySelector("svg.ex-chart")).not.toBeNull();
+    expect(fig(figs, "Most you can lose")).toMatch(/^\$63\.29 · tickets one by one \$191\.60/);
+    expect(fig(figs, "Most it pays")).toBe("$300.00");
+    expect(fig(figs, "Breakeven")).toMatch(/^\$\d{2},\d{3} and \$\d{2},\d{3}$/);
+    expect(fig(figs, "You paid")).toBe("$191.60");
+    // The group's value now is the sum of its lines.
+    const lines = [...g.querySelectorAll(".q-pos-line")];
+    expect(lines).toHaveLength(2);
+    expect(lines.map((l) => l.querySelector(".q-card-title").textContent)).toEqual(["Higher than $86,000", "Lower than $83,000"]);
+    const val = (root) => Number(fig(root, "Value now").replace(/[$,]/g, ""));
+    expect(val(figs)).toBeCloseTo(val(lines[0]) + val(lines[1]), 2);
+    expect(fig(lines[0], "Contracts")).toBe("0.04277");
+    expect(container.querySelector(".q-exp-total").textContent).toContain("$63.29");
+    // Two Close buttons, one per line, each opening its own sell-back under its line.
+    const closes = within(g).getAllByRole("button", { name: "Close" });
+    expect(closes).toHaveLength(2);
+    expect(closes.map((b) => b.closest(".q-pos-line"))).toEqual(lines);
+    const user = userEvent.setup({ advanceTimers: () => {} });
+    await user.click(closes[1]);
+    expect(closes[1].getAttribute("aria-expanded")).toBe("true");
+    expect(lines[1].querySelector(".q-close-sum")).not.toBeNull();
+    expect(lines[0].querySelector(".q-close-sum")).toBeNull();
+    // Each line keeps its folded details.
+    expect(lines.map((l) => l.querySelector(".q-position-details").open)).toEqual([false, false]);
     expect(container.textContent).not.toMatch(BANNED);
   });
 
-  it("adds each date's worst case across dates and shows nothing on the Closed tab", async () => {
+  it("shows one card per coin and date, adds each date's worst case, and keeps the Closed tab's cards", async () => {
     const later = { ...LOWER, key: "l2", id: "BTC-20261016-A-80000-86000", settle_ts: S9 + 7 * 86400,
       journal: { ...LOWER.journal, package: { ...LOWER.journal.package, expiry: "20261016" } } };
-    localStorage.setItem("cowboy-questions", JSON.stringify([HIGHER, later]));
+    const eth = { ...HIGHER, key: "e", id: "ETH-20261009-A-3000-3200", und: "ETH", lo: 3000, hi: 3200,
+      journal: { ...HIGHER.journal, package: { ...HIGHER.journal.package, id: "ETH-20261009-A-3000-3200", und: "ETH" },
+        fill: { ...HIGHER.journal.fill, legs: [{ name: "ETH-20261009-3000-C", act: "buy", planned: 0.04277, qty: 0.04277, signed_qty: 0.04277 }, { name: "ETH-20261009-3200-C", act: "sell", planned: 0.04277, qty: 0.04277, signed_qty: -0.04277 }] } } };
+    const closed = { ...LOWER, key: "c", closed_at: T14 - 60, proceeds: 90 };
+    localStorage.setItem("cowboy-questions", JSON.stringify([HIGHER, later, eth, closed]));
     const { container } = show("/saloon/mine");
-    const sec = screen.getByRole("region", { name: "At settlement" });
-    expect(sec.querySelectorAll(".q-exp-g")).toHaveLength(2);
-    expect(sec.querySelector(".q-exp-total").textContent).toContain("$191.60");
+    const cards = [...container.querySelectorAll(".q-group")];
+    expect(cards.map((c) => c.querySelector("h2").textContent)).toEqual(["BTC · Fri 9 Oct, 08:00 UTC", "ETH · Fri 9 Oct, 08:00 UTC", "BTC · Fri 16 Oct, 08:00 UTC"]);
+    expect(container.querySelectorAll(".q-pos-line")).toHaveLength(0); // one position each: Close sits on the card
+    for (const c of cards) expect(within(c).queryAllByRole("button", { name: "Close" }).length).toBeLessThanOrEqual(1);
+    expect(within(cards[0]).getByRole("button", { name: "Close" }).closest(".q-position-tools")).not.toBeNull();
+    expect(container.querySelector(".q-exp-total").textContent).toMatch(/\$\d/);
     const user = userEvent.setup({ advanceTimers: () => {} });
     await user.click(screen.getByRole("tab", { name: "Closed" }));
-    expect(container.querySelector(".q-exp")).toBeNull();
+    expect(container.querySelector(".q-group")).toBeNull();
+    expect(container.querySelector(".q-exp-total")).toBeNull();
+    const card = container.querySelector(".q-card.q-position");
+    expect(card.querySelector(".q-card-status").textContent).toContain("Closed · sold back by hand");
+    expect(fig(card, "Got back")).toBe("$90.00");
+    expect(fig(card, "Sold back")).toMatch(/^2026-10-03$/);
+    expect(card.querySelector(".ex-chart")).toBeNull();
+  });
+
+  it("puts a single position's status and Close on its card, with the details folded", async () => {
+    localStorage.setItem("cowboy-questions", JSON.stringify([HIGHER]));
+    const { container } = show("/saloon/mine");
+    const card = container.querySelector(".q-group");
+    expect(card.querySelector(".q-group-pos").textContent).toContain("BTC higher or lower than $86,000 on Fri 9 Oct, 08:00 UTC?");
+    expect(card.querySelector(".q-group-pos .q-card-status").textContent).toBe("Placed by hand · both filledi");
+    const close = within(card).getByRole("button", { name: "Close" });
+    expect(close.getAttribute("aria-expanded")).toBe("false");
+    expect(card.querySelector(".q-position-details").open).toBe(false);
+    expect(fig(card.querySelector(".q-position-figures"), "Most you can lose")).toBe("$100.00");
+    const user = userEvent.setup({ advanceTimers: () => {} });
+    await user.click(close);
+    expect(close.getAttribute("aria-expanded")).toBe("true");
+    expect(card.querySelector(".q-close-sum")).not.toBeNull();
+  });
+
+  it("still shows a position the combined figures leave out, inside its date's card", () => {
+    const missing = { ...LOWER, key: "m", journal: { ...LOWER.journal, cost: null }, paid: undefined, exec: "hand_both" };
+    delete missing.journal.cost;
+    const pkg = { ...missing, journal: { ...missing.journal } };
+    localStorage.setItem("cowboy-questions", JSON.stringify([HIGHER, pkg]));
+    const { container } = show("/saloon/mine");
+    const g = container.querySelector(".q-group");
+    expect(g.querySelectorAll(".q-pos-line")).toHaveLength(2);
+    expect(g.querySelector(".q-group-chart").textContent).toMatch(/1 of 2 positions not in this chart/);
+    const figs = g.querySelector(".q-position-figures");
+    expect(fig(figs, "Most you can lose")).toBe("Not available yeti");
+    expect(fig(figs, "You paid")).toBe("Not available yeti");
   });
 });
 

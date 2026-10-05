@@ -24,6 +24,14 @@ export const intrinsic = (leg, S) => (leg.kind === "C" ? Math.max(0, S - leg.str
 export const settleRef = (und) => `${und} index, 30-minute average to 08:00 UTC`;
 
 const expiryOf = (p) => p.journal?.package?.expiry || /^[A-Z0-9]+-(\d{8})-/.exec(p.id || "")?.[1] || null;
+const undOf = (p) => p.und || parseInstrument(p.journal?.fill?.legs?.[0]?.name)?.und || p.id?.split("-")[0] || null;
+
+/** The exposure group a position belongs to (coin, settlement reference and date), whether or not
+ * its figures can be combined yet, so Positions can show every open position under its group. */
+export function exposureKey(p) {
+  const und = undOf(p), expiry = expiryOf(p);
+  return { key: `${und}|${settleRef(und)}|${expiry}`, und, ref: settleRef(und), expiry };
+}
 
 /**
  * A position's exposure at settlement: its legs (signed contracts per instrument) and what it cost,
@@ -55,7 +63,7 @@ export function positionExposure(p) {
   const total = p.exec === "rfq" ? (ok(c?.fees) ? c?.total : null) : c ? (c.total ?? c.premium) : p.paid;
   const feesBasis = c ? c.fees_basis : "included";
   return {
-    key: p.key, und: p.und || legs[0]?.und || p.id?.split("-")[0], expiry: expiryOf(p), settle_ts: p.settle_ts ?? null,
+    key: p.key, und: undOf(p), expiry: expiryOf(p), settle_ts: p.settle_ts ?? null,
     legs, cost: ok(total) ? total * r : null, feesBasis, basis, partial: p.exec === "hand_partial", remaining: r,
   };
 }
@@ -122,7 +130,7 @@ export function exposureGroups(positions, now = Date.now() / 1000) {
     if (p.closed_at || (ok(p.settle_ts) && now >= p.settle_ts)) continue;
     const e = positionExposure(p);
     if (!e || !e.expiry || e.cost == null) continue;
-    const key = `${e.und}|${settleRef(e.und)}|${e.expiry}`;
+    const { key } = exposureKey(p);
     if (!groups.has(key)) groups.set(key, { key, und: e.und, ref: settleRef(e.und), expiry: e.expiry, settle_ts: e.settle_ts, items: [] });
     groups.get(key).items.push(e);
   }
