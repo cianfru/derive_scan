@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../../..");
 /** The header's wallet: its words and class names, which only a testnet build may carry. */
-const WALLET = /Connect wallet|Switch off Cowboy|Derive testnet · test USDC|hw-btn|hdr-wallet/;
+const WALLET = /Connect wallet|Switch off Cowboy|Derive testnet · test USDC|hw-btn|hdr-wallet|hdr-testnet/;
 const MARKERS = [/0x9371352CCef6f5b36EfDFE90942fFE622Ab77F1D/i, /testnet\.api\.derive\.xyz/, /EIP712Domain/, /set_session_key/, /private\/execute_quote/, /get_trade_history/];
 
 async function bundle(env, exts = [".js"]) {
@@ -33,7 +33,7 @@ it("leaves trading code out of a build with the flag off, even with the Saloon o
   const files = await bundle({ VITE_QUESTIONS: "1", VITE_SALOON_TRADE: "" }, [".js", ".css"]);
   for (const { f, src } of files) {
     for (const m of MARKERS) expect(m.test(src), `${f} ${m}`).toBe(false);
-    expect(src, f).not.toMatch(/testnet build|One tap works|Bought in one tap|Testnet</);
+    expect(src, f).not.toMatch(/testnet build|One tap works|Bought in one tap|Testnet<|Loading one-tap|Reload to trade in one tap/);
     expect(src, f).not.toMatch(WALLET);
     expect(src, f).not.toMatch(/Details for testing/);
   }
@@ -55,6 +55,8 @@ it("builds a testnet app: fills on the testnet only, in the trade chunk, with th
   expect(withTrade[0]).toMatch(/^TradePanel-/);
   expect(files.find(({ f }) => f.startsWith("TradePanel-")).src).toMatch(/private\/execute_quote/);
   expect(files.some(({ src }) => /Cowboy home, testnet build/.test(src))).toBe(true);
+  // The "Testnet" marker beside the logo is styled in the entry, so it shows on every page.
+  expect(files.find(({ f }) => f.startsWith("index-")).src).toMatch(/\.hdr-testnet/);
   // The header's wallet: a placeholder and its styles in the entry, no trading code there; the menu
   // itself (connect, Switch off Cowboy, Disconnect) only in the trade chunk.
   const entry = files.find(({ f }) => f.startsWith("index-"));

@@ -114,13 +114,12 @@ export default function Shell() {
       <header className={`hdr${QUESTIONS_ON ? " hdr-marketplace" : ""}${QUESTIONS_ON && pathname === "/" ? " hdr-landing" : ""}${TESTNET_FILLS ? " hdr-wallet" : ""}`} ref={header}>
         <div className="wrap">
           {TESTNET_FILLS ? (
-            // Testnet builds only: one-tap trades go to Derive's testnet. Styled inline, and written as a
-            // separate branch, so other builds stay byte-identical.
+            // Testnet builds only: one-tap trades go to Derive's testnet. A text label with a thin accent
+            // underline on every page (styles in hdr-wallet.css, inlined in these builds alone), written as a
+            // separate branch so other builds stay byte-identical.
             <Link to="/" className="logo" aria-label="Cowboy home, testnet build">
               <Lockup />
-              <span className="hdr-testnet mono" title="One-tap trades in this build go to Derive's testnet with test USDC. Board prices come from Derive's live market."
-                style={{ marginLeft: 10, padding: "1px 6px", fontSize: 11, lineHeight: "16px", letterSpacing: ".04em", textTransform: "uppercase",
-                  color: "var(--accent-text)", border: "1px solid var(--accent)", borderRadius: 4, whiteSpace: "nowrap" }}>Testnet</span>
+              <span className="hdr-testnet mono" title="One-tap trades in this build go to Derive's testnet with test USDC. Board prices come from Derive's live market.">Testnet</span>
             </Link>
           ) : (
             <Link to="/" className="logo" aria-label="Cowboy home">
