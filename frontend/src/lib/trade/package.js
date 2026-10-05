@@ -11,7 +11,7 @@ export const TRADE_LIMITS = {
   tolerance: { major: 0.02, thin: 0.03 }, // T: board price + 2c (BTC, ETH), + 3c thin coins
   betweenTolerance: 0.05, // Inside and Outside: clipped mark + 5c
   feeCeiling: { mult: 1.5, plus: 0.5 }, // Derive's suggested max fee may be at most estimate x 1.5 + $0.50
-  marginSlack: 0.01, // margin before and after must match to the cent
+  marginSlack: 0.01, // margin used may exceed price plus fee by at most a cent
 };
 
 const ok = (v) => v != null && Number.isFinite(v);
@@ -167,7 +167,12 @@ export function checkQuote(best, { direction, payout, limit, feeEstimate }) {
   if (direction === "buy" && ok(limit) && Math.abs(total) > limit + 1e-9) return { ok: false, reason: "beyond", ...figures };
   if (direction === "sell" && ok(limit) && Math.abs(total) < limit - 1e-9) return { ok: false, reason: "beyond", ...figures };
   const pre = Number(best.pre_initial_margin), post = Number(best.post_initial_margin);
-  if (!ok(pre) || !ok(post) || Math.abs(post - pre) > TRADE_LIMITS.marginSlack) return { ok: false, reason: "margin", ...figures };
+  // Derive's initial margin is the room the account has left: paying the package's price and fee
+  // uses that much of it, and a package that would use more locks cash beyond its price.
+  const used = pre - post;
+  if (!ok(pre) || !ok(post) || used > Math.abs(total) + Math.max(fee, ok(maxFee) ? maxFee : 0) + TRADE_LIMITS.marginSlack) {
+    return { ok: false, reason: "margin", ...figures, margin: { pre, post, used } };
+  }
   if (ok(feeEstimate) && maxFee > feeCeiling(feeEstimate) + 1e-9) return { ok: false, reason: "fee", ...figures };
   return { ok: true, reason: null, ...figures, mostLose: direction === "buy" ? Math.abs(total) + fee : null, net: direction === "sell" ? Math.abs(total) - fee : null };
 }

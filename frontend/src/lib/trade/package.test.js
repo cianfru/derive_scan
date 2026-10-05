@@ -113,7 +113,11 @@ describe("quote checks", () => {
     expect(c.ok).toBe(true);
     expect(c.net).toBeCloseTo(93.38, 6);
   });
-  it("refuses a quote that would lock margin", () => expect(checkQuote({ ...base, post_initial_margin: "460" }, ctx).reason).toBe("margin"));
+  it("refuses a quote that would lock margin beyond its price and fee", () => expect(checkQuote({ ...base, post_initial_margin: "300" }, ctx).reason).toBe("margin"));
+  it("takes a quote whose margin use is its price and fee (the owner's testnet run, 5 October 2026)", () => {
+    expect(checkQuote({ ...base, post_initial_margin: String(500 - 100 - 2.10) }, ctx).ok).toBe(true);
+    expect(checkQuote({ ...base, post_initial_margin: String(500 - 100 - 2.10 - 0.02) }, ctx).reason).toBe("margin");
+  });
   it("refuses a fee above the ceiling", () => expect(checkQuote({ ...base, suggested_max_fee: "3.10" }, ctx).reason).toBe("fee"));
   it("passes Derive's own invalid reason through", () => expect(checkQuote({ ...base, is_valid: false, invalid_reason: "x" }, ctx)).toMatchObject({ ok: false, reason: "invalid" }));
   it("handles no quote", () => expect(checkQuote(null, ctx).reason).toBe("no_quote"));
