@@ -22,7 +22,8 @@ def test_comparison_uses_final_decisions_without_mutating_saved_state():
 
 def test_incomplete_and_stale_pairs_cannot_report_current_agreement():
     four,daily = row('4h'),row('1d')
-    for r in [None, {**four,'data_status':'warming up'}, {**four,'engine_errors':['failure']},
+    # A young coin still warming up counts (owner, 5 October 2026); too few bars does not.
+    for r in [None, {**four,'data_status':'not enough data'}, {**four,'engine_errors':['failure']},
               {**four,'signal_bar_close_time':80000}]:
         result=engine_comparison(r,daily,100100)
         assert result['confluence'] is None

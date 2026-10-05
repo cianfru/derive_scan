@@ -68,6 +68,13 @@ def data_status(history_bars: int, normalization_ready: bool) -> str:
     return "ready" if normalization_ready else "warming up"
 
 
+def usable_history(row: dict) -> bool:
+    """Enough bars for a signal. A young coin still warming up (fewer than the engine's 499 bars for
+    its normalisation) publishes its signal as the engine computes it, with z-scores damped by the
+    engine itself (owner, 5 October 2026); only "not enough data" (under 200 bars) is held back."""
+    return row.get("data_status") in ("ready", "warming up")
+
+
 def volume_coverage(ohlcv: dict) -> float:
     v = np.asarray(ohlcv["volume"][-VOLUME_WINDOW:], dtype=np.float64)
     return float((v > 0).mean()) if len(v) else 0.0
@@ -321,7 +328,7 @@ def available_synthesis(row: dict, **context):
         unknown.add("consensus")
     if row.get("btc_status") != "ready":
         unknown.add("no_bear_div")
-    if row.get("data_status") != "ready":
+    if not usable_history(row):
         unknown.update(("bullish_regime", "z_range", "heat_ok", "no_climax", "no_bear_div"))
     if unknown:
         earned = 0
@@ -340,7 +347,7 @@ def available_synthesis(row: dict, **context):
         out.warnings.append(f"Unavailable evidence: {missing}; new entries suppressed")
         out.reason = (f"Unavailable evidence: {missing}; new entries suppressed" if original != out.signal
                       else f"{out.signal}: {row.get('regime', 'Unknown')} price structure; unavailable evidence: {missing}")
-    if row.get("data_status") != "ready":
+    if not usable_history(row):
         out.signal, out.entry_blocked = "WAIT", True
         out.reason = "Price history is not ready; signal unavailable"
     return out
@@ -387,13 +394,14 @@ def synthesize(results: List[dict], tf: str, context_inputs: dict, state, other_
         evaluate_decision(r, context, state, as_of=as_of, metadata=metadata, synthesizer=available_synthesis)
         for condition in r.get("conditions_detail", []):
             if condition["name"] == "no_climax":
-                condition.update(source="derive_perp_volume", freshness=r.get("volume_status"))
+                condition.update(source=r.get("volume_source") or "derive perp",
+                                 freshness=r.get("volume_status"))
             elif condition["name"] == "consensus":
                 condition.update(source="eligible_engines", observed_at=as_of, freshness=consensus["status"])
             elif condition["name"] == "no_bear_div":
                 condition.update(source="BTC_engine", observed_at=(btc or {}).get("signal_bar_close_time"), freshness=r["btc_status"])
         r["analytics_version"] = ANALYTICS_VERSION
-        if r.get("data_status") != "ready":
+        if not usable_history(r):
             r["signal_status"] = "unavailable"
     return consensus
 

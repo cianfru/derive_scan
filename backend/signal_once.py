@@ -32,6 +32,7 @@ CSV_FIELDS = ("bar_close", "symbol", "signal", "unified_signal", "signal_status"
               "raw_signal", "zscore", "heat", "heat_phase", "exhaustion_state", "divergence", "conditions_met",
               "conditions_total", "price", "funding_rate", "oi_trend", "ribbon", "data_status", "volume_status",
               "history_bars")
+CSV_FIELDS += ("volume_source",)
 CSV_FIELDS += ("oi_usd", "oi_contracts", "positioning_at", "heat_valid", "ribbon_quality")
 
 
@@ -71,7 +72,7 @@ def _csv_row(r: dict) -> list:
 
 
 KEEP_KEYS = ("symbol", "underlying", "timeframe", "signal", "signal_status", "regime", "heat", "zscore",
-             "confidence", "entry_blocked", "signal_bar_close_time", "data_status", "volume_status")
+             "confidence", "entry_blocked", "signal_bar_close_time", "data_status", "volume_status", "volume_source")
 
 
 def slim(r: dict) -> dict:
@@ -149,6 +150,39 @@ async def backfill_short(cache, unds: list[str], now: float, transport=None) -> 
     return log_
 
 
+THIN_COVERAGE = 0.9  # the engine's own bar for usable volume (derive/signals.py VOLUME_MIN_COVERAGE)
+
+
+async def thin_volume_from_spot(cache, unds: list[str], now: float, transport=None) -> dict:
+    """Where Derive's own perp volume is missing on too many recent bars, keep one spot market's volume
+    for the whole series (owner, 5 October 2026: OKX, or Coinbase for a verified product when it covers
+    more). Once a coin uses spot volume it keeps it and its source; only new bars are fetched after."""
+    from derive.backfill import spot_volume
+    from derive.signals import VOLUME_WINDOW
+    out = {}
+    for und in unds:
+        for tf in ("4h", "1d"):
+            have, source = cache.spot_volume(und, tf)
+            if not have:
+                rows = cache._rows(cache.path(und, tf))[-VOLUME_WINDOW:]
+                if not rows or sum(float(r[5]) > 0 for r in rows) / len(rows) >= THIN_COVERAGE:
+                    continue
+            ohlcv = cache.load(und, tf)
+            since = int(ohlcv["timestamp"][0]) if not have else max(have)
+            until = int(ohlcv["timestamp"][-1]) + 1
+            try:
+                fresh, got = await spot_volume(und, tf, since, until, transport=transport, max_pages=10 if not have else 2)
+            except Exception as e:
+                out[f"{und}:{tf}"] = {"ok": False, "error": str(e)[:160]}
+                continue
+            if source and got != source:  # never mix sources within one series
+                fresh = {}
+            if fresh:
+                cache.write_spot_volume(und, tf, {**have, **fresh}, source or got)
+            out[f"{und}:{tf}"] = {"ok": True, "bars": len({**have, **fresh}), "source": source or got}
+    return out
+
+
 async def run(out: Path, now: float, due: list[str], client=None, context_transport=None, clock=time.time,
               backfill_transport=None) -> dict:
     from derive import signals as sig
@@ -179,6 +213,7 @@ async def run(out: Path, now: float, due: list[str], client=None, context_transp
                     fetch_errors[f"{und}:{tf}"] = str(e)[:200]
                     logging.warning("candles %s %s failed: %s", und, tf, e)
         backfill_log = await backfill_short(cache, unds, now, transport=backfill_transport)
+        volume_log = await thin_volume_from_spot(cache, unds, now, transport=backfill_transport)
         context_inputs = await fetch_context(transport=context_transport, clock=clock)
     finally:
         if own_client:
@@ -212,6 +247,7 @@ async def run(out: Path, now: float, due: list[str], client=None, context_transp
                 continue
             prev_oi[f"{und}:{tf}"] = sig.attach_positioning(r, tickers.get(f"{und}-PERP"), prev_oi.get(f"{und}:{tf}"))
             r["backfilled_bars"] = cache.counts(und, tf)[1]
+            r["volume_source"] = cache.spot_volume(und, tf)[1] or "derive perp"
             rows.append(r)
         other_tf = "1d" if tf == "4h" else "4h"
         other_rows = {r["symbol"]: r for r in last_rows.get(other_tf, [])}
@@ -234,6 +270,7 @@ async def run(out: Path, now: float, due: list[str], client=None, context_transp
     status["computed_at"] = int(now)
     status["fetch_errors"] = fetch_errors
     status["backfill"] = backfill_log
+    status["spot_volume"] = volume_log
     _write_json(sdir / "status.json", status)
 
     prev = json.loads((sdir / "latest.json").read_text()) if (sdir / "latest.json").exists() else {}

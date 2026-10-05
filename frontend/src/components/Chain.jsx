@@ -64,7 +64,8 @@ export function LayerTile({ alignment, horizon = "30d", kind, sub = null, tag = 
   const word = (state && SHORT[kind]?.[state]) || label;
   const days = horizon === "7d" ? "7" : "30";
   const span = `, next ${days} days${kind === "engine" ? (horizon === "7d" ? " (4-hour bars)" : " (daily bars)") : ""}`;
-  const tip = `${name}${span}: ${label}${sub ? ` (${sub})` : ""}. ${why || HOVER[kind]}${aligned ? " All three layers point the same way for this window." : ""}`;
+  const young = kind === "engine" && state && row?.data_status === "warming up" ? " Young history: the engine damps its readings until the coin has about 500 bars." : "";
+  const tip = `${name}${span}: ${label}${sub ? ` (${sub})` : ""}. ${why || HOVER[kind]}${young}${aligned ? " All three layers point the same way for this window." : ""}`;
   return (
     <span className={`layer-tile ${state || "unknown"}${aligned ? " aligned" : ""}`} tabIndex={0} role="img" aria-label={tip} data-tip={tip}>
       {icon && <span className="lt-icon"><LayerIcon kind={kind} size={16} /></span>}

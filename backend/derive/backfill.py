@@ -51,7 +51,7 @@ async def okx_before(und: str, tf: str, before_ms: int, bars: int,
 
 # Explicit products avoid silently merging unrelated tokens that share a ticker.
 COINBASE_PRODUCTS = {"ADA": "ADA-USD", "ZEC": "ZEC-USD", "VVV": "VVV-USD"}
-BACKFILL_VERSION = 2
+BACKFILL_VERSION = 3  # 3: retried once on 5 October 2026 (VVV had no 4-hour history then)
 
 
 async def supplemental_before(und, tf, before_ms, bars, transport=None):
@@ -95,3 +95,62 @@ async def supplemental_before(und, tf, before_ms, bars, transport=None):
             rows = [[t, w[0][1], max(float(c[2]) for c in w), min(float(c[3]) for c in w), w[-1][4], "0.0"]
                     for t, w in sorted(weeks.items()) if len(w) == 7 and [c[0] for c in w] == [t + i * day for i in range(7)]]
         return rows[-bars:], f"coinbase {COINBASE_PRODUCTS[und]} spot"
+
+
+async def okx_volume(und: str, tf: str, since_ms: int, transport: httpx.AsyncBaseTransport | None = None,
+                     max_pages: int = 10) -> dict[int, float]:
+    """OKX spot volume (base units) for confirmed bars opening at or after `since_ms`, by bar open.
+
+    Used as the whole volume series for a perp whose Derive volume is thin (owner, 5 October 2026):
+    one source for every bar, so relative volume compares like with like.
+    """
+    out: dict[int, float] = {}
+    after = None
+    async with httpx.AsyncClient(timeout=20, transport=transport, headers={"user-agent": "derive-scan/0.1"}) as http:
+        for _ in range(max_pages):
+            params = {"instId": f"{und}-USDT", "bar": OKX_BAR[tf], "limit": PAGE}
+            if after is not None:
+                params["after"] = after
+            r = await http.get(OKX_URL, params=params)
+            r.raise_for_status()
+            body = r.json()
+            if body.get("code") != "0":
+                raise RuntimeError(f"okx {und} {tf}: {body.get('msg')}")
+            data = body.get("data") or []
+            for c in data:  # newest first
+                if c[8] == "1":
+                    out[int(c[0])] = float(c[5])
+            if not data or len(data) < PAGE or int(data[-1][0]) <= since_ms:
+                break
+            after = int(data[-1][0])
+    return {ts: v for ts, v in out.items() if ts >= since_ms}
+
+
+async def coinbase_volume(und: str, since_ms: int, until_ms: int, transport=None) -> dict[int, float]:
+    """Coinbase daily spot volume for a verified product (COINBASE_PRODUCTS), by UTC day open."""
+    if und not in COINBASE_PRODUCTS:
+        return {}
+    out, end, start = {}, until_ms // 1000, since_ms // 1000
+    async with httpx.AsyncClient(timeout=20, transport=transport) as http:
+        while end > start:
+            begin = max(start, end - 299 * 86400)
+            r = await http.get(f"https://api.exchange.coinbase.com/products/{COINBASE_PRODUCTS[und]}/candles",
+                               params={"granularity": 86400, "start": begin, "end": end})
+            r.raise_for_status()
+            for c in r.json():
+                ts = int(c[0]) * 1000
+                if since_ms <= ts < until_ms:
+                    out[ts] = float(c[5])
+            end = begin
+    return out
+
+
+async def spot_volume(und: str, tf: str, since_ms: int, until_ms: int, transport=None, max_pages: int = 10) -> tuple[dict[int, float], str]:
+    """The fuller spot volume series for a thin perp: OKX, or for a verified Coinbase product's daily bars
+    Coinbase when it covers more of the history (VVV listed on OKX only recently)."""
+    okx = await okx_volume(und, tf, since_ms, transport=transport, max_pages=max_pages)
+    if tf == "1d" and und in COINBASE_PRODUCTS:
+        cb = await coinbase_volume(und, since_ms, until_ms, transport=transport)
+        if len(cb) > len(okx):
+            return cb, f"coinbase {COINBASE_PRODUCTS[und]} spot"
+    return okx, f"okx {und}-USDT spot"
