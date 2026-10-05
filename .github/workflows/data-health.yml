@@ -11,4 +11,4 @@ jobs:
     timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
-      - run: python3 backend/check_health.py https://raw.githubusercontent.com/cianfru/derive_scan/site-data/health.json
+      - run: python3 backend/check_health.py https://raw.githubusercontent.com/cianfru/cowboy-feed/site-data/health.json
