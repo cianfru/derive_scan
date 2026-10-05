@@ -3,9 +3,9 @@
 // pays once and Derive holds nothing more). Prices are per $1 of payout; dollars are USDC.
 
 export const TRADE_LIMITS = {
-  perAnswer: 250, // "Most you can lose" per answer at mainnet launch
-  perAnswerTestnet: 250, // the owner's P6 approval (4 October 2026): the same $250 on testnet
-  perDay: 1000, // answers bought per wallet per day, in this browser
+  perAnswer: 250, // a warning above this "Most you can lose" per answer (never a block)
+  perAnswerTestnet: 250, // the same warning on testnet
+  perDay: 1000, // a warning past this total bought per wallet per day, in this browser
   maxPerDollar: 0.99, // the ceiling never goes above 99c per $1
   minPerDollar: 0.01, // the sell-back floor never goes below 1c per $1
   tolerance: { major: 0.02, thin: 0.03 }, // T: board price + 2c (BTC, ETH), + 3c thin coins
@@ -172,10 +172,11 @@ export function checkQuote(best, { direction, payout, limit, feeEstimate }) {
   return { ok: true, reason: null, ...figures, mostLose: direction === "buy" ? Math.abs(total) + fee : null, net: direction === "sell" ? Math.abs(total) - fee : null };
 }
 
-/** Caps: client-side guards against mistakes, not controls. */
+/** Large-trade warnings (owner, 5 October 2026: warn, never block): over $250 most-you-can-lose on
+ * one answer, or past $1,000 bought today in this browser. The trade always stays allowed. */
 export function capCheck(mostLose, { boughtToday = 0, testnet = true } = {}) {
   const per = testnet ? TRADE_LIMITS.perAnswerTestnet : TRADE_LIMITS.perAnswer;
-  if (mostLose > per + 1e-9) return { ok: false, reason: "per_answer", cap: per };
-  if (boughtToday + mostLose > TRADE_LIMITS.perDay + 1e-9) return { ok: false, reason: "per_day", cap: TRADE_LIMITS.perDay, left: Math.max(0, TRADE_LIMITS.perDay - boughtToday) };
-  return { ok: true };
+  if (mostLose > per + 1e-9) return { ok: true, warn: "per_answer", cap: per, mostLose };
+  if (boughtToday + mostLose > TRADE_LIMITS.perDay + 1e-9) return { ok: true, warn: "per_day", cap: TRADE_LIMITS.perDay, today: boughtToday + mostLose };
+  return { ok: true, warn: null };
 }

@@ -301,32 +301,30 @@ describe("the kill switch", () => {
   });
 });
 
-describe("the caps", () => {
-  it("$250 most-you-can-lose per answer and $1,000 a day, with plain messages", () => {
-    expect(capGate(250, OWNER).ok).toBe(true);
-    expect(capGate(250.5, OWNER)).toMatchObject({ ok: false, reason: "per_answer", cap: 250 });
+describe("the large-trade warnings", () => {
+  it("warn over $250 most-you-can-lose per answer and past $1,000 a day, in plain words", () => {
+    expect(capGate(250, OWNER)).toMatchObject({ ok: true, warn: null });
+    expect(capGate(250.5, OWNER)).toMatchObject({ ok: true, warn: "per_answer", cap: 250 });
+    expect(capMessage(capGate(260, OWNER))).toBe("Large trade: you can lose up to $260.00 on this answer. Check the amount before you tap.");
     addSpent(OWNER, 900);
-    expect(capGate(150, OWNER)).toMatchObject({ ok: false, reason: "per_day", left: 100 });
-    expect(capMessage(capGate(150, OWNER))).toBe("That would pass the $1,000 limit per day. $100 is left for today (UTC).");
-    expect(capMessage(capGate(260, OWNER))).toBe("Most you can lose is over the $250 limit per answer. Choose a smaller amount.");
-    addSpent(OWNER, 100);
-    expect(capMessage(capGate(1, OWNER))).toBe("You have reached the $1,000 limit per day. Buying opens again after 00:00 UTC.");
+    expect(capGate(150, OWNER)).toMatchObject({ ok: true, warn: "per_day" });
+    expect(capMessage(capGate(150, OWNER))).toBe("With this trade you have put $1050.00 into answers today (UTC), over $1,000.");
     // A new UTC day starts again from zero.
     expect(spentToday(OWNER, Date.now() + 86_400_000)).toBe(0);
-    for (const c of [capGate(260, OWNER), capGate(1, OWNER)]) expect(capMessage(c)).not.toMatch(BANNED);
+    for (const c of [capGate(260, OWNER), capGate(150, OWNER)]) expect(capMessage(c)).not.toMatch(BANNED);
   });
 
-  it("refuses before any RFQ when the board's estimate is over, and at the tap when the firm price is", async () => {
+  it("never block: a large estimate still asks for a price, and a large firm price still fills", async () => {
     const a = setup({ estimate: 260 });
     await a.t.start();
-    expect(a.t.state.phase).toBe("capped");
-    expect(a.fake.calls("private/send_rfq")).toHaveLength(0);
+    expect(a.t.state.phase).not.toBe("capped");
+    expect(a.fake.calls("private/send_rfq")).toHaveLength(1);
     addSpent(OWNER, 999);
     const b = setup({ estimate: 0.5 });
     await quoted(b.t);
     await b.t.confirm(b.t.state.check.total);
-    expect(b.t.state.phase).toBe("capped");
-    expect(b.fake.calls(EXECUTE)).toHaveLength(0);
+    expect(b.t.state.phase).not.toBe("capped");
+    expect(b.fake.calls(EXECUTE)).toHaveLength(1);
   });
 });
 

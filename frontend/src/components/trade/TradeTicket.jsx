@@ -176,14 +176,14 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE 
       </dl>
 
       {!allowed && <p className="tr-msg" role="status">{TRADING_NOTICE[trading] || TRADING_NOTICE.off}</p>}
-      {allowed && st.phase === "idle" && (!preCap.ok ? <p className="tr-msg">{capMessage(preCap)}</p>
-        : short ? <p className="tr-msg">Your Derive account holds {money(balance, { cents: true })}; this costs about {money(plan.aboutLose, { cents: true })} with fees. Choose a smaller amount.</p>
+      {allowed && st.phase === "idle" && preCap.warn && !short && <p className="tr-msg" role="note">{capMessage(preCap)}</p>}
+      {allowed && st.phase === "idle" && (short ? <p className="tr-msg">Your Derive account holds {money(balance, { cents: true })}; this costs about {money(plan.aboutLose, { cents: true })} with fees. Choose a smaller amount.</p>
           : <button className="btn primary lg tr-go" onClick={ask}>{buy ? "Get price" : "Get sell-back price"}</button>)}
       {busy && <p className="tr-wait"><span className="spin" aria-hidden="true" />{waitText}</p>}
       {quoted && (
         <>
           {st.changed && <p className="tr-msg">Derive's price moved. Check the new number.</p>}
-          {!cap.ok && <p className="tr-msg">{capMessage(cap)}</p>}
+          {cap.warn && <p className="tr-msg" role="note">{capMessage(cap)}</p>}
           <button className="btn primary lg tr-go" disabled={!cap.ok || !allowed} onClick={confirm}>
             {fills ? tap : `Dry run: ${tap.toLowerCase()}`}
           </button>
