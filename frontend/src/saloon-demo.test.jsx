@@ -8,7 +8,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const FORBIDDEN = /\b(will|expect\w*|likely|predict\w*|target\w*|probab\w*|odds|chance\w*|forecast\w*|bet(s|ting)?|edges?|guarantee\w*)\b|%/i;
 
 describe("illustrative Saloon example", () => {
-  it("shows one plainly labelled example answer, leaves the pick to the visitor and reads no market data", () => {
+  it("shows one plainly labelled example answer with Higher picked from the first paint and reads no market data", () => {
     const fetch = vi.fn();
     vi.stubGlobal("fetch", fetch);
     const { container } = render(<SaloonDemo />);
@@ -17,19 +17,22 @@ describe("illustrative Saloon example", () => {
     expect(container.textContent).toContain("BTC higher or lower than $85,000 on a Friday, 08:00 UTC?");
     const higher = screen.getByRole("button", { name: "Higher" });
     const lower = screen.getByRole("button", { name: "Lower" });
-    expect(higher.getAttribute("aria-pressed")).toBe("false");
+    // Higher is on before any tap (owner, 5 October 2026): the line, "You put in" and the result show.
+    expect(higher.getAttribute("aria-pressed")).toBe("true");
     expect(lower.getAttribute("aria-pressed")).toBe("false");
     expect(higher.textContent).toContain("55¢");
     expect(lower.textContent).toContain("48¢");
-    expect(screen.getByRole("slider").disabled).toBe(true);
-    expect(container.querySelector(".sd-payoff")).toBeNull();
+    expect(screen.getByRole("slider").disabled).toBe(false);
+    expect(screen.getByRole("slider").value).toBe("87000");
+    expect(container.querySelector(".sd-payoff.yes")).not.toBeNull();
+    expect(container.querySelector(".sd-cost-label").textContent).toBe("You put in");
+    expect(screen.getByRole("status").textContent).toContain("If BTC settles at $87,000: you get $147.70");
     expect(container.textContent).not.toMatch(FORBIDDEN);
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it("prices $100 including fees with the Saloon's maths and reads the payout and P/L at a settlement price", () => {
     const { container } = render(<SaloonDemo />);
-    fireEvent.click(screen.getByRole("button", { name: "Higher" }));
     const slider = screen.getByRole("slider");
     expect(slider.disabled).toBe(false);
     expect(slider.value).toBe("87000");
@@ -52,8 +55,8 @@ describe("illustrative Saloon example", () => {
 
   it("mirrors the payout for Lower", () => {
     render(<SaloonDemo />);
-    fireEvent.click(screen.getByRole("button", { name: "Higher" }));
     fireEvent.click(screen.getByRole("button", { name: "Lower" }));
+    expect(screen.getByRole("button", { name: "Lower" }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("button", { name: "Higher" }).getAttribute("aria-pressed")).toBe("false");
     const slider = screen.getByRole("slider");
     expect(slider.value).toBe("83000");

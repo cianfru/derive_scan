@@ -44,8 +44,10 @@ const zoneText = (side, p) => {
 };
 
 export default function SaloonDemo() {
-  const [side, setSide] = useState(null);
-  const [price, setPrice] = useState(K);
+  // Higher is picked from the first paint (owner, 5 October 2026), so the payout line, the "You put in"
+  // line and the result show before anyone touches the example; Lower is one tap away.
+  const [side, setSide] = useState("yes");
+  const [price, setPrice] = useState(START.yes);
   const id = useId();
   const svg = useRef(null);
   const plot = useRef(null);

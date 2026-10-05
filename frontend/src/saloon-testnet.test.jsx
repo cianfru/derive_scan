@@ -242,7 +242,9 @@ describe("one tap on Derive's testnet", () => {
   it("carries a Testnet badge in the header", () => {
     window.scrollTo = () => {};
     render(<MemoryRouter><Shell><div /></Shell></MemoryRouter>);
-    expect(screen.getByLabelText("Cowboy home, testnet build").textContent).toMatch(/Testnet/);
+    const home = screen.getByLabelText("Cowboy home, testnet build");
+    expect(home.querySelector(".hdr-testnet").textContent).toBe("Testnet");
+    expect(home.querySelector(".hdr-testnet").getAttribute("style")).toBeNull(); // styled by hdr-wallet.css, not inline
   });
 });
 

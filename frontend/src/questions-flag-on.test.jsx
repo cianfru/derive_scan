@@ -140,8 +140,10 @@ it("sends the landing into Saloon and anchors how-it-works to the non-executing 
   expect(intro.id).toBe("how");
   const demo = within(intro).getByRole("region", { name: "See what it pays" });
   expect(within(demo).getByText("Illustration")).not.toBeNull();
-  expect(within(demo).getByRole("slider").disabled).toBe(true);
-  expect(within(demo).getAllByRole("button", { name: /^(Higher|Lower)$/ }).every((button) => button.getAttribute("aria-pressed") === "false")).toBe(true);
+  // Higher is on from the first paint (owner, 5 October 2026), so the diagram shows something at once.
+  expect(within(demo).getByRole("slider").disabled).toBe(false);
+  expect(within(demo).getAllByRole("button", { name: /^(Higher|Lower)$/ }).map((button) => button.getAttribute("aria-pressed"))).toEqual(["true", "false"]);
+  expect(within(demo).getByRole("status").textContent).toMatch(/If BTC settles at \$87,000: you get \$147\.70/);
   expect(within(demo).queryByRole("link")).toBeNull();
   expect(container.querySelector("#research [role=tablist]")).not.toBeNull();
 });
@@ -189,4 +191,10 @@ it("shows the coin page's Saloon link only for a coin with live questions", () =
   cleanup();
   const { container } = render(<MemoryRouter><SaloonCta und="ADA" live={false} /></MemoryRouter>);
   expect(container.innerHTML).toBe("");
+});
+
+it("carries no Testnet marker in a build without testnet fills", () => {
+  shellAt("/saloon");
+  expect(document.querySelector(".hdr-testnet")).toBeNull();
+  expect(document.querySelector("header").textContent).not.toMatch(/Testnet/);
 });

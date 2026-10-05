@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState } from "react";
+import { Component, Suspense, lazy, useState } from "react";
 import { Link } from "react-router-dom";
 import { Info } from "./ui.jsx";
 import OutcomePreview from "./OutcomePreview.jsx";
@@ -29,9 +29,40 @@ function Copy({ text, label }) {
 // stage 1 alone and the build carries no trading code.
 const TradePanel = TRADE_ON ? lazy(() => import("./trade/TradePanel.jsx")) : null;
 
+// While the trade chunk loads, a short line, never the manual ticket (it read as the one-tap screen).
+// If the chunk fails to load (a page left open across a deploy asks for files that are gone), the
+// boundary offers a reload, with the manual ticket one tap away. Written behind TRADE_ON so other
+// builds carry none of it.
+const TradeLoading = TRADE_ON ? () => <p className="status q-trade-loading" role="status">Loading one-tap…</p> : null;
+
+function TradeLoadFailed({ hand }) {
+  const [byHand, setByHand] = useState(false);
+  if (byHand) return hand;
+  return (
+    <section className="q-ticket q-trade-failed" aria-label="One-tap did not load">
+      <p className="q-trade-failed-line">Reload to trade in one tap</p>
+      <div className="q-ticket-actions">
+        <button type="button" className="btn primary" onClick={() => window.location.reload()}>Reload</button>
+        <button type="button" className="text-control q-trade-hand" onClick={() => setByHand(true)}>Place by hand</button>
+      </div>
+    </section>
+  );
+}
+
+const TradeBoundary = TRADE_ON ? class extends Component {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch(error) { console.warn("One-tap did not load", error); }
+  render() { return this.state.failed ? <TradeLoadFailed hand={this.props.hand} /> : this.props.children; }
+} : null;
+
 function WithTrade(props) {
   const hand = <QuestionTicket {...props} />;
-  return <Suspense fallback={hand}><TradePanel {...props} fallback={hand} /></Suspense>;
+  return (
+    <TradeBoundary hand={hand}>
+      <Suspense fallback={<TradeLoading />}><TradePanel {...props} fallback={hand} /></Suspense>
+    </TradeBoundary>
+  );
 }
 export default TRADE_ON ? WithTrade : QuestionTicket;
 
@@ -112,6 +143,12 @@ function QuestionTicket({ und, question, answer, level, sideKey, t, board, price
   const text = copyText({ question, answer, legs, contracts: t.contracts, tick, settleTs });
   return (
     <section className="q-ticket" aria-label={closing ? "Sell back on Derive" : "Place on Derive"}>
+      {!TRADE_ON && !closing && (
+        // Builds without one-tap (production today): say once, plainly, why there are two orders to place.
+        <p className="q-onetap-note">One-tap trading is coming to Cowboy. For now, place the two orders on Derive yourself.
+          <Info label="Why two orders">A Higher or Lower answer is two options traded together: one bought and one sold, across the zone where it pays in part. Derive's order book takes each option as its own order, so by hand you place both, one after the other.</Info>
+        </p>
+      )}
       <h3>{question} <span className="q-ticket-side">{closing ? `Sell back ${answer}` : <>{answer} · {fullPay(level, sideKey)}</>}</span></h3>
       {closing ? (
         <dl className="q-money q-close-sum">

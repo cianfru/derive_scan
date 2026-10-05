@@ -293,3 +293,11 @@
 }
 .q-history summary::before { content: ""; width: 0; height: 0; margin-right: 8px; border-top: 4px solid transparent; border-bottom: 4px solid transparent; border-left: 6px solid currentColor; }
 .q-history[open] summary::before { transform: rotate(90deg); }
+/* Builds without one-tap: one plain line above the manual ticket. */
+.q-onetap-note { margin: 0 0 2px; padding-bottom: 12px; border-bottom: 1px solid var(--border); color: var(--text-2); font-size: 13px; line-height: 1.55; }
+.q-onetap-note .info { margin-left: 6px; vertical-align: middle; }
+/* One-tap builds: while the trade code loads, and when it fails to load. */
+.q-trade-loading { margin: 0; padding: 14px 0; font-size: 13px; color: var(--text-2); }
+.q-trade-failed-line { margin: 0; color: var(--text-1); font-size: 14px; }
+.q-trade-hand { min-height: 44px; text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 5px; }
+.q-trade-hand:hover { text-decoration-color: var(--accent); }

@@ -111,6 +111,16 @@
 .hdr-landing .nav-research, .hdr-landing .nav-divider { display: none; }
 .hdr-landing .nav-more { display: flex; }
 .hdr-landing .tools { margin-left: 0; }
+/* Tablets and desktops (owner, 5 October 2026): the first screen shows the header and the hero alone.
+   The stage fills the viewport below the header and centres its content; the sign shrinks with the
+   viewport's height so short screens keep everything in view, and when the content is taller still the
+   stage grows rather than clips. */
+@media (min-width: 761px) {
+  .cowboy-draft .hero-stage { display: flex; min-height: calc(100vh - var(--header-h, 60px)); min-height: calc(100svh - var(--header-h, 60px)); }
+  .cowboy-draft .hero-inner { flex: 1; width: 100%; justify-content: center; padding-block: clamp(24px, 5svh, 56px) clamp(32px, 7svh, 80px); gap: clamp(18px, 3.4svh, 34px); }
+  .cowboy-draft .sign-wrap { width: min(900px, 100%, 112svh); padding-block: clamp(4px, 1.2svh, 12px) clamp(8px, 2.4svh, 24px); }
+  .cowboy-draft .hero-row h1 { font-size: clamp(40px, min(4.6vw, 7.4svh), 62px); }
+}
 @media (max-width: 950px) {
   .cowboy-draft .hero-row { gap: 32px; }
   .cowboy-draft .hero-row h1 { font-size: 44px; }
@@ -129,7 +139,7 @@
      the height left over goes above the sign (1 part), below it (2), between subhead and buttons (1)
      and below the buttons (5), so on tall phones the buttons sit in the lower third, close to the
      words above them, and on short ones every gap falls back to its minimum. */
-  .cowboy-draft .hero-stage { display: flex; min-height: calc(100vh - var(--header-h) - 1px); min-height: calc(100svh - var(--header-h) - 1px); }
+  .cowboy-draft .hero-stage { display: flex; min-height: calc(100vh - var(--header-h)); min-height: calc(100svh - var(--header-h)); }
   .cowboy-draft .hero-inner { flex: 1; width: 100%; justify-content: flex-start; padding-block: clamp(20px, 4.4svh, 44px) 0; gap: clamp(14px, 3.2svh, 28px); }
   .cowboy-draft .hero-inner::after { content: ""; flex: 5 1 0; }
   .cowboy-draft .sign-wrap { flex: 3 1 auto; display: flex; flex-direction: column; width: min(76%, 340px); padding: clamp(4px, 1.5svh, 14px) 0; }

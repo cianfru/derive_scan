@@ -62,3 +62,8 @@
   .hdr.hdr-marketplace.hdr-wallet .logo svg { height: 20px; }
 }
 .hw-accounts { padding: 0 10px 6px; }
+/* The "Testnet" marker beside the logo, on every page: a text label with a thin accent underline, the
+   trade screens' TestnetTag style, so the testnet site never passes for the real one. */
+.hdr .logo .hdr-testnet { margin-left: 10px; padding-top: 2px; font-size: 12px; line-height: 18px; letter-spacing: .02em; color: var(--accent-text);
+  border-bottom: 1px solid var(--accent); white-space: nowrap; }
+@media (max-width: 384px) { .hdr .logo .hdr-testnet { margin-left: 6px; font-size: 11px; } }
