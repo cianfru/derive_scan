@@ -264,8 +264,9 @@ def write_site(site: Path, root: Path, boards: dict, state: dict, now: float, pr
 
 
 def kept_chains(root: Path, source: str, und: str, since: float, until: float = float("inf")) -> list[tuple[int, Path]]:
+    from .config import store_dir
     out = []
-    for p in sorted((root / source / und / "chains").glob("*/*.json.gz")):
+    for p in sorted((root / store_dir(source) / und / "chains").glob("*/*.json.gz")):
         try:
             day = p.parent.name
             t = int(datetime.fromisoformat(f"{day}T{p.name[:2]}:00:00+00:00").timestamp())

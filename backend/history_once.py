@@ -236,7 +236,10 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
     t0 = time.monotonic()
     own = client is None
     if own:
-        client = DeriveClient(SOURCES[Settings().sources[0]]["base"])
+        from derive.wallet_alias import attach
+        source = Settings().sources[0]
+        client = DeriveClient(SOURCES[source]["base"])
+        attach(client, source, out)
     state = history.load_state(out)
     # The balance backfill never shares a run with the surface rebuild.
     surface_ready = state.get("surface") == SURFACE_VERSION and "surface_pending" not in state
@@ -323,6 +326,8 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
                                       left=budget - (time.monotonic() - t0))
     finally:
         if own:
+            from derive.wallet_alias import detach
+            await detach(client)
             await client.close()
     out_doc = {"added": len(added), "through": state.get("done_through")}
     if state.get("repair_pending"):

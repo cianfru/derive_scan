@@ -42,7 +42,10 @@ async def run(out: Path, budget: float = 120, max_intervals: int = 8, now: float
     deadline = started + budget
     own_client = client is None
     if own_client:
-        client = DeriveClient(SOURCES[Settings().sources[0]]["base"])
+        from derive.wallet_alias import attach
+        source = Settings().sources[0]
+        client = DeriveClient(SOURCES[source]["base"])
+        attach(client, source, out)
     previous_calls = getattr(client, "calls", 0)
     try:
         try:
@@ -59,6 +62,8 @@ async def run(out: Path, budget: float = 120, max_intervals: int = 8, now: float
         return result
     finally:
         if own_client:
+            from derive.wallet_alias import detach
+            await detach(client)
             await client.close()
 
 

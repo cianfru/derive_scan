@@ -159,6 +159,27 @@ Feature definitions are fixed in `backend/derive/features.py` (docstring). No ex
 
 Measured on 1 October 2026: one snapshot of BTC and ETH from V2 mainnet takes ~11 s and 28 public requests; a raw chain is ~42 KB gzipped per underlying. With the defaults that is ~2 MB a day, ~60 MB a month of chains, plus a few thousand small rows a day.
 
+## Switching to V3
+
+Prepared, not switched: production reads V2 mainnet (`api.lyra.finance`) until the change below is merged. Every job was run once against V3 mainnet (`api.derive.xyz/v3`) on 5 October 2026 on a copy of the data branch.
+
+The change, in `.github/workflows/record.yml`, job `record`, `env:` (one line):
+
+```yaml
+      DERIVE_SNAPSHOT_SOURCES: v3_mainnet
+```
+
+or `DERIVE_SNAPSHOT_SOURCES: ${{ vars.DERIVE_SNAPSHOT_SOURCES }}` once, then set the repository variable `DERIVE_SNAPSHOT_SOURCES` to `v3_mainnet` (unset or empty means `v2_mainnet`). Every job reads the first listed source: recorder, questions, flow, history, signals. Back to V2: remove the line or the variable.
+
+What the switch keeps the same:
+
+- Files: V3 mainnet records into `v2_mainnet/` (`SOURCES[...]["dir"]` in `derive/config.py`), so every reader carries on with one history; `status.json`, `runs/` and `latest.json` name the real source (`v3_mainnet:BTC`). Listing V2 and V3 mainnet together is refused (same directory).
+- Wallet names: V3 names each leg by the owner's own address, V2 by the Derive Wallet; subaccount ids carry over (235 of 238 wallets trading on 4 October changed name, one to one). Legs read from V3 are given their subaccount's V2 wallet, looked up once on V2 and kept in `history/wallet_aliases.json` (`derive/wallet_alias.py`), so the traders' history, market-maker list and trader pages keep one name per trader. Lookups need V2 to answer; run `python wallet_alias_once.py --out ../store --days 30` once before switching (about 1 minute per 3 days) and commit the file to `data`. A subaccount V2 never saw keeps its V3 name; one whose lookup failed keeps it for that read (`last_run.unresolved_legs`).
+
+Check before switching that V3 mainnet is trading: on 5 October 2026 it served the state migrated from V2 (trades up to 4 October 23:24 UTC, all `batch_status` `Settled`) with live marks and implied volatility, but empty order books, zero open interest, no option settlement prices and no funding history. Recorded then, the Saloon board is empty (no quotes) and open-interest features are zero. Switch once `public/get_trade_history` shows trades from the last minutes and BTC options show bids, asks and `stats.oi`.
+
+Shape differences handled: `get_all_currencies` has no `instrument_types` (options are the coins with an `option` object); `tx_status` "reverted" became `batch_status` ending in "Error"; V3 lists option settlement prices only for its own expiries, so saved prices are merged, never replaced; unfiltered `get_trade_history` windows longer than 30 days are cut to the last 30 days without an error (the jobs read 15-minute to one-day windows); index prices carry fewer decimals.
+
 ## Local API
 
 - `GET /health`

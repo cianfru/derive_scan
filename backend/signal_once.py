@@ -154,11 +154,12 @@ async def run(out: Path, now: float, due: list[str], client=None, context_transp
     from derive import signals as sig
     from derive.candles import CandleCache, update
     from derive.client import DeriveClient
-    from derive.config import SOURCES
+    from derive.config import SOURCES, Settings
     from derive.context import fetch_context
 
+    source = Settings().sources[0]
     own_client = client is None
-    client = client or DeriveClient(SOURCES["v2_mainnet"]["base"])
+    client = client or DeriveClient(SOURCES[source]["base"])
     cache = CandleCache(out)
     sdir = out / "signals"
     state_path = sdir / "state.pkl"
@@ -251,7 +252,7 @@ async def run(out: Path, now: float, due: list[str], client=None, context_transp
     sent, sent_at = context_inputs.get("sentiment") or (None, None)
     stab, stab_at = context_inputs.get("stablecoin") or (None, None)
     _write_json(sdir / "latest.json", {
-        "generated_at": int(now), "source": "v2_mainnet", "reflex_commit": "e45ed97d91fa1cca58533144233dc807a63f4e8f",
+        "generated_at": int(now), "source": source, "reflex_commit": "e45ed97d91fa1cca58533144233dc807a63f4e8f",
         "universe": [f"{u}-PERP" for u in unds], "timeframes": tf_blocks,
         "context": {"global_metrics": gm, "global_metrics_at": gm_at, "sentiment": sent, "sentiment_at": sent_at,
                     "stablecoin": stab, "stablecoin_at": stab_at},

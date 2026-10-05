@@ -1,6 +1,6 @@
 """Plain-file storage for the scheduled recorder (GitHub Actions commits these to the `data` branch).
 
-Layout under the root, per source and underlying, one file per UTC day so each commit stays small:
+Layout under the root, per source directory (config.store_dir: V3 mainnet continues `v2_mainnet/`) and underlying, one file per UTC day so each commit stays small:
 
 {source}/{UND}/features/YYYY-MM-DD.csv    ts,feature,value                 every snapshot
 {source}/{UND}/expiries/YYYY-MM-DD.csv    ts + store.SLICE_COLS            every snapshot
@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .features import ExpirySlice
+from .config import store_dir
 from .store import SLICE_COLS
 
 
@@ -59,7 +60,7 @@ class FileStore:
         self.root.mkdir(parents=True, exist_ok=True)
 
     def _dir(self, source: str, underlying: str) -> Path:
-        return self.root / source / underlying
+        return self.root / store_dir(source) / underlying
 
     def write_snapshot(self, ts: int, source: str, underlying: str, features: dict[str, float],
                        slices: list[ExpirySlice], chain: dict | None = None, keep_slices: bool = True) -> None:
