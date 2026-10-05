@@ -195,7 +195,8 @@ describe("the board page", () => {
     const href = card.querySelector(".bd-question").getAttribute("href");
     expect(within(card).getAllByRole("link", { name: /see what it pays/ }).map((a) => a.getAttribute("href"))).toEqual([`${href}?side=yes`, `${href}?side=no`]);
     expect(card.textContent).toMatch(/Pays in part\$[\d,]+–\$[\d,]+/);
-    expect(card.textContent).toMatch(/Cost per \$1 of maximum payout · before fees/);
+    expect(card.textContent).toMatch(/most you make/);
+    expect(container.querySelector(".bd-key").textContent).toMatch(/Price per \$1 · most you make with \$100\.00/);
     cleanup();
     docs.current = { ...docs.current, "markets.json": markets("defensive") }; show(); expect(order()).toEqual(byDate); await pick(); expect(order()).toEqual(first);
     cleanup();
