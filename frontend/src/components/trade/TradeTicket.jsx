@@ -156,7 +156,7 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE 
   const firm = !!c?.ok && ["quoted", "checking", "checked", "executing"].includes(st.phase); // figures from Derive's firm quote
   const cap = quoted && buy ? capGate(c.mostLose, seat.wallet) : { ok: true };
   const busy = ["asking", "checking", "executing", "confirming"].includes(st.phase);
-  const waitText = { asking: "Asking Derive for a firm price…", checking: "Checking with Derive…", executing: "Filling on Derive…", confirming: "Checking your fill…" }[st.phase];
+  const waitText = { asking: st.attempt > 1 ? `Looking for a quote as good as Derive's order book (${st.attempt} of ${st.attempts})…` : "Asking Derive for a firm price…", checking: "Checking with Derive…", executing: "Filling on Derive…", confirming: "Checking your fill…" }[st.phase];
   const again = (label = "Get a new price") => allowed && <button className="btn lg tr-go" onClick={ask}>{label}</button>;
   const tap = buy ? `Buy for ${money(c?.mostLose, { cents: true })}` : `Sell for ${money(c?.net, { cents: true })}`;
 
