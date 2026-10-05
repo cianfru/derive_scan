@@ -101,7 +101,7 @@ def test_options_tone_uses_fresh_skew_adds_covered_flow_and_ignores_nondirection
 
 def test_unavailable_wait_is_not_neutral_alignment():
     row = {**engine("WAIT"), "signal_status": "unavailable"}
-    result = alignment(engine("WAIT"), row, {}, [], {}, None, None, None, NOW, options_at=NOW)
+    result = alignment(row, {**row, "timeframe": "1d"}, {}, [], {}, None, None, None, NOW, options_at=NOW)
     assert result["horizons"]["7d"]["engine"]["state"] is None
     assert result["horizons"]["30d"]["engine"]["state"] is None
 

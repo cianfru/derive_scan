@@ -9,7 +9,7 @@ import { Asset, MarketTrace } from "../components/MarketVisuals.jsx";
 import { EnginePair, Convergence, CONVERGENCE_HELP } from "../components/EngineComparison.jsx";
 import { currentEngine } from "../lib/research.js";
 import StructureBand, { isSignal } from "../components/StructureBand.jsx";
-import { ChainLegend, LayerIcon, LayerTile, chainAgreed, chainReadings } from "../components/Chain.jsx";
+import { LAYERS, LayerIcon, LayerTile, chainAgreed, chainReadings } from "../components/Chain.jsx";
 
 const SCOPE = { options: "options markets", entries: "daily entries", perps: "perps only" };
 const inView = (c, view) => (view === "perps" ? !c.has_options : c.has_options) && (view !== "entries" || (SIGNAL_RANK[c.signal_1d] ?? 0) >= 3);
@@ -24,7 +24,7 @@ function agreement(c, horizon) {
   return states.slice(1).reduce((n, s) => n + (s === dir ? 1 : s && s !== "neutral" ? -1 : 0), 0);
 }
 
-const BOARD_HELP = "Each market is read in three steps, always in this order: 1 Regime (the daily engine), 2 Wallets (what Derive's best options traders hold on expiries in the window), 3 Options (what option prices lean towards). Wallets and Options are shown for the next 7 and 30 days; an orange frame means all three point the same way for that window: context side by side, not a combined signal. Hover any tile for what it reads. Price is the latest options index where available; the daily change compares the two latest completed UTC days.";
+const BOARD_HELP = "Each market is read in three steps, always in this order: 1 Regime (the engine: on 4-hour bars for the next 7 days, about 28 bars, and on daily bars for the next 30 days, about 30 bars), 2 Wallets (what Derive's best options traders hold on expiries in the window), 3 Options (what option prices lean towards). Each market has one line for the next 7 days and one for the next 30; “All agree” in orange means the three layers point the same way for that window: context side by side, not a combined signal. The trace is the last 30 daily closes. Hover any tile for what it reads. Price is the latest options index where available; the daily change compares the two latest completed UTC days.";
 
 export default function Markets() {
   const { data, error } = useData("markets.json");
@@ -89,24 +89,20 @@ export default function Markets() {
               <input className="search" placeholder="Find" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Find a market" />
             </label>
           </div>
-          {overview && rows.length > 0 && <div className="board-mini-key"><ChainLegend /></div>}
-          {overview && rows.length > 0 && <div className="board-mini-head" aria-hidden="true"><span><LayerIcon kind="wallets" size={13} />Wallets <small>7D · 30D</small></span><span><LayerIcon kind="options" size={13} />Options <small>7D · 30D</small></span></div>}
+          {overview && rows.length > 0 && <div className="board-mini-head win-grid" aria-hidden="true"><span>Next</span>{LAYERS.map(([kind, name]) => <span key={kind}><LayerIcon kind={kind} size={13} />{name}</span>)}</div>}
           <div className={overview ? "board-rows" : "table-wrap"}>
             <table className={`grid market-grid${overview ? " overview" : ""}`}>
               {overview && (
-                <colgroup><col style={{ width: "17%" }} /><col className="hide-md" style={{ width: "15%" }} /><col style={{ width: "22%" }} /><col style={{ width: "23%" }} /><col style={{ width: "23%" }} /></colgroup>)}
+                <colgroup><col style={{ width: "18%" }} /><col className="hide-md" style={{ width: "16%" }} /><col style={{ width: "66%" }} /></colgroup>)}
               <thead>
-                {overview && (
-                  <tr className="layer-head-row"><th /><th className="hide-md" /><th className="layer-th">Regime</th><th className="layer-th">Wallets</th><th className="layer-th">Options</th></tr>)}
                 <tr>
                   {sortHead("und", "Market")}
-                  <th className="hide-md">60 days</th>
+                  <th className="hide-md">{overview ? "Last 30 days" : "60D"}</th>
                   {overview ? (
-                    <>
-                      <th className="layer-sub">Daily engine</th>
-                      <th className="layer-sub"><span>7D</span><span>30D</span></th>
-                      <th className="layer-sub"><span>7D</span><span>30D</span></th>
-                    </>
+                    <th className="windows-th">
+                      <div className="win-grid" aria-hidden="true"><span>Next</span>
+                        {LAYERS.map(([kind, name]) => <span key={kind}><LayerIcon kind={kind} size={13} />{name}</span>)}</div>
+                    </th>
                   ) : (
                     <>
                       <th>Engine pair · 1D / 4H</th>
@@ -130,21 +126,23 @@ export default function Markets() {
                       </div>
                     </td>
                     <td className="hide-md trace-td">
-                      <MarketTrace values={c.spark_1d} times={c.spark_times_1d} label={`${c.und} daily closes`} />
+                      <MarketTrace values={overview ? c.spark_1d?.slice(-30) : c.spark_1d} times={overview ? c.spark_times_1d?.slice(-30) : c.spark_times_1d} label={`${c.und} daily closes`} />
                     </td>
                     {overview ? (
                       <>
-                        <td className="regime-td">
-                          {currentEngine(c.engine_comparison?.["1d"])
-                            ? <LayerTile alignment={c.align} kind="engine" sub={REGIME[c.regime_1d] || title(c.regime_1d)} aligned={!!(chainAgreed(c.align, "7d") || chainAgreed(c.align, "30d"))} />
-                            : <Empty label="Short history" />}
+                        <td className="windows-td">
+                          <div className="windows">
+                            {[["7d", "7 days", "4H"], ["30d", "30 days", "1D"]].map(([h, name, tf]) => {
+                              const aligned = !!chainAgreed(c.align, h);
+                              return (
+                                <div key={h} className={`win-grid win-row${aligned ? " aligned" : ""}`}>
+                                  <span className="win-label"><b>{name}</b><small>{aligned ? "All agree" : `${tf} engine`}</small></span>
+                                  {LAYERS.map(([kind]) => <LayerTile key={kind} alignment={c.align} kind={kind} horizon={h} icon={false} aligned={aligned}
+                                    sub={kind === "engine" ? "regime" : null} />)}
+                                </div>);
+                            })}
+                          </div>
                         </td>
-                        {["wallets", "options"].map((kind) => (
-                          <td key={kind} className={`layer-td ${kind}`}>
-                            <div className="layer-pair">
-                              {["7d", "30d"].map((h) => <LayerTile key={h} alignment={c.align} kind={kind} horizon={h} tag={h.toUpperCase()} aligned={!!chainAgreed(c.align, h)} />)}
-                            </div>
-                          </td>))}
                       </>
                     ) : (
                       <>

@@ -407,7 +407,7 @@ svg.viz text { font: 400 var(--t-key) var(--font-mono); }
 .board-toolbar .search-box { background: none; border: 0; border-left: 1px solid var(--seam); padding: 0 0 0 16px; gap: 8px; height: 30px; }
 .board-toolbar .search-box .search { width: 110px; padding: 6px 0; font-size: var(--t-cell); }
 .board-toolbar .search-box:focus-within { color: var(--accent-text); }
-.board-mini-head { display: none; }
+.board-mini-head, .board-mini-head.win-grid { display: none; }
 table.grid.market-grid { min-width: 0; table-layout: fixed; }
 table.grid.market-grid:not(.overview) { min-width: 980px; table-layout: auto; }
 .market-grid th:first-child, .market-grid td:first-child { padding-left: 20px; }
@@ -431,18 +431,24 @@ table.grid.market-grid:not(.overview) { min-width: 980px; table-layout: auto; }
 .trace-td .market-trace.compact .trace-change { margin: 0; font: 400 var(--t-key) var(--font-mono); color: var(--muted); }
 .regime-cell { display: grid; gap: 0; justify-items: start; }
 .regime-cell small { color: var(--muted); font: 400 var(--t-label)/1.35 var(--font-body); margin: 0 0 0 11px !important; }
-/* Markets row by layer (owner, 5 October 2026): Regime once, Wallets and Options for 7D and 30D, as wide
-   tiles in words, coloured by state; the explanation shows on hover or focus. */
-.market-grid .layer-head-row th { padding-block: 12px 0; border-bottom: 0; text-transform: none; letter-spacing: 0; font: 600 var(--t-cell)/1.2 var(--font-body); color: var(--fg); }
-.market-grid th.layer-sub { padding-top: 2px; font: 500 var(--t-key)/1.2 var(--font-body); color: var(--faint); }
-.market-grid th.layer-sub span { display: inline-block; width: calc(50% - 4px); }
-.market-grid th.layer-sub span + span { margin-left: 8px; }
-.layer-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.layer-tile { --c: var(--border-strong); --tint: transparent; position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 46px; padding: 6px 12px;
-  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); border-radius: var(--r-md); background: var(--tint); color: var(--c); outline: none; cursor: default; }
+/* Markets row (owner, 5 October 2026): each market reads two lines, the next 7 days (the engine on
+   4-hour bars) and the next 30 days (on daily bars), each with Regime, Wallets and Options as quiet
+   tiles in words; "All agree" in orange marks a window where the three point the same way. */
+.win-grid { display: grid; grid-template-columns: 96px minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); column-gap: 8px; align-items: center; }
+.market-grid th.windows-th { padding-block: 14px 10px; }
+.windows-th .win-grid span { display: inline-flex; align-items: center; gap: 6px; font: 500 var(--t-key)/1.2 var(--font-body); color: var(--faint); text-transform: none; letter-spacing: 0; }
+.windows-th .win-grid span svg { color: var(--fg-2); }
+.windows { display: grid; row-gap: 6px; }
+.win-label { display: grid; gap: 1px; min-width: 0; }
+.win-label b { font: 600 var(--t-cell)/1.25 var(--font-body); color: var(--fg); white-space: nowrap; }
+.win-label small { font: 400 var(--t-label)/1.3 var(--font-body); color: var(--muted); white-space: nowrap; }
+.win-row.aligned .win-label small { color: var(--accent-text); font-weight: 600; }
+.layer-tile { --c: var(--border-strong); --tint: transparent; position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; padding: 5px 12px;
+  border: 1px solid color-mix(in srgb, var(--c) 32%, transparent); border-radius: var(--r-md); background: var(--tint); color: var(--c); outline: none; cursor: default;
+  transition: border-color 160ms var(--ease), background 160ms var(--ease); }
 .layer-tile.up { --c: var(--up); --tint: var(--up-soft); } .layer-tile.defensive { --c: var(--down); --tint: var(--down-soft); } .layer-tile.neutral { --c: var(--neutral); --tint: var(--neutral-soft); }
 .layer-tile.unknown { --c: var(--text-3); border-style: dashed; border-color: var(--border-strong); }
-.layer-tile.aligned { box-shadow: inset 0 3px 0 -1px var(--accent); }
+.layer-tile:hover { border-color: color-mix(in srgb, var(--c) 70%, transparent); }
 .layer-tile:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .lt-icon { display: inline-grid; place-items: center; flex: none; }
 .lt-text { display: grid; min-width: 0; }
@@ -453,6 +459,7 @@ table.grid.market-grid:not(.overview) { min-width: 980px; table-layout: auto; }
 .layer-tile[data-tip]:hover::after, .layer-tile[data-tip]:focus::after { content: attr(data-tip); position: absolute; z-index: 20; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
   width: max-content; max-width: 280px; padding: 10px 12px; border: 1px solid var(--seam-hi); border-radius: var(--r-md); background: var(--plate-2); box-shadow: var(--elev-1);
   color: var(--fg); font: 400 var(--t-label)/1.5 var(--font-body); white-space: normal; text-align: left; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .layer-tile { transition: none; } }
 .market-board .empty-state { padding: 40px 20px; display: grid; justify-items: center; gap: 12px; }
 @media (max-width: 1180px) {
   .structure-band { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "cons mix fg" "sig sig sig"; }
@@ -483,27 +490,22 @@ table.grid.market-grid:not(.overview) { min-width: 980px; table-layout: auto; }
   .board-mini-key { display: block; padding: 10px 16px 2px; }
   .board-mini-key .chain-key { justify-content: flex-start; gap: 8px 14px; }
   .board-mini-key .chain-key-layers { padding-right: 0; border-right: 0; }
-  .board-mini-head { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; padding: 8px 16px; position: sticky; top: var(--header-h); z-index: 3;
-    background: var(--plate); border-bottom: 1px solid var(--seam); font: 600 var(--t-key)/1.2 var(--font-body); color: var(--fg-2); }
-  .board-mini-head span { display: inline-flex; align-items: center; gap: 6px; }
-  .board-mini-head small { font-weight: 400; color: var(--muted); }
+  .board-mini-head.win-grid { display: grid; }
+  .board-mini-head { padding: 8px 16px; position: sticky; top: var(--header-h); z-index: 3; background: var(--plate); border-bottom: 1px solid var(--seam); }
+  .board-mini-head span { display: inline-flex; align-items: center; gap: 5px; font: 500 var(--t-key)/1.2 var(--font-body); color: var(--faint); }
+  .win-grid { grid-template-columns: 52px minmax(0, 1.45fr) minmax(0, 1fr) minmax(0, 1fr); column-gap: 5px; }
+  .market-grid.overview .lt-text b { font-size: var(--t-label); }
   .market-grid.overview, .market-grid.overview tbody { display: block; }
   .market-grid.overview colgroup, .market-grid.overview thead { display: none; }
-  .market-grid.overview tr { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 8px; row-gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--seam); }
+  .market-grid.overview tr { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--seam); }
   .market-grid.overview tbody tr:last-child { border-bottom: 0; }
   .market-grid.overview td { display: block; border: 0 !important; padding: 0 !important; min-width: 0; }
   .market-grid.overview td.hide-md { display: none; }
-  .market-grid.overview td.market-td { grid-column: 1; grid-row: 1; }
-  .market-grid.overview td.regime-td { grid-column: 2; grid-row: 1; }
-  .market-grid.overview td.layer-td.wallets { grid-column: 1; grid-row: 2; }
-  .market-grid.overview td.layer-td.options { grid-column: 2; grid-row: 2; }
-  .market-grid.overview .layer-pair { gap: 6px; }
-  .market-grid.overview .layer-tile { min-height: 44px; padding: 5px 8px; gap: 6px; }
-  .market-grid.overview .layer-pair .lt-icon { display: none; }
-  .market-grid.overview .layer-tile .lt-text .lt-tag { display: block; font: 500 11px/1.2 var(--font-mono); color: var(--muted); }
-  .layer-tile[data-tip]:hover::after, .layer-tile[data-tip]:focus::after { max-width: min(260px, calc(100vw - 32px)); }
-  .market-grid.overview td.wallets .layer-tile::after, .market-grid.overview td.market-td ~ td.regime-td .layer-tile::after { left: 0; right: auto; transform: none; }
-  .market-grid.overview td.options .layer-tile::after, .market-grid.overview td.regime-td .layer-tile::after { left: auto; right: 0; transform: none; }
+  .market-grid.overview .layer-tile { min-height: 42px; padding: 4px 8px; }
+  .market-grid.overview .lt-text small { display: none; }
+  .market-grid.overview .win-label b { font-size: var(--t-label); }
+  .market-grid.overview .win-label small { font-size: 11px; }
+  .layer-tile[data-tip]:hover::after, .layer-tile[data-tip]:focus::after { max-width: min(260px, calc(100vw - 32px)); left: auto; right: 0; transform: none; }
 }
 
 /* Landing: the sign carries the character; everything below it is as calm as the app. No market data. */

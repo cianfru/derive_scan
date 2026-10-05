@@ -124,14 +124,17 @@ def wallets_reading(positions, strikes, index, now, days, tier=WALLET_TIER):
 def alignment(row_4h, row_1d, features, iv_history, flows, positions, strikes, index, now, *, options_at=None):
     out, score = {}, 0
     for h, days in HORIZONS.items():
-        engine = row_1d  # One daily price engine, separate option/expiry horizons.
+        # Each window reads the engine on the timeframe whose next bars span it (owner, 5 October 2026):
+        # about 28 four-hour bars make 7 days, about 30 daily bars make 30 days.
+        tf = "4h" if h == "7d" else "1d"
+        engine = row_4h if tf == "4h" else row_1d
         status = engine_status(engine, now)
         if status == "ready" and engine.get("volume_status") != "ok":
             status = "thin_volume"
         sig = (engine or {}).get("signal")
         e = (1.0 if sig in UP_SIGNALS else -1.0 if sig in DEFENSIVE_SIGNALS else 0.0) if status == "ready" else None
         row = {"engine": {"signal": sig, "state": state_of(e), "status": status,
-                          "timeframe": "1d", "regime": (engine or {}).get("regime"),
+                          "timeframe": tf, "regime": (engine or {}).get("regime"),
                           "data_status": (engine or {}).get("data_status"), "history_bars": (engine or {}).get("history_bars"),
                           "volume_status": (engine or {}).get("volume_status"), "engine_errors": (engine or {}).get("engine_errors"), "observed_at": (engine or {}).get("signal_bar_close_time")},
                "options": options_reading(h, features, iv_history, flows, observed_at=options_at, now=now),

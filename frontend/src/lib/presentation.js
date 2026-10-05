@@ -20,7 +20,7 @@ export const STATUS_WHY = {
 export function viewReading(alignment, horizon, kind, now) {
   if (!alignment || alignment.version !== 2) return { label: "Unavailable", state: null, why: STATUS_WHY.unavailable };
   if (kind === "wallets" && !(alignment.wallet_coverage?.ready === true && alignment.wallet_coverage?.status === "ready")) return { label: "Building history", state: null, why: STATUS_WHY.building };
-  const row = (alignment.readings || alignment.horizons)?.[kind === "engine" ? "30d" : horizon]?.[kind];
+  const row = (alignment.readings || alignment.horizons)?.[horizon]?.[kind];
   const state = readingState(row, kind, now);
   const status = kind === "engine" && row?.data_status && row.data_status !== "ready" ? row.data_status : row?.status;
   const key = status === "ready" ? "stale" : status;
