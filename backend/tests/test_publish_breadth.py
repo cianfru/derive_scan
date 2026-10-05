@@ -21,6 +21,24 @@ def test_only_ready_regimes_are_counted_in_column_order():
     table = breadth_table(breadth)
     assert table["cols"] == list(BREADTH_COLS) == ["MARKUP", "BLOWOFF", "REACC", "ACCUM", "CAP", "MARKDOWN", "FLAT"]
     assert table["rows"] == [[1, 2, 0, 0, 0, 0, 0, 0], [2, 0, 0, 1, 0, 0, 1, 1], [3, 0, 0, 0, 1, 0, 0, 0]]
+    assert "members" not in table
+
+
+def test_members_follow_each_days_ready_reading_without_borrowing_later_coins():
+    breadth, members = defaultdict(Counter), {}
+    count_breadth(breadth, [_row(2, "MARKDOWN"), _row(1, "MARKUP")], und="ETH", members=members)
+    count_breadth(breadth, [_row(1, "MARKUP"), _row(2, "ACCUM", status="not enough data",
+                            filled_from_replay=["regime"]), _row(3, "CAP", regime_status="unavailable")],
+                  und="BTC", members=members)
+    count_breadth(breadth, [_row(1, "MARKUP", status="warming up"), _row(2, "SOMETHING_NEW"),
+                            _row(3, "BLOWOFF", status="warming up", filled_from_replay=["heat"])],
+                  und="SOL", members=members)
+    table = breadth_table(breadth, members)
+    assert table["rows"] == [[1, 2, 0, 0, 0, 0, 0, 0], [2, 0, 0, 0, 1, 0, 1, 1]]
+    assert table["members"] == [
+        [["BTC", "ETH"], [], [], [], [], [], []],
+        [[], [], [], ["BTC"], [], ["ETH"], ["SOL"]],
+    ]
 
 
 def test_last_breadth_row_is_the_published_consensus(saved_site):
@@ -38,3 +56,16 @@ def test_last_breadth_row_is_the_published_consensus(saved_site):
     assert n["MARKDOWN"] == expected["markdown"]
     assert n["ACCUM"] + n["REACC"] + n["CAP"] == expected["accum"]
     assert sum(counts) == expected["total"] == 3
+    assert len(table["members"]) == len(table["rows"])
+    for (close, *daily_counts), groups in zip(table["rows"], table["members"]):
+        assert [len(group) for group in groups] == daily_counts
+        seen = []
+        for regime, group in zip(table["cols"], groups):
+            assert group == sorted(group)
+            for und in group:
+                coin = json.loads((site / "coins" / f"{und}.json").read_text())
+                reading = next(r for r in coin["history"]["engine"]["1d"] if r["ts"] == close)
+                assert reading["regime"] == regime
+                assert reading["metric_status"]["regime"] == "ready"
+                seen.append(und)
+        assert len(seen) == len(set(seen))

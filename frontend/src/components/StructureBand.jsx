@@ -1,3 +1,4 @@
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Info, Empty } from "./ui.jsx";
 import FearGreed from "./FearGreed.jsx";
 import { REGIME, SIGNAL_LABEL, CONSENSUS, signalTone, title } from "../lib/format.js";
@@ -22,8 +23,16 @@ export const signalCounts = (coins, selected = null) =>
 const CONSENSUS_HELP = "The engine's market consensus on the daily close: every Derive perp with enough history sits in one regime, and the market is named when one group holds more than 55% of them (most coins trending up; most coins basing: building a base, cooling off or washed out; most coins trending down; most coins overheated). Otherwise Mixed. It is one of the nine checks behind an up-setup. The strip shows the same count for each past daily close, replayed from price history; today is the last column. The dotted line marks 55% trending up. A head count of markets, not a strength score.";
 const SIGNAL_COUNT_HELP = "Daily signal counts for the markets in the board's current view. Select one to show only those markets; select it again to show all.";
 
-const month = (t) => new Date(t * 1000).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
-const day = (t) => new Date(t * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" });
+const day = (t) => new Date(t * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+
+function regimeMembers(coins, now) {
+  const members = {};
+  for (const c of coins) if (c.regime_1d && currentEngine(c.engine_comparison?.["1d"], now)) {
+    (members[c.regime_1d] ||= []).push(c.und);
+  }
+  for (const names of Object.values(members)) names.sort();
+  return members;
+}
 
 /** Daily regime counts of every perp with a current daily engine (what the consensus counts). */
 export function regimeCounts(coins, now) {
@@ -36,18 +45,32 @@ export function regimeCounts(coins, now) {
  * The strip's columns: the published daily history, with the latest close taken from the board's own
  * readings (so the last column, the key and the sub-line always agree with the board).
  */
-export function stripColumns(breadth, live, bar) {
+export function stripColumns(breadth, live, bar, liveMembers = null) {
   const cols = breadth?.cols || [];
-  const rows = (breadth?.rows || []).map(([ts, ...n]) => ({ ts, n: Object.fromEntries(cols.map((k, i) => [k, n[i] || 0])) }));
+  const rows = (breadth?.rows || []).map(([ts, ...n], i) => ({
+    ts, n: Object.fromEntries(cols.map((k, j) => [k, n[j] || 0])),
+    members: breadth.members?.[i] ? Object.fromEntries(cols.map((k, j) => [k, breadth.members[i][j]])) : null,
+  }));
   if (Number.isFinite(bar) && Object.keys(live).length) {
     const last = rows[rows.length - 1];
-    if (last && last.ts === bar) last.n = { ...live };
-    else if (!last || last.ts < bar) rows.push({ ts: bar, n: { ...live } });
+    if (last && last.ts === bar) { last.n = { ...live }; last.members = liveMembers; }
+    else if (!last || last.ts < bar) rows.push({ ts: bar, n: { ...live }, members: liveMembers });
   }
   return rows;
 }
 
 function RegimeStrip({ columns }) {
+  const [sel, setSel] = useState(null);
+  const [tipLeft, setTipLeft] = useState(0);
+  const box = useRef(null);
+  const tipId = useId();
+  const open = sel !== null;
+  useEffect(() => {
+    if (!open) return;
+    const close = (e) => { if (!box.current?.contains(e.target)) setSel(null); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
   const H = 32;
   let x = 0;
   const rows = columns.map((col, i) => {
@@ -78,34 +101,82 @@ function RegimeStrip({ columns }) {
   const edge = (run) => `M${run.flatMap((r) => [[r.x, r.bands.MARKUP.top], [r.x + 1, r.bands.MARKUP.top]])
     .map((p) => p.join(",")).join("L")}`;
   const latest = rows[rows.length - 1];
+  const selected = sel === null ? null : rows.find((r) => r.x === sel) || {
+    ts: columns[0].ts + sel * 86400, x: sel, total: 0, n: {},
+  };
+  const shown = selected || latest;
+  const groups = ORDER.filter((k) => shown.n[k]).map((k) => ({
+    k, count: shown.n[k], names: shown.members?.[k]?.length === shown.n[k] ? shown.members[k].join(", ") : null,
+  }));
+  const reading = `${day(shown.ts)} UTC · ${shown.total ? groups.map(({ k, count, names }) =>
+    `${REGIME[k]} ${count}: ${names || "Coin names unavailable"}`).join(" · ") : "No reading"}`;
+  const pick = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    if (r.width) setSel(Math.max(0, Math.min(W - 1, Math.floor((e.clientX - r.left) / r.width * W))));
+  };
+  const keys = (e) => {
+    if (e.key === "Escape") { setSel(null); return; }
+    const i = sel ?? latest.x;
+    const next = { ArrowLeft: i - 1, ArrowRight: i + 1, PageUp: i - 30, PageDown: i + 30, Home: 0, End: W - 1 }[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    setSel(Math.max(0, Math.min(W - 1, next)));
+  };
   const line = H * (1 - 0.55);
+  useLayoutEffect(() => {
+    if (sel === null) return;
+    const place = () => {
+      const r = box.current?.getBoundingClientRect();
+      if (!r) return;
+      const width = Math.min(320, window.innerWidth - 32);
+      const center = r.left + (sel + .5) / W * r.width;
+      setTipLeft(Math.max(16, Math.min(window.innerWidth - width - 16, center - width / 2)) - r.left);
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [sel, W]);
   return (
-    <svg className="regime-strip" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
-      aria-label={`Daily regime mix for the last ${columns.length} daily closes`}>
-      {ORDER.map((k) => runs.map((run) => run.some((r) => r.n[k]) && (
-        <path key={`${k}-${run[0].ts}`} d={area(run, k)} className="rs-area" style={{ fill: REGIME_COLORS[k] }} />
-      )))}
-      <line x1="0" x2={W} y1={line} y2={line} className="rs-line" vectorEffect="non-scaling-stroke" />
-      {runs.map((run) => <path key={run[0].ts} d={edge(run)} className="rs-trend" vectorEffect="non-scaling-stroke" />)}
-      {latest.total > 0 && ORDER.map((k) => {
-        const { top, bottom } = latest.bands[k];
-        return bottom > top && <rect key={k} x={latest.x} width="1" y={top} height={bottom - top}
-          className="rs-today" style={{ fill: REGIME_COLORS[k] }} />;
-      })}
-      {rows.map((r) => <rect key={r.ts} x={r.x} y="0" width="1" height={H} fill="transparent">
-        <title>{day(r.ts)} · {r.total ? ORDER.filter((k) => r.n[k]).map((k) => `${REGIME[k]} ${r.n[k]}`).join(" · ") : "No reading"}</title>
-      </rect>)}
-    </svg>
+    <div ref={box} className="regime-history" role="slider" tabIndex={0}
+      aria-label={`Daily regime mix for the last ${columns.length} daily closes`}
+      aria-valuemin={0} aria-valuemax={W - 1} aria-valuenow={shown.x} aria-valuetext={reading}
+      aria-describedby={open ? tipId : undefined}
+      onFocus={() => setSel((v) => v ?? latest.x)} onBlur={() => setSel(null)} onKeyDown={keys}
+      onPointerLeave={(e) => { if (e.pointerType !== "touch") setSel(null); }}>
+      <svg className="regime-strip" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true"
+        onPointerMove={pick} onPointerDown={(e) => { box.current?.focus(); pick(e); }}>
+        {ORDER.map((k) => runs.map((run) => run.some((r) => r.n[k]) && (
+          <path key={`${k}-${run[0].ts}`} d={area(run, k)} className="rs-area" style={{ fill: REGIME_COLORS[k] }} />
+        )))}
+        <line x1="0" x2={W} y1={line} y2={line} className="rs-line" vectorEffect="non-scaling-stroke" />
+        {runs.map((run) => <path key={run[0].ts} d={edge(run)} className="rs-trend" vectorEffect="non-scaling-stroke" />)}
+        {latest.total > 0 && ORDER.map((k) => {
+          const { top, bottom } = latest.bands[k];
+          return bottom > top && <rect key={k} x={latest.x} width="1" y={top} height={bottom - top}
+            className="rs-today" style={{ fill: REGIME_COLORS[k] }} />;
+        })}
+        {selected && <rect x={selected.x} y="0" width="1" height={H} className="rs-selected" vectorEffect="non-scaling-stroke" />}
+      </svg>
+      {selected && <div id={tipId} className="rs-tooltip" role="tooltip" style={{ left: tipLeft }}>
+        <div className="rs-tooltip-body">
+          <time className="rs-date">{day(selected.ts)}<span>Daily close · UTC</span></time>
+          {selected.total ? groups.map(({ k, count, names }) => <div className="rs-group" key={k} style={{ "--regime-color": REGIME_COLORS[k] }}>
+            <span className="rs-group-label"><i aria-hidden="true" />{REGIME[k]}<b>{count}</b></span>
+            <span className={`rs-coins${names ? "" : " unavailable"}`}>{names || "Coin names unavailable"}</span>
+          </div>) : <span className="rs-coins unavailable">No reading</span>}
+        </div>
+      </div>}
+    </div>
   );
 }
 
 export default function StructureBand({ data, scoped, scopeLabel, signalFilter, onSignal }) {
   const consensus = data.consensus_detail?.["1d"]?.status === "unavailable" ? null : data.consensus?.["1d"];
-  const live = regimeCounts(data.coins || []);
+  const now = Date.now() / 1000;
+  const live = regimeCounts(data.coins || [], now);
   const measured = Object.values(live).reduce((a, b) => a + b, 0);
   const lead = ORDER.filter((k) => live[k]).sort((a, b) => live[b] - live[a]);
-  const columns = stripColumns(data.breadth_1d, live, data.bars?.["1d"]);
-  const lastTs = columns[columns.length - 1]?.ts;
+  const columns = stripColumns(data.breadth_1d, live, data.bars?.["1d"], regimeMembers(data.coins || [], now));
   const ladder = signalCounts(scoped, signalFilter);
 
   return (
@@ -122,13 +193,7 @@ export default function StructureBand({ data, scoped, scopeLabel, signalFilter, 
             {lead.map((k) => <span key={k} style={{ "--regime-color": REGIME_COLORS[k] }}><i />{REGIME[k]}<b>{live[k]}</b></span>)}
           </div>)}
         {columns.length > 0 ? (
-          <>
-            <RegimeStrip columns={columns} />
-            <div className="sb-axis" aria-hidden="true">
-              <span>{month(columns[0].ts)}</span>
-              <span>{lastTs === data.bars?.["1d"] ? "Today" : day(lastTs)}</span>
-            </div>
-          </>
+          <RegimeStrip columns={columns} />
         ) : <Empty label="No regime history" />}
       </div>
 
