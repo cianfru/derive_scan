@@ -16,19 +16,21 @@ import {
 import { breakdownRows, closeEvent, incompleteEntryReceipt, realized, realizedSummary, remainingQty } from "../lib/realized.js";
 import { exposureGroups, exposureKey, settleRef } from "../lib/exposure.js";
 import { compareReadings, hasJournal } from "../lib/journal.js";
-import { TESTNET_FILLS } from "../lib/flags.js";
+import { MAINNET_FILLS, ONE_TAP_FILLS, TESTNET_FILLS } from "../lib/flags.js";
+import { oneTapOffered } from "../lib/pilot.js";
 import "../questions.css";
 import "../journal.css";
 import "../marketplace-positions.css";
 
-// Saloon stage 2 on testnet: Positions reads the testnet journal and the Saloon account on Derive,
-// and one-tap positions sell back through Derive. Other builds carry none of this code.
+// Saloon stage 2 with fills (testnet, or real money on mainnet): Positions reads that network's journal
+// and the Saloon account on Derive, and one-tap positions sell back through Derive. On mainnet the
+// Derive check shows only in a pilot browser. Other builds carry none of this code.
 const NET = TESTNET_FILLS ? "testnet" : "mainnet";
-const OneTap = TESTNET_FILLS ? lazy(() => import("../components/trade/TradePanel.jsx")) : null;
-const DeriveSync = TESTNET_FILLS ? lazy(() => import("../components/trade/TradePanel.jsx").then((m) => ({ default: m.DeriveSync }))) : null;
+const OneTap = ONE_TAP_FILLS ? lazy(() => import("../components/trade/TradePanel.jsx")) : null;
+const DeriveSync = ONE_TAP_FILLS ? lazy(() => import("../components/trade/TradePanel.jsx").then((m) => ({ default: m.DeriveSync }))) : null;
 // Following: the Saloon board limited to followed answers, as a tab here.
 const Board = lazy(() => import("./Board.jsx"));
-const AlsoOnDerive = TESTNET_FILLS ? lazy(() => import("../components/trade/TradePanel.jsx").then((m) => ({ default: m.AlsoOnDerive }))) : null;
+const AlsoOnDerive = ONE_TAP_FILLS ? lazy(() => import("../components/trade/TradePanel.jsx").then((m) => ({ default: m.AlsoOnDerive }))) : null;
 
 const usd = (v) => money(v, { cents: true });
 const DERIVE_ENTRY_FEES = "Derive's entry fees are not available yet. Total cost and profit or loss need those fees.";
@@ -61,7 +63,7 @@ function when(ts) {
 
 const You = () => <small className="q-you">Entered by you</small>;
 /** Who a journal figure comes from: the user, or Derive's own records for a one-tap fill. */
-const By = ({ j }) => (TESTNET_FILLS && j?.source === "derive" ? <small className="q-you">From Derive</small> : <You />);
+const By = ({ j }) => (ONE_TAP_FILLS && j?.source === "derive" ? <small className="q-you">From Derive</small> : <You />);
 
 function Cell({ c, label }) {
   if (!c.show) return <Missing text={c.text} label={label} why={c.why} />;
@@ -120,7 +122,7 @@ function EntryRecord({ p }) {
   const f = j.fill || {};
   const pendingEntry = incompleteEntryReceipt(p);
   const c = j.cost || {};
-  const deriveReceipt = TESTNET_FILLS && j.source === "derive";
+  const deriveReceipt = ONE_TAP_FILLS && j.source === "derive";
   const entryCostUnknown = deriveReceipt && !Number.isFinite(c.total);
   const feeWhy = DERIVE_ENTRY_FEES;
   const m = j.mark;
@@ -138,7 +140,7 @@ function EntryRecord({ p }) {
             <li key={l.name} className="mono">{l.signed_qty > 0 ? "+" : l.signed_qty < 0 ? "-" : ""}{Math.abs(l.signed_qty ?? 0)} {l.name}
               {l.qty < l.planned ? <small> of {l.planned}</small> : null}{l.price != null ? <small> at {usd(l.price)}</small> : null}</li>))}</ul></dd></div>
         <div><dt>Filled amounts<By j={j} /></dt><dd>{pendingEntry ? <span className="warn-text">Derive's records still being checked</span> : f.complete ? (f.filled_pct != null && f.filled_pct < 1 ? `Whole package, ${Math.round(f.filled_pct * 100)}% of the size asked` : "Whole package") : <span className="warn-text">Not fully filled</span>}</dd></div>
-        {TESTNET_FILLS && f.trade_ids?.length > 0 && <div><dt>Derive trade ids</dt><dd className="mono q-trade-ids">{f.trade_ids.map((id) => <span key={id}>{id}</span>)}</dd></div>}
+        {ONE_TAP_FILLS && f.trade_ids?.length > 0 && <div><dt>Derive trade ids</dt><dd className="mono q-trade-ids">{f.trade_ids.map((id) => <span key={id}>{id}</span>)}</dd></div>}
         <div><dt>Premium, before fees<By j={j} />{f.limitation === "package_total" && <small>one total; leg prices not entered</small>}</dt><dd className="mono">{usd(c.premium)}</dd></div>
         <div><dt>Derive's fees{c.fees_basis === "entered" ? <You /> : deriveReceipt ? <By j={j} /> : <small>{c.fees_basis === "estimated" ? "not entered · estimated" : "not entered"}</small>}</dt>
           <dd className="mono">{c.fees != null ? usd(c.fees) : deriveReceipt ? <Missing text="Not available yet" label="Why no entry fees" why={feeWhy} /> : nr}</dd></div>
@@ -183,7 +185,7 @@ function Portion({ x, und, deriveReceipt = false }) {
   const checkingSettlement = x.kind === "settle" && x.missing.includes("fill_pending");
   const head = checkingSettlement ? <>Settlement records still being checked</> : x.kind === "settle"
     ? <>Settled at {money(x.settle_price)}<small className="mono">{amountTextQ(x.qty)} contracts</small></>
-    : <>Sold back {amountTextQ(x.qty)} contracts<small className="mono">{when(x.ts) ? `${when(x.ts)} · ${TESTNET_FILLS && x.basis.exit === "exact" ? "from Derive" : "entered by you"}` : "time not entered"}</small></>;
+    : <>Sold back {amountTextQ(x.qty)} contracts<small className="mono">{when(x.ts) ? `${when(x.ts)} · ${ONE_TAP_FILLS && x.basis.exit === "exact" ? "from Derive" : "entered by you"}` : "time not entered"}</small></>;
   const rows = breakdownRows(x);
   const row = (label, sub, v, cls = "") => (
     <div className={cls}><dt>{label}{sub && <small>{sub}</small>}</dt><dd className="mono">{v}</dd></div>
@@ -227,7 +229,7 @@ function Realized({ p, und }) {
   return (
     <details className="q-real">
       <summary>Where the result came from</summary>
-      {r.portions.map((x, i) => <Portion key={i} x={x} und={und} deriveReceipt={TESTNET_FILLS && p.journal?.source === "derive"} />)}
+      {r.portions.map((x, i) => <Portion key={i} x={x} und={und} deriveReceipt={ONE_TAP_FILLS && p.journal?.source === "derive"} />)}
       {r.open > 0 && <p className="q-note">{amountTextQ(r.open)} contracts are still open and not counted here.</p>}
     </details>
   );
@@ -283,7 +285,7 @@ function positionView(p, { board, now, scope, settle = null }) {
   const paused = board ? priceAge(board.prices_ts, now, board.paused).state === "paused" : true;
   const settling = (!after && now >= settleTs - 1800) || (after && settle == null);
   const half = partial(p);
-  const oneTap = TESTNET_FILLS && p.exec === "rfq";
+  const oneTap = ONE_TAP_FILLS && p.exec === "rfq";
   const pendingReceipt = oneTap && incompleteReceipt(p);
   const pendingEntry = oneTap && incompleteEntryReceipt(p);
   const entryFeesUnknown = oneTap && !Number.isFinite(p.journal?.cost?.fees);
@@ -359,7 +361,9 @@ function StatusLine({ v }) {
     <p className={`q-card-status${status.warn ? " warn" : ""}`}>
       {status.key === "settled" ? <>Settled at {money(settle)} · got {usd(settleExit?.exit.gross ?? f.got)}</> : status.text}
       <Info label="How this was placed">{oneTap
-        ? "Bought through Derive's request for quote in one tap, on Derive's testnet with test USDC. The fill time, options, prices, fees and trade ids come from Derive's own records."
+        ? (MAINNET_FILLS
+          ? "Bought through Derive's request for quote in one tap, with USDC from your Derive account. The fill time, options, prices, fees and trade ids come from Derive's own records."
+          : "Bought through Derive's request for quote in one tap, on Derive's testnet with test USDC. The fill time, options, prices, fees and trade ids come from Derive's own records.")
         : half
         ? "You told Cowboy only the first of the two orders filled. You hold one option alone, which pays differently from the answer and can lose all it cost. Finish or undo it on Derive; Cowboy shows no value for it."
         : "You placed the orders on Derive yourself and told Cowboy what you paid. Cowboy cannot see your Derive account, so these figures are only as good as what you entered."}</Info>
@@ -674,6 +678,8 @@ export default function MyQuestions() {
         </div>
         <p className="q-position-intro">Your record of trades placed on Derive.<Info label="About Positions">{TESTNET_FILLS
           ? "One-tap trades are recorded from Derive's own records and checked against your Saloon account on Derive's testnet; trades placed by hand are records you entered. Everything is saved in this browser. Values use the published sell-back price after exit fees when available; an unavailable value stays unknown."
+          : MAINNET_FILLS
+          ? "One-tap trades are recorded from Derive's own records and checked against your Derive account; trades placed by hand are records you entered. Everything is saved in this browser. Values use the published sell-back price after exit fees when available; an unavailable value stays unknown."
           : "These are records you entered, saved in this browser. Cowboy cannot see your Derive account. Values use the published sell-back price after exit fees when available; an unavailable value stays unknown."}</Info></p>
         {!persistent() && <p className="q-note warn" role="status">This browser is not saving data: Positions last only for this visit. Export a copy to keep them.</p>}
         {list.length > 0 && (
@@ -692,13 +698,13 @@ export default function MyQuestions() {
         <Tabs label="Positions" value={tab} onChange={setTab} items={[["open", "Open"], ["closed", "Closed"], ["following", "Following"]]} />
       </header>
       {NET === "mainnet" && toSettle.map((p) => <SettleWatch key={p.key} p={p} onSettle={(k, price) => setList(settlePosition(k, price))} />)}
-      {TESTNET_FILLS && <Suspense fallback={null}><DeriveSync onScope={(s) => { setScope(s); setSync(null); }}
+      {ONE_TAP_FILLS && (!MAINNET_FILLS || oneTapOffered()) && <Suspense fallback={null}><DeriveSync onScope={(s) => { setScope(s); setSync(null); }}
         onSynced={(r) => { setList(r.list); setSync(r); }} /></Suspense>}
       {tab === "following" ? <Suspense fallback={null}><Board followingOnly embedded /></Suspense> : <>
       {tab === "open" && <ExposureTotal groups={groups} />}
       {tab === "open" && pendingReceipts.length > 0 && <p className="q-note">Derive's trade records are still being checked. These positions are left out of the combined settlement figures.</p>}
       {tab === "open" && unknownFeeEntries.length > 0 && <p className="q-note">Derive's entry fees are not available yet. These positions are left out of the combined settlement figures.</p>}
-      {TESTNET_FILLS && tab === "open" && sync?.extra && <Suspense fallback={null}><AlsoOnDerive extra={sync.extra} /></Suspense>}
+      {ONE_TAP_FILLS && (!MAINNET_FILLS || oneTapOffered()) && tab === "open" && sync?.extra && <Suspense fallback={null}><AlsoOnDerive extra={sync.extra} /></Suspense>}
       {rows.length ? (tab === "open"
         ? <section className="q-groups" aria-label="Open positions by settlement date">{cards.map((c) => (
           <GroupCard key={c.key} und={c.und} expiry={c.expiry} items={c.items} g={c.g} scope={scope} syncs={syncs}

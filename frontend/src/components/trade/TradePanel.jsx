@@ -1,10 +1,13 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Info } from "../ui.jsx";
-import { useData } from "../../lib/data.js";
+import { DATA_URL, useData } from "../../lib/data.js";
 import { money } from "../../lib/questions.js";
 import { addPosition, closePosition, incompleteReceipt, loadPositions, patchPosition, replacePosition, settlePosition } from "../../lib/positions.js";
 import { remainingQty } from "../../lib/realized.js";
-import { MODE } from "../../lib/trade/config.js";
+import { MODE, NETWORK } from "../../lib/trade/config.js";
+import { mainnetSwitch, setMainnetSwitch } from "../../lib/trade/live.js";
+import { notePilotInvite, oneTapOffered } from "../../lib/pilot.js";
+import { MAINNET_FILLS, TESTNET_FILLS } from "../../lib/flags.js";
 import { failure } from "../../lib/trade/derive.js";
 import { TRADING_NOTICE, tradingState } from "../../lib/trade/limits.js";
 import { buyRecord, exitFromFill, knownRfqs } from "../../lib/trade/record.js";
@@ -23,19 +26,41 @@ export { testnetListing } from "../../lib/trade/listing.js";
 
 /** A level whose options the testnet does not list: said plainly, the names in the (i). */
 function NotListed({ missing }) {
+  if (!TESTNET_FILLS) return <p className="tr-msg" role="status">{NOT_LISTED}</p>;
   return <p className="tr-msg" role="status">{NOT_LISTED}<ErrorDetail detail={{ step: "listing", source: "Derive", code: "", message: `Not listed on testnet: ${missing.join(", ")}`, data: "" }} /></p>;
 }
 
 /** The header's wallet (testnet builds), exported here so all trading code stays in this one lazy chunk. */
 export { default as WalletMenu } from "./WalletMenu.jsx";
 
-const NETWORK_NOTE = "Prices on the Saloon board come from Derive's live market, recorded every 15 minutes. One-tap trades in this build go to Derive's testnet with test USDC, so the firm price you are offered comes from the testnet and can differ from the board.";
+// Network words are chosen with the build flags, which the build folds, so a mainnet build carries
+// none of the testnet's wording and the reverse.
+const NETWORK_NOTE = MAINNET_FILLS
+  ? "Prices on the Saloon board come from Derive's live market, recorded every 15 minutes. One-tap trades are real: they use the USDC in your own Derive account, at the firm price Derive gives when you ask, which can differ from the board."
+  : "Prices on the Saloon board come from Derive's live market, recorded every 15 minutes. One-tap trades in this build go to Derive's testnet with test USDC, so the firm price you are offered comes from the testnet and can differ from the board.";
 
-/** The "Testnet" badge every trade screen carries, with what it means in an (i). */
+/** Builds where a tap fills (testnet, or real money on mainnet). */
+const FILLS = MODE === "testnet" || MODE === "mainnet";
+
+/** The badge every trade screen carries, with what it means in an (i): "Real money" on mainnet,
+ * "Testnet" on the testnet. */
 export function TestnetTag() {
+  if (MAINNET_FILLS) return <span className="tr-tag tr-real mono">Real money<Info label="About real money">{NETWORK_NOTE}</Info></span>;
   if (MODE !== "testnet") return <span className="tr-tag mono">Testnet · dry run</span>;
   return <span className="tr-tag tr-testnet mono">Testnet<Info label="About testnet">{NETWORK_NOTE}</Info></span>;
 }
+
+/** Real money: the published mainnet switch, read afresh (no cache) right before a fill. */
+async function readMainnetSwitch() {
+  const r = await fetch(`${DATA_URL}questions/index.json`, { cache: "no-store" });
+  if (!r.ok) return "off";
+  const s = mainnetSwitch(await r.json());
+  return s === "loading" ? "off" : s;
+}
+
+/** The stage 1 ticket for a browser outside the mainnet pilot, told one tap is on its way
+ * (QuestionTicket reads `oneTapComing`). */
+const handWithNote = (fallback) => (isValidElement(fallback) ? cloneElement(fallback, { oneTapComing: true }) : fallback);
 
 /** The setup steps before the ticket: connect, Derive's terms, add USDC, approve Cowboy. */
 function useStep(ticket) {
@@ -61,14 +86,17 @@ export default function TradePanel({ und, question, answer, level, sideKey, boar
   const { data: index } = useData("questions/index.json");
   const { data: markets } = useData("markets.json");
   const trading = tradingState(index);
+  // Real money: the page's copy of the mainnet switch, which the client checks before any fill.
+  useEffect(() => { if (MODE === "mainnet") setMainnetSwitch(trading); }, [trading]);
+  if (MODE === "mainnet") notePilotInvite();
   const plan = sell
     ? sellPlan({ position: sell.position, level, board, paused: sell.paused })
     : t?.contracts > 0 && level && board ? ticketPlan({ und, level, sideKey, board, contracts: t.contracts }) : null;
 
   const onFill = (fill, filledScope) => {
-    if (MODE !== "testnet") return;
+    if (!FILLS) return;
     const savedTs = Math.floor(Date.now() / 1000);
-    if (knownRfqs(loadPositions("testnet")).has(fill.rfq_id)) return;
+    if (knownRfqs(loadPositions(NETWORK.name)).has(fill.rfq_id)) return;
     if (sell) {
       const lv = level, p = sell.position;
       const fair = lv && Number.isFinite(lv.fair) ? (p.side === "yes" ? lv.fair : 1 - lv.fair) : null;
@@ -77,7 +105,7 @@ export default function TradePanel({ und, question, answer, level, sideKey, boar
       return;
     }
     const estimate = t ? { premium: t.premium, fees: t.fees, total: t.mostLose, contracts: t.contracts, ts: pricesTs ?? null } : null;
-    const rec = buyRecord({ fill, id: level.id, side: sideKey, network: "testnet", requested: plan?.contracts, level, board, markets, pricesTs, estimate, question, savedTs,
+    const rec = buyRecord({ fill, id: level.id, side: sideKey, network: NETWORK.name, requested: plan?.contracts, level, board, markets, pricesTs, estimate, question, savedTs,
       wallet: filledScope.wallet, subaccountId: filledScope.subaccountId });
     if (rec) addPosition(rec, savedTs * 1000);
   };
@@ -95,8 +123,11 @@ export default function TradePanel({ und, question, answer, level, sideKey, boar
     ? <p className="tr-msg" role="status">Check this position with Derive to confirm its wallet and account before selling it back.</p>
     : elsewhere
     ? <p className="tr-msg" role="status">This position is in Derive account #{from}. Connect its wallet and choose that account to sell it back in one tap.</p>
-    : <TradeTicket plan={plan} trading={trading} onFill={onFill} />;
+    : <TradeTicket plan={plan} trading={trading} onFill={onFill} {...(MODE === "mainnet" ? { readSwitch: readMainnetSwitch } : {})} />;
   const step = useStep(ticket);
+  // Real money: only a pilot browser gets one tap; everyone else places the orders by hand, with the
+  // note that one tap is on its way.
+  if (MODE === "mainnet" && !oneTapOffered()) return sell ? fallback : handWithNote(fallback);
   if ((closing && !sell) || !canTrade(und)) return fallback;
   return (
     <section className="q-ticket tr" aria-label={sell ? `Sell back ${answer} through Derive` : `${answer} through Derive`}>
@@ -147,24 +178,24 @@ export function DeriveSync({ onSynced, onScope }) {
     const now = Math.floor(Date.now() / 1000);
     // Only this wallet's records on this Derive account are matched; others stay as they are.
     try {
-      let list = loadPositions("testnet");
+      let list = loadPositions(NETWORK.name);
       const firsts = list.filter((p) => (!p.wallet || String(p.wallet).toLowerCase() === String(scope.wallet).toLowerCase())
         && (p.subaccount_id == null || p.subaccount_id === scope.subaccountId))
         .map((p) => p.journal?.fill?.ts ?? p.at).filter(Number.isFinite);
       const sinceSec = Math.max(0, (firsts.length ? Math.min(...firsts) : now - 30 * 86400) - 3600);
       const { trades, held } = await readSaloon(client, scope.subaccountId, { sinceSec });
       if (!current()) return;
-      list = loadPositions("testnet");
+      list = loadPositions(NETWORK.name);
       const fills = fillsByRfq(trades);
       const { added, repairs, claims } = recoverFills(list, fills, now, scope);
       const repairedKeys = new Set(repairs.map((r) => r.key));
-      for (const c of claims) { if (!current()) return; list = patchPosition(c.key, { wallet: c.wallet, subaccount_id: c.subaccount_id }, "testnet"); }
-      for (const { key, record } of repairs) { if (!current()) return; list = replacePosition(key, record, "testnet"); }
+      for (const c of claims) { if (!current()) return; list = patchPosition(c.key, { wallet: c.wallet, subaccount_id: c.subaccount_id }, NETWORK.name); }
+      for (const { key, record } of repairs) { if (!current()) return; list = replacePosition(key, record, NETWORK.name); }
       for (const r of added) { if (!current()) return; list = addPosition(r, Date.now()); }
       const { exits, repairs: laterRepairs, claims: laterClaims, unmatched = [] } = recoverFills(list, fills, now, scope);
-      for (const c of laterClaims) { if (!current()) return; list = patchPosition(c.key, { wallet: c.wallet, subaccount_id: c.subaccount_id }, "testnet"); }
-      for (const { key, record } of laterRepairs) { if (!current()) return; list = replacePosition(key, record, "testnet"); repairedKeys.add(key); }
-      for (const { key, exit } of exits) { if (!current()) return; list = closePosition(key, exit, now, "testnet"); }
+      for (const c of laterClaims) { if (!current()) return; list = patchPosition(c.key, { wallet: c.wallet, subaccount_id: c.subaccount_id }, NETWORK.name); }
+      for (const { key, record } of laterRepairs) { if (!current()) return; list = replacePosition(key, record, NETWORK.name); repairedKeys.add(key); }
+      for (const { key, exit } of exits) { if (!current()) return; list = closePosition(key, exit, now, NETWORK.name); }
       const prices = new Map();
       const { mine: settlingRecords } = accountRecords(list, fills, scope);
       for (const p of settlingRecords) {
@@ -174,7 +205,7 @@ export function DeriveSync({ onSynced, onScope }) {
         if (!prices.has(k)) prices.set(k, await settlementPrice(client, p.und, expiry).catch(() => null));
         if (!current()) return;
         const price = prices.get(k);
-        if (Number.isFinite(price)) list = settlePosition(p.key, price, now, "testnet");
+        if (Number.isFinite(price)) list = settlePosition(p.key, price, now, NETWORK.name);
       }
       const { mine } = accountRecords(list, fills, scope);
       const ours = new Set(mine.map((p) => p.key));
@@ -201,7 +232,7 @@ export function DeriveSync({ onSynced, onScope }) {
     <section className="tr tr-sync" aria-label="Your Saloon account on Derive">
       <header className="tr-head">
         <p className="tr-lead">Your Saloon account on Derive
-          <Info label="About this check">On this testnet build Positions reads your Saloon account on Derive over your own connection: its open positions and its trades. Derive's records are the reference; one-tap trades this browser missed are added from them, and each card says whether Derive holds its options. {NETWORK_NOTE}</Info>
+          <Info label="About this check">On this build Positions reads your Saloon account on Derive over your own connection: its open positions and its trades. Derive's records are the reference; one-tap trades this browser missed are added from them, and each card says whether Derive holds its options. {NETWORK_NOTE}</Info>
         </p>
         <TestnetTag />
       </header>

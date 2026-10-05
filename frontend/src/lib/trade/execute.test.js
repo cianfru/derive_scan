@@ -236,7 +236,7 @@ describe("the mainnet guard", () => {
     expect(fillsAllowed({ ...NETWORK, chainId: 1 }, "testnet")).toBe(false);
     expect(fillsAllowed({ ...NETWORK, wsUrl: "wss://api.derive.xyz/v3/ws" }, "testnet")).toBe(false);
     expect(fillsAllowed(undefined, "testnet")).toBe(false);
-    expect(NETWORKS.mainnet.wsUrl).toBeUndefined();
+    expect(NETWORKS.mainnet).toBeUndefined(); // a testnet build carries no mainnet network at all
   });
 
   it("never calls execute_quote with a mainnet configuration", async () => {

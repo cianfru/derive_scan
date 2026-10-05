@@ -5,6 +5,7 @@ import { DEPOSIT_SUGGESTED, NETWORK } from "../../lib/trade/config.js";
 import { depositCheck } from "../../lib/trade/account.js";
 import { acceptTerms, connect, deposit, depositGasUsd, holdSend, pickAccount, refreshFunding, useSeat } from "../../lib/trade/seat.js";
 import ErrorDetail from "./ErrorDetail.jsx";
+import { MAINNET_FILLS } from "../../lib/flags.js";
 
 export const DERIVE_TERMS_URL = "https://www.derive.xyz/terms-of-use";
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "");
@@ -64,7 +65,9 @@ export function ConnectStep() {
   return (
     <div className="tr-step">
       <p className="tr-lead">Buy this answer in one tap with your own Derive account.
-        <Info label="How one tap works">Your wallet owns the account; Cowboy never holds your money or your keys. Derive fills both options of the answer at once, at one firm price you see first. This build runs on Derive's testnet with test USDC.</Info>
+        <Info label="How one tap works">Your wallet owns the account; Cowboy never holds your money or your keys. Derive fills both options of the answer at once, at one firm price you see first. {MAINNET_FILLS
+          ? "This is real money: trades use the USDC in your own Derive account."
+          : "This build runs on Derive's testnet with test USDC."}</Info>
       </p>
       <button className="btn primary lg" onClick={connect} disabled={seat.busy}>{seat.busy ? "Connecting…" : "Connect wallet"}</button>
       {seat.message && <p className="tr-msg">{seat.message}<ErrorDetail detail={seat.detail} /></p>}
@@ -150,7 +153,9 @@ export function FundStep({ ethUsd }) {
         <button className="text-control" onClick={refreshFunding} disabled={seat.busy}>Check again</button>
         <a className="text-link" href={NETWORK.appUrl} target="_blank" rel="noreferrer">Fund it on Derive instead ↗</a>
       </div>
-      <p className="tr-note">Test USDC comes from Derive's testnet app. Funded there, it shows here after Check again.</p>
+      <p className="tr-note">{MAINNET_FILLS
+        ? `Send only USDC on ${NETWORK.chainName} to this address. Funded on Derive instead, it shows here after Check again.`
+        : "Test USDC comes from Derive's testnet app. Funded there, it shows here after Check again."}</p>
       {seat.message && <p className="tr-msg">{seat.message}<ErrorDetail detail={seat.detail} /></p>}
     </div>
   );

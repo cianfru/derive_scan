@@ -31,8 +31,8 @@ export const addChainParams = (net = NETWORK) => ({
 });
 
 /**
- * Ask for the wallet's address and move it to the testnet's chain. A wallet without the chain is
- * asked once to add it, then to switch again. Contract wallets are refused for now; if the wallet
+ * Ask for the wallet's address and move it to the build's chain (Sepolia, or Ethereum on mainnet). A
+ * wallet without Sepolia is asked once to add it, then to switch again. Contract wallets are refused for now; if the wallet
  * cannot say (eth_getCode fails), it is taken as an ordinary wallet.
  */
 export async function connectWallet(provider, { chainId = NETWORK.chainId, net = NETWORK } = {}) {
@@ -45,7 +45,7 @@ export async function connectWallet(provider, { chainId = NETWORK.chainId, net =
     try {
       await sw();
     } catch (e) {
-      if (!unknownChain(e)) throw e;
+      if (!unknownChain(e) || net.addable === false) throw e; // Ethereum itself is never "added"
       await ask(provider, { method: "wallet_addEthereumChain", params: [addChainParams({ ...net, chainId })] }, "add network");
       await sw();
     }

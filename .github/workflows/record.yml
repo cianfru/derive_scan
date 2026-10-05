@@ -37,6 +37,9 @@ jobs:
       # off. Set the repository variable QUESTIONS_TRADING to change it without a redeploy; unset
       # means on (one-tap trading exists only in testnet builds today).
       QUESTIONS_TRADING: ${{ vars.QUESTIONS_TRADING }}
+      # Real-money one tap (builds with VITE_SALOON_TRADE=mainnet) has its own switch, published as
+      # `trading_mainnet`: on, sell_only or off; unset means off (README "Saloon real money").
+      QUESTIONS_TRADING_MAINNET: ${{ vars.QUESTIONS_TRADING_MAINNET }}
       # Which Derive API the jobs read: the repository variable DERIVE_SNAPSHOT_SOURCES, unset or
       # empty means v2_mainnet; v3_mainnet once V3 trades (README "Switching to V3").
       DERIVE_SNAPSHOT_SOURCES: ${{ vars.DERIVE_SNAPSHOT_SOURCES }}
