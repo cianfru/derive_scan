@@ -86,13 +86,15 @@ jobs:
         working-directory: backend
         run: python flow_once.py --out ../store --budget 120 --max-intervals 8
 
-      # V3 names trades by the owner's wallet; history/wallet_aliases.json maps each subaccount to
-      # its V2 wallet so traders keep one identity. Kept fresh while V2 still answers.
+      # Traders are named by the owner's own wallet (V3's name). history/wallet_aliases.json learns
+      # each subaccount's owner from V3 trades and its Derive Wallet (V2's name), so history kept
+      # under the Derive Wallet joins its owner. Days already read are skipped: the last 30 days
+      # fill in over the first few runs, then each new day is read once.
       - name: Wallet aliases
         if: always() && steps.due.outputs.flow_due == 'true'
         continue-on-error: true
         working-directory: backend
-        run: python wallet_alias_once.py --out ../store --days 2 --budget 60
+        run: python wallet_alias_once.py --out ../store --days 30 --budget 60
 
       - name: Signals
         if: always() && steps.due.outputs.signals_due == 'true'

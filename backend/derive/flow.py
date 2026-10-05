@@ -132,7 +132,9 @@ def reverted(t: dict) -> bool:
 
 
 def leg_key(t: dict) -> str:
-    return f"{t.get('trade_id')}:{t.get('wallet')}:{t.get('subaccount_id')}:{t.get('direction')}"
+    """One leg's identity, by the wallet name as read (a leg renamed to its owner keeps `wallet_raw`),
+    so keys saved before a rename still match."""
+    return f"{t.get('trade_id')}:{t.get('wallet_raw') or t.get('wallet')}:{t.get('subaccount_id')}:{t.get('direction')}"
 
 
 def option_kind(name: str) -> str:
@@ -140,19 +142,31 @@ def option_kind(name: str) -> str:
 
 
 def market_makers(root: Path) -> set[str]:
+    """Wallets classed as market makers (history/wallets.json), under the names they had there and
+    their owner's name (derive/wallet_alias.py), so a leg renamed after the file was written is
+    still left out; with every SCW that translates to a market maker's owner."""
     p = root / "history" / "wallets.json"
     if not p.exists():
         return set()
-    return {w for w, v in json.loads(p.read_text()).get("wallets", {}).items() if v.get("class") == "market_maker"}
+    from .wallet_alias import canonical
+    canon = canonical(root)
+    out = {w for w, v in json.loads(p.read_text()).get("wallets", {}).items() if v.get("class") == "market_maker"}
+    out |= {canon(w) for w in out}
+    low = {w.lower() for w in out}
+    out |= {scw for scw, eoa in canon.map.items() if eoa.lower() in low}
+    return out
 
 
 def sides(trades: list[dict], run_ts: int, exclude: set[str] = frozenset()) -> list[list]:
-    """Taker buying and selling per coin and kind, without the excluded wallets."""
+    """Taker buying and selling per coin and kind, without the excluded wallets (compared without
+    case, by the leg's wallet and by its name as read)."""
     agg: dict = defaultdict(lambda: defaultdict(float))
+    exclude = {w.lower() for w in exclude}
     for t in trades:
         if reverted(t):
             continue
-        if t.get("liquidity_role") != "taker" or t.get("wallet") in exclude:
+        if t.get("liquidity_role") != "taker" or (t.get("wallet") or "").lower() in exclude \
+                or (t.get("wallet_raw") or "").lower() in exclude:
             continue
         name = t.get("instrument_name", "")
         if kind_of(name) == "other":
@@ -278,7 +292,7 @@ async def read_exact(client, params: dict, from_ms: int, to_ms: int, *, deadline
 
     got, exact = await window(from_ms, to_ms, 0)
     legs = list(got.values())
-    alias = getattr(client, "wallet_alias", None)  # V3 mainnet: V2 wallet names (derive/wallet_alias.py)
+    alias = getattr(client, "wallet_alias", None)  # owner's wallet as the name (derive/wallet_alias.py)
     if alias is not None:
         await alias.apply(legs)
     return legs, exact

@@ -7,7 +7,10 @@ Reads the oldest day not yet done (from December 2023), up to yesterday, until t
 the next run carries on (every run while behind, not only recording runs). Once caught up it reads each new day once, an hour after it ends. When
 any day was added, wallet classes and tiers are recomputed (history/wallets.json), with the
 open option positions of each tier (history/positions.json) and the traders' leaderboard and
-cohorts (history/traders.json, derive/traders.py). See derive/history.py.
+cohorts (history/traders.json, derive/traders.py). See derive/history.py. Wallets carry their
+owner's name (derive/wallet_alias.py): legs read from V2 are renamed as they are read, older rows
+when the files are rebuilt, which also happens when new owner names were learned (at most once
+an hour, ALIAS_REBUILD_EVERY).
 
 Then each new day adds one row per coin with options to history/surface/{UND}.csv: the day's
 volatility readings rebuilt from its traded options (derive/surface_history.py). A new
@@ -50,7 +53,11 @@ from pathlib import Path
 # and the balance closes are rebuilt from the repaired days.
 REPAIRS = ("fractional_strikes", "paging")
 REPAIR = REPAIRS[-1]
-SCHEMA_VERSION = 3
+# 4: wallets under their owner's name (derive/wallet_alias.py, owner's decision 5 October 2026).
+SCHEMA_VERSION = 4
+# The wallet files are rebuilt when the owner names change (history/wallet_aliases.json), at most
+# this often; a new day or a schema change rebuilds them anyway.
+ALIAS_REBUILD_EVERY = 3600
 # Definitions of history/surface (derive/surface_history.py); a new version rebuilds every row.
 SURFACE_VERSION = 1
 # Definitions of history/balance.json (derive/balance_history.py); a new version rebuilds its closes.
@@ -230,6 +237,7 @@ def balance_step(out: Path, state: dict, *, added: bool, surface_ready: bool, no
 async def run(out: Path, budget: float, now: float | None = None, client=None) -> dict:
     from derive import balance_history, history, traders
     from derive.client import DeriveClient
+    from derive.wallet_alias import canonical
     from derive.config import SOURCES, Settings
 
     now = time.time() if now is None else now
@@ -297,11 +305,14 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
             history.save_state(out, state)
         snapshots = [out / "history" / f"{name}.json" for name in ("wallets", "positions", "traders")]
         needs_rebuild = bool(retried)
+        aliases = canonical(out).digest
         for p in snapshots:
             doc = json.loads(p.read_text()) if p.exists() else {}
             if doc.get("schema_version") != SCHEMA_VERSION or doc.get("through") != state.get("done_through") \
                     or doc.get("gaps", 0) != gaps(state)["gaps"]:
                 needs_rebuild = True
+            elif doc.get("aliases", "") != aliases and now - doc.get("built_at", 0) >= ALIAS_REBUILD_EVERY:
+                needs_rebuild = True  # owner names learned since: they apply to the whole history
         if state.get("done_through") and (added or needs_rebuild or repaired_now):
             uni = out / "universe.json"
             unds = json.loads(uni.read_text()).get("underlyings", []) if uni.exists() else ["BTC", "ETH"]
@@ -310,7 +321,8 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
             as_of = min(now, datetime.fromisoformat(state["done_through"]).replace(tzinfo=timezone.utc).timestamp() + 86400)
             scan = history.scan_days(out, as_of)
             classes = history.classify(out, settlements, as_of, held, scan=scan)
-            meta = {"as_of": int(as_of), "through": state["done_through"], "schema_version": SCHEMA_VERSION, **gaps(state)}
+            meta = {"as_of": int(as_of), "through": state["done_through"], "schema_version": SCHEMA_VERSION, **gaps(state),
+                    "aliases": scan["aliases"], "built_at": int(now)}
             positions = history.tier_positions(held, classes)
             (out / "history" / "wallets.json").write_text(json.dumps({**meta, "wallets": classes}, separators=(",", ":")))
             (out / "history" / "positions.json").write_text(json.dumps({**meta, "positions": positions}, separators=(",", ":")))

@@ -9,14 +9,16 @@ from pathlib import Path
 # "dir": where recorded files go. V3 mainnet continues the mainnet series in `v2_mainnet/` (the
 # directory every reader uses), so switching the source does not start an empty history; status
 # keys, runs/ and latest.json keep the real source name.
-# "wallets_from": V3 mainnet names each subaccount by its owner's own address, where V2 named the
-# Derive Wallet holding it; subaccount ids carry over, so legs read from V3 are given the V2 wallet
-# of their subaccount (derive/wallet_alias.py) and the traders' history keeps one name per trader.
+# "wallets": how a source names traders. V2 names each leg by the Derive Wallet holding the
+# subaccount ("scw"), V3 by the owner's own address ("eoa"), which is the canonical name (owner,
+# 5 October 2026): legs read from an "scw" source are given their owner's address when known, legs
+# from an "eoa" source teach the owners (derive/wallet_alias.py). "wallets_from": where the SCW of a
+# subaccount seen on V3 is looked up, so history kept under SCWs finds its owner.
 SOURCES = {
-    "v2_mainnet": {"base": "https://api.lyra.finance/", "api": 2, "dir": "v2_mainnet"},
+    "v2_mainnet": {"base": "https://api.lyra.finance/", "api": 2, "dir": "v2_mainnet", "wallets": "scw"},
     "v3_testnet": {"base": "https://testnet.api.derive.xyz/v3/", "api": 3, "dir": "v3_testnet"},
     "v3_mainnet": {"base": "https://api.derive.xyz/v3/", "api": 3, "dir": "v2_mainnet",
-                   "wallets_from": "v2_mainnet"},
+                   "wallets": "eoa", "wallets_from": "v2_mainnet"},
 }
 
 
