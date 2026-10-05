@@ -73,6 +73,8 @@ export const SWITCH_OFF_SEC = 330;
 /** Ticket timing (design 2.4): wait up to 10 s for a quote, show each quote as firm for 12 s, re-read
  * the best quote every 1.5 s. */
 export const QUOTE_WAIT_MS = 10_000;
+/** When Derive's order book beats every quote, a ticket asks again by itself, this many requests in all. */
+export const BOOK_ASKS = 3;
 export const FIRM_MS = 12_000;
 export const POLL_MS = 1_500;
 /** After a tap with no clear answer (timeout, dropped socket): re-read the RFQ this many times, this

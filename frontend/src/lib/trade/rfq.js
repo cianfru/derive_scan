@@ -9,7 +9,7 @@
 // The kill switch and the caps are checked before the RFQ and again before the fill. A tap with no
 // clear answer is never re-sent: the RFQ is re-read until Derive says what happened.
 import {
-  CHECK_MS, CHECK_TRIES, EXTRA_FEE, FIRM_MS, MODE, NETWORK, PARTIAL_FILL_STEP, POLL_MS, QUOTE_WAIT_MS, REFERRAL, fillsAllowed,
+  BOOK_ASKS, CHECK_MS, CHECK_TRIES, EXTRA_FEE, FIRM_MS, MODE, NETWORK, PARTIAL_FILL_STEP, POLL_MS, QUOTE_WAIT_MS, REFERRAL, fillsAllowed,
 } from "./config.js";
 import { TRADE_LIMITS, checkQuote, packageCost } from "./package.js";
 import { buildExecute, debugMatches, randomNonce } from "./sign.js";
@@ -91,14 +91,17 @@ export function createTicket({
     return null;
   }
 
-  async function start() {
+  let attempt = 0;
+  /** `again`: Cowboy's own new request after the order book beat every quote (never the user's tap). */
+  async function start({ again = false } = {}) {
     if (closed) return;
+    attempt = again ? attempt + 1 : 1;
     stop();
     await cancel();
     if (closed) return;
     rfq = null;
     filled = false;
-    set({ phase: "asking", quote: null, check: null, message: null, detail: null, debug: null, firmUntil: null, fill: null, cap: null });
+    set({ phase: "asking", attempt, attempts: BOOK_ASKS, quote: null, check: null, message: null, detail: null, debug: null, firmUntil: null, fill: null, cap: null });
     const blocked = gate(estimate);
     if (blocked) return set(blocked);
     const incidents = await checkIncidents(client);
@@ -175,11 +178,20 @@ export function createTicket({
     }
     const check = checkQuote(res, { direction, payout, limit: floor, feeEstimate });
     // A quote worse than Derive's order book would be refused at the tap: keep waiting for a better
-    // one, for twice the usual wait, before saying so.
-    if (!check.ok && check.reason === "book_better" && t - started < 2 * QUOTE_WAIT_MS) {
-      if (state.phase === "quoted") set({ phase: "asking", quote: null, check: null, firmUntil: null });
-      timer = schedule(poll, POLL_MS);
-      return;
+    // one, then ask again with a new request (makers re-price), BOOK_ASKS requests in all, before
+    // saying so.
+    if (!check.ok && check.reason === "book_better") {
+      if (t - started < QUOTE_WAIT_MS) {
+        if (state.phase === "quoted") set({ phase: "asking", quote: null, check: null, firmUntil: null });
+        timer = schedule(poll, POLL_MS);
+        return;
+      }
+      if (attempt < BOOK_ASKS) {
+        stop();
+        await cancel();
+        if (closed) return;
+        return start({ again: true });
+      }
     }
     if (!check.ok) {
       await cancel();

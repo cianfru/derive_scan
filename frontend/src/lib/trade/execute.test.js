@@ -465,13 +465,30 @@ describe("a quote worse than Derive's order book (owner's testnet run, 5 October
     expect(fake.calls(EXECUTE)).toHaveLength(0);
   });
 
-  it("says so after twice the usual wait, with both totals in the testnet details", async () => {
+  it("asks again by itself, three requests in all, then says so with both totals in the testnet details", async () => {
     const { t, fake } = setup({ handlers: worse(() => "1.10") });
     await t.start();
+    await vi.advanceTimersByTimeAsync(11_000);
+    expect(t.state).toMatchObject({ phase: "asking", attempt: 2, attempts: 3 });
+    expect(fake.calls("private/send_rfq")).toHaveLength(2);
     await vi.advanceTimersByTimeAsync(25_000);
     expect(t.state).toMatchObject({ phase: "blocked", check: { reason: "book_better" } });
     expect(JSON.parse(t.state.detail.data)).toEqual({ quote_total_cost: 1.1, orderbook_total_cost: 1 });
-    expect(fake.calls("private/cancel_rfq")).toHaveLength(1);
+    expect(fake.calls("private/send_rfq")).toHaveLength(3);
+    expect(fake.calls("private/cancel_rfq")).toHaveLength(3);
     expect(fake.calls(EXECUTE)).toHaveLength(0);
+  });
+
+  it("takes a good quote from a request it sent by itself", async () => {
+    let n = 0;
+    const { t, fake } = setup({ handlers: worse(() => (fake.calls("private/send_rfq").length >= 2 && n++ >= 0 ? "0.95" : "1.10")) });
+    await t.start();
+    await vi.advanceTimersByTimeAsync(13_000);
+    expect(t.state.phase).toBe("quoted");
+    expect(t.state.check.total).toBe(0.95);
+    expect(fake.calls("private/send_rfq")).toHaveLength(2);
+    // The user's own Ask again starts the count again.
+    await t.start();
+    expect(t.state.attempt).toBe(1);
   });
 });
