@@ -78,6 +78,18 @@ export const FALLBACK_PLAIN = "Derive didn't accept that. Try again.";
 /** Derive's code when the wallet has no Derive account yet (created by the first deposit). */
 export const NO_ACCOUNT = 14000;
 
+/** Derive no longer takes Cowboy's key (error catalog): 14023 signer is neither the owner nor a
+ * registered key, 14026 key not found, 14030 key expired; an RFQ cancelled for
+ * "session_key_deregistered". On a sign-in with the key, 14014 (the signer does not check out) means
+ * the same. */
+export const KEY_REJECTED = new Set([14023, 14026, 14030]);
+export function deriveKeyRejected(err, { login = false } = {}) {
+  if (typeof err === "string") return err === "session_key_deregistered";
+  if (!err || err.source === "wallet") return false;
+  const code = Number(err.code ?? err?.error?.code);
+  return KEY_REJECTED.has(code) || (login && code === 14014);
+}
+
 /** What the user's own wallet answered (EIP-1193 and MetaMask's codes), never blamed on Derive. */
 export const WALLET_PLAIN = {
   4001: "You declined in your wallet.",

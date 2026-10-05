@@ -8,7 +8,7 @@ import {
 import { createTicket } from "../../lib/trade/rfq.js";
 import { instrumentCache } from "../../lib/trade/derive.js";
 import { keySigner } from "../../lib/trade/sessionKey.js";
-import { useSeat } from "../../lib/trade/seat.js";
+import { dropKey, useSeat } from "../../lib/trade/seat.js";
 import { MODE } from "../../lib/trade/config.js";
 import { capGate, capMessage, tradingAllows, TRADING_NOTICE } from "../../lib/trade/limits.js";
 import { buyLabel, closeLabel } from "../../lib/trade/record.js";
@@ -82,6 +82,7 @@ function Filled({ fill, buy }) {
     <div className="tr-done" role="status">
       <p>{buy ? <>Bought {c} contracts for <b className="mono">{money(total ?? fill.premium, { cents: true })}</b>{fill.fees != null && <>, Derive fees {money(fill.fees, { cents: true })} included</>}.</>
         : <>Sold back {c} contracts. Got <b className="mono">{money(total ?? -fill.premium, { cents: true })}</b>{fill.fees != null && <> after Derive fees of {money(fill.fees, { cents: true })}</>}.</>}</p>
+      {fill.complete === false && <p>Derive's records don't show every option of this trade yet. Positions checks it again with Derive.</p>}
       {fill.partial && <p>Derive filled {Math.round(fill.pct * 100)}% of the package; the rest is cancelled and not sent again.</p>}
       <p className="tr-note">From Derive's trade records{fill.trade_ids?.length ? <> · {fill.trade_ids.length} {fill.trade_ids.length === 1 ? "trade" : "trades"}</> : null}. <Link className="text-link" to="/saloon/mine">See it in Positions</Link></p>
     </div>
@@ -114,7 +115,7 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE 
       client: seat.client, getInstrument, subaccountId: seat.saloon.id, owner: seat.wallet, key: keySigner(seat.key),
       legs: plan.wire, direction: plan.direction, limit: plan.limit, payout: plan.payout, feeEstimate: plan.fee, label: plan.label,
       estimate: buy ? plan.aboutLose : null, tolerance: plan.T, mode, trading: () => tradingRef.current,
-      onFill: (f) => onFill?.(f), onChange: (s) => setSt({ ...s }),
+      onFill: (f) => onFill?.(f), onChange: (s) => setSt({ ...s }), onKeyRejected: () => dropKey(),
     });
     run.current.start();
   };

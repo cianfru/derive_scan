@@ -4,8 +4,8 @@
 // trade history (by the RFQ label), one-tap sell backs become exact exits, and each record says
 // whether Derive's positions hold its legs. Settlement uses the testnet's own settlement price.
 import { parseInstrument } from "./package.js";
-import { fillFromTrades, tradesSince } from "./fills.js";
-import { buyRecord, exitFromFill, knownRfqs, parseLabel } from "./record.js";
+import { fillFromTrades, packageComplete, tradesSince } from "./fills.js";
+import { buyRecord, exitFromFill, fillDiffers, knownRfqs, parseLabel, repairBuy } from "./record.js";
 import { remainingQty } from "../realized.js";
 
 const EPS = 1e-9;
@@ -118,30 +118,99 @@ export function fillsByRfq(trades) {
   return [...by.entries()].map(([rfqId, rows]) => fillFromTrades(rows, { rfqId })).filter(Boolean).sort((a, b) => a.ts - b.ts);
 }
 
+const sameWallet = (a, b) => !!a && !!b && String(a).toLowerCase() === String(b).toLowerCase();
+const rfqsOf = (r) => [r.journal?.fill?.rfq_id, ...(r.exits || []).map((e) => e.rfq_id)].filter(Boolean);
+
 /**
- * Bring the testnet journal in line with Derive's trade history: a one-tap buy whose RFQ is not in the
- * journal becomes a record (exact, from Derive), and a one-tap sell back becomes an exact exit on the
- * oldest open record of that answer. Returns { added, exits } for the caller to save; after saving the
- * added records, call it again so their sell backs land too.
+ * Which records belong to the Derive account in use (`wallet`, `subaccountId`): those saved with
+ * both, and older one-tap records with neither whose RFQs this account's trades contain (they are
+ * claimed: `claims` lists them for the caller to save). Without a scope every record counts (tests,
+ * older callers).
  */
-export function recoverFills(records, fills, now = Date.now() / 1000) {
-  const seen = knownRfqs(records);
-  const added = [], exits = [];
+export function accountRecords(records, fills, { wallet = null, subaccountId = null } = {}) {
+  const list = records || [];
+  if (!wallet || subaccountId == null) return { mine: list, claims: [] };
+  const here = new Set((fills || []).map((f) => f.rfq_id));
+  const mine = [], claims = [];
+  for (const r of list) {
+    if (r.subaccount_id != null || r.wallet) {
+      if (r.subaccount_id === subaccountId && sameWallet(r.wallet, wallet)) mine.push(r);
+      continue;
+    }
+    if (r.exec === "rfq" && rfqsOf(r).some((id) => here.has(id))) {
+      mine.push({ ...r, wallet, subaccount_id: subaccountId });
+      claims.push({ key: r.key, wallet, subaccount_id: subaccountId });
+    }
+  }
+  return { mine, claims };
+}
+
+/** A record with one recovered exit rebuilt from Derive's fill (its mark and saved time kept). */
+function repairExit(record, index, fill, now) {
+  const old = record.exits[index];
+  const exit = { ...exitFromFill(fill, { mark: old.mark, savedTs: old.saved_ts ?? Math.floor(now) }), repaired_ts: Math.floor(now) };
+  const exits = record.exits.map((e, i) => (i === index ? exit : e));
+  const q = { ...record, exits, updated_at: Math.floor(now) };
+  if (!q.closed_at) return q;
+  const nets = exits.filter((e) => e.kind === "close").map((e) => e.net);
+  return { ...q, proceeds: nets.every(Number.isFinite) ? nets.reduce((a, b) => a + b, 0) : null };
+}
+
+/**
+ * Bring the testnet journal in line with Derive's trade history for the account in use (`scope`:
+ * { wallet, subaccountId }); records of other accounts are never matched.
+ *   added    a one-tap buy whose RFQ is in no record, as a new record (exact, from Derive; its key
+ *            comes from its RFQ and legs)
+ *   exits    a one-tap sell back as an exact exit, each on one open record of that answer (oldest
+ *            first) that still has the contracts, which it then consumes
+ *   repairs  a known RFQ whose saved fill is flagged incomplete or disagrees with Derive's complete
+ *            trades (legs, premium, fees): the record rebuilt from Derive, its key and entry kept
+ *   claims   older records without wallet or account that this account's trades name
+ * The caller saves them; after saving the added records, call it again so their sell backs land too.
+ */
+export function recoverFills(records, fills, now = Date.now() / 1000, scope = {}) {
+  const all = records || [];
+  const seen = knownRfqs(all);
+  const { mine, claims } = accountRecords(all, fills, scope);
+  const added = [], exits = [], repairs = [];
+  const repaired = new Map();
+  const left = new Map(mine.map((r) => [r.key, r.closed_at ? 0 : remainingQty(r)]));
   for (const f of fills) {
-    if (seen.has(f.rfq_id)) continue;
     const lab = parseLabel(f.label);
+    if (seen.has(f.rfq_id)) {
+      // Known: repair it when Derive's trades are complete and the saved fill is not, or disagrees.
+      if (!packageComplete(f)) continue;
+      for (const r of mine) {
+        const cur = repaired.get(r.key) || r;
+        if (cur.journal?.fill?.rfq_id === f.rfq_id && (cur.journal.fill.complete === false || fillDiffers(cur.journal.fill, f))) {
+          const fixed = repairBuy(cur, f, { now });
+          if (fixed) repaired.set(r.key, fixed);
+        }
+        const i = (cur.exits || []).findIndex((e) => e.rfq_id === f.rfq_id && e.via === "rfq");
+        if (i >= 0 && fillDiffers(cur.exits[i], f)) repaired.set(r.key, repairExit(repaired.get(r.key) || cur, i, f, now));
+      }
+      continue;
+    }
     if (!lab) continue;
     if (!lab.close) {
-      const r = buyRecord({ fill: { ...f, pct: 1 }, id: lab.id, side: lab.side, network: "testnet", savedTs: Math.floor(now) });
+      const r = buyRecord({ fill: { ...f, pct: 1, complete: packageComplete(f) }, id: lab.id, side: lab.side, network: "testnet", savedTs: Math.floor(now),
+        wallet: scope.wallet || null, subaccountId: scope.subaccountId ?? null });
       if (r) { added.push({ ...r, recovered: true }); seen.add(f.rfq_id); }
       continue;
     }
     // Only saved records (with their keys) take exits; a record added in this pass gets its exit on the next.
-    const open = records.filter((r) => r.id === lab.id && r.side === lab.side && !r.closed_at && remainingQty(r) > 0)
+    const qty = f.legs[0]?.qty || 0;
+    const open = mine.filter((r) => r.id === lab.id && r.side === lab.side && (left.get(r.key) || 0) > EPS)
       .sort((a, b) => (a.journal?.fill?.ts ?? a.at ?? 0) - (b.journal?.fill?.ts ?? b.at ?? 0));
-    if (open.length) { exits.push({ key: open[0].key, exit: exitFromFill(f, { savedTs: Math.floor(now) }) }); seen.add(f.rfq_id); }
+    const pick = open.find((r) => left.get(r.key) >= qty - 1e-9) || open[0];
+    if (pick) {
+      exits.push({ key: pick.key, exit: exitFromFill(f, { savedTs: Math.floor(now) }) });
+      left.set(pick.key, round(Math.max(0, left.get(pick.key) - qty)));
+      seen.add(f.rfq_id);
+    }
   }
-  return { added, exits };
+  for (const [key, record] of repaired) repairs.push({ key, record });
+  return { added, exits, repairs, claims };
 }
 
 /** One read of the Saloon account: open option positions and the trades since `sinceSec`. */

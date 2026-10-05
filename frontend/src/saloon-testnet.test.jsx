@@ -22,7 +22,9 @@ import MyQuestions from "./pages/MyQuestions.jsx";
 import Shell from "./components/Shell.jsx";
 import { BANNED, findLevel, ticket } from "./lib/questions.js";
 import { saveBudget } from "./lib/follows.js";
-import { loadPositions, _resetMemory } from "./lib/positions.js";
+import { addPosition, loadPositions, _resetMemory } from "./lib/positions.js";
+import { fillFromTrades } from "./lib/trade/fills.js";
+import { buyRecord } from "./lib/trade/record.js";
 import { _setSeatDeps } from "./lib/trade/seat.js";
 import { EXECUTE, createClient } from "./lib/trade/derive.js";
 import { fakeDerive } from "./lib/trade/fakeSocket.js";
@@ -191,6 +193,30 @@ describe("one tap on Derive's testnet", () => {
     await user.click(within(sync).getByRole("button", { name: "Connect wallet" }));
     await within(sync).findByText(/1 added from Derive's records/);
     expect(loadPositions("testnet")[0]).toMatchObject({ id: ID, exec: "rfq", recovered: true, paid: 98.3301 });
+    expect(await screen.findByText("On Derive: held")).toBeTruthy();
+  });
+
+  it("corrects a fill saved one leg short from Derive's records, and claims it for this wallet and account", async () => {
+    setup();
+    const legs = [row(BUY_RFQ, "q1", C82, "buy", "3180", "1.3395", (T14 + 700) * 1000, `${ID}:yes`), row(BUY_RFQ, "q1", C88, "sell", "240", "0", (T14 + 700) * 1000, `${ID}:yes`)];
+    trades.push(...legs);
+    held = [{ instrument_name: C82, instrument_type: "option", amount: "0.03299" }, { instrument_name: C88, instrument_type: "option", amount: "-0.03299" }];
+    // Saved by an older build: only the short leg, no wallet or account.
+    const short = { ...fillFromTrades([legs[1]], { rfqId: BUY_RFQ }), pct: 1 };
+    const old = buyRecord({ fill: short, id: ID, side: "yes", savedTs: T14 + 710 });
+    delete old.key;
+    addPosition(old, (T14 + 710) * 1000);
+    expect(loadPositions("testnet")[0].journal.fill.premium).toBeCloseTo(-7.9176, 4);
+    localStorage.setItem("cowboy-saloon-terms:testnet", JSON.stringify({ at: 1 }));
+    const user = userEvent.setup();
+    page("/saloon/mine");
+    const sync = await screen.findByRole("region", { name: "Your Saloon account on Derive" });
+    await user.click(within(sync).getByRole("button", { name: "Connect wallet" }));
+    await within(sync).findByText(/1 corrected from Derive's records/);
+    const [p] = loadPositions("testnet");
+    expect(loadPositions("testnet")).toHaveLength(1);
+    expect(p).toMatchObject({ wallet: wallet.address, subaccount_id: 90212, paid: 98.3301 });
+    expect(p.journal.fill).toMatchObject({ complete: true, premium: 96.9906, rfq_id: BUY_RFQ });
     expect(await screen.findByText("On Derive: held")).toBeTruthy();
   });
 

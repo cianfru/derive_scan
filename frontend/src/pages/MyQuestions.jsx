@@ -10,7 +10,7 @@ import {
   ANSWER, cents, closeTicket, countdown, dayLabel, findLevel, fullPay, money, noPriceReason, parseId, priceAge, questionText, signed,
 } from "../lib/questions.js";
 import {
-  closePosition, exportPositions, importPositions, loadPositions, openPart, partial, persistent, positionFigures, positionStatus, prune, removePosition,
+  closePosition, exportPositions, forWallet, importPositions, loadPositions, openPart, partial, persistent, positionFigures, positionStatus, prune, removePosition,
   settlePosition,
 } from "../lib/positions.js";
 import { breakdownRows, closeEvent, realized, realizedSummary, remainingQty } from "../lib/realized.js";
@@ -245,10 +245,16 @@ const SYNC = {
   settled: ["Settled on Derive", "Past its settlement time; Derive pays the result into the Saloon account."],
   closed: ["Closed on Derive", "Nothing of this answer is open any more."],
   unknown: ["Not checked", "This record has no options to compare with Derive."],
+  other_account: ["Another Derive account", null],
 };
 /** How a one-tap record stands against Derive's own positions (testnet builds). */
 function SyncLine({ s }) {
-  const [text, why] = SYNC[s.state] || SYNC.unknown;
+  const [text, whyFixed] = SYNC[s.state] || SYNC.unknown;
+  const why = s.state === "other_account"
+    ? (s.subaccount_id != null
+      ? `Recorded from Derive account #${s.subaccount_id}. It is checked against Derive only while that account is in use.`
+      : "Not found in the trades of the Derive account in use. It is checked against Derive when its own account is in use.")
+    : whyFixed;
   const diff = s.diff?.map((d) => `${d.name}: recorded ${d.expected}, Derive holds ${d.held}`).join("; ");
   return (
     <p className={`q-card-status q-sync${s.state === "differs" ? " warn" : ""}`}>{text}
@@ -386,10 +392,13 @@ function Card({ p, onRemove, onClose, sync = null }) {
 
 /** Positions: kept in this browser only, with export and import under "Saved in this browser". */
 export default function MyQuestions() {
-  const [list, setListRaw] = useState(() => prune(loadPositions(NET)));
+  const [stored, setListRaw] = useState(() => prune(loadPositions(NET)));
   const setList = (l) => setListRaw(prune(l));
   const other = loadPositions(NET === "testnet" ? "mainnet" : "testnet").length;
   const [sync, setSync] = useState(null);
+  // Testnet: with a wallet connected, its own one-tap records (and those naming no wallet); other
+  // wallets' records stay saved and in Export.
+  const list = useMemo(() => forWallet(stored, sync?.wallet), [stored, sync?.wallet]);
   const [params, setParams] = useSearchParams();
   const tab = ["open", "closed", "following"].includes(params.get("tab")) ? params.get("tab") : "open";
   const setTab = (t) => setParams(t === "open" ? {} : { tab: t }, { replace: true });
