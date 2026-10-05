@@ -360,21 +360,17 @@ svg.viz text { font: 400 var(--t-key) var(--font-mono); }
 .sb-headline { font: 600 var(--t-kpi)/1.05 var(--font-display); letter-spacing: -.01em; }
 .sb-sub { font: 400 var(--t-label)/1.3 var(--font-body); color: var(--muted); white-space: nowrap; }
 .sb-sub b { font: 500 var(--t-label) var(--font-mono); color: var(--fg-2); }
-/* Regime mix: today's counts above the daily step areas, with Trending up at the foot. */
+/* Regime mix: today's counts above individual daily bars, with Trending up at the foot. */
 .sb-key { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: var(--t-label); color: var(--muted); }
 .sb-key > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.sb-key > span:first-child { color: var(--fg-2); }
-.sb-key i { width: 7px; height: 10px; display: inline-block; position: relative; }
-.sb-key i::after { content: ""; position: absolute; left: 2px; width: 3px; height: 100%; background: var(--regime-color); }
+.sb-key i { width: 7px; height: 7px; display: inline-block; background: var(--regime-color); }
 .sb-key b { font: 500 var(--t-label) var(--font-mono); color: var(--fg); }
-.sb-key > span:first-child b { color: var(--regime-color); }
 .regime-history { position: relative; height: 59px; min-width: 0; touch-action: pan-y; }
 .regime-history:focus-visible { outline-offset: 3px; }
 .regime-strip { display: block; width: 100%; height: 100%; cursor: crosshair; }
-.rs-area { opacity: .42; }
-.rs-today { opacity: .9; }
-.rs-trend { fill: none; stroke: var(--up); stroke-width: 1; opacity: .85; }
-.rs-line { stroke: var(--fg-2); stroke-dasharray: 2 4; stroke-width: .65; opacity: .3; }
+.rs-bar { opacity: .62; }
+.rs-today { opacity: 1; }
+.rs-line { stroke: var(--bg); stroke-dasharray: 3 2; stroke-width: 1.5; }
 .rs-selected { fill: color-mix(in srgb, var(--fg) 8%, transparent); stroke: var(--fg-2); stroke-width: 1; }
 .rs-tooltip { position: absolute; z-index: 8; top: 100%; padding-top: 8px; width: min(320px, calc(100vw - 32px)); }
 .rs-tooltip-body { display: grid; gap: 12px; padding: 12px 14px; background: var(--plate-2); border: 1px solid var(--seam-hi);
