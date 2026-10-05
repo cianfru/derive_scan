@@ -19,7 +19,7 @@ export const isSignal = (c, s) => (GROUP[s] || [s]).includes(c.signal_1d);
 export const signalCounts = (coins, selected = null) =>
   LADDER.map((s) => ({ s, n: coins.filter((c) => isSignal(c, s)).length })).filter((x) => x.n || x.s === selected);
 
-const CONSENSUS_HELP = "The engine's market consensus on the daily close: every Derive perp with enough history sits in one regime, and the market is named when one group holds more than 55% of them (most coins trending up; most coins basing: building a base, cooling off or washed out; most coins trending down; most coins overheated). Otherwise Mixed. It is one of the nine checks behind an up-setup. The strip shows the same count for each past daily close, replayed from price history; today is the last column. A head count of markets, not a strength score.";
+const CONSENSUS_HELP = "The engine's market consensus on the daily close: every Derive perp with enough history sits in one regime, and the market is named when one group holds more than 55% of them (most coins trending up; most coins basing: building a base, cooling off or washed out; most coins trending down; most coins overheated). Otherwise Mixed. It is one of the nine checks behind an up-setup. The strip shows the same count for each past daily close, replayed from price history; today is the last column. The dotted line marks 55% trending up. A head count of markets, not a strength score.";
 const SIGNAL_COUNT_HELP = "Daily signal counts for the markets in the board's current view. Select one to show only those markets; select it again to show all.";
 
 const month = (t) => new Date(t * 1000).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" });
@@ -48,24 +48,53 @@ export function stripColumns(breadth, live, bar) {
 }
 
 function RegimeStrip({ columns }) {
-  const W = columns.length, H = 32;
+  const H = 32;
+  let x = 0;
+  const rows = columns.map((col, i) => {
+    if (i) x += Math.max(1, Math.round((col.ts - columns[i - 1].ts) / 86400));
+    const total = ORDER.reduce((a, k) => a + (col.n[k] || 0), 0);
+    let bottom = H;
+    const bands = Object.fromEntries(ORDER.map((k) => {
+      const top = bottom - (total ? ((col.n[k] || 0) / total) * H : 0);
+      const bounds = { top, bottom };
+      bottom = top;
+      return [k, bounds];
+    }));
+    return { ...col, x, total, bands };
+  });
+  const W = x + 1;
+  const runs = [];
+  for (const row of rows) {
+    if (!row.total) continue;
+    const run = runs[runs.length - 1];
+    if (run && run[run.length - 1].x + 1 === row.x) run.push(row);
+    else runs.push([row]);
+  }
+  const area = (run, k) => {
+    const top = run.flatMap((r) => [[r.x, r.bands[k].top], [r.x + 1, r.bands[k].top]]);
+    const bottom = [...run].reverse().flatMap((r) => [[r.x + 1, r.bands[k].bottom], [r.x, r.bands[k].bottom]]);
+    return `M${[...top, ...bottom].map((p) => p.join(",")).join("L")}Z`;
+  };
+  const edge = (run) => `M${run.flatMap((r) => [[r.x, r.bands.MARKUP.top], [r.x + 1, r.bands.MARKUP.top]])
+    .map((p) => p.join(",")).join("L")}`;
+  const latest = rows[rows.length - 1];
   const line = H * (1 - 0.55);
   return (
     <svg className="regime-strip" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img"
-      aria-label={`Daily regime mix for the last ${W} daily closes`}>
-      {columns.map((col, i) => {
-        const total = ORDER.reduce((a, k) => a + (col.n[k] || 0), 0);
-        if (!total) return null;
-        let y = H;
-        return ORDER.map((k) => {
-          const h = ((col.n[k] || 0) / total) * H;
-          if (!h) return null;
-          y -= h;
-          return <rect key={`${col.ts}-${k}`} x={i + 0.08} width={0.84} y={y} height={h} className={i === W - 1 ? "today" : undefined}
-            style={{ fill: REGIME_COLORS[k] }} />;
-        });
-      })}
+      aria-label={`Daily regime mix for the last ${columns.length} daily closes`}>
+      {ORDER.map((k) => runs.map((run) => run.some((r) => r.n[k]) && (
+        <path key={`${k}-${run[0].ts}`} d={area(run, k)} className="rs-area" style={{ fill: REGIME_COLORS[k] }} />
+      )))}
       <line x1="0" x2={W} y1={line} y2={line} className="rs-line" vectorEffect="non-scaling-stroke" />
+      {runs.map((run) => <path key={run[0].ts} d={edge(run)} className="rs-trend" vectorEffect="non-scaling-stroke" />)}
+      {latest.total > 0 && ORDER.map((k) => {
+        const { top, bottom } = latest.bands[k];
+        return bottom > top && <rect key={k} x={latest.x} width="1" y={top} height={bottom - top}
+          className="rs-today" style={{ fill: REGIME_COLORS[k] }} />;
+      })}
+      {rows.map((r) => <rect key={r.ts} x={r.x} y="0" width="1" height={H} fill="transparent">
+        <title>{day(r.ts)} · {r.total ? ORDER.filter((k) => r.n[k]).map((k) => `${REGIME[k]} ${r.n[k]}`).join(" · ") : "No reading"}</title>
+      </rect>)}
     </svg>
   );
 }
@@ -90,7 +119,7 @@ export default function StructureBand({ data, scoped, scopeLabel, signalFilter, 
       <div className="sb-cell sb-mix">
         {lead.length > 0 && (
           <div className="sb-key">
-            {lead.map((k) => <span key={k}><i style={{ background: REGIME_COLORS[k] }} />{REGIME[k]}<b>{live[k]}</b></span>)}
+            {lead.map((k) => <span key={k} style={{ "--regime-color": REGIME_COLORS[k] }}><i />{REGIME[k]}<b>{live[k]}</b></span>)}
           </div>)}
         {columns.length > 0 ? (
           <>
