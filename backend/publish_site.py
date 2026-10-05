@@ -20,7 +20,9 @@ keeps no history. Files:
   traders.json        options traders' leaderboard (market makers left out) and cohorts by results
                       and size with their positioning; traders/{address}.json per ranked trader
                       (no other wallet has a file); traders/index.json lists every non-market-maker
-                      wallet active in the last year with its last active day
+                      wallet active in the last year with its last active day; traders/aliases.json
+                      maps each Derive Wallet (V2 name) to its owner's wallet, the canonical name
+                      (derive/wallet_alias.py), so old /trader links redirect
   flow.json           last 24 hours: large trades, most active wallets (market makers left out once
                       the rebuilt history has classed them), with each wallet's class
   strikes/{UND}.json  written by record_once.py (per-strike view of the newest chain)
@@ -57,6 +59,7 @@ from derive.lean import DEFENSIVE_SIGNALS, HORIZONS, UP_SIGNALS, WALLET_MIN_POSI
 from derive import traders as traders_mod
 from derive.history import last_complete_day, parse_option
 from derive.metric_history import build_engine_history
+from derive.wallet_alias import canonical, translate_keys
 
 SOURCE = "v2_mainnet"
 CANDLES_KEEP = {"4h": 500, "1d": 400}
@@ -509,10 +512,16 @@ def change_pct(closes: list[float], bars: int) -> float | None:
     return (closes[-1] / closes[-1 - bars] - 1) * 100
 
 
-def wallet_classes(data: Path) -> dict[str, str]:
-    """{wallet: tier or class} from the rebuilt history (derive/history.py); empty until it exists."""
+def wallet_classes(data: Path, canon=None) -> dict[str, str]:
+    """{wallet: tier or class} from the rebuilt history (derive/history.py), under the owner's name
+    (derive/wallet_alias.py: names learned since the file was built apply at once; a market maker
+    wins when two names meet); empty until it exists."""
     p = data / "history" / "wallets.json"
-    return {w: v.get("tier") or v["class"] for w, v in json.loads(p.read_text()).get("wallets", {}).items()} if p.exists() else {}
+    if not p.exists():
+        return {}
+    classes = {w: v.get("tier") or v["class"] for w, v in json.loads(p.read_text()).get("wallets", {}).items()}
+    canon = canonical(data) if canon is None else canon
+    return translate_keys(classes, canon, lambda a, b: "market_maker" if "market_maker" in (a, b) else a)
 
 
 def tier_positions(data: Path) -> dict:
@@ -530,10 +539,12 @@ def flow_block(data: Path, now: float, sides: dict | None = None) -> dict:
     from derive.flow import window_coverage
     coverage = window_coverage(data, now, 86400)
     since_ms = coverage["start"] * 1000
-    classes = wallet_classes(data)
+    canon = canonical(data)
+    classes = wallet_classes(data, canon)
     by_kind: dict = defaultdict(list)
     for day in _days(2, now):
         for r in _read_csv(data / "flow" / "large" / f"{day}.csv"):
+            r["wallet"] = canon(r["wallet"])  # rows written before the owner's name was known
             cls = classes.get(r["wallet"])
             if not since_ms <= int(r["ts"]) < coverage["end"] * 1000 or cls == "market_maker" \
                     or r["kind"] not in FLOW_LARGE or (r["kind"] == "perp" and cls is None):
@@ -546,6 +557,7 @@ def flow_block(data: Path, now: float, sides: dict | None = None) -> dict:
     wallets: dict = defaultdict(lambda: defaultdict(float))
     for day in _days(2, now):
         for r in _read_csv(data / "flow" / "wallets_v2" / f"{day}.csv"):
+            r["wallet"] = canon(r["wallet"])
             if not coverage["start"] <= int(r["bucket_ts"]) < coverage["end"] or classes.get(r["wallet"]) == "market_maker":
                 continue
             keys = ("legs", "perp_notional_usd", "option_notional_usd", "premium_bought_usd", "premium_sold_usd",
@@ -648,21 +660,34 @@ def wallet_index(data: Path, ranked: set[str]) -> dict | None:
     if not through:
         return None
     end = date.fromisoformat(through)
-    rows = []
+    canon = canonical(data)
+    makers = {canon(a).lower() for a, v in doc.get("wallets", {}).items() if v.get("class") == "market_maker"}
+    best: dict[str, int] = {}
     for address, v in doc.get("wallets", {}).items():
-        if v.get("class") == "market_maker" or not v.get("last"):
+        name = canon(address).lower()  # owner's name, also for names learned since the file was built
+        if name in makers or not v.get("last"):
             continue
         offset = (end - date.fromisoformat(v["last"])).days
         if 0 <= offset <= INDEX_DAYS:
-            rows.append([address.lower(), "o", offset, int(address.lower() in ranked)])
-    rows.sort()
+            best[name] = min(offset, best.get(name, offset))
+    rows = sorted([a, "o", off, int(a in ranked)] for a, off in best.items())
     return {"through": through, "fields": ["address", "books", "last_offset_days", "has_file"], "wallets": rows}
 
 
-def _publish_wallet_files(site: Path, files: dict[str, dict], index: dict | None) -> None:
-    """Writes traders/{address}.json for `files` and traders/index.json, and deletes every other
-    file in traders/: a wallet off the leaderboard has no file (its index row says so)."""
-    keep = set(files) | ({"index"} if index is not None else set())
+def wallet_aliases(data: Path, known: set[str]) -> dict | None:
+    """traders/aliases.json: {Derive Wallet: owner's wallet}, both lowercased, for the Derive Wallets
+    whose owner has a trader file or an index row (`known`), so an old link /trader/<Derive Wallet>
+    opens the owner's page (the app reads it only when a trader file is missing)."""
+    canon = canonical(data)
+    pairs = {scw: eoa.lower() for scw, eoa in sorted(canon.map.items()) if eoa.lower() in known}
+    return {"version": 1, "aliases": pairs} if pairs else None
+
+
+def _publish_wallet_files(site: Path, files: dict[str, dict], index: dict | None, aliases: dict | None = None) -> None:
+    """Writes traders/{address}.json for `files`, traders/index.json and traders/aliases.json, and
+    deletes every other file in traders/: a wallet off the leaderboard has no file (its index row
+    says so)."""
+    keep = set(files) | ({"index"} if index is not None else set()) | ({"aliases"} if aliases else set())
     for old in (site / "traders").glob("*.json"):
         if old.stem not in keep:
             old.unlink()
@@ -670,6 +695,8 @@ def _publish_wallet_files(site: Path, files: dict[str, dict], index: dict | None
         _write(site / "traders" / f"{address}.json", doc)
     if index is not None:
         _write(site / "traders" / "index.json", index)
+    if aliases:
+        _write(site / "traders" / "aliases.json", aliases)
 
 
 def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) -> None:
@@ -684,12 +711,13 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
     coverage = history_coverage(doc, now)
     ranked = {t["address"].lower() for t in doc["traders"]}
     index = wallet_index(data, ranked)
+    aliases = wallet_aliases(data, ranked | {r[0] for r in (index or {}).get("wallets", [])})
     if not coverage["ready"]:
         _write(site / "traders.json", {"generated_at": int(now), **coverage})
         for und in chains:
             _write(site / "wallets" / f"{und}.json", {"generated_at": int(now), **coverage, "und": und})
         # Direct links must not keep serving a stale, apparently current book.
-        _publish_wallet_files(site, {a: dict(coverage) for a in ranked}, index)
+        _publish_wallet_files(site, {a: dict(coverage) for a in ranked}, index, aliases)
         return
     files: dict[str, dict] = {}
     rows = []
@@ -719,7 +747,7 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
         valued = [b["valuation_at"] for b in book if b.get("valuation_at")]
         files[t["address"].lower()] = {**coverage, **summary, "valued_at": max(valued) if valued else None,
                                        "book": book, "recent": t["recent"], "large_24h": large}
-    _publish_wallet_files(site, files, index)
+    _publish_wallet_files(site, files, index, aliases)
     cohorts = {}
     order = {"pnl": [c[0] for c in traders_mod.PNL_COHORTS][::-1], "size": [c[0] for c in traders_mod.SIZE_COHORTS][::-1]}
     for dim, names in order.items():

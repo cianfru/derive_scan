@@ -84,23 +84,25 @@ def v2_lookup(owners, calls, fail=()):
     return DeriveClient("https://v2/", transport=httpx.MockTransport(handler), retries=0)
 
 
-def test_wallet_alias_gives_v3_legs_their_v2_names(tmp_path):
+def test_wallet_alias_learns_owners_and_keeps_v3_names(tmp_path):
     calls = []
     alias = WalletAlias(tmp_path, client=v2_lookup({1: "0xSCW1", 2: "0xSAME"}, calls, fail={4}))
     legs = [{"subaccount_id": 1, "wallet": "0xEOA1"}, {"subaccount_id": 1, "wallet": "0xEOA1"},
             {"subaccount_id": 2, "wallet": "0xSAME"}, {"subaccount_id": 3, "wallet": "0xNEW"},
             {"subaccount_id": 4, "wallet": "0xEOA4"}]
     asyncio.run(alias.apply(legs))
-    assert [t["wallet"] for t in legs] == ["0xSCW1", "0xSCW1", "0xSAME", "0xNEW", "0xEOA4"]
-    assert legs[0]["wallet_v3"] == "0xEOA1" and "wallet_v3" not in legs[2]
+    # V3 legs keep the owner's wallet as given: it is the canonical name
+    assert [t["wallet"] for t in legs] == ["0xEOA1", "0xEOA1", "0xSAME", "0xNEW", "0xEOA4"]
     saved = json.loads((tmp_path / "history" / "wallet_aliases.json").read_text())
+    assert saved["version"] == 2
     assert saved["subaccounts"] == {"1": "0xSCW1", "2": "0xSAME", "3": None}  # the failed lookup is not saved
-    assert saved["last_run"]["unresolved_legs"] == 1 and saved["last_run"]["renamed_legs"] == 2
+    assert saved["owners"] == {"1": "0xEOA1", "2": "0xSAME", "3": "0xNEW", "4": "0xEOA4"}
     assert sorted(calls) == [1, 2, 3, 4]
     calls.clear()
     again = WalletAlias(tmp_path, client=v2_lookup({4: "0xSCW4"}, calls))
-    asyncio.run(again.apply([{"subaccount_id": 1, "wallet": "0xEOA1"}, {"subaccount_id": 4, "wallet": "0xEOA4"}]))
-    assert calls == [4]  # only what was not known
+    asyncio.run(again.apply([{"subaccount_id": 1, "wallet": "0xEOA1"}, {"subaccount_id": 4, "wallet": "0xEOA4"},
+                             {"subaccount_id": 5, "wallet": "0xEOA1"}]))
+    assert calls == [4]  # only what was not known; subaccount 5's owner already has a Derive Wallet
 
 
 def test_read_exact_applies_the_alias(tmp_path):
@@ -112,7 +114,7 @@ def test_read_exact_applies_the_alias(tmp_path):
 
     async def go():
         client = DeriveClient("https://v3/", transport=httpx.MockTransport(handler), retries=0)
-        assert attach(client, "v2_mainnet", tmp_path) is None  # V2 needs no alias
+        assert attach(client, "v3_testnet", tmp_path) is None  # testnet names nobody
         assert attach(client, "v3_mainnet", tmp_path) is not None
         client.wallet_alias._client, client.wallet_alias._own = v2_lookup({1: "0xSCW1", 2: "0xSCW2"}, []), True
         try:
@@ -123,7 +125,9 @@ def test_read_exact_applies_the_alias(tmp_path):
         return got, exact
 
     got, exact = asyncio.run(go())
-    assert exact and sorted(t["wallet"] for t in got) == ["0xSCW1", "0xSCW2"]
+    assert exact and sorted(t["wallet"] for t in got) == ["0xEOA1", "0xEOA2"]
+    saved = json.loads((tmp_path / "history" / "wallet_aliases.json").read_text())
+    assert saved["subaccounts"] == {"1": "0xSCW1", "2": "0xSCW2"} and saved["owners"] == {"1": "0xEOA1", "2": "0xEOA2"}
 
 
 def test_settlement_prices_are_merged_not_replaced(tmp_path):

@@ -9,9 +9,10 @@ with the 00:00 UTC chain the recorder kept at the close, through lean.wallets_re
 the live reading. A coin whose chain is missing is modelled (below).
 
 Backfill (once, and again after a gap): Replay reads every day file once, keeping the running
-totals of history.scan_days, so each wallet's class and tier are recomputed at every close from
-that close's information only (history.classify_stats, history.rank_tiers): a wallet joins the
-cohort on the close it qualifies, never before. With them it keeps each wallet's open contracts per
+totals of history.scan_days (wallets under their owner's name, history.canonical_rows), so each
+wallet's class and tier are recomputed at every close from that close's information only
+(history.classify_stats, history.rank_tiers): a wallet joins the cohort on the close it qualifies,
+never before. With them it keeps each wallet's open contracts per
 instrument. Each close is valued with its recorded chain where one exists, otherwise modelled:
 Black-76 delta (history.option_delta) at the daily index close, with the instrument's last traded
 implied volatility (at most IV_MAX_AGE = 21 days old), else the coin's last near-the-money traded
@@ -56,6 +57,7 @@ from pathlib import Path
 from . import history as H
 from .lean import HORIZONS, WALLET_MIN_POSITIONS, WALLET_MIN_USD, WALLET_TIER, wallets_reading
 from .valuation import delta_at
+from .wallet_alias import canonical
 
 SCHEMA = 2              # 2: no intrinsic-delta fallback; unavailable closes carry bit 2
 CLOSES = 90             # closes rebuilt by a backfill
@@ -319,6 +321,7 @@ class Replay:
         self._pnl: dict = {}
         self._pnl_dirty: set = set()
         self.ivs = TradeIVs()
+        self.members = H.Members()  # parts of traders merged under their owner's wallet
 
     def opt(self, name: str):
         return self.ivs.opt(name)
@@ -396,7 +399,7 @@ class Replay:
             "sold_share": round(a[3] / premium, 3) if premium else 0,
             "otm_sold_share": round(a[4] / a[3], 3) if a[3] else 0,
             "hedged_days_share": round(self.hedged[wallet] / opt_days, 3) if opt_days else 0,
-            "active_days": span})
+            "active_days": span}) if not self.members.market_maker(wallet) else "market_maker"
 
     def _option_pnl(self, wallet: str) -> float:
         """Summed in first-trade order, as history.classify sums it."""
@@ -500,9 +503,10 @@ def backfill(root: Path, n: int = CLOSES, source: str = SOURCE) -> int:
     write_from = days[-n] if len(days) >= n else (days[0] if days else None)
     candles = index_closes(root)
     replay = Replay(load_settlements(root))
+    canon = canonical(root)
     closes, expiry_gross, prev = {}, {}, None
     for p, day in zip(files, days):
-        replay.add_day(day, H.read_day(p), candles)
+        replay.add_day(day, H.canonical_rows(H.read_day(p), canon, replay.members), candles)
         if day not in targets:
             continue
         as_of = close_ts(day)

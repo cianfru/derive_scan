@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { usd, pct, price, ago, utc, optionLabel, strike } from "../lib/format.js";
 import { TYPE_INFO } from "../lib/traders.js";
@@ -127,9 +127,20 @@ export function NoProfile({ address, index }) {
   );
 }
 
+/** The owner's wallet for a Derive Wallet address (traders/aliases.json), or null. Traders are named
+ *  by the owner's own wallet since 5 October 2026; links to the Derive Wallet open the owner's page. */
+export function ownerOf(aliases, address) {
+  const from = String(address || "").toLowerCase();
+  const to = aliases?.aliases?.[from];
+  return to && to !== from ? to : null;
+}
+
 function Missing({ address, crumb }) {
   const { data: index, error } = useData("traders/index.json", 30 * 60_000);
-  if (!index && !error) return <div className="wrap page"><Loading /></div>;
+  const aliases = useData("traders/aliases.json", 30 * 60_000);
+  const owner = ownerOf(aliases.data, address);
+  if (owner) return <Navigate to={`/trader/${owner}`} replace />;
+  if ((!index && !error) || (!aliases.data && !aliases.error)) return <div className="wrap page"><Loading /></div>;
   return <div className="wrap page people-page trader-page">{crumb(codename(address))}<NoProfile address={address} index={index} /></div>;
 }
 

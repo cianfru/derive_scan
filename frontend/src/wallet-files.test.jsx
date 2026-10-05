@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor, renderHook } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { useData } from "./lib/data.js";
-import Trader, { NoProfile, lastActive } from "./pages/Trader.jsx";
+import Trader, { NoProfile, lastActive, ownerOf } from "./pages/Trader.jsx";
 import CoinWallets from "./components/CoinWallets.jsx";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
@@ -46,5 +46,31 @@ describe("wallet files that do not exist", () => {
     render(<MemoryRouter><CoinWallets und="ZZZ404" alignment={null} /></MemoryRouter>);
     await waitFor(() => expect(screen.getByText("No ranked trader holds options on this coin right now.")).toBeTruthy());
     expect(screen.queryByLabelText("Loading")).toBeNull();
+  });
+
+  it("an old link to a Derive Wallet opens its owner's page", async () => {
+    const SCW = "0x5cw0000000000000000000000000000000000001";
+    const EOA = "0xe0a0000000000000000000000000000000000001";
+    expect(ownerOf({ aliases: { [SCW]: EOA } }, SCW.toUpperCase().replace("0X", "0x"))).toBe(EOA);
+    expect(ownerOf({ aliases: { [SCW]: EOA } }, EOA)).toBeNull();
+    expect(ownerOf(null, SCW)).toBeNull();
+    serve({
+      "traders/index.json": INDEX,
+      "traders/aliases.json": { version: 1, aliases: { [SCW]: EOA } },
+      [`traders/${EOA}.json`]: { ready: true, status: "ready", address: EOA, rank: 3, option_pnl: 1000, win_rate: 0.5,
+        expired: 4, premium_traded: 5000, first: "2025-01-01", last: "2026-10-01", perp_pnl: 0, book: [], recent: [],
+        through: "2026-10-04", gaps: 0, gap_days: [] },
+    });
+    render(<MemoryRouter initialEntries={[`/trader/${SCW}`]}>
+      <Routes><Route path="/trader/:address" element={<Trader />} /></Routes></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText("Rank 3")).toBeTruthy());
+    expect(screen.getByTitle(EOA)).toBeTruthy();
+  });
+
+  it("an unknown address without an alias keeps the fallback", async () => {
+    serve({ "traders/index.json": INDEX, "traders/aliases.json": { version: 1, aliases: {} } });
+    render(<MemoryRouter initialEntries={["/trader/0xdef0000000000000000000000000000000000002"]}>
+      <Routes><Route path="/trader/:address" element={<Trader />} /></Routes></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText("No public profile for this wallet.")).toBeTruthy());
   });
 });

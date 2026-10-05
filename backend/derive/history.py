@@ -19,6 +19,16 @@ history/anomalies.json           days kept although their pages did not reconcil
 
 Positions are not stored: a wallet's open contracts in an instrument are the running sum of its
 daily buys minus sells, and an option held to expiry settles at the settlement price.
+
+Wallet names: every reader goes through canonical_rows, which gives each row its owner's wallet
+(derive/wallet_alias.py: the EOA once known, the Derive Wallet until then) and merges rows that meet
+under one name on one day. Day files are never rewritten for it: rows keep the name they were
+written with (an SCW before 5 October 2026, the owner's wallet after when it was known), so a name
+learned later applies to the whole history on the next rebuild. A merged trader's figures are the
+sums of its parts: contracts and cash per instrument add up (opposite positions in two
+subaccounts net out), so option PnL, positions, premium and legs are sums; entry prices follow the
+merged daily rows. A merged trader is a market maker when any of its parts alone is one (Members),
+so the market-maker list keeps every wallet it held.
 """
 from __future__ import annotations
 
@@ -146,6 +156,70 @@ def day_rows(trades: list[dict]) -> list[list]:
                      int(a["taker_legs"]), round(a["delta_usd"], 2), iv, round(a["otm_sell_usd"], 2),
                      round(a["realized_pnl_usd"], 2), round(a["fees_usd"], 2)])
     return rows
+
+
+_SUMMED = ("buy_contracts", "sell_contracts", "buy_value_usd", "sell_value_usd", "maker_legs", "taker_legs",
+           "delta_usd", "otm_sell_usd", "realized_pnl_usd", "fees_usd")
+
+
+class Members:
+    """Market-maker figures of each part of a merged trader (each name as written in the day files),
+    so a trader merged from several names is a market maker when any part alone is one (the rule of
+    classify_stats: maker share or both-sides share). Only names that translate or are translated to
+    are kept."""
+
+    def __init__(self):
+        self.raw: dict = defaultdict(lambda: [0.0, 0.0, set(), set()])  # legs, maker legs, instruments, both-sides instruments
+        self.of: dict = defaultdict(set)  # canonical -> names written
+
+    def add(self, canonical: str, raw: str, r: dict) -> None:
+        self.of[canonical].add(raw)
+        name = r["instrument"]
+        if name.endswith("-PERP"):
+            return
+        a = self.raw[raw]
+        maker = _f(r["maker_legs"])
+        a[0] += maker + _f(r["taker_legs"])
+        a[1] += maker
+        a[2].add(name)
+        if _f(r["buy_contracts"]) > 0 and _f(r["sell_contracts"]) > 0:
+            a[3].add(name)
+
+    def market_maker(self, canonical: str) -> bool:
+        parts = self.of.get(canonical)
+        if not parts or len(parts) < 2:
+            return False
+        for raw in parts:
+            legs, maker, inst, both = self.raw.get(raw) or (0, 0, (), ())
+            if legs and (round(maker / legs, 3) > MM_MAKER_SHARE
+                         or (inst and round(len(both) / len(inst), 3) > MM_BOTH_SIDES_SHARE)):
+                return True
+        return False
+
+
+def canonical_rows(rows: list[dict], canon, members: Members | None = None) -> list[dict]:
+    """Rows of one day file under canonical wallet names (canon: derive.wallet_alias.Canon), rows of
+    one name and instrument merged (sums; implied volatility weighted by contracts). members, when
+    given, records the parts of merged names."""
+    if not canon:
+        return rows
+    out: dict = {}
+    for r in rows:
+        raw = r["wallet"]
+        w = canon(raw)
+        if members is not None and canon.merged(raw):
+            members.add(w, raw, r)
+        key = (w, r["instrument"])
+        have = out.get(key)
+        if have is None:
+            out[key] = {**r, "wallet": w} if w != raw else r
+            continue
+        n0 = _f(have["buy_contracts"]) + _f(have["sell_contracts"]) if _f(have.get("iv")) else 0.0
+        n1 = _f(r["buy_contracts"]) + _f(r["sell_contracts"]) if _f(r.get("iv")) else 0.0
+        merged = {**have, "wallet": w, **{k: _f(have[k]) + _f(r[k]) for k in _SUMMED}}
+        merged["iv"] = round((n0 * _f(have.get("iv")) + n1 * _f(r.get("iv"))) / (n0 + n1), 4) if n0 + n1 else ""
+        out[key] = merged
+    return list(out.values())
 
 
 def write_day(root: Path, day: date, rows: list[list]) -> Path:
@@ -322,10 +396,15 @@ def advance_entry(net: float, entry: float | None, buy: float, sell: float, bv: 
     return None if entry is None else (abs(net) * entry + abs(change) * price) / abs(after)
 
 
-def scan_days(root: Path, as_of: float | None = None) -> dict:
+def scan_days(root: Path, as_of: float | None = None, canon=None) -> dict:
     """One pass over every day file: per-wallet and per-(wallet, instrument) totals, the days each
     wallet traded options, option and perp delta per wallet, day and coin, and the last
-    RECENT_DAYS days of option rows (for trader pages)."""
+    RECENT_DAYS days of option rows (for trader pages). Wallets under their canonical names
+    (canonical_rows; canon defaults to the alias file under root)."""
+    if canon is None:
+        from .wallet_alias import canonical
+        canon = canonical(root)
+    members = Members()
     w: dict = defaultdict(lambda: defaultdict(float))
     inst: dict = defaultdict(lambda: defaultdict(float))  # (wallet, instrument) -> totals
     days_seen: dict = defaultdict(set)
@@ -339,7 +418,7 @@ def scan_days(root: Path, as_of: float | None = None) -> dict:
     recent: dict = defaultdict(list)  # wallet -> [[day, instrument, buy, sell, buy_value, sell_value]]
     for p in files:
         day = p.name[:10]
-        for r in read_day(p):
+        for r in canonical_rows(read_day(p), canon, members):
             wallet, name = r["wallet"], r["instrument"]
             und = name.split("-")[0]
             buy, sell = _f(r["buy_contracts"]), _f(r["sell_contracts"])
@@ -371,7 +450,7 @@ def scan_days(root: Path, as_of: float | None = None) -> dict:
             if day >= recent_from:
                 recent[wallet].append([day, name, round(buy, 6), round(sell, 6), round(bv, 2), round(sv, 2)])
     return {"w": w, "inst": inst, "days_seen": days_seen, "day_delta": day_delta, "coins": coins, "recent": recent,
-            "cutoff": as_of}
+            "cutoff": as_of, "members": members, "aliases": canon.digest}
 
 
 def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float, held: dict | None = None,
@@ -392,6 +471,7 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float,
     if scan is None or scan.get("cutoff") != as_of:
         scan = scan_days(root, as_of)
     w, inst, days_seen, day_delta = deepcopy(scan["w"]), scan["inst"], scan["days_seen"], scan["day_delta"]
+    members = scan.get("members")
     for (wallet, name), i in inst.items():
         a = w[wallet]
         if held is not None and abs(i["net"]) > 1e-9:
@@ -427,7 +507,10 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float,
                  "option_pnl": round(a["option_pnl"], 2), "perp_pnl": round(a["perp_pnl"], 2),
                  "expired": int(a["expired"]), "win_rate": round(a["wins"] / a["expired"], 3) if a["expired"] else None,
                  "premium_traded": round(premium, 2)}
-        out[wallet] = {"class": classify_stats(stats), **stats}
+        cls = classify_stats(stats)
+        if cls != "market_maker" and members is not None and members.market_maker(wallet):
+            cls = "market_maker"  # a part of this trader alone is a market maker
+        out[wallet] = {"class": cls, **stats}
     return rank_tiers(out)
 
 
