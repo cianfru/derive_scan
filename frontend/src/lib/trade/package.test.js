@@ -113,6 +113,11 @@ describe("quote checks", () => {
     expect(c.ok).toBe(true);
     expect(c.net).toBeCloseTo(93.38, 6);
   });
+  it("refuses a quote worse than Derive's order book, buying or selling", () => {
+    expect(checkQuote({ ...base, orderbook_total_cost: "99.50" }, ctx)).toMatchObject({ ok: false, reason: "book_better", book: 99.5 });
+    expect(checkQuote({ ...base, orderbook_total_cost: "100.00" }, ctx).ok).toBe(true);
+    expect(checkQuote({ ...base, estimated_total_cost: "-90", orderbook_total_cost: "-95" }, { ...ctx, direction: "sell", limit: 80 }).reason).toBe("book_better");
+  });
   it("refuses a quote that would lock margin beyond its price and fee", () => expect(checkQuote({ ...base, post_initial_margin: "300" }, ctx).reason).toBe("margin"));
   it("takes a quote whose margin use is its price and fee (the owner's testnet run, 5 October 2026)", () => {
     expect(checkQuote({ ...base, post_initial_margin: String(500 - 100 - 2.10) }, ctx).ok).toBe(true);

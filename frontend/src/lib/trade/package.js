@@ -166,6 +166,12 @@ export function checkQuote(best, { direction, payout, limit, feeEstimate }) {
   if (!ok(total) || !ok(fee)) return { ok: false, reason: "invalid", ...figures };
   if (direction === "buy" && ok(limit) && Math.abs(total) > limit + 1e-9) return { ok: false, reason: "beyond", ...figures };
   if (direction === "sell" && ok(limit) && Math.abs(total) < limit - 1e-9) return { ok: false, reason: "beyond", ...figures };
+  // Derive refuses a quote worse than its own order book for the same package (11110), so such a
+  // quote is never offered for a tap.
+  const book = Number(best.orderbook_total_cost);
+  if (ok(book) && (direction === "buy" ? Math.abs(total) > Math.abs(book) + 1e-6 : Math.abs(total) < Math.abs(book) - 1e-6)) {
+    return { ok: false, reason: "book_better", ...figures, book: Math.abs(book) };
+  }
   const pre = Number(best.pre_initial_margin), post = Number(best.post_initial_margin);
   // Derive's initial margin is the room the account has left: paying the package's price and fee
   // uses that much of it, and a package that would use more locks cash beyond its price.

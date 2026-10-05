@@ -174,10 +174,19 @@ export function createTicket({
       return;
     }
     const check = checkQuote(res, { direction, payout, limit: floor, feeEstimate });
+    // A quote worse than Derive's order book would be refused at the tap: keep waiting for a better
+    // one, for twice the usual wait, before saying so.
+    if (!check.ok && check.reason === "book_better" && t - started < 2 * QUOTE_WAIT_MS) {
+      if (state.phase === "quoted") set({ phase: "asking", quote: null, check: null, firmUntil: null });
+      timer = schedule(poll, POLL_MS);
+      return;
+    }
     if (!check.ok) {
       await cancel();
       // Derive's own reason (free text) goes to the testnet build's (i); the screen says it plainly.
       const detail = check.reason === "invalid" ? { step: "price", source: "Derive", code: "quote_not_valid", message: check.detail || "", data: "" }
+        : check.reason === "book_better" ? { step: "price", source: "Derive", code: "book_better", message: "quote total cost above Derive's order book",
+          data: JSON.stringify({ quote_total_cost: check.total, orderbook_total_cost: check.book }) }
         : check.reason === "margin" ? { step: "price", source: "Cowboy", code: "margin_check", message: "initial margin used beyond price and fee",
           data: JSON.stringify({ ...check.margin, total: check.total, fee: check.fee, max_fee: check.maxFee }) } : null;
       return set({ phase: check.reason === "beyond" ? "beyond" : "blocked", check, quote: best, message: null, detail });

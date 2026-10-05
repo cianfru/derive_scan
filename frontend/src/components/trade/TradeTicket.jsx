@@ -204,6 +204,7 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE 
       {st.phase === "blocked" && (
         <>
           <p className="tr-msg">{c?.reason === "fee" ? "Derive's fee is higher than usual right now."
+            : c?.reason === "book_better" ? "Derive's order book is cheaper than the best quote right now, and Derive takes only a quote at least as good. Ask again in a moment."
             : c?.reason === "margin" ? "On Derive this package would hold more than its price, so Cowboy does not offer it."
               : c?.reason === "invalid" && SHORT_FUNDS.test(c.detail || "") ? "Your Derive account doesn't hold enough for this. Try a smaller amount."
                 : "Derive did not accept this package."}<ErrorDetail detail={st.detail} /></p>
