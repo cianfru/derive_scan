@@ -1,0 +1,49 @@
+.fg-compact {
+  --fg-fear: #b7847d;
+  --fg-caution: #b4a081;
+  --fg-neutral: #aaa69b;
+  --fg-greed: #8faf9d;
+  --fg-extreme: #75b395;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.fg-band-0 { --fg-reading: var(--fg-fear); }
+.fg-band-1 { --fg-reading: var(--fg-caution); }
+.fg-band-2 { --fg-reading: var(--fg-neutral); }
+.fg-band-3 { --fg-reading: var(--fg-greed); }
+.fg-band-4 { --fg-reading: var(--fg-extreme); }
+.fg-dial { display: block; width: 72px; height: auto; flex: none; }
+.fg-arc { fill: none; stroke-width: 10; stroke: var(--seam-hi); }
+.fg-arc-0 { --fg-segment: var(--fg-fear); }
+.fg-arc-1 { --fg-segment: var(--fg-caution); }
+.fg-arc-2 { --fg-segment: var(--fg-neutral); }
+.fg-arc-3 { --fg-segment: var(--fg-greed); }
+.fg-arc-4 { --fg-segment: var(--fg-extreme); }
+.fg-arc { stroke: color-mix(in srgb, var(--fg-segment) 48%, var(--seam)); }
+.fg-arc.on { stroke: var(--fg-segment); }
+.fg-band--1 .fg-arc { stroke: var(--seam-hi); }
+.fg-needle { fill: none; stroke: var(--fg); stroke-width: 3; stroke-linecap: round; }
+.fg-marker { fill: var(--fg-reading); stroke: var(--plate); stroke-width: 3; }
+.fg-hub { fill: var(--fg); }
+.fg-read { display: grid; gap: 2px; }
+.fg-label { display: inline-flex; align-items: center; gap: 2px; font: 600 var(--t-key)/1.4 var(--font-body); color: var(--faint); white-space: nowrap; }
+.fg-value { display: inline-flex; align-items: baseline; gap: 8px; }
+.fg-value strong { font: 600 var(--t-kpi)/1 var(--font-mono); letter-spacing: -.02em; }
+.fg-value em { font: 600 var(--t-cell) var(--font-display); font-style: normal; color: var(--fg-2); }
+.fg-compact.stale .fg-value strong { color: var(--muted); }
+.fg-compact.stale .fg-arc.on { stroke: color-mix(in srgb, var(--fg-segment) 55%, var(--seam)); }
+.fg-compact.stale .fg-marker { fill: var(--muted); }
+.fg-compact.stale .fg-needle, .fg-compact.stale .fg-hub { stroke: var(--muted); fill: var(--muted); }
+:root[data-theme="light"] .fg-compact {
+  --fg-fear: #a25e54;
+  --fg-caution: #987a4e;
+  --fg-neutral: #817a6d;
+  --fg-greed: #527b66;
+  --fg-extreme: #347455;
+}
+@media (max-width: 600px) {
+  .fg-compact { gap: 8px; }
+  .fg-dial { width: 44px; }
+  .fg-value strong { font-size: var(--t-h2); }
+}
