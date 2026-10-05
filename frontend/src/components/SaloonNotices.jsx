@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useFeeds } from "./Feeds.jsx";
-import { Info } from "./ui.jsx";
+import { Arrow, Info } from "./ui.jsx";
 import { computeNotices, dismiss, dismissAll, loadDoc, saveDoc, useFollowsDoc } from "../lib/follows.js";
 import "../board.css";
 
@@ -69,7 +69,7 @@ export function SaloonNotices() {
 export default function SaloonHead({ view, board = false, quoteTs, paused = false }) {
   const following = view === "following";
   const guided = view === "guided";
-  const viewLink = <Link className="saloon-view-link" to={guided ? "/saloon" : "/saloon/guided"}>{guided ? "Browse outcomes" : "Guided setup"}<span aria-hidden="true">↗</span></Link>;
+  const viewLink = <Link className="saloon-view-link" to={guided ? "/saloon" : "/saloon/guided"}>{guided ? "Browse outcomes" : "Guided setup"}<span aria-hidden="true"><Arrow /></span></Link>;
   return (
     <header className={`q-head sn-head-wrap${board ? " bd-heading" : ""}`}>
       <div className="q-head-top">
