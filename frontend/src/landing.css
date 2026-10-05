@@ -135,11 +135,14 @@
   .cowboy-draft .lp-faq { gap: 32px; }
 }
 @media (max-width: 760px) {
-  /* Eyebrow, sign, headline, subhead and both buttons as one tight group from the top of the page,
-     so the product reads at once; the next section follows right after (owner, 5 October 2026:
-     closer together, a bigger sign). */
-  .cowboy-draft .hero-stage { display: block; min-height: 0; }
-  .cowboy-draft .hero-inner { width: 100%; justify-content: flex-start; padding-block: clamp(18px, 3.4svh, 32px) 40px; gap: clamp(10px, 2.2svh, 20px); }
+  /* The first screen shows the hero alone (svh: Safari with its bars showing): eyebrow, sign,
+     headline, subhead and both buttons as one tight group, centred, a little higher than the middle;
+     the next section starts below the fold (owner, 5 October 2026: closer together, a bigger sign,
+     nothing of the Saloon section on the first screen). */
+  .cowboy-draft .hero-stage { display: flex; min-height: calc(100vh - var(--header-h)); min-height: calc(100svh - var(--header-h)); }
+  .cowboy-draft .hero-inner { flex: 1; width: 100%; justify-content: flex-start; padding-block: clamp(16px, 3svh, 32px); gap: clamp(10px, 2.2svh, 20px); }
+  .cowboy-draft .hero-inner::before { content: ""; flex: 2 1 0; margin-bottom: calc(-1 * clamp(10px, 2.2svh, 20px)); }
+  .cowboy-draft .hero-inner::after { content: ""; flex: 3 1 0; margin-top: calc(-1 * clamp(10px, 2.2svh, 20px)); }
   .cowboy-draft .sign-wrap { width: min(94%, 420px); padding: 0; }
   .cowboy-draft .hero-row { display: flex; flex-direction: column; align-items: stretch; gap: clamp(12px, 2.4svh, 20px); margin-top: 0; }
   .cowboy-draft .hero-side { display: flex; flex-direction: column; }
