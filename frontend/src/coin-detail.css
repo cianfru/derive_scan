@@ -89,6 +89,9 @@
 .coin-detail .checks-list, .coin-detail .checks-against { padding: 20px var(--cd-pad); gap: 13px; }
 .coin-detail .checks-list li { min-height: 34px; font-size: 13px; }
 .coin-detail .checks-list li > span { white-space: normal; overflow: visible; text-overflow: clip; }
+/* A check whose value is long (the market consensus) wraps its value under the label instead of running into it. */
+.coin-detail .checks-list li { grid-template-columns: 16px max-content minmax(0, 1fr) auto; }
+.coin-detail .checks-list li > b { white-space: normal; text-align: right; min-width: 0; }
 .coin-detail .checks-against li { font: 400 13px/1.55 var(--font-body); }
 .coin-detail .engine-detail { padding: 0 var(--cd-pad) 4px; }
 .coin-detail .engine-detail > summary { display: flex; align-items: center; min-height: 52px; width: fit-content; padding: 10px 0; font: 500 13px/1.4 var(--font-body); color: var(--fg-2); }
