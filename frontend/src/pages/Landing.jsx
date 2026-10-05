@@ -341,13 +341,13 @@ export default function Landing() {
     <div className="landing cowboy-landing cowboy-draft">
       <section className="hero-stage" aria-labelledby="lp-hero">
         <div className="hero-inner">
-          <p className="hero-eyebrow">{QUESTIONS_ON ? "Price outcomes. Trader intelligence. Built on Derive." : "Independent trader intelligence on Derive."}</p>
+          <p className="hero-eyebrow">{QUESTIONS_ON ? `Engine · Traders · Options · ${oneTapOffered() ? "One tap" : "Saloon"}` : "Independent trader intelligence on Derive."}</p>
           <div className="sign-wrap"><NeonSign /></div>
           <div className="hero-row">
-            <h1 id="lp-hero">Know where<br />the herd stands.</h1>
+            <h1 id="lp-hero">Know where<br />the herd stands.{QUESTIONS_ON && <span className="hero-then"> Then pick your side.</span>}</h1>
             <div className="hero-side">
               <p className="hero-description">{QUESTIONS_ON
-                ? "Explore higher-or-lower price outcomes, see the full cost, and check the research before placing a trade on Derive."
+                ? `Our engine names each coin's regime. Cowboy shows where Derive's profitable traders are positioned and what options are pricing. When you have a view, take higher or lower ${oneTapOffered() ? "in one tap" : "on Derive"}, with the full cost shown first.${oneTapOffered() ? "" : " One-tap trading is coming."}`
                 : "Understand the price cycle, follow wallet positioning and see what the options market prices in."}</p>
               <div className="hero-cta">
                 <EntryButton />

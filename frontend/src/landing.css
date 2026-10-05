@@ -6,6 +6,7 @@
 .cowboy-draft .sign-wrap { width: min(900px, 100%); padding: 12px 1% 24px; }
 .cowboy-draft .hero-row { grid-template-columns: 1.15fr 1fr; align-items: center; gap: 72px; margin: 0; }
 .cowboy-draft .hero-row h1 { font-size: clamp(40px, 4.6vw, 62px); line-height: 1.07; letter-spacing: -.045em; }
+.cowboy-draft .hero-then { display: block; margin-top: .18em; font-size: .62em; line-height: 1.15; letter-spacing: -.03em; color: var(--accent-text); }
 .cowboy-draft .hero-side { gap: 24px; }
 .cowboy-draft .hero-description { max-width: 43ch; font-size: 16px; line-height: 1.7; }
 .cowboy-draft .hero-cta { gap: 24px; }
@@ -193,4 +194,9 @@
 }
 @media (prefers-reduced-motion: reduce) {
   html:has(.cowboy-draft) { scroll-behavior: auto; }
+}
+/* Short phones (375x548 with Safari's bars): the longer hero copy still fits above the fold. */
+@media (max-width: 700px) and (max-height: 600px) {
+  .cowboy-draft .hero-row h1 { font-size: 32px; }
+  .cowboy-draft .hero-description { font-size: 13px; line-height: 1.45; }
 }
