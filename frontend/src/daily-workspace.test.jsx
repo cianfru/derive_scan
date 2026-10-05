@@ -11,7 +11,7 @@ import { Reading } from "./components/MarketVisuals.jsx";
 import FearGreed from "./components/FearGreed.jsx";
 
 afterEach(cleanup);
-it("shows the exact daily signal even when the short-window legacy engine disagrees", () => {
+it("reads the 4H engine for the next 7 days and the daily engine for the next 30 (owner, 5 October 2026)", () => {
   const now = Date.now() / 1000;
   const alignment = {
     version: 2,
@@ -37,11 +37,12 @@ it("shows the exact daily signal even when the short-window legacy engine disagr
       },
     },
   };
-  expect(viewReading(alignment, "7d", "engine", now)).toMatchObject({
+  expect(viewReading(alignment, "7d", "engine", now)).toMatchObject({ label: "Strong up-setup", state: "up" });
+  expect(viewReading(alignment, "30d", "engine", now)).toMatchObject({
     label: "Leaning down",
     state: "defensive",
   });
-  render(<Reading alignment={alignment} horizon="7d" kind="engine" />);
+  render(<Reading alignment={alignment} horizon="30d" kind="engine" />);
   expect(screen.getByText("Leaning down")).toBeTruthy();
   expect(screen.getByText("Trending down")).toBeTruthy();
 });

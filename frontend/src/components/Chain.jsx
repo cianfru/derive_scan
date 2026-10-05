@@ -1,5 +1,6 @@
 import { viewReading } from "../lib/presentation.js";
 import { Info } from "./ui.jsx";
+import { REGIME } from "../lib/format.js";
 
 // The three layers of a market, always in this order and always drawn the same way (soft tiles
 // joined by a thin line that lights orange when all three agree):
@@ -40,6 +41,34 @@ export function ChainMini({ alignment, horizon = "30d" }) {
           {i > 0 && <i className="chain-link" />}
           <b className={`chain-sq ${x.state || "unknown"}`} title={`${x.name}: ${x.text}`}><LayerIcon kind={x.kind} size={15} /></b>
         </span>))}
+    </span>
+  );
+}
+
+const SHORT = { wallets: { up: "Long", defensive: "Short", neutral: "Balanced" }, options: { up: "Upward", defensive: "Defensive", neutral: "Balanced" } };
+const HOVER = {
+  engine: "The engine's signal and regime: on 4-hour bars for the next 7 days (about 28 bars), on daily bars for the next 30 days (about 30 bars).",
+  wallets: "How Derive's Smart wallets hold options expiring in the window: long or short delta overall.",
+  options: "What option prices lean towards: skew against its own range and the direction of taker flow.",
+};
+
+/** Is every layer pointing the same way for this window (and not balanced)? */
+export const chainAgreed = (alignment, horizon) => agreedOf(chainReadings(alignment, horizon));
+
+/** One layer as a wide tile: its icon and reading in words, coloured by state, with the explanation on
+ * hover or focus. `aligned` frames it in orange when all three layers agree for its window. */
+export function LayerTile({ alignment, horizon = "30d", kind, sub = null, tag = null, aligned = false, icon = true }) {
+  const [, name] = LAYERS.find(([k]) => k === kind);
+  const { label, state, why, row } = viewReading(alignment, horizon, kind);
+  if (sub === "regime") sub = state && row?.regime ? REGIME[row.regime] || null : null;
+  const word = (state && SHORT[kind]?.[state]) || label;
+  const days = horizon === "7d" ? "7" : "30";
+  const span = `, next ${days} days${kind === "engine" ? (horizon === "7d" ? " (4-hour bars)" : " (daily bars)") : ""}`;
+  const tip = `${name}${span}: ${label}${sub ? ` (${sub})` : ""}. ${why || HOVER[kind]}${aligned ? " All three layers point the same way for this window." : ""}`;
+  return (
+    <span className={`layer-tile ${state || "unknown"}${aligned ? " aligned" : ""}`} tabIndex={0} role="img" aria-label={tip} data-tip={tip}>
+      {icon && <span className="lt-icon"><LayerIcon kind={kind} size={16} /></span>}
+      <span className="lt-text">{tag && <small className="lt-tag">{tag}</small>}<b>{word}</b>{sub && <small>{sub}</small>}</span>
     </span>
   );
 }

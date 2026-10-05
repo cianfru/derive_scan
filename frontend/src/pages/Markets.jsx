@@ -3,13 +3,13 @@ import { Link, useNavigate } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { price, chg, pct, usd, z, title, dayTime, clock, SIGNAL_RANK, REGIME } from "../lib/format.js";
 import { openMarketRow } from "../lib/explain.js";
-import { Signal, Tabs, Loading, Failed, Info, PageHead, Empty, Lead } from "../components/ui.jsx";
+import { Tabs, Loading, Failed, Info, PageHead, Empty, Lead } from "../components/ui.jsx";
 import { marketsLead } from "../lib/takeaway.js";
 import { Asset, MarketTrace } from "../components/MarketVisuals.jsx";
 import { EnginePair, Convergence, CONVERGENCE_HELP } from "../components/EngineComparison.jsx";
 import { currentEngine } from "../lib/research.js";
 import StructureBand, { isSignal } from "../components/StructureBand.jsx";
-import { ChainMini, ChainLegend, chainReadings } from "../components/Chain.jsx";
+import { LAYERS, LayerIcon, LayerTile, chainAgreed, chainReadings } from "../components/Chain.jsx";
 
 const SCOPE = { options: "options markets", entries: "daily entries", perps: "perps only" };
 const inView = (c, view) => (view === "perps" ? !c.has_options : c.has_options) && (view !== "entries" || (SIGNAL_RANK[c.signal_1d] ?? 0) >= 3);
@@ -24,7 +24,7 @@ function agreement(c, horizon) {
   return states.slice(1).reduce((n, s) => n + (s === dir ? 1 : s && s !== "neutral" ? -1 : 0), 0);
 }
 
-const BOARD_HELP = "Each market is read in three steps, always in this order: 1 Regime (the daily engine), 2 Wallets (what Derive's best options traders hold on expiries in the window), 3 Options (what option prices lean towards). A framed chain means all three point the same way: context side by side, not a combined signal. Price is the latest options index where available; the daily change compares the two latest completed UTC days.";
+const BOARD_HELP = "Each market is read in three steps, always in this order: 1 Regime (the engine: on 4-hour bars for the next 7 days, about 28 bars, and on daily bars for the next 30 days, about 30 bars), 2 Wallets (what Derive's best options traders hold on expiries in the window), 3 Options (what option prices lean towards). Each market has one line for the next 7 days and one for the next 30; “All agree” in orange means the three layers point the same way for that window: context side by side, not a combined signal. The trace is the last 30 daily closes. Hover any tile for what it reads. Price is the latest options index where available; the daily change compares the two latest completed UTC days.";
 
 export default function Markets() {
   const { data, error } = useData("markets.json");
@@ -89,24 +89,20 @@ export default function Markets() {
               <input className="search" placeholder="Find" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Find a market" />
             </label>
           </div>
-          {overview && rows.length > 0 && <div className="board-mini-key"><ChainLegend /></div>}
-          {overview && rows.length > 0 && <div className="board-mini-head" aria-hidden="true"><span /><span>7D</span><span>30D</span></div>}
+          {overview && rows.length > 0 && <div className="board-mini-head win-grid" aria-hidden="true"><span>Next</span>{LAYERS.map(([kind, name]) => <span key={kind}><LayerIcon kind={kind} size={13} />{name}</span>)}</div>}
           <div className={overview ? "board-rows" : "table-wrap"}>
             <table className={`grid market-grid${overview ? " overview" : ""}`}>
               {overview && (
-                <colgroup><col style={{ width: "22%" }} /><col className="hide-md" style={{ width: "16%" }} /><col style={{ width: "18%" }} /><col style={{ width: "22%" }} /><col style={{ width: "22%" }} /></colgroup>)}
+                <colgroup><col style={{ width: "18%" }} /><col className="hide-md" style={{ width: "16%" }} /><col style={{ width: "66%" }} /></colgroup>)}
               <thead>
-                {overview && (
-                  <tr className="legend-row"><th /><th className="hide-md" /><th /><th colSpan={2} className="legend-th"><ChainLegend /></th></tr>)}
                 <tr>
                   {sortHead("und", "Market")}
-                  <th className="hide-md">60D</th>
+                  <th className="hide-md">{overview ? "Last 30 days" : "60D"}</th>
                   {overview ? (
-                    <>
-                      <th>Regime</th>
-                      {sortHead("a7", "7D", "chain-th")}
-                      {sortHead("a30", "30D", "chain-th")}
-                    </>
+                    <th className="windows-th">
+                      <div className="win-grid" aria-hidden="true"><span>Next</span>
+                        {LAYERS.map(([kind, name]) => <span key={kind}><LayerIcon kind={kind} size={13} />{name}</span>)}</div>
+                    </th>
                   ) : (
                     <>
                       <th>Engine pair · 1D / 4H</th>
@@ -130,17 +126,23 @@ export default function Markets() {
                       </div>
                     </td>
                     <td className="hide-md trace-td">
-                      <MarketTrace values={c.spark_1d} times={c.spark_times_1d} label={`${c.und} daily closes`} />
+                      <MarketTrace values={overview ? c.spark_1d?.slice(-30) : c.spark_1d} times={overview ? c.spark_times_1d?.slice(-30) : c.spark_times_1d} label={`${c.und} daily closes`} />
                     </td>
                     {overview ? (
                       <>
-                        <td className="regime-td two-line">
-                          {currentEngine(c.engine_comparison?.["1d"])
-                            ? <div className="regime-cell"><Signal s={c.signal_1d} explain={false} /><small>{REGIME[c.regime_1d] || title(c.regime_1d)}</small></div>
-                            : <Empty label="Short history" />}
+                        <td className="windows-td">
+                          <div className="windows">
+                            {[["7d", "7 days", "4H"], ["30d", "30 days", "1D"]].map(([h, name, tf]) => {
+                              const aligned = !!chainAgreed(c.align, h);
+                              return (
+                                <div key={h} className={`win-grid win-row${aligned ? " aligned" : ""}`}>
+                                  <span className="win-label"><b>{name}</b><small>{aligned ? "All agree" : `${tf} engine`}</small></span>
+                                  {LAYERS.map(([kind]) => <LayerTile key={kind} alignment={c.align} kind={kind} horizon={h} icon={false} aligned={aligned}
+                                    sub={kind === "engine" ? "regime" : null} />)}
+                                </div>);
+                            })}
+                          </div>
                         </td>
-                        <td className="chain-td"><ChainMini alignment={c.align} horizon="7d" /></td>
-                        <td className="chain-td"><ChainMini alignment={c.align} horizon="30d" /></td>
                       </>
                     ) : (
                       <>
