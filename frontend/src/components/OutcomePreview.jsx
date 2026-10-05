@@ -10,6 +10,7 @@ import { breakeven, countdown, dayLabel, fullPay, money, outcome, payAt, signed,
 const usd = (v) => money(v, { cents: true });
 const plWord = (v) => (v > 0.004 ? "profit" : v < -0.004 ? "loss" : "even");
 const plText = (v) => (plWord(v) === "even" ? "$0.00" : `${plWord(v)} ${usd(Math.abs(v))}`);
+const plLabel = (v) => ({ profit: "Profit", loss: "Loss", even: "Even" })[plWord(v)];
 const tone = (v) => (v > 0.004 ? "up" : v < -0.004 ? "down" : "");
 
 /** The figures every preview and ticket shares: what you pay, what it pays, what you can make,
@@ -55,10 +56,12 @@ function Slider({ und, level, side, t, index }) {
   const text = `${und} at ${money(s)}: pays ${perDollar}c per $1, you get ${usd(o.payout)}, ${plText(o.pl)}`;
   return (
     <div className="op-sim">
-      <p className="op-read" id={`${id}-read`} aria-hidden="true">
-        If {und} settles at <b className="mono">{money(s)}</b>, this pays <b className="mono">{perDollar}c</b> per $1: you get <b className="mono">{usd(o.payout)}</b>
-        <span className="op-sep"> · </span><b className={`mono ${tone(o.pl)}`}>{plText(o.pl)}</b>
-      </p>
+      <dl className="op-read" id={`${id}-read`} aria-hidden="true">
+        <div><dt>If {und} settles at</dt><dd className="mono">{money(s)}</dd></div>
+        <div><dt>Pays per $1</dt><dd className="mono">{perDollar}c</dd></div>
+        <div><dt>You get</dt><dd className="mono">{usd(o.payout)}</dd></div>
+        <div><dt>{plLabel(o.pl)}</dt><dd className={`mono ${tone(o.pl)}`}>{signed(o.pl)}</dd></div>
+      </dl>
       <div className="op-ramp">
         <PayZone lo={level.lo} hi={level.hi} side={side} index={index} mark={s} plain />
         <input type="range" className="op-range" min={min} max={max} step={step} value={s}

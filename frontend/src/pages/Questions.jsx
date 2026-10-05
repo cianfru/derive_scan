@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { Info, Loading, Failed, Tabs } from "../components/ui.jsx";
-import { Asset } from "../components/MarketVisuals.jsx";
+import { Asset, CoinIcon } from "../components/MarketVisuals.jsx";
+import { ASSET_NAMES } from "../lib/presentation.js";
 import Chain from "../components/Chain.jsx";
 import QuestionLadder from "../components/QuestionLadder.jsx";
 import PayZone from "../components/PayZone.jsx";
@@ -76,17 +77,23 @@ function Settled({ board }) {
   );
 }
 
+/** The coin's research, one tap away: its three layers now and a large way into the coin's page
+ * (the reverse of the coin page's "in the Saloon" card). */
 function Context({ und, days }) {
   const { data } = useData("markets.json");
   const row = data?.coins?.find((c) => c.und === und);
   const h = days <= 10 ? "7d" : "30d";
   return (
-    <section className="q-context" aria-label="Context, not advice">
-      <h3 className="label">Context, not advice
-        <Info label="About the context">What Cowboy's three layers show for {und} now, for the next {h === "7d" ? "7" : "30"} days. They describe the market; they do not choose an answer.</Info>
-      </h3>
-      {row?.align ? <Chain alignment={row.align} horizon={h} linked={false} compact /> : <p className="status">Unavailable</p>}
-      <Link className="text-link" to={`/coin/${und}#regime`}>Open {und}</Link>
+    <section className="q-context md-context" aria-label="Context, not advice">
+      <h2 className="md-context-title">Context, not advice
+        <Info label="About the context">What Cowboy's three layers show for {und} now, for the next {h === "7d" ? "7" : "30"} days: regime, wallets and options. They describe the market; they do not choose an answer.</Info>
+      </h2>
+      <Link className="md-coin-cta" to={`/coin/${und}#regime`}>
+        <CoinIcon und={und} />
+        <span className="md-coin-cta-text"><b>Open {und}</b><small>{ASSET_NAMES[und] || und}: chart, regime, wallets and options</small></span>
+        <span className="md-coin-cta-chain">{row?.align ? <Chain alignment={row.align} horizon={h} linked={false} compact /> : <span className="status">Unavailable</span>}</span>
+        <span className="md-coin-cta-go" aria-hidden="true">→</span>
+      </Link>
     </section>
   );
 }
@@ -242,6 +249,7 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
           <div className="md-history-key"><span>Price history</span><Info label="About the price chart">Question shows Derive's mark, buy and sell-back prices in cents per $1 of maximum payout for {ANSWER[sideKey || "yes"]}. Select {und} to see the coin's index instead. These are prices, not a measure of how often an outcome happens.</Info></div>
           {historyError && !hist ? <p className="status">Price history is unavailable right now.</p> : <QuestionChart hist={hist} id={level.id} side={sideKey || "yes"} level={level} und={und} theme={theme} />}
         </section>
+        <Context und={und} days={(date.settle_ts - Date.now() / 1000) / 86400} />
         {t && <section className="md-payoff-study" aria-label="Settlement payout"><h2>What it pays at settlement</h2><OutcomePayoffStudy und={und} level={level} side={sideKey} t={t} index={board.index} expiry={date.expiry} /></section>}
         <section className="md-settlement" aria-label="How settlement works">
           <div className="md-section-heading"><h2>It can pay in part.</h2><Rules und={und} /></div>
@@ -249,7 +257,6 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
           <div className="md-boundaries"><div><span className="md-lower">Lower pays in full</span><b className="mono">{money(level.lo)} or below</b></div><div><span className="md-higher">Higher pays in full</span><b className="mono">{money(level.hi)} or above</b></div></div>
           <ZoneNote und={und} date={date} index={board.index} />
         </section>
-        <Context und={und} days={(date.settle_ts - Date.now() / 1000) / 86400} />
         <section className="md-other"><button className="text-control q-other" aria-expanded={ladderOpen} onClick={onLadder}>{ladderOpen ? "Hide other levels" : "Other levels"}</button>{ladderOpen && renderLadder(dollars)}</section>
       </div>
 

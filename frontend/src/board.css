@@ -70,17 +70,11 @@
 .bd-key { display: grid; grid-template-columns: var(--cols); gap: 16px; padding: 0 64px 0 19px; font-size: 12px; color: var(--text-2); }
 .bd-key > span:last-child { grid-column: 2 / -1; }
 .bd-key b { font-weight: 500; color: var(--text-1); }
-.bd-card { position: relative; isolation: isolate; min-width: 0; display: grid; grid-template-columns: var(--cols); align-items: center; gap: 0 16px;
+.bd-card { position: relative; min-width: 0; display: grid; grid-template-columns: var(--cols); align-items: center; gap: 0 16px;
   padding: 14px 64px 14px 18px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--elev-fill); box-shadow: var(--elev-1);
   transition: border-color 200ms var(--ease), box-shadow 200ms var(--ease), transform 200ms var(--ease); }
-/* Depth: a warm lit edge along the bottom, and an orange glow that comes up on hover or focus. */
-.bd-card::before { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; z-index: -1; opacity: 0;
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent), 0 10px 34px -10px color-mix(in srgb, var(--accent) 55%, transparent), inset 0 -22px 40px -28px color-mix(in srgb, var(--accent) 70%, transparent);
-  transition: opacity 220ms var(--ease); }
-.bd-card::after { content: ""; position: absolute; left: 16px; right: 16px; bottom: -1px; height: 1px; pointer-events: none; opacity: .45;
-  background: linear-gradient(90deg, transparent, var(--accent) 30%, var(--accent-hover) 50%, var(--accent) 70%, transparent); transition: opacity 220ms var(--ease); }
-.bd-card:hover, .bd-card:focus-within { border-color: color-mix(in srgb, var(--accent) 45%, var(--border-strong)); box-shadow: var(--elev-2); transform: translateY(var(--elev-lift, -2px)); }
-.bd-card:hover::before, .bd-card:focus-within::before, .bd-card:hover::after, .bd-card:focus-within::after { opacity: 1; }
+/* Depth: raised at rest; on hover or focus an orange border and a small lift, nothing more. */
+.bd-card:hover, .bd-card:focus-within { border-color: var(--accent); box-shadow: var(--elev-2); transform: translateY(var(--elev-lift, -2px)); }
 .bd-level { min-width: 0; }
 .bd-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .bd-card .asset { gap: 8px; }
@@ -109,11 +103,10 @@
 .bd-choice.yes { --side: var(--up); }
 .bd-choice.no { --side: var(--down); }
 .bd-choice.yes, .bd-choice.no { color: var(--side); border-color: color-mix(in srgb, var(--side) 24%, transparent);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--side) 5%, var(--surface-1)), color-mix(in srgb, var(--side) 15%, var(--surface-1)));
-  box-shadow: var(--elev-tile), inset 0 -2px 0 color-mix(in srgb, var(--side) 45%, transparent); }
+  background: linear-gradient(180deg, color-mix(in srgb, var(--side) 5%, var(--surface-1)), color-mix(in srgb, var(--side) 13%, var(--surface-1)));
+  box-shadow: var(--elev-tile); }
 .bd-choice.yes:hover, .bd-choice.no:hover, .bd-choice.yes:focus-visible, .bd-choice.no:focus-visible { border-color: var(--side);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--side) 9%, var(--surface-1)), color-mix(in srgb, var(--side) 24%, var(--surface-1)));
-  box-shadow: var(--elev-tile), inset 0 -2px 0 var(--side), 0 8px 24px -10px color-mix(in srgb, var(--side) 70%, transparent); }
+  background: linear-gradient(180deg, color-mix(in srgb, var(--side) 8%, var(--surface-1)), color-mix(in srgb, var(--side) 18%, var(--surface-1))); }
 .bd-choice:active { transform: translateY(1px); box-shadow: var(--elev-tile-press); }
 .bd-choice-side { display: grid; gap: 2px; }
 .bd-choice-name { display: flex; align-items: center; gap: 5px; font-size: 13px; }
@@ -227,7 +220,7 @@
   .bd-choice-side b { font-size: 24px; }
   .bd-comparison-grid { grid-template-columns: 1fr; }
 }
-@media (prefers-reduced-motion: reduce) { .bd-card, .bd-choice, .bd-card::before, .bd-card::after { transition: none; } .bd-card:hover, .bd-card:focus-within, .bd-choice:active { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .bd-card, .bd-choice { transition: none; } .bd-card:hover, .bd-card:focus-within, .bd-choice:active { transform: none; } }
 @media (pointer: coarse) {
   .bd-answer .fl-btn, .q-follow .fl-btn { min-width: 44px; min-height: 44px; }
 }
