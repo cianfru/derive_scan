@@ -3,11 +3,13 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { radarPoint, radarLabels, viewReading, traceGeometry, STATE_NAMES } from "../lib/presentation.js";
 import { price, usd, z, chg, clock, REGIME, DASH } from "../lib/format.js";
-import { Tabs, Loading, Failed, PageHead, PanelHead, Empty, Arrow, Info, Lead } from "../components/ui.jsx";
+import { Tabs, Loading, Failed, PanelHead, Empty, Arrow, Info, Lead } from "../components/ui.jsx";
+import { MarketResearchHeader } from "../components/MarketResearchHeader.jsx";
 import { radarLead } from "../lib/takeaway.js";
 import { Asset } from "../components/MarketVisuals.jsx";
 import { useElementWidth } from "../lib/useElementWidth.js";
 import { radarFrames, frameAt, trailAt, closeLabel, nearest, walletAt, NO_IV_HELP } from "../lib/radarHistory.js";
+import "../radar-page.css";
 
 const TONE = { up: "var(--up)", defensive: "var(--down)", neutral: "var(--fg-2)" };
 const toneOf = (coin) => viewReading(coin.align, "30d", "engine").state;
@@ -206,7 +208,7 @@ function RailTrace({ values, label }) {
   );
 }
 
-const KINDS = [["engine", "Engine"], ["options", "Options"], ["wallets", "Wallets"]];
+const KINDS = [["engine", "Regime"], ["wallets", "Wallets"], ["options", "Options"]];
 
 // The number under a reading: z for the engine, skew points for options, delta balance for wallets.
 function readingNumber(c, kind, r) {
@@ -429,27 +431,32 @@ export default function Radar() {
   const wSeries = sel?.w.map((p) => (p && !p.unavailable ? { v: p.y, thin: p.modelled, brk: p.brk } : null));
   const hasHist = Boolean(sel) && (zSeries.filter(Boolean).length > 1 || wSeries.filter(Boolean).length > 1);
   const sBound = Math.max(2, xBound);
-  const tabs = <Tabs label="Wallet expiry window" value={horizon} onChange={(v) => choose("window", v)} items={[["7d", "Within 7 days", "7 days"], ["30d", "Within 30 days", "30 days"]]} />;
+  const tabs = <Tabs label="Wallet expiry window" value={horizon} onChange={(v) => choose("window", v)} items={[["7d", "Within 7 days"], ["30d", "Within 30 days"]]} />;
   const info = H ? <div className="radar-help"><p>{RADAR_HELP}</p><p>{RADAR_HISTORY_HELP}</p></div> : RADAR_HELP;
 
   return (
-    <div className="wrap page radar-page">
-      <PageHead error={error} title="Radar" info={info} tabs={tabs} meta={<>{coins.length} markets · {clock(data.generated_at)}</>} />
+    <div className="wrap page market-research-page radar-page">
+      <MarketResearchHeader error={error} title="Radar" description="Price stretch beside Smart wallet positioning." info={info} meta={<>{coins.length} markets · {clock(data.generated_at)}</>} />
       <Lead lead={radarLead(coins, horizon)} />
       <div className="plate radar-workspace">
+        <div className="mr-controls radar-map-toolbar">
+          <span className="radar-window-label">Wallet expiry window</span>
+          {tabs}
+        </div>
         <section className="radar-stage" aria-label="Positioning map">
-          <PanelHead title="Positioning map" right={<span className="radar-count" title={atNow ? "Markets with a current Smart wallet reading" : "Markets with a Smart wallet reading at that close"}>{points.length}/{coins.length}</span>} />
+          <PanelHead title="Positioning map" right={<span className="radar-map-count"><span>On the map</span><b className="radar-count" title={atNow ? "Markets plotted with daily stretch and a current Smart wallet reading" : "Markets plotted with daily stretch and a Smart wallet reading at that close"}>{points.length}/{coins.length}</b></span>} />
           {points.length || strip.length
             ? <RadarMap points={points} strip={strip} focus={selected?.und} onSelect={(v) => choose("focus", v)}
                 trails={trails} steps={H?.steps} past={!atNow} maxGross={maxGross} xBound={xBound} labelPoints={labelPoints} stripSets={stripSets} />
             : <div className="radar-empty"><Empty /></div>}
+          <div className="radar-map-caption"><span>Price stretch · 1D</span><span>Circle size: gross delta</span></div>
           {H && <Player open={open} steps={H.steps} t={tt} onScrub={scrub} playing={playing} onPlay={play}
             onOpen={() => { setOpen(true); setT(null); }} onClose={() => { stop(); setOpen(false); setT(null); }} />}
         </section>
         {selected && (
           <aside ref={detailRef} className="radar-detail" aria-live={playing ? "off" : "polite"} aria-label={`${selected.und} radar detail`}>
             <div className="rd-coin">
-              <Asset und={selected.und} compact />
+              <Asset und={selected.und} />
               <span className="rd-price">{atNow || k >= last ? `$${price(selected.price)}` : <><span className="rd-when">{closeLabel(closeAt)} close</span>{Number.isFinite(closePrice) && ` $${price(closePrice)}`}</>}</span>
             </div>
             <Link to={`/coin/${selected.und}`} className="rd-trace-link" aria-label={`Open ${selected.und} chart`}>
@@ -468,6 +475,7 @@ export default function Radar() {
                 <HistAxis steps={H.steps} />
               </div>
             )}
+            <div className="rd-reading-label">{past ? `${closeLabel(closeAt)} close` : `${horizon === "7d" ? "7" : "30"}-day readings`}</div>
             <div className="rd-readings">
               {KINDS.map(([kind, name]) => {
                 if (past) {
@@ -497,11 +505,11 @@ export default function Radar() {
         )}
       </div>
       <section className="plate radar-list" aria-label="Market readings">
-        <PanelHead title="Market readings" />
-        <div className="rl-head" aria-hidden="true"><span>Market</span><span>Engine</span><span>Options</span><span>Wallets</span></div>
+        <PanelHead title="Market readings" right={<span className="rl-context">Latest · {horizon === "7d" ? "7" : "30"}-day window</span>} />
+        <div className="rl-head" aria-hidden="true"><span>Market</span>{KINDS.map(([kind, name]) => <span key={kind}>{name}</span>)}</div>
         {coins.map((c) => (
           <button className="rl-row" key={c.und} aria-pressed={c.und === selected?.und} onClick={() => choose("focus", c.und)}>
-            <Asset und={c.und} compact />
+            <Asset und={c.und} />
             {KINDS.map(([kind, name]) => {
               const r = viewReading(c.align, horizon, kind);
               const n = readingNumber(c, kind, r);
