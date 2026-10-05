@@ -375,7 +375,9 @@ describe("Positions", () => {
     expect(worth).toBeLessThan(91.57);
     expect(fig("Profit / loss now")).toBe(`-$${(103.01 - worth).toFixed(2)}`);
     expect(fig("At 08:00 UTC, today's price")).toMatch(/^-\$\d+\.\d\d$/);
-    expect(fig("Settles")).toBe("Fri 9 Oct, 08:00 UTC");
+    // The card is the date's group: its header names the coin, date, countdown and today's index.
+    expect(card.querySelector("h2").textContent).toBe("BTC · Fri 9 Oct, 08:00 UTC");
+    expect(card.querySelector(".q-group-meta").textContent).toMatch(/^in \d+d \d+hnow \$[\d,]+1 position/);
     const user = userEvent.setup({ advanceTimers: () => {} });
     await user.click(screen.getByRole("button", { name: "Close" }));
     // The close summary first: proceeds, fees and the result, then the orders inside Order details.

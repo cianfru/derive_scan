@@ -84,3 +84,59 @@
   .marketplace-positions .ex-figs { grid-template-columns: 1fr 1fr; padding-top: 0; border-top: 0; gap: 18px 28px; }
 }
 .marketplace-positions .q-empty-card.q-empty-tab { min-height: 220px; }
+
+/* Open tab: one card per coin and settlement date. Header (coin, date, countdown, index), then the
+   result at settlement beside the group's figures, then the position (one) or one line per position. */
+.q-groups { display: grid; gap: 12px; }
+.q-groups > .q-exp-total { margin: 0; }
+.marketplace-positions .q-position.q-group { grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 20px 24px 6px; }
+.q-card.q-group .q-group-head, .q-group-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 18px; }
+.q-group-head h2 { display: flex; align-items: center; flex-wrap: wrap; gap: 0 4px; margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.q-group-head h2 .asset { display: inline-flex; align-items: center; gap: 10px; }
+.q-group-head h2 .asset b { font-weight: 600; }
+.q-group-sep { color: var(--text-3); }
+.q-group-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: 0; color: var(--text-3); font-size: 13px; }
+.q-group-meta b { color: var(--text-1); font-weight: 500; }
+.q-group-n { display: inline-flex; align-items: center; }
+.q-group-body { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 12px 36px; align-items: center; }
+.q-group-body.no-chart { grid-template-columns: minmax(0, 1fr); }
+.q-group-chart { display: grid; gap: 4px; min-width: 0; }
+.q-group-chart .ex-chart { width: 100%; max-width: 440px; }
+.q-group-chart .q-note { margin: 0; font-size: 12px; display: inline-flex; align-items: center; flex-wrap: wrap; }
+.marketplace-positions .q-group .q-position-figures { grid-column: auto; grid-row: auto; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 22px; padding: 0; border: 0; }
+.marketplace-positions .q-group .q-position-figures > div:last-child dd { font-family: var(--font-mono); font-size: 14px; white-space: normal; }
+.q-group .q-position-figures .q-lose dd small { display: block; font-family: var(--font-sans); font-weight: 400; color: var(--text-3); font-size: 12px; }
+.q-group-pos { display: grid; gap: 6px; padding-top: 12px; border-top: 1px solid var(--border); }
+.q-group-pos .q-card-title { font-size: 14px; line-height: 1.5; }
+.q-group-pos .q-position-side { font-size: 12px; }
+.q-group-pos .q-card-status { font-size: 12px; font-weight: 400; }
+.q-group > .q-position-tools { margin-top: 0; }
+.q-group > .q-ticket, .q-pos-line > .q-ticket { margin-bottom: 16px; }
+.q-group-lines { list-style: none; margin: 0; padding: 0; display: grid; }
+.q-pos-line { display: grid; gap: 8px; padding: 14px 0 0; border-top: 1px solid var(--border); min-width: 0; }
+.q-pos-line-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.q-pos-line-what { display: grid; gap: 3px; min-width: 0; }
+.q-pos-line-what .q-card-title { font-size: 14px; }
+.q-pos-line-what .q-card-title.higher { color: var(--up); } .q-pos-line-what .q-card-title.lower { color: var(--down); }
+.q-pos-line-what > small { color: var(--text-3); font-size: 12px; }
+.q-pos-line-what .q-card-status { font-size: 12px; font-weight: 400; }
+.q-line-close { flex: 0 0 auto; min-height: 34px; padding: 5px 14px; font-size: 12px; }
+.marketplace-positions .q-pos-line .q-pos-line-figs { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px 18px; padding: 0; border: 0; }
+.marketplace-positions .q-pos-line-figs dd { font-size: 14px; }
+.marketplace-positions .q-pos-line-figs > div:last-child dd { font-size: 14px; }
+.q-pos-line > .q-position-details { margin-top: -2px; }
+
+@media (max-width: 1050px) {
+  .q-group-body { grid-template-columns: minmax(0, 1fr); }
+  .marketplace-positions .q-position.q-group { padding: 18px 20px 6px; }
+}
+@media (max-width: 600px) {
+  .marketplace-positions .q-position.q-group { padding: 16px 16px 6px; }
+  .q-group-head h2 { font-size: 16px; }
+  .marketplace-positions .q-group .q-position-figures, .marketplace-positions .q-pos-line .q-pos-line-figs { grid-template-columns: 1fr 1fr; gap: 14px; }
+  .marketplace-positions .q-group .q-position-figures dd { font-size: 16px; }
+  .q-line-close { min-height: 44px; }
+}
+@media (pointer: coarse) {
+  .q-line-close, .q-group .q-position-close { min-height: 44px; }
+}

@@ -59,7 +59,8 @@ export const PROTOCOL = {
 
 /** BTC and ETH options sit in Derive's PRIME universe; its Standard manager is 1 (public/get_risk_universes). */
 export const PRIME_STANDARD = 1;
-export const TRADE_COINS = ["BTC", "ETH"];
+/** One tap for every coin on the board (owner, 5 October 2026: "available across the board"; it was BTC and ETH). */
+export const TRADE_COINS = "all";
 export const SALOON_LABEL = "Cowboy";
 export const KEY_LABEL = "Cowboy Saloon";
 

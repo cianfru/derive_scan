@@ -169,7 +169,7 @@ describe("one tap through Derive (testnet, dry run)", () => {
     await wordcheck(user, panel);
   });
 
-  it("keeps stage 1's ticket one tap from order review, and alone for coins outside BTC and ETH", async () => {
+  it("keeps stage 1's ticket one tap from order review, and offers one tap for every coin (owner, 5 October 2026)", async () => {
     setup();
     const user = userEvent.setup();
     show(`/q/${ID}?side=yes`);
@@ -178,16 +178,15 @@ describe("one tap through Derive (testnet, dry run)", () => {
     await user.click(within(panel).getByRole("button", { name: "Place by hand" }));
     expect(within(panel).getByText("Place these two orders on Derive, in this order.")).toBeTruthy();
     cleanup();
-    // The old HYPE credit package stays unavailable; use its live debit neighbour to verify
-    // that an actual order review outside BTC/ETH exposes the manual ticket alone.
+    // The old HYPE credit package stays unavailable; its live debit neighbour opens one tap too.
     show("/q/HYPE-20261009-A-85-91?side=yes");
     expect(screen.getByRole("button", { name: "Review orders" }).disabled).toBe(true);
     expect(screen.queryByRole("region", { name: /through Derive/ })).toBeNull();
     cleanup();
     show("/q/HYPE-20261009-A-89-95?side=yes");
     await user.click(screen.getByRole("button", { name: "Review orders" }));
-    expect(await screen.findByRole("region", { name: "Place on Derive" })).toBeTruthy();
-    expect(screen.queryByRole("region", { name: /through Derive/ })).toBeNull();
+    const hype = await screen.findByRole("region", { name: "Higher through Derive" });
+    expect(within(hype).getByRole("button", { name: "Place by hand" })).toBeTruthy();
   });
 });
 

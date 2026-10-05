@@ -65,7 +65,7 @@ export function publicClient() {
   return pub;
 }
 
-export const canTrade = (und) => TRADE_COINS.includes(und);
+export const canTrade = (und) => typeof und === "string" && /^[A-Z0-9]+$/.test(und) && (TRADE_COINS === "all" || TRADE_COINS.includes(und));
 export const termsAccepted = () => !!read(KEYS.terms());
 
 /**

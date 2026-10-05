@@ -212,9 +212,13 @@ describe("trade receipts that are still incomplete", () => {
     await waitFor(() => expect(mock.reads).toHaveLength(1));
     expect(screen.getByText(/These positions are left out of the combined settlement figures/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
-    expect(screen.queryByRole("region", { name: "At settlement" })).toBeNull();
+    expect(screen.queryByRole("region", { name: /^At settlement/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "About incomplete fills" })).toBeNull();
     const card = screen.getByRole("article");
+    // Still shown, as its date's card, with the combined figures withheld.
+    expect(card.classList.contains("q-group")).toBe(true);
+    expect(card.querySelector("h2").textContent).toMatch(/^BTC · /);
+    expect(within(card.querySelector(".q-position-figures")).getByText("Most you can lose").closest("div").querySelector("dd").textContent).toMatch(/Not available yet/);
     expect(within(card).getAllByText("Not available yet").length).toBeGreaterThanOrEqual(kind === "entry" ? 4 : 3);
     const paid = within(card).getByText("You paid").closest("div").querySelector("dd");
     expect(paid.textContent).toMatch(kind === "entry" ? /Not available yet/ : /\$1.60/);
@@ -310,7 +314,7 @@ describe("a full receipt whose Derive fees are unavailable", () => {
       expect(figure(top, "Value now").textContent).toMatch(/\$[\d.]+/);
       expect(figure(top, "Most it pays").textContent).toBe("$20.00");
       expect(screen.getByText("Derive's entry fees are not available yet. These positions are left out of the combined settlement figures.")).toBeTruthy();
-      expect(screen.queryByRole("region", { name: "At settlement" })).toBeNull();
+      expect(screen.queryByRole("region", { name: /^At settlement/ })).toBeNull();
     }
     const details = card.querySelector(".q-entry");
     expect(figure(details, "Premium, before fees").textContent).toBe("$0.95");
@@ -325,7 +329,7 @@ describe("a full receipt whose Derive fees are unavailable", () => {
       expect(figure(top, "You paid").textContent).toBe("$1.60");
       expect(figure(top, "Profit / loss now").textContent).toMatch(/\$[\d.]+/);
       expect(screen.queryByText("Derive's entry fees are not available yet. These positions are left out of the combined settlement figures.")).toBeNull();
-      expect(screen.getByRole("region", { name: "At settlement" })).toBeTruthy();
+      expect(screen.getByRole("region", { name: /^At settlement/ })).toBeTruthy();
     } else {
       await finishRead(0, unknownRows());
       expect(mock.settlements).toHaveLength(1);

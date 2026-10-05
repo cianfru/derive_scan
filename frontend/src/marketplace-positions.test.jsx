@@ -58,7 +58,12 @@ describe("compact Positions", () => {
   it("keeps missing marks and incomplete fills unknown instead of displaying a portfolio value", () => {
     docs.current = {};
     const { container } = show([position, { ...position, key: "partial", exec: "hand_partial" }]);
-    const [whole, part] = container.querySelectorAll(".q-position");
+    // Both settle on the same date: one card, one line per position, the totals unknown.
+    expect(container.querySelectorAll(".q-position")).toHaveLength(1);
+    const group = container.querySelector(".q-position-figures");
+    expect(figure(group, "Value now").textContent).toBe("Not available yeti");
+    expect(figure(group, "You paid").textContent).toBe("$206.02");
+    const [whole, part] = container.querySelectorAll(".q-pos-line");
     expect(figure(whole, "Value now").textContent).toBe("No price nowi");
     expect(figure(whole, "Profit / loss now").textContent).toBe("Not available yeti");
     expect(figure(part, "Value now").textContent).toBe("Not available yeti");

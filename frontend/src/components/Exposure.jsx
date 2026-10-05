@@ -1,10 +1,8 @@
 import { Info } from "./ui.jsx";
-import { useData } from "../lib/data.js";
-import { dayLabel, money, signed } from "../lib/questions.js";
+import { money, signed } from "../lib/questions.js";
 import { totalMostLose } from "../lib/exposure.js";
 
 const usd = (v) => money(v, { cents: true });
-const tone = (v) => (v > 0.004 ? "up" : v < -0.004 ? "down" : "");
 
 /** "$12.40", or "No limit" for an unlimited amount. */
 export const amount = (v) => (v === Infinity ? "No limit" : usd(v));
@@ -53,47 +51,31 @@ export function breakevenText(c) {
   return c.mostLose === 0 ? "None, it never ends below what you paid" : "None, it ends below what you paid at every price";
 }
 
-function Group({ g }) {
-  const { data: board } = useData(`questions/${g.und}.json`);
-  const n = g.items.length;
-  const notes = [
+/** What the combined figures of a group rest on, as sentences for an (i). */
+export function groupNotes(g) {
+  if (!g) return "";
+  return [
     g.estimatedFees && "Some fees are Cowboy's estimates from Derive's schedule, since they were not entered.",
     g.feesMissing && "Some fees were not entered and could not be estimated, so they are left out.",
     g.fromAnswer && "Older positions saved without their filled amounts are drawn from their answer's pay zone.",
     g.partial && "A position that did not fully fill counts only the options that filled.",
-  ].filter(Boolean);
+  ].filter(Boolean).join(" ");
+}
+
+/** "Most you can lose" from the combined payoff, with the tickets-one-by-one sum when it is higher. */
+export function MostLose({ g }) {
   const diff = g.sumTickets - g.mostLose;
   return (
-    <article className="q-exp-g" aria-label={`${g.und} on ${dayLabel(g.expiry)}`}>
-      <header className="q-exp-gh">
-        <h3>{g.und} · {dayLabel(g.expiry)}, 08:00 UTC</h3>
-        <span className="q-exp-n">{n} {n === 1 ? "position" : "positions"}<Info label="How these are combined">
-          Every open position on {g.und} settling {dayLabel(g.expiry)} at 08:00 UTC, against Derive's {g.ref}, from the exact options and amounts you recorded, after what you paid. The line is the result for each settlement price, not a view of where it settles. {notes.join(" ")}</Info></span>
-      </header>
-      <ExposureChart und={g.und} index={board?.index} curves={[{ combo: g, label: "What you hold", kind: "held" }]} />
-      <dl className="ex-figs">
-        <div className="q-lose"><dt>Most you can lose<small>combined, fees included</small></dt><dd className="mono">{amount(g.mostLose)}
-          {diff > 0.005 && <small> · tickets one by one {usd(g.sumTickets)}<Info label="Why combined is lower">Added one by one, each ticket's own worst case comes to {usd(g.sumTickets)}. They cannot all be at their worst at one settlement price, so the combined worst case is {amount(g.mostLose)}.</Info></small>}</dd></div>
-        <div><dt>Most it pays<small>total back</small></dt><dd className="mono">{amount(g.mostPays)}</dd></div>
-        <div><dt>Most you can make<small>after what you paid</small></dt><dd className={`mono ${tone(g.mostMake)}`}>{g.mostMake === Infinity ? "No limit" : g.mostMake > 0.004 ? signed(g.mostMake) : "None"}</dd></div>
-        <div><dt>Breakeven</dt><dd className="mono">{breakevenText(g)}</dd></div>
-      </dl>
-    </article>
+    <>{amount(g.mostLose)}
+      {diff > 0.005 && <small> · tickets one by one {usd(g.sumTickets)}<Info label="Why combined is lower">Added one by one, each ticket's own worst case comes to {usd(g.sumTickets)}. They cannot all be at their worst at one settlement price, so the combined worst case is {amount(g.mostLose)}.</Info></small>}</>
   );
 }
 
-/** Positions: open exposure by coin and date, and the total most-you-can-lose across dates. */
-export default function Exposure({ groups }) {
+/** Across dates, each settling on its own: the total most-you-can-lose line above the group cards. */
+export function ExposureTotal({ groups }) {
   if (!groups.length) return null;
-  const total = totalMostLose(groups);
   return (
-    <section className="q-exp" aria-label="At settlement">
-      <div className="q-exp-head">
-        <h2>At settlement</h2>
-        <span className="q-exp-total">Most you can lose, all dates <b className="mono">{amount(total)}</b>
-          <Info label="About the total">Each date settles on its own at 08:00 UTC, so the total is each date's combined worst case added up. Selling back before then is valued at Derive's screen price, not by these lines.</Info></span>
-      </div>
-      {groups.map((g) => <Group key={g.key} g={g} />)}
-    </section>
+    <p className="q-exp-total">Most you can lose, all dates <b className="mono">{amount(totalMostLose(groups))}</b>
+      <Info label="About the total">Each date settles on its own at 08:00 UTC, so the total is each date's combined worst case added up. Selling back before then is valued at Derive's screen price, not by these lines.</Info></p>
   );
 }
