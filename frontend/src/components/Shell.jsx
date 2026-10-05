@@ -4,7 +4,8 @@ import { Loading } from "./ui.jsx";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import { Lockup, HatMark } from "./Brand.jsx";
 import NavMenu, { MySpace } from "./NavMenu.jsx";
-import { QUESTIONS_ON, TESTNET_FILLS } from "../lib/flags.js";
+import { MAINNET_FILLS, QUESTIONS_ON, TESTNET_FILLS } from "../lib/flags.js";
+import { notePilotInvite, oneTapOffered } from "../lib/pilot.js";
 import "../marketplace.css";
 import walletCss from "../hdr-wallet.css?inline";
 
@@ -43,18 +44,26 @@ export const MENUS = [
 // the browser's records from their own chunk and fill in when it arrives, without remounting the menu.
 const MySpaceCounts = QUESTIONS_ON ? lazy(() => import("./MySpace.jsx")) : null;
 
-// Testnet builds only: the wallet in the header. Its code is the trade chunk's (loaded lazily, so other
-// builds carry none of it) and its styles are inlined here, so the header keeps its shape while that
-// chunk loads. Every piece sits behind TESTNET_FILLS, which drops it from other builds.
-const WalletMenu = TESTNET_FILLS ? lazy(() => import("./trade/TradePanel.jsx").then((m) => ({ default: m.WalletMenu }))) : null;
-const QuietBoundary = TESTNET_FILLS ? class extends Component {
+// Builds with fills only (testnet; mainnet for a pilot browser): the wallet in the header. Its code is
+// the trade chunk's (loaded lazily, so other builds carry none of it) and its styles are inlined here,
+// so the header keeps its shape while that chunk loads. Every piece sits behind the build flags, which
+// drop it from other builds.
+const WalletMenu = TESTNET_FILLS || MAINNET_FILLS ? lazy(() => import("./trade/TradePanel.jsx").then((m) => ({ default: m.WalletMenu }))) : null;
+const QuietBoundary = TESTNET_FILLS || MAINNET_FILLS ? class extends Component {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
   render() { return this.state.failed ? null : this.props.children; }
 } : null;
 
 /** The wallet this browser connected before (lib/trade/store.js KEYS.lastWallet), read without the trade chunk. */
-const LAST_WALLET_KEY = TESTNET_FILLS ? "cowboy-saloon-wallet:testnet" : null;
+const LAST_WALLET_KEY = TESTNET_FILLS ? "cowboy-saloon-wallet:testnet" : MAINNET_FILLS ? "cowboy-saloon-wallet:mainnet" : null;
+
+/** Real money: the header's wallet shows only in a pilot browser (lib/pilot.js); testnet: always. */
+function useHeaderWallet(pathname) {
+  const [pilot, setPilot] = useState(() => MAINNET_FILLS && (notePilotInvite(), oneTapOffered()));
+  useEffect(() => { if (MAINNET_FILLS) setPilot(oneTapOffered()); }, [pathname]);
+  return TESTNET_FILLS || (MAINNET_FILLS && pilot);
+}
 function remembersWallet() {
   try { return !!globalThis.window?.ethereum && !!globalThis.localStorage?.getItem(LAST_WALLET_KEY); } catch { return false; }
 }
@@ -92,6 +101,8 @@ export default function Shell() {
   const { pathname, hash } = useLocation();
   const header = useRef(null);
   const [space, setSpace] = useState(null);
+  // A build constant decides whether the hook runs at all, so builds without fills carry none of it.
+  const headerWallet = TESTNET_FILLS || MAINNET_FILLS ? useHeaderWallet(pathname) : false; // eslint-disable-line react-hooks/rules-of-hooks
   const saloonActive = pathname !== "/saloon/mine" && pathname !== "/saloon/following" && (pathname.startsWith("/saloon") || pathname.startsWith("/q/"));
   useEffect(() => {
     if (!hash) window.scrollTo(0, 0);
@@ -111,7 +122,7 @@ export default function Shell() {
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
-      <header className={`hdr${QUESTIONS_ON ? " hdr-marketplace" : ""}${QUESTIONS_ON && pathname === "/" ? " hdr-landing" : ""}${TESTNET_FILLS ? " hdr-wallet" : ""}`} ref={header}>
+      <header className={`hdr${QUESTIONS_ON ? " hdr-marketplace" : ""}${QUESTIONS_ON && pathname === "/" ? " hdr-landing" : ""}${(TESTNET_FILLS || MAINNET_FILLS) && headerWallet ? " hdr-wallet" : ""}`} ref={header}>
         <div className="wrap">
           {TESTNET_FILLS ? (
             // Testnet builds only: one-tap trades go to Derive's testnet. A text label with a thin accent
@@ -143,7 +154,7 @@ export default function Shell() {
           <div className="tools">
             {QUESTIONS_ON && <MySpace positions={space?.positions} following={space?.following} counted={!!space} />}
             {QUESTIONS_ON && <Suspense fallback={null}><MySpaceCounts onCounts={setSpace} /></Suspense>}
-            {TESTNET_FILLS && <HeaderWallet />}
+            {(TESTNET_FILLS || MAINNET_FILLS) && headerWallet && <HeaderWallet />}
             <button
               className="icon-btn"
               onClick={toggle}

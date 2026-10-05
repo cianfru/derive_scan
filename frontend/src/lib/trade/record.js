@@ -2,12 +2,14 @@
 // (its trade history, or execute_quote's answer): fill time, legs, prices, fees and trade ids, kept as
 // exact. Nothing is entered by the user. The board's estimate, Derive's mark from the board and the
 // three readings are kept beside it as in the manual journal (lib/journal.js), never as the fill.
-// Testnet records live under the testnet journal key, apart from mainnet.
+// Testnet records live under the testnet journal key, apart from mainnet; a mainnet build's one-tap
+// records live under the mainnet key, beside the trades placed by hand.
 import { captureContext, markBenchmark, settleBreakeven } from "../journal.js";
 import { fullPay, parseId, questionText, ANSWER } from "../questions.js";
 import { reconcileExits } from "../positions.js";
 import { packageLegs } from "./package.js";
 import { packageComplete } from "./fills.js";
+import { NETWORK } from "./config.js";
 
 const round = (v, d = 6) => (Number.isFinite(v) ? Number(v.toFixed(d)) : null);
 const settleOf = (expiry) => Date.UTC(+expiry.slice(0, 4), +expiry.slice(4, 6) - 1, +expiry.slice(6, 8), 8) / 1000;
@@ -65,7 +67,7 @@ export function oneTapKey(fill) {
 /** A position record for addPosition from a one-tap buy (exec "rfq"). `requested` is the contracts
  * asked for; a part fill records what filled. `wallet` and `subaccountId` name the wallet and the
  * Derive account it was traded from: sync matches a record only against that account. */
-export function buyRecord({ fill, id, side, network = "testnet", requested = null, level = null, board = null, markets = null, pricesTs = null, estimate = null, question = null, savedTs, wallet = null, subaccountId = null }) {
+export function buyRecord({ fill, id, side, network = NETWORK.name, requested = null, level = null, board = null, markets = null, pricesTs = null, estimate = null, question = null, savedTs, wallet = null, subaccountId = null }) {
   const q = parseId(id);
   if (!q || !fill?.legs?.length) return null;
   fill = { ...fill, complete: fill.complete !== false && matchesPackage(fill, id, side) };
@@ -105,7 +107,7 @@ export function fillDiffers(saved, derive) {
  */
 export function repairBuy(record, fill, { now }) {
   const j = record.journal || {};
-  const fresh = buyRecord({ fill: { ...fill, pct: j.fill?.filled_pct ?? 1, complete: true }, id: record.id, side: record.side, network: record.network || "testnet",
+  const fresh = buyRecord({ fill: { ...fill, pct: j.fill?.filled_pct ?? 1, complete: true }, id: record.id, side: record.side, network: record.network || NETWORK.name,
     requested: j.fill?.requested ?? null, savedTs: j.saved_ts ?? record.at ?? now, wallet: record.wallet || null, subaccountId: record.subaccount_id ?? null });
   if (!fresh) return null;
   const mark = j.mark && record.contracts > 0 && fresh.contracts !== record.contracts

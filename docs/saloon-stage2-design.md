@@ -374,6 +374,8 @@ Owner decisions (section 8). Questions for Derive, sent with the data-consent em
 
 ### P8. Mainnet (owner approval gate)
 
+**Status (5 October 2026):** built on the owner's request and off: `VITE_SALOON_TRADE=mainnet`, the published `trading_mainnet` switch (unset means off) and the pilot list `VITE_SALOON_PILOT` in place of "wallets listed in the published file". Switch-on steps in the README, "Saloon real money".
+
 **Preconditions:**
 - V3 mainnet is live;
 - Derive has answered 7.0;

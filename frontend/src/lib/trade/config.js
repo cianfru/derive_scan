@@ -1,20 +1,50 @@
 // Saloon stage 2: where the browser trades and the fixed values it uses. Pure data, no network.
-// Stage 2 runs on Derive's V3 testnet only (owner, 4 October 2026: testnet, dry run first; P6 real
-// fills on testnet only). Mainnet is listed only as disabled: it has no endpoint here, nothing can
-// select it, and the execute path refuses anything but the testnet (fillsAllowed, and the client).
+// Each build reaches exactly one Derive network, chosen at build time by VITE_SALOON_TRADE:
+//   "1" / "dryrun" / "testnet": Derive's V3 testnet (dry run first; P6 real fills on testnet).
+//   "mainnet": Derive's V3 mainnet, real money (P8). Fills stay closed until the owner opens them:
+//   the published `trading_mainnet` switch (unset means off) and the pilot wallet list.
+// The other network's endpoint is not in the build at all: the comparisons below are folded at
+// build time, so a testnet build carries no mainnet URL and a mainnet build no testnet URL.
+// Values come from Derive's docs (Introduction, Contracts, Action signing, Programmatic onboarding)
+// and derive-py 0.1.3 (config/contracts.py); token addresses from public/get_all_currencies.
 import { tradeMode } from "../flags.js";
+import { mainnetOpen } from "./live.js";
 
-/** The one endpoint fills may go to. */
-export const TESTNET_WS = "wss://testnet.api.derive.xyz/v3/ws";
+/** The endpoints fills may go to; null for the network this build does not reach. */
+export const TESTNET_WS = import.meta.env.VITE_SALOON_TRADE === "mainnet" ? null : "wss://testnet.api.derive.xyz/v3/ws";
+export const MAINNET_WS = import.meta.env.VITE_SALOON_TRADE === "mainnet" ? "wss://api.derive.xyz/v3/ws" : null;
 export const TESTNET_CHAIN = 11155111;
+export const MAINNET_CHAIN = 1;
 
-export const NETWORKS = {
-  testnet: {
+/** This build's network. */
+export const NETWORK = import.meta.env.VITE_SALOON_TRADE === "mainnet"
+  ? Object.freeze({
+    name: "mainnet",
+    enabled: true,
+    real: true, // real money: every trade screen says so plainly
+    wsUrl: MAINNET_WS,
+    chainId: MAINNET_CHAIN, // Ethereum: the mainnet's settlement chain and signing domain
+    chainName: "Ethereum",
+    addable: false, // every wallet has Ethereum; Cowboy only asks to switch to it
+    // The action domain's separator on this chain (Derive docs, Contracts; derive-py CONFIGS).
+    domainSeparator: "0xda616dfabb88681b08e1592820a41d55ddc62d68de110e327ae99d734506fe19",
+    appUrl: "https://app.derive.xyz/",
+    // USDC on Ethereum (public/get_all_currencies: USDC spot erc20.underlying_erc20, 6 decimals).
+    usdc: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+    usdcDecimals: 6,
+    // Derive's own USDC asset (public/get_all_currencies: USDC spot address). A fallback only: the
+    // page reads the collateral list itself.
+    usdcAsset: "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
+  })
+  : Object.freeze({
     name: "testnet",
     enabled: true,
+    real: false,
     wsUrl: TESTNET_WS,
     chainId: TESTNET_CHAIN, // Ethereum Sepolia: the testnet's settlement chain and signing domain
     chainName: "Sepolia",
+    addable: true,
+    domainSeparator: "0x24d674cd5f2b9d564691c51e9d88f649b99246a2244dd74ce27b96578d773e85",
     // For wallet_addEthereumChain when the wallet lacks Sepolia (MetaMask docs, "Add a network").
     // symbol kept to 6 characters or fewer: some MetaMask versions refuse longer ones.
     nativeCurrency: { name: "SepoliaETH", symbol: "ETH", decimals: 18 },
@@ -27,24 +57,45 @@ export const NETWORKS = {
     // address; its erc20.underlying_erc20 is `usdc` above). Pending deposits name this address.
     // A fallback only: the page reads the collateral list itself.
     usdcAsset: "0x57B03E14d409ADC7fAb6CFc44b5886CAD2D5f02b",
-  },
-  // Needs V3 mainnet to be live and the owner's written approval (design section 7, P8).
-  mainnet: { name: "mainnet", enabled: false },
-};
+  });
 
-export const NETWORK = NETWORKS.testnet;
+/** The build's networks by name: only its own. */
+export const NETWORKS = { [NETWORK.name]: NETWORK };
 
-/** This build's mode: "testnet" (real fills on the testnet), "dryrun" (nothing fills) or "off". */
+/** This build's mode: "testnet" or "mainnet" (fills), "dryrun" (nothing fills) or "off". */
 export const MODE = tradeMode(import.meta.env?.VITE_SALOON_TRADE, true);
+/** Real money in this build. */
+export const REAL_MONEY = MODE === "mainnet";
 
 /**
- * The mainnet guard: fills (private/execute_quote) are allowed only in a "testnet" build, on the
- * testnet network, its Sepolia signing domain and its testnet endpoint. Anything else, including any
- * mainnet configuration, is refused.
+ * The fill guard: fills (private/execute_quote) are allowed only
+ *   - in a "testnet" build, on the testnet network, its Sepolia signing domain and its endpoint; or
+ *   - in a "mainnet" build, on the mainnet network, its Ethereum signing domain and its endpoint,
+ *     and only while `live` is true (the published mainnet switch allows it for a pilot wallet).
+ * Anything else is refused. A build carries only its own endpoint, so the other network never matches.
  */
-export function fillsAllowed(network, mode) {
-  return mode === "testnet" && !!network && network.name === "testnet" && network.enabled === true
-    && network.chainId === TESTNET_CHAIN && network.wsUrl === TESTNET_WS;
+export function fillsAllowed(network, mode, live = false) {
+  if (!network || network.enabled !== true) return false;
+  if (mode === "testnet") {
+    return !!TESTNET_WS && network.name === "testnet" && network.chainId === TESTNET_CHAIN && network.wsUrl === TESTNET_WS;
+  }
+  if (mode === "mainnet") {
+    return live === true && MODE === "mainnet" && !!MAINNET_WS && network.name === "mainnet"
+      && network.chainId === MAINNET_CHAIN && network.wsUrl === MAINNET_WS;
+  }
+  return false;
+}
+
+/**
+ * The client's last check before private/execute_quote goes on the wire: the testnet's endpoint (in
+ * a testnet or dry-run build), or the mainnet's in a mainnet build while the published switch allows
+ * this direction for this pilot wallet. Every other endpoint is refused.
+ */
+export function executeAllowed(url, { wallet = null, direction = null } = {}) {
+  if (!url) return false;
+  if (TESTNET_WS && url === TESTNET_WS) return true;
+  if (MAINNET_WS && url === MAINNET_WS) return MODE === "mainnet" && mainnetOpen(wallet, direction);
+  return false;
 }
 
 /** Fixed protocol values from Derive's docs (Action signing, Contracts), the same on every network. */

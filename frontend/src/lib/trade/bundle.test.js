@@ -2,7 +2,8 @@
 // Bundle check: a build with VITE_SALOON_TRADE off carries no trading code, and a build with it on
 // carries it only in its own lazy chunk and points nowhere but Derive's testnet. A "testnet" build
 // (P6 fills) adds the header badge and the header's wallet (its code in the same lazy chunk) and
-// nothing that reaches a mainnet endpoint.
+// nothing that reaches a mainnet endpoint. A "mainnet" build (P8, real money) reaches mainnet only and
+// carries none of the testnet's endpoint, chain or wording.
 import { it, expect } from "vitest";
 import { build } from "vite";
 import react from "@vitejs/plugin-react";
@@ -71,6 +72,29 @@ it("builds a testnet app: fills on the testnet only, in the trade chunk, with th
   for (const { src } of files) {
     expect(src).not.toMatch(/wss:\/\/api\.derive\.xyz/);
     expect(src).not.toMatch(/https:\/\/api\.derive\.xyz/);
+    expect(src).not.toMatch(/Real money/);
+  }
+}, 120_000);
+
+it("builds a real-money app: mainnet only, in the trade chunk, with none of the testnet's code or wording", async () => {
+  const files = await bundle({ VITE_QUESTIONS: "1", VITE_SALOON_TRADE: "mainnet", VITE_SALOON_PILOT: "0x0000000000000000000000000000000000000001" }, [".js", ".css"]);
+  const js = files.filter(({ f }) => f.endsWith(".js"));
+  const withTrade = js.filter(({ src }) => MARKERS[0].test(src)).map(({ f }) => f);
+  expect(withTrade).toHaveLength(1);
+  expect(withTrade[0]).toMatch(/^TradePanel-/);
+  const trade = js.find(({ f }) => f.startsWith("TradePanel-")).src;
+  expect(trade).toMatch(/private\/execute_quote/);
+  expect(trade).toContain("wss://api.derive.xyz/v3/ws");
+  expect(trade).toMatch(/Real money/);
+  expect(js.filter(({ src }) => /wss:\/\/api\.derive\.xyz/.test(src)).map(({ f }) => f)).toEqual(withTrade);
+  const entry = js.find(({ f }) => f.startsWith("index-"));
+  for (const m of MARKERS) expect(m.test(entry.src), `entry ${m}`).toBe(false);
+  for (const { f, src } of files) {
+    // Exactly one network: nothing of the testnet's endpoint, chain or wording; no testing details.
+    expect(src, f).not.toMatch(/testnet\.api\.derive\.xyz|testnet\.app\.derive\.xyz/);
+    expect(src, f).not.toMatch(/Sepolia|sepolia/);
+    expect(src, f).not.toMatch(/Details for testing/);
+    expect(src, f).not.toMatch(/test USDC|Testnet · dry run|Not on testnet|testnet build|One tap works on Derive's testnet|Show test networks|Derive testnet/);
   }
 }, 120_000);
 

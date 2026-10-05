@@ -1,8 +1,10 @@
-// Testnet builds: the wallet in the header. It is the same seat as every ticket (lib/trade/seat.js),
-// so connecting here or in a ticket shows in both. Styles: src/hdr-wallet.css, inlined by the Shell.
+// Testnet builds, and mainnet builds for pilot browsers: the wallet in the header. It is the same seat
+// as every ticket (lib/trade/seat.js), so connecting here or in a ticket shows in both. Styles:
+// src/hdr-wallet.css, inlined by the Shell.
 import { useEffect, useId, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { money } from "../../lib/questions.js";
+import { MAINNET_FILLS } from "../../lib/flags.js";
 import { connect, disconnect, resume, seatState, switchOff, useSeat } from "../../lib/trade/seat.js";
 import { WalletEmblem } from "../WalletTag.jsx";
 import { AccountChoice, Copy, TermsStep, accountName } from "./SeatSetup.jsx";
@@ -134,7 +136,7 @@ export default function WalletMenu({ early = null }) {
         <div id={id} ref={panel} className="hw-menu" role="group" aria-label="Your wallet">
           <div className="hw-who">
             <WalletEmblem address={seat.wallet} size={28} />
-            <span className="hw-addr"><b className="mono" title={seat.wallet}>{shortAddr(seat.wallet)}</b><small>Derive testnet · test USDC</small></span>
+            <span className="hw-addr"><b className="mono" title={seat.wallet}>{shortAddr(seat.wallet)}</b><small>{MAINNET_FILLS ? "Derive · real USDC" : "Derive testnet · test USDC"}</small></span>
             <Copy text={seat.wallet} />
           </div>
           {seat.stage === "terms" ? <div className="hw-terms tr"><TermsStep /></div> : (

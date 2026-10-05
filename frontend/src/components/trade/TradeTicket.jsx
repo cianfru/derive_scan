@@ -15,6 +15,7 @@ import { buyLabel, closeLabel } from "../../lib/trade/record.js";
 import { remainingQty } from "../../lib/realized.js";
 import { partial } from "../../lib/positions.js";
 import ErrorDetail from "./ErrorDetail.jsx";
+import { MAINNET_FILLS } from "../../lib/flags.js";
 
 const perDollar = (x) => cents(Math.round(x * 100));
 /** Derive's invalid-quote reasons that mean the account cannot carry the package. */
@@ -97,9 +98,10 @@ function Filled({ fill, buy }) {
 
 /**
  * The stage 2 ticket: a firm RFQ price for the whole package. In a dry-run build the fill is signed
- * and checked by Derive, nothing fills; in a testnet build the user's tap fills it on Derive's testnet.
+ * and checked by Derive, nothing fills; in a testnet build the user's tap fills it on Derive's testnet;
+ * in a mainnet build it fills with real money, once the fresh switch read (`readSwitch`) allows it.
  */
-export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE }) {
+export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE, readSwitch }) {
   const seat = useSeat();
   const [st, setSt] = useState({ phase: "idle" });
   const run = useRef(null);
@@ -124,7 +126,7 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE 
 
   if (!plan) return <p className="status">No price on Derive's screen for this right now.</p>;
   const buy = plan.direction === "buy";
-  const fills = mode === "testnet";
+  const fills = mode === "testnet" || mode === "mainnet";
   const allowed = tradingAllows(trading, plan.direction);
   const preCap = buy ? capGate(plan.aboutLose, seat.wallet) : { ok: true };
   // A buy the account cannot pay for is never sent: Derive would only refuse the quote.
@@ -141,6 +143,7 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE 
       client: seat.client, getInstrument, subaccountId: seat.saloon.id, owner: seat.wallet, key: keySigner(seat.key),
       legs: plan.wire, direction: plan.direction, limit: plan.limit, payout: plan.payout, feeEstimate: plan.fee, label: plan.label,
       estimate: buy ? plan.aboutLose : null, tolerance: plan.T, mode, trading: () => current() ? tradingRef.current : "off",
+      ...(readSwitch ? { readSwitch } : {}),
       onFill: (f) => onFill?.(f, { wallet: scope.wallet, subaccountId: scope.subaccountId }),
       onChange: (s) => { if (current()) setSt({ ...s }); }, onKeyRejected: () => { if (current()) dropKey(); },
     });
@@ -187,7 +190,9 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE 
           <button className="btn primary lg tr-go" disabled={!cap.ok || !allowed} onClick={confirm}>
             {fills ? tap : `Dry run: ${tap.toLowerCase()}`}
           </button>
-          <p className="tr-note">{fills
+          <p className="tr-note">{MAINNET_FILLS
+            ? <><b>Real money.</b> USDC from your Derive account. One tap fills every option of the answer at this price.</>
+            : fills
             ? <>Derive testnet, test USDC. One tap fills every option of the answer at this price.</>
             : "Testnet dry run. Cowboy signs the trade and Derive checks the signature; nothing fills."}</p>
         </>

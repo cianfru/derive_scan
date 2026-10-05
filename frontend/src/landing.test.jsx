@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 
-vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: false, TESTNET_FILLS: false }));
+vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: false, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false, TRADE_ON: false }));
 import Shell from "./components/Shell.jsx";
 import Landing from "./pages/Landing.jsx";
 
