@@ -60,6 +60,10 @@ export const chainAgreed = (alignment, horizon) => agreedOf(chainReadings(alignm
 export function LayerTile({ alignment, horizon = "30d", kind, sub = null, tag = null, aligned = false, icon = true }) {
   const [, name] = LAYERS.find(([k]) => k === kind);
   const { label, state, why, row } = viewReading(alignment, horizon, kind);
+  // "detail": what the reading rests on, per layer (the regime; the positions counted; skew alone or with flow).
+  if (sub === "detail") sub = kind === "engine" ? "regime" : !state ? null
+    : kind === "wallets" ? (Number.isFinite(row?.positions) ? `${row.positions} ${row.positions === 1 ? "position" : "positions"}` : null)
+    : row?.status === "skew_only" ? "Skew only" : "Skew and flow";
   if (sub === "regime") sub = state && row?.regime ? REGIME[row.regime] || null : null;
   const word = (state && SHORT[kind]?.[state]) || label;
   const days = horizon === "7d" ? "7" : "30";

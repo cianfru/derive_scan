@@ -27,7 +27,7 @@ const markets = (coins) => ({
     rows: [[bar - 86400, 2, 0, 1, 0, 0, 0, 0], [bar, 2, 0, 1, 0, 0, 0, 0]] },
   coins,
 });
-const boardRows = () => screen.queryAllByRole("row", { name: /^Open .* market$/ });
+const boardRows = () => [...screen.queryAllByRole("article", { name: /^\S+ market$/ }), ...screen.queryAllByRole("row", { name: /^\S+ market$/ })];
 const band = () => within(screen.getByRole("region", { name: "Daily market structure" }));
 const show = () => render(<MemoryRouter><Markets /></MemoryRouter>);
 
