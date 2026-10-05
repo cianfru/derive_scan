@@ -353,3 +353,25 @@ describe("a full receipt whose Derive fees are unavailable", () => {
     expect(screen.getByRole("status").textContent).not.toMatch(/contracts for/);
   });
 });
+
+describe("a buy the Derive account cannot pay for", () => {
+  it("is never sent: the ticket names the balance and asks for a smaller amount", () => {
+    _setSeatState({ ...seat(A, 8101), saloon: { id: 8101, usdc: 10 } });
+    const plan = { ...sellPlan({ position: record() }), direction: "buy", aboutLose: 10.4 };
+    page(<TradeTicket plan={plan} />);
+    expect(screen.queryByRole("button", { name: "Get price" })).toBeNull();
+    expect(document.body.textContent).toMatch(/Your Derive account holds \$10\.00; this costs about \$10\.40 with fees\. Choose a smaller amount\./);
+    expect(mock.rfqs).toHaveLength(0);
+  });
+
+  it("says so plainly when Derive marks the quote short of funds, with Derive's words in the details", async () => {
+    const plan = { ...sellPlan({ position: record() }), direction: "buy", aboutLose: 1.5 };
+    page(<TradeTicket plan={plan} />);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Get price" }));
+    act(() => mock.rfqs[0].params.onChange({ phase: "blocked", check: { ok: false, reason: "invalid", detail: "Insufficient buying power" },
+      detail: { step: "price", source: "Derive", code: "quote_not_valid", message: "Insufficient buying power", data: "" } }));
+    expect(document.body.textContent).toMatch(/Your Derive account doesn't hold enough for this\. Try a smaller amount\./);
+    await userEvent.setup().click(screen.getByRole("button", { name: "Details for testing" }));
+    expect(document.body.textContent).toContain("Insufficient buying power");
+  });
+});

@@ -189,8 +189,10 @@ describe("the outcome preview", () => {
     expect(answerNames(true)).toEqual({ yes: "Higher", no: "Lower" });
   });
   it("offers debit packages only: a credit side left in an older file has no price", () => {
-    expect(live(lv83, "yes")).toBe(true);
-    expect(live(lv83, "no")).toBe(false);
+    // Judged before the fixture's own settlement (Mon 5 Oct 2026, 08:00 UTC), whatever today's date.
+    const before = Date.UTC(2026, 9, 4, 12) / 1000;
+    expect(live(lv83, "yes", false, before)).toBe(true);
+    expect(live(lv83, "no", false, before)).toBe(false);
   });
   it("prices the first order alone when placing by hand", () => {
     const t = ticket(lv83, "yes", 100, mon);
