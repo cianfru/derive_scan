@@ -279,7 +279,9 @@
 .bd-browser .bd-key .info { vertical-align: middle; }
 .bd-browser .bd-card { gap: 0 20px; padding: 18px 64px 18px var(--bd-pad); border: 0; border-bottom: 1px solid var(--seam); border-radius: 0; background: none; box-shadow: none; transform: none; transition: background 160ms var(--ease); }
 .bd-browser .bd-card:last-child { border-bottom: 0; }
-.bd-browser .bd-card:hover, .bd-browser .bd-card:focus-within, .bd-browser .bd-card:has(.bd-comparison[open]) { border-color: var(--seam); background: color-mix(in srgb, var(--surface-2) 40%, transparent); box-shadow: none; transform: none; }
+.bd-browser .bd-card:has(.bd-comparison[open]) { background: color-mix(in srgb, var(--surface-2) 40%, transparent); box-shadow: none; transform: none; }
+/* Owner, 5 October 2026: rows stay flat but show they can be clicked: an orange border on hover or focus. */
+.bd-browser .bd-card:hover, .bd-browser .bd-card:focus-within { z-index: 1; background: color-mix(in srgb, var(--surface-2) 40%, transparent); box-shadow: inset 0 0 0 1px var(--accent); transform: none; }
 .bd-browser .bd-question { color: var(--fg-2); }
 .bd-browser .bd-question strong { font: 500 24px/1.2 var(--font-mono); letter-spacing: -.035em; color: var(--fg); }
 .bd-browser .bd-question::after { border-radius: 0; }
@@ -336,11 +338,11 @@
 .bd-browser .bd-research-layers .layer-tile[data-tip]:hover .lt-text b { text-decoration: underline dotted; text-underline-offset: 3px; }
 .bd-browser .bd-more { justify-self: stretch; margin: 0; min-height: 48px; padding: 14px var(--bd-pad); border-top: 1px solid var(--seam); color: var(--fg-2); font: 500 13px/1.4 var(--font-body); text-align: center; }
 
-.bd-browser .bd-now { gap: 12px; padding: 10px var(--bd-pad); color: var(--fg-2); border-bottom: 1px solid var(--seam); }
-.bd-browser .bd-now-line, .bd-browser .bd-now-line.end { background: var(--seam); box-shadow: none; }
+/* The index stays the lit orange line across the ladder (owner, 5 October 2026). */
+.bd-browser .bd-now { gap: 12px; padding: 10px var(--bd-pad); color: var(--accent-text); border-bottom: 1px solid var(--seam); }
 .bd-browser .bd-now-line:first-child { flex-basis: 18px; }
-.bd-browser .bd-now-text { font: 400 12px/1.3 var(--font-body); }
-.bd-browser .bd-now-text b { font: 500 13px/1.3 var(--font-mono); }
+.bd-browser .bd-now-text { font: 600 13px/1.3 var(--font-body); }
+.bd-browser .bd-now-text b { font: 600 13px/1.3 var(--font-mono); }
 .bd-browser .bd-noprice, .bd-browser .bd-following { margin: 0; border: 0; border-top: 1px solid var(--seam); border-radius: 0; padding: 8px var(--bd-pad); background: none; }
 .bd-browser .bd-noprice summary, .bd-browser .bd-following summary { color: var(--fg-2); min-height: 44px; }
 .bd-browser .bd-noprice li, .bd-browser .bd-following li { border-color: var(--seam); color: var(--fg-2); }
