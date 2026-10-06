@@ -1,0 +1,28 @@
+/* Trader page: gross options P&L over time (components/PnlHistory.jsx). Green and red follow the result. */
+.pnl-history .plate-b { padding: 16px 20px 12px; display: grid; gap: 12px; }
+.ph-read { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 32px; min-height: 58px; }
+.ph-read > div { display: grid; gap: 4px; }
+.ph-read span { font: 600 var(--t-key)/1.2 var(--font-body); color: var(--faint); white-space: nowrap; }
+.ph-read b { display: inline-flex; align-items: baseline; gap: 8px; font: 500 var(--t-h2)/1.15 var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ph-main b { font-size: var(--t-kpi-big); font-weight: 600; letter-spacing: -.02em; }
+.ph-read b small { font: 500 var(--t-num) var(--font-mono); }
+.ph-read .up { color: var(--up); } .ph-read .down { color: var(--down); } .ph-read .dim { color: var(--fg-2); }
+.ph-chart { position: relative; width: 100%; touch-action: pan-y; cursor: crosshair; outline: none; border-radius: var(--r-sm); }
+.ph-chart:focus-visible { outline: 2px solid var(--focus, var(--accent)); outline-offset: 4px; }
+.ph-chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.ph-grid line { stroke: var(--seam); stroke-width: 1; }
+.ph-grid text, .ph-axis { fill: var(--muted); font: 400 11px var(--font-mono); }
+.ph-zero { stroke: var(--seam-hi); stroke-width: 1; stroke-dasharray: 3 3; }
+.ph-line { fill: none; stroke-width: 1.8; stroke-linejoin: round; }
+.ph-line.up { stroke: var(--up); } .ph-line.down { stroke: var(--down); }
+.ph-stop-a.up { stop-color: var(--up); stop-opacity: .22; } .ph-stop-a.down { stop-color: var(--down); stop-opacity: .22; }
+.ph-stop-b.up, .ph-stop-b.down { stop-opacity: 0; } .ph-stop-b.up { stop-color: var(--up); } .ph-stop-b.down { stop-color: var(--down); }
+.ph-cursor { stroke: var(--fg-2); stroke-width: 1; stroke-dasharray: 2 3; }
+.ph-dot { stroke: var(--surface-1); stroke-width: 2; }
+.ph-dot.up { fill: var(--up); } .ph-dot.down { fill: var(--down); }
+@media (max-width: 600px) {
+  .pnl-history .plate-b { padding: 14px 16px 10px; }
+  .ph-read { gap: 6px 20px; }
+  .ph-main b { font-size: var(--t-kpi); }
+  .ph-read b { font-size: var(--t-hero); }
+}

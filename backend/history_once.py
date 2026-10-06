@@ -54,7 +54,7 @@ from pathlib import Path
 REPAIRS = ("fractional_strikes", "paging")
 REPAIR = REPAIRS[-1]
 # 4: wallets under their owner's name (derive/wallet_alias.py, owner's decision 5 October 2026).
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 # The wallet files are rebuilt when the owner names change (history/wallet_aliases.json), at most
 # this often; a new day or a schema change rebuilds them anyway.
 ALIAS_REBUILD_EVERY = 3600
@@ -327,7 +327,7 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
             (out / "history" / "wallets.json").write_text(json.dumps({**meta, "wallets": classes}, separators=(",", ":")))
             (out / "history" / "positions.json").write_text(json.dumps({**meta, "positions": positions}, separators=(",", ":")))
             (out / "history" / "traders.json").write_text(json.dumps(
-                {**meta, **traders.build(scan, classes, as_of)}, separators=(",", ":")))
+                {**meta, **traders.build(scan, classes, as_of, settlements)}, separators=(",", ":")))
             # The close just classed, valued as the live reading was; earlier closes are the backfill's.
             if state["done_through"] >= history.last_complete_day(now).isoformat() and state.get("repaired") == REPAIR:
                 if balance_history.append(out, state["done_through"], positions) and state.pop("balance", None):

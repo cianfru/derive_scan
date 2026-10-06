@@ -10,6 +10,7 @@ import { WalletEmblem } from "../components/WalletTag.jsx";
 import LeanBar from "../components/LeanBar.jsx";
 import { Asset } from "../components/MarketVisuals.jsx";
 import HistoryStatus, { coverageReady, GapNote } from "../components/HistoryStatus.jsx";
+import PnlHistory from "../components/PnlHistory.jsx";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const short = (t) => { const d = new Date(t * 1000); return `${MONTHS[d.getUTCMonth()]} ${String(d.getUTCDate()).padStart(2, "0")}`; };
@@ -188,6 +189,7 @@ export default function Trader() {
           <div><span>Premium traded</span><b>{usd(data.premium_traded)}</b></div>
         </div>
       </section>
+      <PnlHistory history={data.pnl_history} through={data.through} />
       <Plate title="Open options" info={BOOK_HELP} right={data.lean?.score != null ? <LeanBar lean={data.lean} /> : null} bodyClass="flush">
         {book.length ? <OpenOptions book={book} /> : <p className="status pad">—</p>}
       </Plate>

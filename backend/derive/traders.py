@@ -15,7 +15,9 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 
-from .history import parse_option
+from datetime import datetime, timezone
+
+from .history import expired_pnl, parse_option
 
 INF = math.inf
 PNL_COHORTS = (
@@ -57,11 +59,40 @@ def open_positions(scan: dict, as_of: float) -> dict:
     return out
 
 
-def build(scan: dict, wallets: dict, as_of: float) -> dict:
+def pnl_history(scan: dict, wallets: set, settlements: dict, as_of: float) -> dict:
+    """{wallet: [[day, cumulative gross options PnL, cumulative premium traded]]}: each expired option's
+    PnL (history.expired_pnl, the rule behind option_pnl) booked on its settlement day (UTC), the
+    premium bought plus sold on those options beside it, from a zero point on the wallet's first
+    trade day. The last point equals option_pnl."""
+    per: dict = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))
+    for (wallet, name), i in scan["inst"].items():
+        if wallet not in wallets:
+            continue
+        pnl = expired_pnl(name, i, settlements, as_of)
+        if pnl is None:
+            continue
+        day = datetime.fromtimestamp(parse_option(name)[1], timezone.utc).date().isoformat()
+        cell = per[wallet][day]
+        cell[0] += pnl
+        cell[1] += i["buy_value"] + i["sell_value"]
+    out = {}
+    for wallet, days in per.items():
+        first = min(scan["days_seen"].get(wallet) or [min(days)])
+        rows, pnl, prem = [] if first >= min(days) else [[first, 0.0, 0.0]], 0.0, 0.0
+        for day in sorted(days):
+            pnl += days[day][0]
+            prem += days[day][1]
+            rows.append([day, round(pnl, 2), round(prem, 2)])
+        out[wallet] = rows
+    return out
+
+
+def build(scan: dict, wallets: dict, as_of: float, settlements: dict | None = None) -> dict:
     held = open_positions(scan, as_of)
     eligible = {a: v for a, v in wallets.items() if v["class"] != "market_maker"}
     ranked = sorted((a for a, v in eligible.items() if v["legs"] >= RANK_MIN_LEGS and v.get("expired")),
                     key=lambda a: eligible[a]["option_pnl"], reverse=True)
+    history = pnl_history(scan, set(ranked[:RANKED]), settlements, as_of) if settlements is not None else {}
     traders = []
     for rank, a in enumerate(ranked[:RANKED], 1):
         v = eligible[a]
@@ -71,7 +102,8 @@ def build(scan: dict, wallets: dict, as_of: float) -> dict:
             "sold_share")},
             "pnl_cohort": pnl_cohort(v), "size_cohort": size_cohort(v),
             "coins": {u: round(x, 2) for u, x in sorted(coins.items(), key=lambda kv: -kv[1])[:4]},
-            "open": held.get(a, []), "recent": sorted(scan["recent"].get(a, []), reverse=True)[:120]})
+            "open": held.get(a, []), "recent": sorted(scan["recent"].get(a, []), reverse=True)[:120],
+            "pnl_history": history.get(a, [])})
     cohorts = {"pnl": defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [0.0, 0, 0.0]))),
                "size": defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: [0.0, 0, 0.0])))}
     counts = {"pnl": defaultdict(int), "size": defaultdict(int)}

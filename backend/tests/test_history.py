@@ -178,3 +178,25 @@ def test_history_repair_rereads_days_with_fractional_strikes(tmp_path):
     assert history_once.is_due(tmp_path, now) and "balance" not in state
     asyncio.run(history_once.run(tmp_path, budget=200, now=now, client=object()))
     assert set(calls) == {"2024-06-02"} and history_once.is_due(tmp_path, now) is False
+
+
+def test_trader_pnl_history_books_each_option_on_its_settlement_day(tmp_path):
+    """The P&L history steps on each settlement day, starts at zero on the first trade day and ends at option_pnl."""
+    from derive import traders
+    early, late, live = "ETH-20240614-4000-C", "ETH-20240628-4000-P", "ETH-20991231-5000-C"
+    rows = []
+    for i in range(6):
+        rows += [{"wallet": "0xW", "instrument": early, "buy_contracts": 1, "buy_value_usd": 50, "taker_legs": 1},
+                 {"wallet": "0xW", "instrument": late, "sell_contracts": 1, "sell_value_usd": 80, "taker_legs": 1}]
+    rows.append({"wallet": "0xW", "instrument": live, "buy_contracts": 1, "buy_value_usd": 100, "taker_legs": 1})
+    _write(tmp_path, date(2024, 6, 1), rows)
+    settle = {"ETH": {"20240614": 4200.0, "20240628": 3900.0}}
+    scan = history.scan_days(tmp_path)
+    cls = history.classify(tmp_path, settle, as_of=1.75e9, scan=scan)
+    out = traders.build(scan, cls, as_of=1.75e9, settlements=settle)
+    w = out["traders"][0]
+    # early call: 6 x (200 - 50) = 900; late put sold for 80 and 100 in the money: 6 x (80 - 100) = -120
+    assert w["pnl_history"] == [["2024-06-01", 0.0, 0.0], ["2024-06-14", 900.0, 300.0], ["2024-06-28", 780.0, 780.0]]
+    assert w["pnl_history"][-1][1] == w["option_pnl"]
+    # without settlements (older callers) the field is empty rather than wrong
+    assert traders.build(scan, cls, as_of=1.75e9)["traders"][0]["pnl_history"] == []
