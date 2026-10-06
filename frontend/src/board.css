@@ -439,3 +439,50 @@
   .bd-browser .bd-footer summary { margin-top: 8px; text-align: left; }
 }
 @media (prefers-reduced-motion: reduce) { .bd-browser .bd-card, .bd-browser .bd-choice { transition: none; } }
+
+/* Higher / Lower tiles (owner, 6 October 2026: "much more prominent"): a filled green or red tile, the most it
+ * makes as the big figure, the side and its price per $1 on one small line above. */
+.bd-page .bd-choice.yes, .bd-page .bd-choice.no {
+  flex-direction: column; align-items: stretch; justify-content: space-between; gap: 6px;
+  min-height: 92px; padding: 12px 14px; border-radius: 10px; color: var(--side);
+  border: 1px solid color-mix(in srgb, var(--side) 70%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--side) 34%, var(--surface-1)), color-mix(in srgb, var(--side) 22%, var(--surface-1)));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--side) 30%, transparent);
+  transition: background 140ms var(--ease), border-color 140ms var(--ease), transform 80ms var(--ease);
+}
+.bd-page .bd-choice.yes:hover, .bd-page .bd-choice.no:hover, .bd-page .bd-choice.yes:focus-visible, .bd-page .bd-choice.no:focus-visible {
+  border-color: var(--side);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--side) 46%, var(--surface-1)), color-mix(in srgb, var(--side) 32%, var(--surface-1)));
+}
+.bd-page .bd-choice.yes:active, .bd-page .bd-choice.no:active { transform: scale(.985); }
+.bd-choice-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.bd-page .bd-choice-top .bd-choice-name { font: 700 14px/1.2 var(--font-sans); color: var(--side); padding-right: 0; }
+.bd-page .bd-choice-top .bd-price { font: 500 13px/1.2 var(--font-mono); color: var(--text-1); opacity: .85; }
+.bd-page .bd-capped { margin-left: 1px; font-size: 12px; color: var(--text-1); }
+.bd-choice-ret { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.bd-choice-ret small { flex: none; white-space: nowrap; font: 500 12px/1 var(--font-sans); color: var(--text-1); opacity: .8; }
+.bd-choice-ret b { font: 700 28px/1 var(--font-mono); letter-spacing: -.05em; color: var(--side); white-space: nowrap; }
+.bd-choice-ret b.long { font-size: 24px; }
+.bd-page .bd-choice.off { min-height: 92px; border-radius: 10px; }
+.bd-card .bd-level strong { font-size: 18px; }
+
+/* Smart wallets beside the price in each date header */
+.bd-row-smart { display: inline-flex; align-items: center; gap: 5px; font: 400 13px/1.4 var(--font-body); color: var(--text-2); }
+.bd-row-smart b { font-weight: 700; }
+.bd-row-smart b.up { color: var(--up); } .bd-row-smart b.defensive { color: var(--down); } .bd-row-smart b.neutral { color: var(--text-1); }
+.bd-row-all { display: block; width: calc(100% - 2 * var(--bd-pad, 16px)); margin: 4px auto 14px; min-height: 44px; border: 1px solid var(--border); border-radius: 8px;
+  background: none; color: var(--text-1); font: 600 14px var(--font-body); cursor: pointer; }
+.bd-row-all:hover, .bd-row-all:focus-visible { border-color: var(--border-strong); }
+
+@media (min-width: 681px) and (max-width: 860px) { .bd-page .bd-choice.yes, .bd-page .bd-choice.no, .bd-page .bd-choice.off { min-height: 100px; } }
+@media (max-width: 680px) {
+  /* Phones: the figures that decide, nothing else. */
+  .bd-browser .bd-heading .saloon-heading p, .bd-browser .bd-count-main { display: none; }
+  .bd-page .bd-choice.yes, .bd-page .bd-choice.no, .bd-page .bd-choice.off { min-height: 96px; padding: 12px; }
+  .bd-choice-ret b { font-size: 30px; }
+  .bd-choice-ret b.long { font-size: 25px; }
+  .bd-page .bd-choice-top { padding-right: 30px; }
+  .bd-card .bd-level strong { font-size: 20px; }
+  .bd-row-smart { font-size: 13px; }
+}
+@media (prefers-reduced-motion: reduce) { .bd-page .bd-choice.yes:active, .bd-page .bd-choice.no:active { transform: none; } }

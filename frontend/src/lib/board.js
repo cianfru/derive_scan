@@ -174,3 +174,17 @@ export function dateRows(items, coins = []) {
   }
   return out.sort((a, b) => a.settleTs - b.settleTs || rank(a.und) - rank(b.und) || (a.und < b.und ? -1 : a.und > b.und ? 1 : 0));
 }
+
+/** The n levels of a date row nearest the coin's index, low to high, with the index mark recomputed;
+ * a row without an index keeps its middle n. Rows of n + 1 or fewer keep every level. */
+export function nearRow(row, n = 3) {
+  if (!row || row.items.length <= n + 1) return row;
+  let items;
+  if (row.index == null) {
+    const start = Math.max(0, Math.floor((row.items.length - n) / 2));
+    items = row.items.slice(start, start + n);
+  } else {
+    items = [...row.items].sort((a, b) => Math.abs(a.k - row.index) - Math.abs(b.k - row.index) || a.k - b.k).slice(0, n).sort((a, b) => a.k - b.k);
+  }
+  return { ...row, items, nowAt: row.index == null ? null : items.filter((it) => it.k <= row.index).length, hidden: row.items.length - items.length };
+}
