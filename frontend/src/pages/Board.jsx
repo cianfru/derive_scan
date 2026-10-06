@@ -318,7 +318,7 @@ export default function Board({ followingOnly = false, embedded = false }) {
         </div>
       </section>
       {followingOnly && <Following />}
-      {!index || !ready ? <Loading /> : feedFailed ? <div className="bd-empty" role="status"><h2>Outcome data is unavailable right now.</h2><p>Prices could not be loaded. Try again shortly.</p></div> : (
+      {!index || !ready ? <Loading /> : feedFailed ? <div className="bd-empty" role="status"><h2>Outcome data is unavailable right now.</h2><p>Prices could not be loaded. Try again shortly.</p></div> : !followingOnly && !coins.length ? <div className="bd-empty" role="status"><h2>No prices on Derive right now.</h2><p>Derive's order books are empty, so no outcome can be priced. Outcomes return here once Derive quotes again.</p></div> : (
         <>
           {embedded && <p className="bd-count status" aria-live="polite">
             {scope}
