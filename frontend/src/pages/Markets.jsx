@@ -105,13 +105,15 @@ function MarketRow({ c, open, onToggle }) {
   return (
     <article className={`mk-market${open ? " open" : ""}`} aria-label={`${c.und} market`}>
       <div className="mk-row" onClick={(e) => { if (!e.target.closest("a,button")) onToggle(); }}>
-        <div className="mk-asset">
-          <Link className="asset-link" to={`/coin/${c.und}`}><Asset und={c.und} /></Link>
-          <span className="mk-price">${price(c.price)}<small className={c.chg_1d > 0 ? "up" : c.chg_1d < 0 ? "down" : "dim"}>{chg(c.chg_1d)}</small></span>
-        </div>
-        <div className="mk-trace">
-          <MarketTrace values={c.spark_1d?.slice(-30)} times={c.spark_times_1d?.slice(-30)} label={`${c.und} daily closes`} />
-        </div>
+        <Link className="mk-coin-link" to={`/coin/${c.und}`} aria-label={`Open ${c.und} chart and data`}>
+          <div className="mk-asset">
+            <Asset und={c.und} />
+            <span className="mk-price">${price(c.price)}<small className={c.chg_1d > 0 ? "up" : c.chg_1d < 0 ? "down" : "dim"}>{chg(c.chg_1d)}</small></span>
+          </div>
+          <div className="mk-trace">
+            <MarketTrace values={c.spark_1d?.slice(-30)} times={c.spark_times_1d?.slice(-30)} label={`${c.und} daily closes`} />
+          </div>
+        </Link>
         <div className="mk-windows">
           <div className="mk-mini-head" aria-hidden="true"><span />{LAYERS.map(([kind, name]) => <span key={kind}>{name}</span>)}</div>
           {WINDOWS.map(([h, name, tf]) => {
