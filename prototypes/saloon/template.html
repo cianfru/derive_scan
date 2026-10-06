@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Saloon — Cowboy design preview</title>
+  <style>/* PROTOTYPE_CSS */</style>
+</head>
+<body>
+  <a class="skip-link" href="#outcomes">Skip to outcomes</a>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="https://cowboy.trading" target="_blank" rel="noopener noreferrer" aria-label="Cowboy home"><img class="brand-light" src="{{LOGO_LIGHT}}" alt="Cowboy"><img class="brand-dark" src="{{LOGO_DARK}}" alt="Cowboy"></a>
+      <nav aria-label="Main"><a href="https://cowboy.trading/markets" target="_blank" rel="noopener noreferrer">Markets</a><a class="active" href="#outcomes" aria-current="page">Saloon</a><a href="https://cowboy.trading/traders" target="_blank" rel="noopener noreferrer">Traders</a></nav>
+      <button id="theme-toggle" class="icon-button theme-button" aria-label="Use dark theme" title="Change theme"></button>
+    </div>
+  </header>
+  <main class="page">
+    <div class="preview-notice"><span class="preview-mark">Design preview</span><span>Illustrative prices · No orders placed</span></div>
+    <section class="intro" aria-labelledby="page-title">
+      <div><h1 id="page-title">Saloon<span class="title-period">.</span></h1><p>Pick a price outcome. See what it could pay.</p></div>
+      <button class="text-button how-button" id="how-button">How payouts work <span class="info-symbol" aria-hidden="true">i</span></button>
+    </section>
+    <section class="board-tools" aria-label="Find an outcome">
+      <div class="tools-top">
+        <div class="coin-tabs" role="group" aria-label="Coin filter">
+          <button data-coin="all" class="tab active" aria-pressed="true">All coins</button><button data-coin="BTC" class="tab" aria-pressed="false">BTC</button><button data-coin="ETH" class="tab" aria-pressed="false">ETH</button><button data-coin="HYPE" class="tab" aria-pressed="false">HYPE</button><button data-coin="ZEC" class="tab" aria-pressed="false">ZEC</button>
+          <button id="following-tab" class="tab following-tab" aria-pressed="false">Following <span id="follow-count">0</span></button>
+        </div>
+        <label class="date-filter"><span class="sr-only">Settlement date</span><select id="date-filter"><option value="all">All dates</option><option value="20261008">Thu 8 Oct</option><option value="20261009">Fri 9 Oct</option></select></label>
+      </div>
+      <div class="tools-bottom">
+        <div class="comparison"><label for="compare-amount">Compare with</label><div class="amount-field"><span aria-hidden="true">$</span><input id="compare-amount" type="text" inputmode="decimal" value="100" maxlength="10" autocomplete="off" aria-describedby="amount-note amount-error"></div><div class="amount-presets" role="group" aria-label="Comparison amounts"><button data-amount="100" class="active" aria-pressed="true">$100</button><button data-amount="250" aria-pressed="false">$250</button><button data-amount="500" aria-pressed="false">$500</button></div><span id="amount-note" class="muted">Fees included</span></div>
+        <div class="result-meta"><span id="result-count">6 outcomes</span><span class="meta-separator">·</span><span>Settles at 08:00 UTC</span></div>
+      </div>
+      <p id="amount-error" class="field-error" aria-live="polite" hidden></p>
+    </section>
+    <section id="outcomes" class="outcome-grid" aria-label="Price outcomes"></section>
+    <p id="empty-state" class="empty-state" hidden></p>
+    <footer class="board-footer"><span>Maximum profit assumes a full payout at settlement.</span><button id="footer-how" class="text-button">Understand the payout <span aria-hidden="true">↗</span></button></footer>
+  </main>
+  <dialog id="trade-dialog" class="trade-dialog" aria-labelledby="trade-title">
+    <div class="drawer-head"><span id="drawer-mode">Your outcome</span><button class="icon-button close-dialog" aria-label="Close preview"></button></div>
+    <div id="trade-content"></div>
+  </dialog>
+  <dialog id="help-dialog" class="help-dialog" aria-labelledby="help-title">
+    <div class="drawer-head"><span>Payouts, simply</span><button class="icon-button close-help" aria-label="Close explanation"></button></div>
+    <div class="help-content"><h2 id="help-title">A price outcome, with a range.</h2><p>Choose Higher or Lower and a settlement date. The coin’s settlement price determines how much comes back.</p><div class="help-example"><div><strong>Outside the range</strong><p>One side pays in full. The other pays zero.</p></div><div><strong>Inside the range</strong><p>Both sides pay in part. The closer to your side’s full-payout price, the more comes back.</p></div></div><p><strong>Maximum profit</strong> is the full payout minus your cost, including fees. It is a best-case amount, not a promised return. Your cost is the most you can lose.</p><p class="muted">The cents quote is the price per $1 of maximum payout. It is not a probability. Settlement uses the 30-minute average ending at 08:00 UTC.</p><button id="help-done" class="primary-button">Got it</button></div>
+  </dialog>
+  <script>/* PROTOTYPE_JS */</script>
+</body>
+</html>
