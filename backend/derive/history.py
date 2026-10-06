@@ -453,6 +453,20 @@ def scan_days(root: Path, as_of: float | None = None, canon=None) -> dict:
             "cutoff": as_of, "members": members, "aliases": canon.digest}
 
 
+def expired_pnl(name: str, i: dict, settlements: dict[str, dict[str, float]], as_of: float) -> float | None:
+    """One wallet's gross PnL on one option that expired by as_of: premium received minus paid plus
+    contracts held at expiry x settlement value. None while it has not expired or its settlement
+    price is unknown. The rank (classify) and the trader's PnL history (traders.build) both use it."""
+    opt = parse_option(name)
+    if not opt or opt[1] > as_of:
+        return None
+    settle = settlements.get(opt[0], {}).get(name.split("-")[1])
+    if settle is None:
+        return None
+    payoff = max(settle - opt[2], 0.0) if opt[3] == "C" else max(opt[2] - settle, 0.0)
+    return i["cash"] + i["net"] * payoff
+
+
 def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float, held: dict | None = None,
              scan: dict | None = None) -> dict:
     """Each wallet's class from every day file, using information up to as_of only.
@@ -480,15 +494,11 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float,
                 held[(wallet, name)] = i["net"]
         a["instruments"] += 1
         a["both_instruments"] += 1 if i["both"] else 0
-        opt = parse_option(name)
-        if opt and opt[1] <= as_of:
-            settle = settlements.get(opt[0], {}).get(name.split("-")[1])
-            if settle is not None:
-                payoff = max(settle - opt[2], 0.0) if opt[3] == "C" else max(opt[2] - settle, 0.0)
-                pnl = i["cash"] + i["net"] * payoff
-                a["option_pnl"] += pnl
-                a["expired"] += 1
-                a["wins"] += 1 if pnl > 0 else 0
+        pnl = expired_pnl(name, i, settlements, as_of)
+        if pnl is not None:
+            a["option_pnl"] += pnl
+            a["expired"] += 1
+            a["wins"] += 1 if pnl > 0 else 0
     out = {}
     for wallet, a in w.items():
         if not a["legs"]:

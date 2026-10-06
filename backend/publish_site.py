@@ -747,7 +747,7 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
                 "positions": len(legs), "nearest_expiry": min(b["expiry"] for b in legs),
                 "legs": [{k: b[k] for k in ("instrument", "net", "strike", "type", "expiry", "delta_usd", "entry", "mark")}
                          for b in legs[:4]]})
-        summary = {k: v for k, v in t.items() if k not in ("open", "recent")}
+        summary = {k: v for k, v in t.items() if k not in ("open", "recent", "pnl_history")}
         summary.update({"open_count": len(book), "lean": _lean(book),
                         "upnl": round(sum(b["upnl"] for b in book if b["upnl"] is not None), 2)
                         if book and all(b["upnl"] is not None for b in book) else None})
@@ -755,7 +755,8 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
         large = [r for r in flow.get("large", []) if (r.get("wallet") or "").lower() == t["address"].lower()]
         valued = [b["valuation_at"] for b in book if b.get("valuation_at")]
         files[t["address"].lower()] = {**coverage, **summary, "valued_at": max(valued) if valued else None,
-                                       "book": book, "recent": t["recent"], "large_24h": large}
+                                       "book": book, "recent": t["recent"], "large_24h": large,
+                                       "pnl_history": t.get("pnl_history", [])}
     _publish_wallet_files(site, files, index, aliases)
     cohorts = {}
     order = {"pnl": [c[0] for c in traders_mod.PNL_COHORTS][::-1], "size": [c[0] for c in traders_mod.SIZE_COHORTS][::-1]}
