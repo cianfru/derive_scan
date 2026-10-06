@@ -27,12 +27,34 @@ const raw = [
   ['BTC', '20261009', 90000, 86000, 94000, .32, .73, 86207, ['Leaning up', 'Balanced', 'Upward tone']],
   ['ETH', '20261009', 2800, 2600, 3000, .36, .70, 2722, ['Base forming', 'Net long', 'Upward tone']],
 ];
-const rows = raw.map(([coin, expiry, k, lo, hi, yes, no, index, context]) => {
+const datesByCoin = {
+  BTC: ['20261008', '20261009', '20261010', '20261016', '20261023', '20261030', '20261106'],
+  ETH: ['20261008', '20261009', '20261016', '20261030'],
+  HYPE: ['20261008', '20261009', '20261016', '20261023', '20261030', '20261106'],
+  ZEC: ['20261008', '20261009', '20261016'],
+};
+const offsets = { BTC: [-2, -1, 0, 1, 2, 3, 4], ETH: [-3, -2, -1, 0, 1, 2, 3], HYPE: [-2, -1, 0, 1, 2, 3], ZEC: [-2, -1, 0, 1, 2, 3] };
+const spacing = { BTC: 2000, ETH: 100, HYPE: 5, ZEC: 100 };
+// More levels and dates expose the catalogue structure; these remain frozen illustrative prices.
+const catalogue = raw.slice(0, 4).flatMap(seed => {
+  const [coin, , center, lo, hi, higher, lower, index, context] = seed;
+  return datesByCoin[coin].flatMap((expiry, dateIndex) => {
+    const halfWidth = (hi - lo) / 2 * (dateIndex < 2 ? 1 : 1.5);
+    const allOffsets = dateIndex >= 2 ? [-4, -3, ...offsets[coin], 5] : offsets[coin];
+    return [...new Set(allOffsets)].map(offset => {
+      const k = center + offset * spacing[coin];
+      const yes = Math.min(.89, Math.max(.13, higher - offset * spacing[coin] / (halfWidth * 2) * .4 + dateIndex * .006));
+      const no = Math.min(.89, Math.max(.13, lower + higher - yes));
+      return [coin, expiry, k, k - halfWidth, k + halfWidth, yes, no, index, context];
+    });
+  });
+});
+const rows = catalogue.map(([coin, expiry, k, lo, hi, yes, no, index, context]) => {
   const width = hi - lo;
   const side = (price, kind) => ({ buy: price, state: 'open', size: 20000, form: 'debit', legs: [[`${coin}-${expiry}-${kind}-A`, 'buy', width * (price + .12)], [`${coin}-${expiry}-${kind}-B`, 'sell', width * .12]] });
   return { id: `${coin}-${expiry}-${k}`, coin, expiry, context, board: { index, spec: specs[coin] }, level: { k, lo, hi, state: 'open', yes: side(yes, 'C'), no: side(no, 'P') } };
 });
-const state = { coin: 'all', expiry: 'all', following: false, follows: new Set(), context: new Set(), budget: 100, selected: null, side: 'yes', ticketBudget: 100, ticketDraft: '100', settle: null, review: false };
+const state = { coin: 'all', expiry: 'all', dates: Object.fromEntries(Object.entries(datesByCoin).map(([coin, dates]) => [coin, dates[0]])), expanded: new Set(), following: false, follows: new Set(), context: new Set(), budget: 100, selected: null, side: 'yes', ticketBudget: 100, ticketDraft: '100', settle: null, review: false };
 const $ = (selector) => document.querySelector(selector);
 const tradeDialog = $('#trade-dialog');
 const helpDialog = $('#help-dialog');
@@ -66,25 +88,45 @@ function sideTile(row, side) {
   const unavailable = state.budget == null ? 'Set an amount' : `From ${minimumAmount(t)}`;
   return `<button class="answer ${side}" data-id="${row.id}" data-side="${side}" ${valid ? '' : 'disabled'} aria-label="${row.coin} ${label} than ${money(row.level.k)} on ${dayLabel(row.expiry)}${valid ? `, maximum profit ${dollars(t.payout - t.mostLose)}, ${condition(row, side)}` : `, ${unavailable}`}" aria-haspopup="dialog">
     <span class="answer-label"><span><span class="direction" aria-hidden="true">${direction}</span> ${label}</span><span class="quote" title="Price per $1 of maximum payout">${centsUp(row.level[side].buy)}c</span></span>
-    ${valid ? `<span class="profit-label">Maximum profit</span><span class="max-profit" style="--digits:${signed(t.payout - t.mostLose).length}">${signed(t.payout - t.mostLose)}</span><span class="return-row"><span>+${percent(t)} return</span><span class="open-arrow">${icons.next}</span></span><span class="actual-cost">On ${dollars(t.mostLose)} cost, incl. fees</span>` : `<span class="profit-label">Amount needed</span><span class="minimum-profit">${unavailable}</span><span class="answer-unavailable-note">Fees included</span>`}
-    <span class="full-threshold">${condition(row, side)}</span>
+    ${valid ? `<span class="profit-label">Maximum profit</span><span class="max-profit" style="--digits:${signed(t.payout - t.mostLose).length}">${signed(t.payout - t.mostLose)}</span><span class="return-row"><span>+${percent(t)} return</span><span class="open-arrow">${icons.next}</span></span><span class="actual-cost">Cost ${dollars(t.mostLose)}</span>` : `<span class="profit-label">Amount needed</span><span class="minimum-profit">${unavailable}</span><span class="answer-unavailable-note">Fees included</span>`}
+    <span class="full-threshold">${side === 'yes' ? `Full from ${money(row.level.hi)}` : `Full at/below ${money(row.level.lo)}`}</span>
   </button>`;
 }
+function renderLevel(row) {
+  const followed = state.follows.has(row.id);
+  return `<div class="price-row" data-level-id="${row.id}" aria-label="${row.coin}, ${dayLabel(row.expiry)}, higher or lower than ${money(row.level.k)}">
+    <div class="price-level"><div class="level-title"><h3>${money(row.level.k)}</h3><button class="follow-button level-follow" data-follow="${row.id}" aria-pressed="${followed}" aria-label="${followed ? 'Unfollow' : 'Follow'} ${row.coin} ${money(row.level.k)} on ${dayLabel(row.expiry)}">${icons.bookmark}</button></div><div class="level-zone"><span>Partial payout</span><span>${money(row.level.lo)}–<wbr>${money(row.level.hi)}</span></div></div>
+    ${sideTile(row, 'yes')}${sideTile(row, 'no')}
+  </div>`;
+}
+function renderCoin(coin) {
+  const all = rows.filter(row => row.coin === coin), first = all[0], expiry = state.expiry === 'all' || state.following ? state.dates[coin] : state.expiry;
+  const dateRows = all.filter(row => row.expiry === expiry).sort((a, b) => a.level.k - b.level.k);
+  const key = `${coin}-${expiry}`, expanded = state.expanded.has(key), contextOpen = state.context.has(coin);
+  const nearby = [...dateRows].sort((a, b) => Math.abs(a.level.k - first.board.index) - Math.abs(b.level.k - first.board.index)).slice(0, 3).sort((a, b) => a.level.k - b.level.k);
+  const visible = expanded ? dateRows : nearby;
+  const saved = all.filter(row => state.follows.has(row.id));
+  const shown = state.following ? saved : visible;
+  const dateGroups = state.following ? [...new Set(saved.map(row => row.expiry))].map(date => `<div class="followed-date">${dayLabel(date)} · 08:00 UTC</div>${saved.filter(row => row.expiry === date).sort((a, b) => a.level.k - b.level.k).map(renderLevel).join('')}`).join('') : shown.map(renderLevel).join('');
+  return `<article class="outcome-card coin-card" data-panel-coin="${coin}" aria-labelledby="coin-title-${coin}">
+    <div class="coin-head"><div class="asset"><img src="${ASSETS[coin]}" alt=""><div><h2 id="coin-title-${coin}" class="asset-name">${names[coin]}</h2><div class="asset-code">${coin} <span aria-hidden="true">·</span> ${money(first.board.index)} now</div></div></div><span class="catalogue-size">${all.length} levels<br>${datesByCoin[coin].length} dates</span></div>
+    ${state.following ? `<div class="coin-date-bar"><span>${saved.length} followed price level${saved.length === 1 ? '' : 's'}</span><span>All saved dates</span></div>` : `<div class="coin-date-bar"><label for="coin-date-${coin}">Settlement</label><select id="coin-date-${coin}" data-coin-date="${coin}" aria-label="${coin} settlement date">${datesByCoin[coin].map(date => `<option value="${date}" ${date === expiry ? 'selected' : ''}>${dayLabel(date)} · 08:00 UTC</option>`).join('')}</select></div><div class="ladder-note"><span>${expanded ? `All ${dateRows.length} price levels` : `Near current price · ${visible.length} of ${dateRows.length} levels`}</span><button data-help aria-label="How these price outcomes pay" aria-haspopup="dialog"><span class="info-symbol" aria-hidden="true">i</span></button></div>`}
+    <div class="ladder-head"><span>Higher or lower than</span><span>Maximum profit · fees included</span></div><div class="price-ladder">${dateGroups}</div>
+    ${state.following || dateRows.length <= 3 ? '' : `<div class="ladder-expand"><button data-expand="${key}" data-coin-expand="${coin}" aria-expanded="${expanded}" aria-label="${expanded ? 'Show fewer' : `View all ${dateRows.length}`} ${coin} price levels for ${dayLabel(expiry)}">${expanded ? 'Show fewer levels' : `View all ${dateRows.length} price levels`} ${icons.chevron}</button></div>`}
+    <div class="card-footer coin-footer"><span>${state.following ? 'Followed levels stay here across dates' : `${dayLabel(expiry)} · 08:00 UTC`}</span><button class="context-details text-button" data-context="${coin}" aria-expanded="${contextOpen}" aria-controls="context-${coin}">Market context ${icons.chevron}</button></div>
+    <div id="context-${coin}" class="context-panel" ${contextOpen ? '' : 'hidden'}><div class="context-grid">${first.context.map((reading, i) => `<div class="context-reading"><span>${['Regime', 'Wallets', 'Options'][i]}</span><span class="${reading === 'Balanced' ? '' : 'up'}">${reading}</span></div>`).join('')}</div><div class="context-bottom"><span>Illustrative context · Not advice</span><a href="https://cowboy.trading/coin/${coin}" target="_blank" rel="noopener noreferrer">Explore ${coin} ${icons.higher}</a></div></div>
+  </article>`;
+}
 function renderCards() {
-  const filtered = rows.filter(row => (state.coin === 'all' || row.coin === state.coin) && (state.expiry === 'all' || row.expiry === state.expiry) && (!state.following || state.follows.has(row.id)));
-  $('#result-count').textContent = `${filtered.length} outcome${filtered.length === 1 ? '' : 's'}`;
-  $('#outcomes').innerHTML = filtered.map(row => {
-    const followed = state.follows.has(row.id), expanded = state.context.has(row.id);
-    return `<article class="outcome-card" aria-labelledby="question-${row.id}">
-      <div class="card-content"><div class="card-head"><div class="asset"><img src="${ASSETS[row.coin]}" alt=""><div><div class="asset-name">${names[row.coin]}</div><div class="asset-code">${row.coin} <span aria-hidden="true">·</span> ${money(row.board.index)} now</div></div></div><div class="settlement"><strong>${dayLabel(row.expiry)}</strong><br>08:00 UTC</div></div>
-      <h2 id="question-${row.id}" class="card-question">Higher or lower than <span class="level">${money(row.level.k)}?</span></h2>
-      <div class="range-row"><span>Partial payout: ${money(row.level.lo)}–${money(row.level.hi)}</span><button class="info-button" data-help aria-label="How partial payouts work" aria-haspopup="dialog"><span class="info-symbol" aria-hidden="true">i</span></button></div><div class="side-grid">${sideTile(row, 'yes')}${sideTile(row, 'no')}</div></div>
-      <div class="card-footer"><button class="follow-button" data-follow="${row.id}" aria-pressed="${followed}" aria-label="${followed ? 'Unfollow' : 'Follow'} ${row.coin} ${money(row.level.k)} on ${dayLabel(row.expiry)}">${icons.bookmark}<span>${followed ? 'Following' : 'Follow'}</span></button><button class="context-details text-button" data-context="${row.id}" aria-expanded="${expanded}" aria-controls="context-${row.id}">Market context ${icons.chevron}</button></div>
-      <div id="context-${row.id}" class="context-panel" ${expanded ? '' : 'hidden'}><div class="context-grid">${row.context.map((reading, i) => `<div class="context-reading"><span>${['Regime', 'Wallets', 'Options'][i]}</span><span class="${reading === 'Balanced' ? '' : 'up'}">${reading}</span></div>`).join('')}</div><div class="context-bottom"><span>Illustrative context · Not advice</span><a href="https://cowboy.trading/coin/${row.coin}" target="_blank" rel="noopener noreferrer">Explore ${row.coin} ${icons.higher}</a></div></div>
-    </article>`;
-  }).join('');
-  $('#empty-state').hidden = filtered.length > 0;
-  $('#empty-state').textContent = state.following ? 'Nothing here yet. Follow an outcome to keep it in view.' : 'No outcomes for this date and coin. Choose another filter.';
+  const coins = Object.keys(names).filter(coin => (state.coin === 'all' || coin === state.coin) && (state.following ? rows.some(row => row.coin === coin && state.follows.has(row.id)) : state.expiry === 'all' || datesByCoin[coin].includes(state.expiry)));
+  $('#outcomes').classList.toggle('focused', state.coin !== 'all' || coins.length === 1);
+  $('#outcomes').innerHTML = coins.map(renderCoin).join('');
+  const shown = $('#outcomes').querySelectorAll('.price-row').length;
+  $('#result-count').textContent = state.following ? `${shown} followed price levels` : `${coins.length} coins · ${shown} levels shown`;
+  $('#date-filter').disabled = state.following;
+  $('#date-filter').closest('.date-filter').hidden = state.following;
+  $('#empty-state').hidden = coins.length > 0;
+  $('#empty-state').textContent = state.following ? 'Nothing here yet. Follow a price level to keep it in view across settlement dates.' : 'No price levels for this date and coin. Choose another filter.';
   $('#follow-count').textContent = String(state.follows.size);
   document.querySelectorAll('[data-coin]').forEach(button => {
     const active = !state.following && button.dataset.coin === state.coin;
@@ -175,11 +217,26 @@ $('#outcomes').addEventListener('click', event => {
     const id = context.dataset.context; state.context.has(id) ? state.context.delete(id) : state.context.add(id);
     const expanded = state.context.has(id); context.setAttribute('aria-expanded', String(expanded)); $(`#context-${id}`).hidden = !expanded; return;
   }
+  const expand = event.target.closest('[data-expand]');
+  if (expand) {
+    const key = expand.dataset.expand, wasExpanded = state.expanded.has(key); wasExpanded ? state.expanded.delete(key) : state.expanded.add(key); renderCards();
+    $(`[data-expand="${key}"]`).focus({ preventScroll: !wasExpanded }); return;
+  }
   if (event.target.closest('[data-help]')) help();
+});
+$('#outcomes').addEventListener('change', event => {
+  const select = event.target.closest('[data-coin-date]');
+  if (!select) return;
+  const coin = select.dataset.coinDate; state.dates[coin] = select.value; state.expiry = 'all'; $('#date-filter').value = 'all'; renderCards();
+  $(`[data-coin-date="${coin}"]`).focus();
 });
 document.querySelectorAll('[data-coin]').forEach(button => button.addEventListener('click', () => { state.coin = button.dataset.coin; state.following = false; renderCards(); }));
 $('#following-tab').addEventListener('click', () => { state.following = !state.following; state.coin = 'all'; renderCards(); });
-$('#date-filter').addEventListener('change', event => { state.expiry = event.target.value; renderCards(); });
+$('#date-filter').addEventListener('change', event => {
+  state.expiry = event.target.value;
+  if (state.expiry !== 'all') Object.keys(names).forEach(coin => { if (datesByCoin[coin].includes(state.expiry)) state.dates[coin] = state.expiry; });
+  renderCards();
+});
 $('#compare-amount').addEventListener('input', event => {
   state.budget = readAmount(event.target.value); setAmountError(event.target, $('#amount-error'), state.budget == null); setPresetStates($('.comparison'), state.budget); renderCards();
 });
@@ -226,5 +283,6 @@ function theme(dark) {
 }
 $('#theme-toggle').addEventListener('click', () => theme(document.documentElement.dataset.theme !== 'dark'));
 $('#footer-how').innerHTML = `Understand the payout ${icons.higher}`;
+$('#date-filter').innerHTML = `<option value="all">Per coin</option>${[...new Set(Object.values(datesByCoin).flat())].sort().map(date => `<option value="${date}">${dayLabel(date)}</option>`).join('')}`;
 theme(false);
 renderCards();
