@@ -7,7 +7,7 @@ import { DASH, REGIME, SIGNAL_LABEL, title, dayTime } from "../lib/format.js";
 import { SIGNAL_HELP } from "../lib/explain.js";
 import { STATUS_NAMES, STATUS_WHY } from "../lib/presentation.js";
 import {
-  REGIME_COLORS, REGIME_SHORT, REGIME_LINE, REGIME_INFO, Z_INFO, HEAT_INFO, BAND_INFO, RIBBON_INFO, CHECKS_INFO,
+  REGIME_COLORS, REGIME_SHORT, REGIME_LINE, REGIME_INFO, Z_INFO, HEAT_INFO, BAND_INFO, AVERAGE_INFO, RIBBON_INFO, CHECKS_INFO,
   RIBBON_STATE, HEAT_PHASE, regimeTerm, checks, bandGate, against, whyLine, lastRun, fmtZ,
 } from "../lib/regime.js";
 
@@ -48,8 +48,15 @@ function regimeRun(history, regime) {
   return start === first ? `${n}d+` : `since ${md(rows[start].ts - DAY)} · ${n}d`;
 }
 
+/** Which side of the weekly band the daily close is on, in plain words: "Above its long-term average since 19 Aug · 48d". */
+export function bandLine(band) {
+  if (!band || !["above", "below"].includes(band.side) || !Number.isFinite(band.since) || !Number.isFinite(band.days)) return null;
+  const side = band.side === "above" ? "Above" : "Below";
+  return band.open ? `${side} its long-term average · ${band.days}d+` : `${side} its long-term average since ${md(band.since)} · ${band.days}d`;
+}
+
 /** current: the 1D engine reading is fresh; status: its published status when it is not (e.g. "ready" but expired, "unavailable"). */
-export function RegimeHeader({ row, row4, history, current = true, current4 = true, status = null }) {
+export function RegimeHeader({ row, row4, history, band = null, current = true, current4 = true, status = null }) {
   if (!row) return null;
   const early = warming(row);
   const four = row4 && current4 && !warming(row4);
@@ -60,6 +67,7 @@ export function RegimeHeader({ row, row4, history, current = true, current4 = tr
     title: `${md(open)} · ${r?.regime ? REGIME[r.regime] || title(r.regime) : "No reading"}`,
   }));
   const run = early ? null : regimeRun(history, row.regime);
+  const avg = early ? null : bandLine(band);
   const bars = Math.min(FULL_HISTORY, row.history_bars || 0);
   const list = checks(row, null);
   // While warming up the regime cell already carries the bar count, so the signal cell needs no reason line.
@@ -87,6 +95,7 @@ export function RegimeHeader({ row, row4, history, current = true, current4 = tr
                 {run && <span className="rh-since mono">{run}</span>}
               </div>
             )}
+            {avg && <span className="rh-avg">{avg} <Info label="About the long-term average">{AVERAGE_INFO}</Info></span>}
           </>
         )}
       </div>

@@ -66,6 +66,9 @@ export const HEAT_INFO =
 export const BAND_INFO =
   "The weekly band is the average of the 21-week exponential and 20-week simple averages of weekly closes. " +
   "Up-setups need the daily close above it; below it the engine checks only down-setups.";
+export const AVERAGE_INFO =
+  "The long-term average is the weekly band: the average of the 21-week exponential and 20-week simple averages of weekly closes. " +
+  "Up-setups need the daily close above it. The regime comes from the z-score instead, so it can change before price crosses this average.";
 export const RIBBON_INFO =
   "Four moving averages of the daily close: 32, 35, 50 and 58 days. Gold: stacked upward, shortest on top. Blue: stacked downward. " +
   "Grey: mixed. On the chart, the 32- and 58-day lines take each day's colour. Shown for reference; the signal does not use it.";

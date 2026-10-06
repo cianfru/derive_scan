@@ -160,7 +160,7 @@ export default function Coin() {
       <SaloonCta und={und} live={data.questions === true} />
 
       <Step id="regime" n={1} kind="engine" title="Regime">
-        <RegimeHeader row={row} row4={row4} history={data.history} current={engineReady} current4={fourReady}
+        <RegimeHeader row={row} row4={row4} history={data.history} band={data.band} current={engineReady} current4={fourReady}
           status={data.engine_comparison?.["1d"]?.status} />
         <Plate className="price-stage" id="price-chart" title={`${und} · 1D`} info={chartInfo(data.options, data.backfilled?.[tf])}
           right={<ChartLegend opts={data.options} />}>

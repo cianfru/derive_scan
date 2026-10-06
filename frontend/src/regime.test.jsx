@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import * as regime from "./lib/regime.js";
 import { SIGNAL_HELP, REGIME_HELP } from "./lib/explain.js";
-import { RegimeHeader, Readings, Checks, ribbonView } from "./components/RegimePanel.jsx";
+import { RegimeHeader, Readings, Checks, ribbonView, bandLine } from "./components/RegimePanel.jsx";
 import { stackTags } from "./components/CandleChart.jsx";
 
 afterEach(cleanup);
@@ -139,6 +139,12 @@ describe("panel", () => {
     expect(screen.getByText("Cooling off")).toBeTruthy();
     expect(document.querySelectorAll(".rh-regime .day-strip i")).toHaveLength(90);
     expect(document.querySelector(".rh-regime .day-strip i:last-child").title).toBe("2 Oct · Trending up");
+  });
+  it("says since when price is on its side of the long-term average", () => {
+    render(<RegimeHeader row={BTC} row4={null} history={history} band={{ side: "above", since: Date.UTC(2026, 7, 19) / 1000, days: 48, open: false }} />);
+    expect(screen.getByText(/Above its long-term average since 19 Aug · 48d/)).toBeTruthy();
+    expect(bandLine({ side: "below", since: 0, days: 400, open: true })).toBe("Below its long-term average · 400d+");
+    expect(bandLine(null)).toBe(null);
   });
   it("marks a reading that is no longer current", () => {
     render(<RegimeHeader row={{ ...BTC, signal_bar_close_time: END }} row4={null} history={history} current={false} status="ready" />);
