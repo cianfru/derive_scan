@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import { Info, Loading, Failed, Tabs } from "../components/ui.jsx";
+import { Info, Loading, Failed, Tabs, Arrow } from "../components/ui.jsx";
 import { Asset, CoinIcon } from "../components/MarketVisuals.jsx";
 import { ASSET_NAMES } from "../lib/presentation.js";
-import Chain from "../components/Chain.jsx";
+import { LAYERS, LayerTile } from "../components/Chain.jsx";
 import QuestionLadder from "../components/QuestionLadder.jsx";
 import PayZone from "../components/PayZone.jsx";
 import QuestionChart from "../components/QuestionChart.jsx";
@@ -22,6 +22,7 @@ import {
 } from "../lib/questions.js";
 import "../questions.css";
 import "../marketplace-detail.css";
+import "../saloon-guided.css";
 
 const clock = (t) => `${new Date(t * 1000).toISOString().slice(11, 16)} UTC`;
 const QUICK = [25, 100, 500];
@@ -90,9 +91,13 @@ function Context({ und, days }) {
       </h2>
       <Link className="md-coin-cta" to={`/coin/${und}#regime`}>
         <CoinIcon und={und} />
-        <span className="md-coin-cta-text"><b>Open {und}</b><small>{ASSET_NAMES[und] || und}: chart, regime, wallets and options</small></span>
-        <span className="md-coin-cta-chain">{row?.align ? <Chain alignment={row.align} horizon={h} linked={false} compact /> : <span className="status">Unavailable</span>}</span>
-        <span className="md-coin-cta-go" aria-hidden="true">→</span>
+        <span className="md-coin-cta-text"><b>Open {und}</b><small>{ASSET_NAMES[und] || und} · chart and data</small></span>
+        <span className="md-coin-cta-readings">{LAYERS.map(([kind, name]) => (
+          <span key={kind} className="md-context-reading"><small>{name}</small>
+            <LayerTile alignment={row?.align} horizon={h} kind={kind} icon={false} />
+          </span>
+        ))}</span>
+        <span className="md-coin-cta-go" aria-hidden="true"><Arrow /></span>
       </Link>
     </section>
   );
@@ -120,7 +125,7 @@ function SettledView({ und, level, price, paid, expiry }) {
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
 
 /** The phone ticket sheet is a dialog: focus moves into it on open, Tab stays inside, Escape closes
- * it, and focus returns to the button that opened it. Wide screens show the ticket as a column. */
+ * it, and focus returns to the button that opened it. Wide screens keep the ticket in the page. */
 export function useSheetFocus(open, sheetRef, openerRef, close) {
   useEffect(() => {
     const el = sheetRef.current;
@@ -173,23 +178,6 @@ function ActionBar({ und, level, sideKey, date, t, label, onGo, disabled, hidden
       </span>
       <button ref={goRef} className="btn primary lg q-get" onClick={onGo} disabled={disabled}>{label}</button>
     </div>
-  );
-}
-
-/** Wide screens, before the ticket: what is picked so far. */
-function Summary({ und, level, sideKey, date, t }) {
-  return (
-    <section className="q-summary" aria-label="Your trade">
-      <h3 className="label">Your trade</h3>
-      {sideKey ? (
-        <dl className="q-money">
-          <div><dt>Answer</dt><dd>{ANSWER[sideKey]} · {money(level.k)}</dd></div>
-          <div><dt>Pays in full</dt><dd>{fullPay(level, sideKey).replace("full $1 ", "")}</dd></div>
-          <div><dt>Settles</dt><dd className="mono">{dayLabel(date.expiry)}, 08:00 UTC</dd></div>
-          {t && <div className="q-lose"><dt>Most you can lose</dt><dd className="mono">{money(t.mostLose, { cents: true })}</dd></div>}
-        </dl>
-      ) : <p className="status">Pick Higher or Lower on {und} to see what you pay and what it pays.</p>}
-    </section>
   );
 }
 
@@ -428,7 +416,7 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
             <QuestionTicket und={und} question={question} answer={ANSWER[sideKey]} level={level} sideKey={sideKey} t={t} board={board}
               pricesTs={board.prices_ts} settleTs={date.settle_ts} expiry={date.expiry} stale={age.state === "stale"} />
           </div>
-        ) : !settling && <Summary und={und} level={level} sideKey={sideKey} date={date} t={t} />}
+        ) : null}
       </aside>
     </div>
   );
@@ -528,7 +516,7 @@ export default function Questions() {
   );
   const ladderEl = renderLadder();
   return (
-    <div className={`wrap page q-page${id ? " md-page" : ""}`}>
+    <div className={`wrap page q-page${id ? " md-page" : " q-guided"}`}>
       {!id && <SaloonHead view="guided" />}
       {found && !found.settled ? (
         id ? <OutcomeDetail key={found.level.id} und={und} board={board} found={found} sideKey={sideKey} setSide={setSide} age={age} theme={theme}

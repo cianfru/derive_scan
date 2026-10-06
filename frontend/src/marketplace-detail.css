@@ -31,10 +31,6 @@
 .md-boundaries span { font-size: 12px; color: var(--text-3); }
 .md-boundaries b { font-size: 14px; font-weight: 500; }
 .md-evidence .q-context { gap: 12px; }
-.md-evidence .q-context .chain { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.md-evidence .q-context .chain-tile { padding: 12px; gap: 9px; }
-.md-evidence .q-context .chain-icon, .md-evidence .q-context .step-n { display: none; }
-.md-evidence .q-context .chain-text b { font-size: 13px; }
 .md-other { padding-top: 20px; border-top: 1px solid var(--border); display: grid; gap: 15px; }
 .md-other .q-other { justify-self: start; }
 .md-selection { grid-area: selection; position: sticky; top: 104px; min-width: 0; }
@@ -131,28 +127,30 @@
   .md-detail .q-chart-head .tabs button[aria-selected="true"] { border-bottom-color: transparent; background: linear-gradient(var(--accent), var(--accent)) no-repeat 50% 100% / calc(100% - 20px) 2px; }
 }
 
-/* Context, not advice: a large card into the coin's page, its three layers inside. */
+/* The coin's research in the same plain readings used on Markets. */
 .q-context.md-context { display: grid; gap: 12px; }
 .md-context-title { display: inline-flex; align-items: center; margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
-.md-coin-cta { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.6fr) auto; align-items: center; gap: 14px 18px; padding: 16px 20px;
-  border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--elev-fill); box-shadow: var(--elev-1); color: var(--text-1); text-decoration: none;
-  transition: border-color 160ms var(--ease), box-shadow 160ms var(--ease), transform 160ms var(--ease); }
-.md-coin-cta:hover, .md-coin-cta:focus-visible { border-color: var(--accent); box-shadow: var(--elev-2); transform: translateY(var(--elev-lift, -2px)); }
+.md-coin-cta { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.6fr) auto; align-items: center; gap: 16px; padding: 20px;
+  border: 1px solid var(--seam); border-radius: 13px; background: var(--surface-1); color: var(--text-1); text-decoration: none;
+  transition: background 160ms var(--ease), border-color 160ms var(--ease); }
+.md-coin-cta:hover, .md-coin-cta:focus-visible { border-color: var(--accent-text); background: color-mix(in srgb, var(--surface-2) 60%, var(--surface-1)); }
 .md-coin-cta:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-.md-coin-cta .asset-icon { width: 36px; height: 36px; }
-.md-coin-cta-text { display: grid; gap: 3px; min-width: 0; }
-.md-coin-cta-text b { font: 650 18px/1.2 var(--font-sans); letter-spacing: -.01em; }
-.md-coin-cta-text small { font-size: 13px; color: var(--text-2); }
-.md-coin-cta-chain { min-width: 0; }
-.md-coin-cta .chain { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.md-coin-cta .chain-tile { padding: 10px 12px; gap: 6px; }
-.md-coin-cta .chain-icon, .md-coin-cta .step-n { display: none; }
-.md-coin-cta .chain-text b { font-size: 13px; }
-.md-coin-cta-go { font-size: 22px; color: var(--accent-text); }
+.md-coin-cta .asset-icon { width: 32px; height: 32px; }
+.md-coin-cta-text { display: grid; gap: 5px; min-width: 0; }
+.md-coin-cta-text b { font: 600 16px/1.3 var(--font-display); }
+.md-coin-cta-text small { font-size: 12px; color: var(--muted); }
+.md-coin-cta-readings { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; min-width: 0; }
+.md-context-reading { display: grid; gap: 5px; align-content: start; min-width: 0; }
+.md-context-reading > small { font: 400 12px/1.3 var(--font-body); color: var(--muted); }
+.md-coin-cta .layer-tile { min-height: 0; padding: 0; border: 0; border-radius: 0; background: none; gap: 0; }
+.md-coin-cta .layer-tile .lt-text b { font: 600 13px/1.35 var(--font-body); white-space: normal; }
+.md-coin-cta .layer-tile.neutral .lt-text b { color: var(--fg-2); }
+.md-coin-cta .layer-tile.unknown .lt-text b { color: var(--muted); font-weight: 400; }
+.md-coin-cta .layer-tile[data-tip]:hover .lt-text b { text-decoration: underline dotted; text-underline-offset: 3px; }
+.md-coin-cta-go { display: flex; color: var(--accent-text); }
 @media (max-width: 760px) {
-  .md-coin-cta { grid-template-columns: auto minmax(0, 1fr) auto; padding: 14px 16px; }
-  .md-coin-cta-chain { grid-column: 1 / -1; grid-row: 2; }
-  .md-evidence .md-coin-cta .chain, .md-coin-cta .chain { grid-template-columns: 1fr; }
-  .md-evidence .md-coin-cta .chain-text, .md-coin-cta .chain-text { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .md-coin-cta { grid-template-columns: auto minmax(0, 1fr) auto; padding: 16px; }
+  .md-coin-cta-readings { grid-column: 1 / -1; grid-row: 2; border-top: 1px solid var(--seam); padding-top: 14px; }
+  .md-coin-cta .layer-tile { position: static; }
 }
-@media (prefers-reduced-motion: reduce) { .md-coin-cta { transition: none; } .md-coin-cta:hover, .md-coin-cta:focus-visible { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .md-coin-cta { transition: none; } }

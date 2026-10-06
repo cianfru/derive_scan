@@ -1,0 +1,59 @@
+/* One centered width for the guided coin, choice, amount and research sections. */
+.q-guided { max-width: 1040px; gap: 28px; }
+.q-guided .q-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+.q-guided .q-flow { max-width: none; gap: 28px; }
+.q-guided .q-aside { position: static; }
+.q-guided .q-aside:empty { display: none; }
+.q-guided .q-step-head { font: 500 13px/1.4 var(--font-body); color: var(--muted); }
+.q-guided .q-step-n { border: 0; width: auto; height: auto; color: var(--faint); }
+.q-guided .q-step-coin, .q-guided .q-step-date { padding-bottom: 20px; border-bottom: 1px solid var(--seam); }
+.q-guided .q-title { font: 600 clamp(22px, 2.6vw, 30px)/1.3 var(--font-display); letter-spacing: -.025em; }
+.q-guided .q-settles { flex-wrap: wrap; line-height: 1.6; }
+.q-guided .q-pick, .q-guided .q-amount, .q-guided .q-actbar { max-width: none; }
+.q-guided .q-pick { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.q-guided .q-pick-btn { min-height: 100px; padding: 18px 20px; border-radius: 13px; }
+.q-guided .q-pick-btn b { font-size: 24px; }
+.q-guided .q-amount, .q-guided .q-actbar { padding: 20px; border-radius: 13px; }
+.q-guided .q-amount-in { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 16px; }
+.q-guided .q-amount-in > label { display: inline-flex; align-items: center; font: 400 14px/1.5 var(--font-body); letter-spacing: 0; text-transform: none; }
+.q-guided .q-dollar-field { height: 48px; }
+.q-guided .q-quick { gap: 16px; }
+.q-guided .q-quick button { min-height: 44px; }
+.q-guided .q-preview .op { gap: 24px; }
+.q-guided .op-figs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 24px; }
+.q-guided .op-figs > div { display: grid; gap: 6px; align-content: start; }
+.q-guided .op-figs dd { text-align: left; font-size: 18px; }
+.q-guided .op-figs .op-total { grid-column: 1 / -1; padding-bottom: 18px; }
+.q-guided .op-figs .op-total dd { font-size: 28px; }
+.q-guided .op-sim, .q-guided .payzone-fig, .q-guided .op-ex { max-width: none; }
+.q-guided .op-range { max-width: none; }
+.q-guided .q-history { border-block: 1px solid var(--seam); padding-block: 6px; }
+.q-guided .q-small { margin: 0; }
+@media (max-width: 1279px) {
+  .q-guided .q-actbar { left: calc(max(0px, (100% - 1040px) / 2) + clamp(16px, 3vw, 40px)); right: calc(max(0px, (100% - 1040px) / 2) + clamp(16px, 3vw, 40px)); padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-width: 1px; border-radius: 13px 13px 0 0; box-shadow: none; }
+  .q-guided .q-layout.has-bar { padding-bottom: 96px; }
+}
+@media (max-width: 640px) {
+  .q-guided { gap: 16px; }
+  .q-guided .q-head-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
+  .q-guided .saloon-heading { display: contents; }
+  .q-guided .saloon-heading > p { grid-column: 1 / -1; grid-row: 2; margin: 0; max-width: none; }
+  .q-guided .saloon-view-link { grid-column: 2; grid-row: 1; font-size: 12px; }
+  .q-guided .q-flow { gap: 16px; }
+  .q-guided .q-step { gap: 8px; }
+  .q-guided .q-step-coin, .q-guided .q-step-date { padding-bottom: 10px; }
+  .q-guided .q-title { font-size: 20px; }
+  .q-guided .q-pick { gap: 10px; }
+  .q-guided .q-pick-btn { min-height: 88px; padding: 12px; gap: 8px 6px; }
+  .q-guided .q-pick-zone { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .q-guided .q-pick-btn b { font-size: 22px; }
+  .q-guided .q-amount { padding: 16px; }
+  .q-guided .q-amount-in { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  .q-guided .q-amount-in > label { grid-column: 1 / -1; }
+  .q-guided .q-dollar-field { min-width: 0; }
+  .q-guided .q-dollar-field input { width: 100%; min-width: 0; }
+  .q-guided .q-quick { gap: 12px; }
+  .q-guided .q-actbar { padding-inline: 16px; gap: 10px; }
+  .q-guided .q-actbar-sum small { white-space: normal; }
+  .q-guided .q-actbar .btn { padding-inline: 12px; font-size: 13px; }
+}
