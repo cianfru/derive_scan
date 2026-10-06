@@ -201,15 +201,9 @@ Measured on 1 October 2026: one snapshot of BTC and ETH from V2 mainnet takes ~1
 
 ## Switching to V3
 
-Prepared, not switched: production reads V2 mainnet (`api.lyra.finance`) until the change below is merged. Every job was run once against V3 mainnet (`api.derive.xyz/v3`) on 5 October 2026 on a copy of the data branch.
+Switched on 6 October 2026 at 18:47 UTC, once Derive's migration had emptied V2 (no options listed) and V3 carried the open interest over. The feed (`cianfru/cowboy-feed`, `feed.yml`) reads `DERIVE_SNAPSHOT_SOURCES: ${{ vars.DERIVE_SNAPSHOT_SOURCES || 'v3_mainnet' }}`: unset means V3 mainnet; setting the repository variable there overrides it. Every job reads the first listed source: recorder, questions, flow, history, signals. `record.yml` here is off (`RECORDER_OFF=1`). Every job had been run once against V3 mainnet on 5 October 2026 on a copy of the data branch.
 
-The change, in `.github/workflows/record.yml`, job `record`, `env:` (one line):
-
-```yaml
-      DERIVE_SNAPSHOT_SOURCES: v3_mainnet
-```
-
-or `DERIVE_SNAPSHOT_SOURCES: ${{ vars.DERIVE_SNAPSHOT_SOURCES }}` once, then set the repository variable `DERIVE_SNAPSHOT_SOURCES` to `v3_mainnet` (unset or empty means `v2_mainnet`). Every job reads the first listed source: recorder, questions, flow, history, signals. Back to V2: remove the line or the variable.
+While V3's order books are empty the questions board publishes no coins and the Saloon reads "No prices on Derive right now."
 
 What the switch keeps the same:
 

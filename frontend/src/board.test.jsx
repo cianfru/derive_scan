@@ -174,6 +174,13 @@ describe("failed outcome reads", () => {
     expect(screen.queryAllByRole("link", { name: /see what it pays/ })).toHaveLength(0);
   });
 
+  it("says Derive has no prices when no coin can be priced", () => {
+    docs.current["questions/index.json"] = { ...idx, coins: [] };
+    show();
+    expect(screen.getByRole("heading", { name: "No prices on Derive right now." })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "No outcomes match these filters." })).toBeNull();
+  });
+
   it("shows available coins and identifies missing coin data, including its selected empty state", async () => {
     delete docs.current["questions/HYPE.json"];
     docs.errors["questions/HYPE.json"] = new Error("Unavailable");
