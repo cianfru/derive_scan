@@ -133,6 +133,10 @@ Built 5 October 2026 (design P8) and **off**: nothing trades until the owner swi
 - **Hard stop:** in Vercel, remove `VITE_SALOON_TRADE` (or empty `VITE_SALOON_PILOT`) and redeploy: the build then carries no trading code, or offers one tap to nobody.
 - Either way, positions already on Derive are untouched and settle as usual; users can sell them on Derive.
 
+## X cards (`/control`)
+
+`cowboy.trading/control` is a page for the owner: the X cards built from the latest `site-data` files (BTC options range, the herd, BTC higher or lower on Friday; the first copies are in `docs/x-cards/`), each with its post text to edit (character count, a warning without @derivexyz or with a link or address), Download PNG (2160x2160, drawn in the browser) and Copy text, and one card marked as today's in turn. Posting stays by hand. The page is its own build entry (`frontend/control.html`, `src/control/`), not part of the app's bundle, and opens only with the password in the Vercel environment variable `CONTROL_PASSWORD` (project `torq`, Production); while it is unset the page stays shut. The browser asks for a name and a password: any name, the password set there.
+
 ## Tracking values over time
 
 Coin pages include **Market history**: dated engine metrics, funding and open interest. Inspect exact samples by pointer, touch or keyboard; select daily or four-hour readings. Missing intervals remain gaps. Details: `docs/history-tracking.md`.

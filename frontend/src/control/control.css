@@ -1,0 +1,30 @@
+:root { color-scheme: dark; }
+body { margin: 0; background: #0e0d0b; color: #f7f3ed; font: 500 15px/1.45 Manrope, system-ui, sans-serif; }
+.cc { max-width: 1240px; margin: 0 auto; padding: 32px 24px 80px; }
+.cc-head { display: flex; gap: 24px; align-items: center; margin-bottom: 28px; }
+.cc-head img { height: 36px; }
+.cc-head h1 { margin: 0; font-size: 24px; }
+.cc-head p { margin: 2px 0 0; color: #c6beb2; }
+.cc-card { border: 1px solid #3b352f; border-radius: 12px; background: #161412; padding: 20px; margin-bottom: 24px; }
+.cc-card.today { border-color: #ff5e00; }
+.cc-card > header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 14px; }
+.cc-card h2 { margin: 0; font-size: 18px; }
+.cc-today { color: #ff5e00; font-weight: 700; font-size: 14px; }
+.cc-body { display: grid; grid-template-columns: 540px minmax(0, 1fr); gap: 24px; align-items: start; }
+.cc-preview { width: 540px; height: 540px; overflow: hidden; border-radius: 8px; }
+.cc-scale { transform: scale(.5); transform-origin: 0 0; width: 1080px; height: 1080px; }
+.cc-post label { display: block; color: #c6beb2; margin-bottom: 6px; }
+.cc-post textarea { width: 100%; box-sizing: border-box; background: #0e0d0b; color: #f7f3ed; border: 1px solid #5a5148; border-radius: 8px; padding: 12px; font: inherit; resize: vertical; }
+.cc-meta { display: flex; gap: 16px; margin-top: 6px; font: 500 13px "Chivo Mono", monospace; color: #c6beb2; }
+.cc-meta .over { color: #f4968b; }
+.cc-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+.cc-actions button { min-height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid #ff5e00; background: #ff5e00; color: #0e0d0b; font: 700 15px Manrope, sans-serif; cursor: pointer; }
+.cc-actions button.quiet { background: transparent; color: #f7f3ed; border-color: #5a5148; }
+.cc-note { min-height: 20px; color: #c6beb2; margin: 10px 0 0; }
+.cc-empty { color: #c6beb2; margin: 0; }
+@media (max-width: 900px) {
+  .cc-body { grid-template-columns: 1fr; }
+  .cc-preview { width: 324px; height: 324px; }
+  .cc-scale { transform: scale(.3); }
+}
+.cc-retry { margin-left: 12px; min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #5a5148; background: transparent; color: #f7f3ed; font: 700 14px Manrope, sans-serif; cursor: pointer; }
