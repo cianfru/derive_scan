@@ -1,0 +1,4 @@
+.wtag-av.wtag-hat { --wa-ink: var(--hat-dark); --wa-ground: var(--hat-background); }
+.wtag-av.wtag-hat .wa-tile { fill: var(--wa-ground); stroke: color-mix(in srgb, var(--wa-ink) 18%, var(--wa-ground)); stroke-width: 2; }
+.wtag-av.wtag-hat .wa-mark { fill: none; stroke: var(--wa-ink); stroke-linecap: round; stroke-linejoin: round; }
+:root[data-theme="light"] .wtag-av.wtag-hat { --wa-ink: var(--hat-light); --wa-ground: var(--hat-background-light); }
