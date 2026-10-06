@@ -1,0 +1,77 @@
+@font-face { font-family: "Manrope"; font-weight: 200 800; src: url("/fonts/manrope-latin-variable.woff2") format("woff2"); }
+@font-face { font-family: "Chivo Mono"; font-weight: 100 900; src: url("/fonts/chivo-mono-latin-variable.woff2") format("woff2"); }
+
+.xc { width: 1080px; height: 1080px; overflow: hidden; position: relative; color: #f7f3ed; font-family: Manrope, sans-serif;
+  background: radial-gradient(760px 560px at 105% 30%, var(--glow-a, rgba(80,200,150,.30)), transparent 62%),
+              radial-gradient(720px 560px at -10% 95%, var(--glow-b, rgba(240,110,95,.26)), transparent 62%),
+              radial-gradient(640px 420px at 12% -8%, rgba(255,128,40,.22), transparent 65%),
+              linear-gradient(160deg, #1c1714 0%, #0f0d0b 55%, #0c0b0a 100%); }
+.xc * { margin: 0; box-sizing: border-box; }
+.xc .grain { position: absolute; inset: 0; opacity: .5; background-image: radial-gradient(rgba(255,255,255,.035) 1px, transparent 1px); background-size: 4px 4px; }
+.xc .frame { position: absolute; inset: 22px; border-radius: 28px; border: 1px solid rgba(255,255,255,.10);
+  background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.01)); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 30px 80px rgba(0,0,0,.45); }
+.xc .top { position: absolute; left: 58px; right: 58px; top: 52px; display: flex; justify-content: space-between; align-items: center; }
+.xc .top img { height: 40px; }
+.xc .stamp { font: 500 15px/1 "Chivo Mono"; color: #e4ded5; }
+.xc .eyebrow { position: absolute; left: 58px; top: 138px; font: 700 18px/1 Manrope; letter-spacing: .16em; text-transform: uppercase; color: #ffb27a; }
+.xc h1 { position: absolute; left: 58px; right: 58px; top: 172px; font: 800 58px/1.04 Manrope; letter-spacing: -.04em; }
+.xc .g { color: #8ff0c6; } .xc .r { color: #ff9d90; }
+.xc .n { font-family: "Chivo Mono"; font-weight: 600; letter-spacing: -.06em; }
+.xc .sub { position: absolute; left: 58px; right: 70px; top: 252px; font: 500 22px/1.38 Manrope; color: #ece6dd; }
+.xc .sub b { color: #fff; }
+.xc .glass { border-radius: 20px; border: 1px solid rgba(255,255,255,.12); background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025)); box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
+.xc .foot { position: absolute; left: 58px; right: 58px; bottom: 46px; display: flex; justify-content: space-between; font: 500 14px/1 Manrope; color: #b9b0a4; }
+.xc .foot b { font: 600 15px "Chivo Mono"; color: #f7f3ed; }
+.xc .tiles { position: absolute; left: 58px; right: 58px; top: 852px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+/* Options range */
+.xc-range .sub { top: 318px; }
+.xc-range svg { position: absolute; left: 0; top: 0; }
+.xc-range .gl { stroke: rgba(255,255,255,.07); } .xc-range .exp { stroke: rgba(255,255,255,.14); stroke-dasharray: 2 6; }
+.xc-range .ax { font: 400 15px "Chivo Mono"; fill: #b9b0a4; } .xc-range .mid { text-anchor: middle; }
+.xc-range .pt { font: 700 20px "Chivo Mono"; letter-spacing: -.03em; } .xc-range .pt.up { fill: #8ff0c6; } .xc-range .pt.dn { fill: #ff9d90; }
+.xc-range .tiles { top: 850px; gap: 14px; }
+.xc-range .tile { padding: 18px 20px; }
+.xc-range .tile b { display: block; font: 700 30px/1.05 "Chivo Mono"; letter-spacing: -.05em; }
+.xc-range .tile span { display: block; margin-top: 8px; font: 500 16px/1.3 Manrope; color: #ece6dd; }
+.xc-range .tile.g b { color: #8ff0c6; } .xc-range .tile.r b { color: #ff9d90; }
+
+/* The herd */
+.xc-herd .grid { position: absolute; left: 58px; right: 58px; top: 396px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.xc-herd .tile { padding: 14px 14px 12px; position: relative; min-height: 158px; }
+.xc-herd .tile.all { border-color: rgba(143,240,198,.55); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 28px rgba(143,240,198,.22); background: linear-gradient(180deg, rgba(143,240,198,.14), rgba(143,240,198,.03)); }
+.xc-herd .row1 { display: flex; align-items: center; gap: 10px; } .xc-herd .row1 img { width: 30px; height: 30px; border-radius: 50%; }
+.xc-herd .row1 b { display: block; font: 700 18px/1.1 Manrope; } .xc-herd .row1 small { display: block; font: 500 12px/1.2 Manrope; color: #b9b0a4; }
+.xc-herd .chg { margin-left: auto; font: 600 15px "Chivo Mono"; letter-spacing: -.03em; text-align: right; }
+.xc-herd .wk { display: block; font: 500 11px Manrope; color: #9d958a; letter-spacing: 0; }
+.xc-herd .reg { margin-top: 16px; font: 700 16px/1.2 Manrope; }
+.xc-herd .dots { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+.xc-herd .dot { display: inline-flex; align-items: center; gap: 5px; font: 500 12px Manrope; color: #c6beb2; }
+.xc-herd .dot i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.xc-herd .dot.u i { background: #8ff0c6; box-shadow: 0 0 8px rgba(143,240,198,.7); } .xc-herd .dot.d i { background: #ff9d90; box-shadow: 0 0 8px rgba(255,157,144,.6); }
+.xc-herd .dot.z i { background: #8a847b; } .xc-herd .dot.x i { border: 1.5px dashed #6d675f; }
+.xc-herd .badge { position: absolute; right: 12px; bottom: 12px; font: 700 11px Manrope; letter-spacing: .06em; text-transform: uppercase; color: #8ff0c6; }
+.xc-herd .key { position: absolute; left: 58px; right: 58px; top: 930px; display: flex; gap: 22px; font: 500 15px Manrope; color: #c6beb2; flex-wrap: wrap; }
+.xc-herd .key b { color: #f7f3ed; } .xc-herd .key b.g { color: #8ff0c6; } .xc-herd .key b.r { color: #ff9d90; } .xc-herd .key b.z { color: #8a847b; }
+
+/* Higher or lower ladder */
+.xc-ladder .ladder { position: absolute; left: 58px; right: 58px; top: 368px; display: grid; gap: 10px; }
+.xc-ladder .lvl { display: grid; grid-template-columns: 210px 1fr; align-items: center; gap: 18px; padding: 10px 14px; }
+.xc-ladder .k b { display: block; font: 600 26px/1.1 "Chivo Mono"; letter-spacing: -.05em; }
+.xc-ladder .k small { display: block; margin-top: 4px; font: 500 13px Manrope; color: #b9b0a4; }
+.xc-ladder .bar { display: flex; height: 48px; border-radius: 14px; overflow: hidden; gap: 3px; }
+.xc-ladder .bar > div { display: flex; align-items: center; min-width: 120px; padding: 0 16px; font: 600 16px Manrope; }
+.xc-ladder .bar b { font: 700 22px "Chivo Mono"; letter-spacing: -.04em; }
+.xc-ladder .hi { background: linear-gradient(90deg, rgba(143,240,198,.42), rgba(143,240,198,.22)); color: #eafff5; border-radius: 14px 4px 4px 14px; }
+.xc-ladder .hi b { color: #8ff0c6; margin-left: 6px; }
+.xc-ladder .lo { background: linear-gradient(90deg, rgba(255,157,144,.22), rgba(255,157,144,.42)); color: #fff0ed; justify-content: flex-end; border-radius: 4px 14px 14px 4px; }
+.xc-ladder .lo b { color: #ff9d90; margin-right: 6px; }
+.xc-ladder .now { display: flex; align-items: center; gap: 16px; height: 22px; }
+.xc-ladder .now::before, .xc-ladder .now::after { content: ""; flex: 1; height: 2px; }
+.xc-ladder .now::before { background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.7)); }
+.xc-ladder .now::after { background: linear-gradient(90deg, rgba(255,255,255,.7), rgba(255,255,255,0)); }
+.xc-ladder .now span { font: 700 16px "Chivo Mono"; color: #f7f3ed; letter-spacing: -.02em; }
+.xc-ladder .tile { padding: 16px 18px; }
+.xc-ladder .tile b { display: block; font: 800 24px/1.1 Manrope; letter-spacing: -.03em; }
+.xc-ladder .tile b.m { font-family: "Chivo Mono"; font-weight: 700; letter-spacing: -.05em; }
+.xc-ladder .tile span { display: block; margin-top: 6px; font: 500 15px/1.3 Manrope; color: #ece6dd; }
