@@ -47,12 +47,12 @@ function AnswerChoice({ r, budget }) {
     <div className={`bd-answer ${r.side}${available ? "" : " off"}`}>
       {offTestnet ? <div className="bd-choice off">{side}<span className="q-noprice">{NOT_ON_TESTNET}<Info label={`Why ${name} is not on testnet`}>{NOT_ON_TESTNET_WHY}</Info></span></div>
         : available ? <Link to={`/q/${r.id}?side=${r.side}`} state={{ step: "preview" }} className={`bd-choice ${r.side}`} aria-label={`${name}: see what it pays`}>
-          <span className="bd-choice-side">{side}<b className="mono">{r.buyCents}<small>¢</small></b></span>
+          <span className="bd-choice-side">{side}<span className="bd-price"><b className="mono">{r.buyCents}<small>¢</small></b>
+            {r.capped && <small className="bd-capped" title="Small size at this price">Small size</small>}</span></span>
           <span className="bd-choice-out"><b className="mono">{returnText(r.make, r.total)}</b><small>most you make</small></span>
         </Link>
         : <div className="bd-choice off">{side}<span className="q-noprice">No price now<Info label={`Why ${name} has no price`}>{r.reason}</Info></span></div>}
       <FollowButton id={r.id} side={r.side} k={r.k} board={r.board} compact />
-      {available && r.capped && <small className="bd-capped">Small size at this price</small>}
     </div>
   );
 }
