@@ -104,7 +104,7 @@ function MarketRow({ c, open, onToggle }) {
   const id = useId();
   return (
     <article className={`mk-market${open ? " open" : ""}`} aria-label={`${c.und} market`}>
-      <div className="mk-row" onClick={(e) => { if (!e.target.closest("a,button")) onToggle(); }}>
+      <div className="mk-row">
         <Link className="mk-coin-link" to={`/coin/${c.und}`} aria-label={`Open ${c.und} chart and data`}>
           <div className="mk-asset">
             <Asset und={c.und} />
@@ -114,21 +114,23 @@ function MarketRow({ c, open, onToggle }) {
             <MarketTrace values={c.spark_1d?.slice(-30)} times={c.spark_times_1d?.slice(-30)} label={`${c.und} daily closes`} />
           </div>
         </Link>
-        <div className="mk-windows">
-          <div className="mk-mini-head" aria-hidden="true"><span />{LAYERS.map(([kind, name]) => <span key={kind}>{name}</span>)}</div>
-          {WINDOWS.map(([h, name, tf]) => {
-            const aligned = !!chainAgreed(c.align, h);
-            return (
-              <div key={h} className={`mk-win${aligned ? " aligned" : ""}`}>
-                <span className="mk-win-label"><b>{name}</b><small>{aligned ? "All agree" : `${tf} engine`}</small></span>
-                {LAYERS.map(([kind]) => <LayerTile key={kind} alignment={c.align} kind={kind} horizon={h} icon={false} aligned={aligned} sub="detail" />)}
-              </div>);
-          })}
+        <div className="mk-readings" onClick={(e) => { if (!e.target.closest("button")) onToggle(); }}>
+          <div className="mk-windows">
+            <div className="mk-mini-head" aria-hidden="true"><span />{LAYERS.map(([kind, name]) => <span key={kind}>{name}</span>)}</div>
+            {WINDOWS.map(([h, name, tf]) => {
+              const aligned = !!chainAgreed(c.align, h);
+              return (
+                <div key={h} className={`mk-win${aligned ? " aligned" : ""}`}>
+                  <span className="mk-win-label"><b>{name}</b><small>{aligned ? "All agree" : `${tf} engine`}</small></span>
+                  {LAYERS.map(([kind]) => <LayerTile key={kind} alignment={c.align} kind={kind} horizon={h} icon={false} aligned={aligned} sub="detail" />)}
+                </div>);
+            })}
+          </div>
+          <button className="mk-expand" aria-expanded={open} aria-controls={id} onClick={onToggle}
+            aria-label={`${open ? "Hide" : "Show"} what ${c.und}'s readings rest on`}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M3 8h10" />{!open && <path d="M8 3v10" />}</svg>
+          </button>
         </div>
-        <button className="mk-expand" aria-expanded={open} aria-controls={id} onClick={onToggle}
-          aria-label={`${open ? "Hide" : "Show"} what ${c.und}'s readings rest on`}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="M3 8h10" />{!open && <path d="M8 3v10" />}</svg>
-        </button>
       </div>
       {open && <Evidence c={c} id={id} />}
     </article>
