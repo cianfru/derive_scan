@@ -68,7 +68,7 @@ export default function CandleChart({ candles, signals, tf, theme, implied = nul
       autoSize: true,
       localization: { priceFormatter: price },
       layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: c("--muted"), fontFamily: "Chivo Mono, monospace", fontSize: 11, attributionLogo: false },
-      grid: { vertLines: { color: c("--seam") + "66" }, horzLines: { color: c("--seam") + "66" } },
+      grid: { vertLines: { color: c("--seam") + "99" }, horzLines: { color: c("--seam") + "99" } },
       rightPriceScale: { borderColor: c("--seam") },
       timeScale: { borderColor: c("--seam"), timeVisible: tf === "4h", rightOffset: 4 },
       crosshair: { mode: CrosshairMode.Normal, vertLine: { color: c("--faint"), labelBackgroundColor: c("--plate-3") }, horzLine: { color: c("--faint"), labelBackgroundColor: c("--plate-3") } },

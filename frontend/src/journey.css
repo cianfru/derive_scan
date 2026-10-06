@@ -136,7 +136,7 @@ a.chain-tile:hover { border-color: color-mix(in srgb, var(--c) 75%, var(--border
 .checks [data-s="fail"] > i { color: var(--down); }
 .checks [data-s="unknown"] > i { color: var(--faint); }
 .checks [data-s="fail"] > span { color: var(--fg); }
-.checks-list li .info { margin-left: 0; opacity: .7; }
+.checks-list li .info { margin-left: 0; }
 .checks-gate { margin: 2px 0 0; display: flex; align-items: center; gap: 8px; font-size: var(--t-cell); color: var(--fg-2); }
 .checks-gate b { font-weight: 400; color: var(--muted); font-size: var(--t-label); }
 .checks-against ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
