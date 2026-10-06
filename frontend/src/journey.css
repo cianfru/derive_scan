@@ -89,6 +89,7 @@ a.chain-tile:hover { border-color: color-mix(in srgb, var(--c) 75%, var(--border
 .rh-sub { color: var(--muted); font-size: var(--t-cell); }
 .rh-strip { display: flex; align-items: center; gap: 12px; margin-top: 4px; min-width: 0; }
 .rh-since { font-size: var(--t-key); color: var(--faint); white-space: nowrap; }
+.rh-avg { display: flex; align-items: center; gap: 4px; margin-top: 6px; color: var(--muted); font-size: var(--t-cell); }
 .rh-meter { flex: 1; height: 10px; background: var(--plate-3); position: relative; min-width: 0; }
 .rh-meter i { position: absolute; inset: 0 auto 0 0; background: var(--faint); }
 .rh-signal .sig { font-size: var(--t-h2); }

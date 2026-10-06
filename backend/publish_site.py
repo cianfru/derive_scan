@@ -14,7 +14,7 @@ keeps no history. Files:
                       and reconstructed price metrics, with coverage of the engine and the option
                       recording), options detail (term structure, per-strike open interest and IV,
                       14-day IV history, implied ranges, open-interest levels, options lean),
-                      alignment by horizon
+                      alignment by horizon, band (side of the weekly band and since when)
   wallets/{UND}.json  per coin: the ranked traders holding its options (biggest delta first) and how
                       each cohort is positioned on it within 7 days, 30 days and all expiries
   traders.json        options traders' leaderboard (market makers left out) and cohorts by results
@@ -51,6 +51,7 @@ from statistics import median
 
 import numpy as np
 
+from derive.band import band_since
 from derive.candles import CandleCache
 from derive.signals import engine_comparison, ribbon_trail
 from derive.quality import ANALYTICS_VERSION, engine_status, snapshot_status
@@ -830,6 +831,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
                                                 ("open", "high", "low", "close", "volume"))]
                                                 for i in range(max(0, len(c["close"]) - keep), len(c["close"]))]
         ribbon = {"1d": ribbon_chars(ribbon_trail(loaded["1d"], "1d", now * 1000), candles["1d"])}
+        band = band_since(loaded["1d"], cache.load(und, "1w"), now * 1000)
         closes4 = [b[4] for b in candles["4h"]]
         closes1 = [b[4] for b in candles["1d"]]
         opts = options_block(data, site, und, now)
@@ -886,7 +888,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
         _write(site / "coins" / f"{und}.json", {
             "und": und, "symbol": sym, "generated_at": int(now), "candles": candles, "daily_history": history_meta,
             "engine_comparison": comparison, "ribbon": ribbon, "engine_context": context,
-            "history": tracking,
+            "history": tracking, "band": band,
             "backfilled": {tf: cache.counts(und, tf)[1] for tf in CANDLES_KEEP},
             "signals": history.get(und, {}), "latest": {"4h": r4 or None, "1d": r1 or None}, "options": opts,
             "has_surface": has_surface, "taker_flow": coin_flows, "alignment": align,
