@@ -28,3 +28,11 @@ body { margin: 0; background: #0e0d0b; color: #f7f3ed; font: 500 15px/1.45 Manro
   .cc-scale { transform: scale(.3); }
 }
 .cc-retry { margin-left: 12px; min-height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid #5a5148; background: transparent; color: #f7f3ed; font: 700 14px Manrope, sans-serif; cursor: pointer; }
+.cc-tabs { display: flex; gap: 22px; flex-wrap: wrap; border-bottom: 1px solid #3b352f; margin-bottom: 24px; }
+.cc-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; color: #c6beb2; font: 600 15px Manrope, sans-serif; padding: 12px 0; min-height: 44px; cursor: pointer; }
+.cc-tabs button[aria-pressed="true"] { color: #ff5e00; border-bottom-color: #ff5e00; }
+.cc-group { color: #c6beb2; font-size: 14px; }
+.cc-param { margin-left: auto; color: #c6beb2; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+.cc-param select { background: #0e0d0b; color: #f7f3ed; border: 1px solid #5a5148; border-radius: 8px; min-height: 36px; padding: 0 10px; font: 600 14px Manrope, sans-serif; }
+.cc-angle { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.cc-link { background: none; border: 0; color: #ff8a3d; font: 600 14px Manrope, sans-serif; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; min-height: 32px; }
