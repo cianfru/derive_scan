@@ -1,5 +1,9 @@
 // X cards for the control page: each card builds a model from published files,
 // draws it at 1080x1080 and drafts the post text. Plain words for retail, no forecast words.
+import { centsUp, live, priceAge, SETTLING_SEC } from "../lib/questions.js";
+import { viewReading } from "../lib/presentation.js";
+import { currentEngine } from "../lib/research.js";
+import { readingState } from "../lib/analytics.js";
 
 const NAME = { ADA: "Cardano", BTC: "Bitcoin", CC: "Canton", ETH: "Ethereum", HYPE: "Hyperliquid", LIT: "Lighter", PUMP: "Pump", SOL: "Solana", VVV: "Venice", XAUT: "Tether Gold", XRP: "XRP", ZEC: "Zcash", BNB: "BNB", DOGE: "Dogecoin", LINK: "Chainlink" };
 const REG = { MARKUP: "Trending up", REACC: "Cooling off", ACCUM: "Building a base", MARKDOWN: "Trending down", BLOWOFF: "Overheated", CAP: "Washed out" };
@@ -10,7 +14,7 @@ const k0 = (v) => `$${(v / 1000).toLocaleString("en-US", { minimumFractionDigits
 const k = (v) => (Math.abs(v) >= 20000 ? k0(v) : Math.abs(v) >= 1000 ? `$${Math.round(v).toLocaleString("en-US")}` : `$${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}`);
 const tick = (v) => (v >= 20000 ? k0(v) : v >= 1000 ? `$${(v / 1000).toFixed(2)}k` : `$${v.toFixed(2)}`);
 const usd = (v) => `$${Math.round(v).toLocaleString("en-US")}`;
-const cents = (p) => `${Math.round(p * 100)}¢`;
+const cents = (p) => `${centsUp(p)}¢`;
 const utc = (t, opts) => new Date(t * 1000).toLocaleString("en-GB", { timeZone: "UTC", ...opts });
 const dm = (t) => utc(t, { day: "numeric", month: "short" });
 const weekday = (t) => utc(t, { weekday: "long" });
@@ -30,26 +34,30 @@ function Frame({ kind, stamp, footRight, children }) {
 }
 
 // 1. The range BTC options price for Friday.
-export function rangeModel(coin, und = "BTC") {
+export function rangeModel(coin, und = "BTC", now = Date.now() / 1000) {
   const o = coin?.options;
   const candles = coin?.candles?.["1d"];
-  if (!o?.implied?.length || !candles?.length) return null;
-  const spot = o.features.index_price;
-  const now = o.ts;
-  const fridays = o.implied.filter((e) => new Date(e.expiry * 1000).getUTCDay() === 5 && e.days < 30 && e.q?.length === 5);
-  if (!fridays.length || !spot) return null;
+  const current = (status, observed_at) => readingState({ status, observed_at, state: "ready" }, "options", now);
+  if (!current(o?.status, o?.ts) || !current(o?.chain_status, o?.chain_at) || !o.implied?.length || !candles?.length) return null;
+  const spot = o.features?.index_price;
+  const iv = o.features?.atm_iv_30d, skew = o.features?.rr25_30d;
+  const history = candles.slice(-30);
+  const fridays = o.implied.filter((e) => e.expiry > now && new Date(e.expiry * 1000).getUTCDay() === 5 && e.days > 0 && e.days < 30
+    && e.q?.length === 5 && e.q.every((p, i) => Number.isFinite(p) && p > 0 && (!i || p >= e.q[i - 1]))).sort((a, b) => a.expiry - b.expiry);
+  if (!fridays.length || !Number.isFinite(spot) || spot <= 0 || !Number.isFinite(iv) || iv <= 0 || !Number.isFinite(skew)
+    || history.some((c) => !Number.isFinite(c[0]) || !Number.isFinite(c[4]) || c[4] <= 0)) return null;
   return {
-    und, spot, now,
-    hist: [...candles.slice(-30).map((c) => [c[0] + 86400, c[4]]), [now, spot]],
-    cone: [[now, [spot, spot, spot, spot, spot]], ...fridays.map((e) => [e.expiry, e.q])],
+    und, spot, now: o.ts,
+    hist: [...history.map((c) => [c[0] + 86400, c[4]]), [o.ts, spot]],
+    cone: [[o.ts, [spot, spot, spot, spot, spot]], ...fridays.map((e) => [e.expiry, e.q])],
     head: fridays[0],
     past: (() => {
-      const n = Math.max(2, Math.ceil(fridays[0].days));
-      const closes = [...candles.slice(-n).map((c) => c[4]), spot];
+      const n = Math.min(history.length, Math.max(2, Math.ceil(fridays[0].days)));
+      const closes = [...history.slice(-n).map((c) => c[4]), spot];
       return { n, lo: Math.min(...closes), hi: Math.max(...closes) };
     })(),
-    swing: o.features.atm_iv_30d * Math.sqrt(30 / 365) * 100,
-    skew: o.features.rr25_30d,
+    swing: iv * Math.sqrt(30 / 365) * 100,
+    skew,
     wall: o.levels?.call_wall,
   };
 }
@@ -78,7 +86,7 @@ function RangeCard({ m }) {
     <Frame kind="range" stamp={stampText("Derive options", m.now)} footRight="What option prices imply, not a forecast · Not investment advice">
       <div className="eyebrow">{NAME[m.und] || m.und} · {weekday(m.head.expiry)} {dm(m.head.expiry)}</div>
       <h1>Options traders price {m.und} between <span className="n r">{k(m.head.q[1])}</span> and <span className="n g">{k(m.head.q[3])}</span> on {weekday(m.head.expiry)}</h1>
-      <div className="sub">That's the middle half of what they're paying for. Over the last {m.past.n} days {m.und} swung between <b>{k(m.past.lo)}</b> and <b>{k(m.past.hi)}</b>, so options price a {calmer(m) ? "calmer" : "busier"} stretch ahead.</div>
+      <div className="sub">That's the middle half of priced settlement outcomes. The last {m.past.n} daily closes and today's index span <b>{k(m.past.lo)}</b> to <b>{k(m.past.hi)}</b>; the priced band is {bandComparison(m)} that observed range.</div>
       <svg width="1080" height="1080" viewBox="0 0 1080 1080">
         <defs>
           <linearGradient id="xr-gu" x1="0" x2="1"><stop offset="0" stopColor="#8ff0c6" stopOpacity=".08" /><stop offset="1" stopColor="#8ff0c6" stopOpacity=".42" /></linearGradient>
@@ -115,25 +123,37 @@ function RangeCard({ m }) {
   );
 }
 
-const calmer = (m) => m.head.q[3] - m.head.q[1] < m.past.hi - m.past.lo;
+const bandComparison = (m) => {
+  const priced = m.head.q[3] - m.head.q[1], observed = m.past.hi - m.past.lo;
+  return priced < observed ? "narrower than" : priced > observed ? "wider than" : "the same width as";
+};
 const rangeAngles = (m) => [
-  `Options traders on ${TAG} price ${m.und} between ${k(m.head.q[1])} and ${k(m.head.q[3])} for ${weekday(m.head.expiry)}. In the last ${m.past.n} days it swung between ${k(m.past.lo)} and ${k(m.past.hi)}. They're paying for a ${calmer(m) ? "calmer" : "busier"} stretch than the one just gone.`,
+  `Options traders on ${TAG} price ${m.und} between ${k(m.head.q[1])} and ${k(m.head.q[3])} for ${weekday(m.head.expiry)}. Recent daily closes and today's index span ${k(m.past.lo)}–${k(m.past.hi)}. The priced settlement band is ${bandComparison(m)} that range.`,
   `Where does ${m.und} settle on ${weekday(m.head.expiry)}? Nobody knows, but options on ${TAG} put the middle half of outcomes between ${k(m.head.q[1])} and ${k(m.head.q[3])}. ${m.skew < 0 ? "And protection against a drop costs more than a bet on a rise." : "And bets on a rise cost more than protection against a drop."}`,
   m.wall ? `${m.und} at ${k(m.spot)}. The most open bets on ${TAG} sit at ${usd(m.wall)}, and options price the middle of ${weekday(m.head.expiry)}'s outcomes between ${k(m.head.q[1])} and ${k(m.head.q[3])}. A normal month's swing: ±${Math.round(m.swing)}%.` : null,
 ].filter(Boolean);
 
 // 2. The herd: how every coin with options reads over the next 30 days.
-export function herdModel(markets) {
+export function herdModel(markets, now = Date.now() / 1000) {
+  if (markets?.generated_at > now || priceAge(markets?.generated_at, now).state !== "fresh") return null;
   const coins = (markets?.coins || []).filter((c) => c.has_options);
   if (coins.length < 4) return null;
-  const st = (c, key) => c.align?.readings?.["30d"]?.[key]?.state ?? null;
-  const agree = (c) => ["engine", "wallets", "options"].every((key) => st(c, key) === "up");
-  const rows = coins.map((c) => ({ und: c.und, chg: c.chg_7d || 0, regime: c.regime_1d, all: agree(c), engine: st(c, "engine"), wallets: st(c, "wallets"), options: st(c, "options") }));
+  const st = (c, key) => viewReading(c.align, "30d", key, now).state;
+  const rows = coins.map((c) => {
+    const current = currentEngine(c.engine_comparison?.["1d"], now);
+    const engine = current ? st(c, "engine") : null, wallets = st(c, "wallets"), options = st(c, "options");
+    return { und: c.und, chg: Number.isFinite(c.chg_7d) ? c.chg_7d : null, regime: current ? c.regime_1d : null,
+      all: [engine, wallets, options].every((state) => state === "up"), engine, wallets, options };
+  });
+  const read = rows.filter((r) => r.regime);
+  if (!read.length) return null;
   rows.sort((a, b) => (b.all - a.all) || ((b.regime === "MARKUP") - (a.regime === "MARKUP")) || (b.chg - a.chg));
-  const b = markets.breadth_1d, opt = new Set(coins.map((c) => c.und));
-  const ago = b?.members?.length > 30 ? (b.members.at(-31)?.[b.cols.indexOf("MARKUP")] || []).filter((u) => opt.has(u)).length : null;
-  const hot = [...rows].sort((a, b2) => b2.chg - a.chg)[0];
-  return { ts: markets.generated_at, rows: rows.slice(0, 12), total: coins.length, up: coins.filter((c) => c.regime_1d === "MARKUP").length, both: rows.filter((r) => r.all).map((r) => r.und), ago, hot };
+  const b = markets.breadth_1d, opt = new Set(read.map((c) => c.und));
+  const past = b?.members?.length > 30 ? b.members.at(-31)?.[b.cols?.indexOf("MARKUP")] : null;
+  const ago = Array.isArray(past) ? past.filter((u) => opt.has(u)).length : null;
+  const hot = rows.filter((r) => Number.isFinite(r.chg)).sort((a, b2) => b2.chg - a.chg)[0] || null;
+  return { ts: markets.generated_at, rows: rows.slice(0, 12), total: read.length, missing: coins.length - read.length,
+    up: read.filter((r) => r.regime === "MARKUP").length, both: rows.filter((r) => r.all).map((r) => r.und), ago, hot };
 }
 
 function Dot({ s, label }) {
@@ -146,15 +166,15 @@ function HerdCard({ m }) {
   return (
     <Frame kind="herd" stamp={stampText("Derive data", m.ts)} footRight="What the data shows today · Not investment advice">
       <div className="eyebrow">Derive options markets · next 30 days</div>
-      <h1>{m.up} of {m.total} coins are <span className={most ? "g" : ""}>trending up</span></h1>
-      <div className="sub">Three things we watch for every coin: the engine's price signal, how smart wallets are positioned, and what options traders pay for. {m.both.length ? <>On <b>{join(m.both)}</b> all three point up.</> : "Today no coin has all three pointing up."}{m.ago != null && m.ago !== m.up ? <> A month ago, {m.ago} were trending up.</> : null}</div>
+      <h1>{m.up} of {m.total} coins {m.missing ? "with a current daily reading " : ""}are <span className={most ? "g" : ""}>trending up</span></h1>
+      <div className="sub">Three things we watch for every coin: the engine's price signal, how smart wallets are positioned, and what options traders pay for. {m.both.length ? <>On <b>{join(m.both)}</b> all three point up.</> : "No coin has a current upward reading in all three layers."}{m.ago != null && m.ago !== m.up ? <> A month ago, {m.ago} of these coins were trending up.</> : null}</div>
       <div className="grid">
         {m.rows.map((c) => (
           <div key={c.und} className={`tile glass${c.all ? " all" : ""}`}>
             <div className="row1">
               <img src={`/coins/${ICON[c.und] || c.und + ".svg"}`} alt="" />
               <div><b>{c.und}</b><small>{NAME[c.und] || c.und}</small></div>
-              <span className={`chg ${c.chg >= 0 ? "g" : "r"}`}>{c.chg >= 0 ? "+" : ""}{c.chg.toFixed(1)}%<small className="wk">7d</small></span>
+              <span className={`chg ${c.chg == null ? "" : c.chg >= 0 ? "g" : "r"}`}>{c.chg == null ? "—" : `${c.chg >= 0 ? "+" : ""}${c.chg.toFixed(1)}%`}<small className="wk">7d</small></span>
             </div>
             <div className="reg">{REG[c.regime] || "No reading yet"}</div>
             <div className="dots"><Dot s={c.engine} label="Signal" /><Dot s={c.wallets} label="Wallets" /><Dot s={c.options} label="Options" /></div>
@@ -168,18 +188,20 @@ function HerdCard({ m }) {
 }
 
 const herdAngles = (m) => [
-  `${m.up} of ${m.total} coins with options on ${TAG} are trending up${m.ago != null && m.ago !== m.up ? ` (a month ago: ${m.ago})` : ""}. ` + (m.both.length ? `On ${join(m.both)}, the engine, smart wallets and options all point the same way.` : "No coin has all three pointing up today."),
-  m.both.length ? `Three different crowds, one direction: on ${join(m.both)}, our trend engine, the most profitable options wallets and option prices on ${TAG} all point up. It doesn't happen often. Here's the whole board.` : `Our engine, smart wallets and option prices on ${TAG} disagree on every coin today. When they don't line up, nobody has the full story.`,
-  `Hottest week: ${m.hot.und} ${m.hot.chg >= 0 ? "+" : ""}${m.hot.chg.toFixed(1)}%. But price is one read of three. For every coin with options on ${TAG}, we check the trend, the smart wallets and what options traders pay for.`,
-];
+  `${m.up} of ${m.total} coins with ${m.missing ? "current daily readings and " : ""}options on ${TAG} are trending up${m.ago != null && m.ago !== m.up ? ` (a month ago: ${m.ago})` : ""}. ` + (m.both.length ? `On ${join(m.both)}, the engine, smart wallets and options all point up.` : "No coin has a current upward reading in all three layers."),
+  m.both.length ? `Three independent reads, one direction: on ${join(m.both)}, our trend engine, smart options wallets and option prices on ${TAG} all point up. Positioning is context, not a signal.` : `No coin has a current upward reading in all three layers: our engine, smart wallets and option prices on ${TAG}. Readings can differ or be unavailable. Positioning is context, not a signal.`,
+  m.hot ? `Hottest week: ${m.hot.und} ${m.hot.chg >= 0 ? "+" : ""}${m.hot.chg.toFixed(1)}%. But price is one read of three. For every coin with options on ${TAG}, we check the trend, the smart wallets and what options traders pay for.` : null,
+].filter(Boolean);
 
 // 3. Higher or lower on the next Friday with a full ladder.
-export function ladderModel(q) {
-  if (!q?.dates?.length || !q.index) return null;
+export function ladderModel(q, now = Date.now() / 1000) {
+  if (!q?.dates?.length || !Number.isFinite(q.index) || q.index <= 0 || q.prices_ts > now || priceAge(q.prices_ts, now, q.paused).state !== "fresh") return null;
   const idx = q.index;
-  for (const d of q.dates) {
-    if (new Date(d.settle_ts * 1000).getUTCDay() !== 5) continue;
-    const priced = d.levels.filter((l) => l.yes?.buy && l.no?.buy);
+  for (const d of [...q.dates].sort((a, b) => a.settle_ts - b.settle_ts)) {
+    if (d.board !== true || !(d.settle_ts > now + SETTLING_SEC) || new Date(d.settle_ts * 1000).getUTCDay() !== 5) continue;
+    const priced = (d.levels || []).filter((l) => [7, 15].includes(l.ladder) && Number.isFinite(l.k) && l.k > 0
+      && Number.isFinite(l.lo) && Number.isFinite(l.hi) && l.lo < l.hi
+      && ["yes", "no"].every((side) => live(l, side, false, now) && l[side].buy > 0 && Number.isFinite(l[side].size) && l[side].size > 0));
     const counts = {};
     for (const l of priced) counts[l.ladder] = (counts[l.ladder] || 0) + 1;
     const ladder = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];

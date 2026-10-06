@@ -80,7 +80,7 @@ export function boardRows(boards, budget, { now = Date.now() / 1000, paused = fa
   const noPrice = [];
   for (const board of boards || []) {
     if (!board?.dates) continue;
-    const off = paused || !!board.paused;
+    const off = paused || priceAge(board.prices_ts, now, board.paused).state === "paused";
     for (const date of board.dates) {
       if (!date.board) continue;
       for (const level of date.levels || []) {

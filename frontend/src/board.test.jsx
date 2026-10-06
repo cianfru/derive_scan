@@ -1,14 +1,14 @@
 import React from "react";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import btc from "./fixtures/questions/BTC.json";
 import hype from "./fixtures/questions/HYPE.json";
 import index from "./fixtures/questions/index.json";
 
-const docs = vi.hoisted(() => ({ current: {} }));
-vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.current[path] ?? null : null, error: null }) }));
+const docs = vi.hoisted(() => ({ current: {}, errors: {} }));
+vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.current[path] ?? null : null, error: docs.errors[path] ?? null }) }));
 import Board, { returnText } from "./pages/Board.jsx";
 import { SaloonNotices } from "./components/SaloonNotices.jsx";
 import { BANNED, ticket } from "./lib/questions.js";
@@ -31,6 +31,7 @@ beforeEach(() => {
   localStorage.clear();
   _resetMemory();
   docs.current = { "questions/index.json": idx, "questions/BTC.json": btc, "questions/HYPE.json": hype, "markets.json": markets("up") };
+  docs.errors = {};
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -104,6 +105,92 @@ describe("board maths per budget", () => {
     expect(boardRows([btc], 100, { now: NOW, paused: true }).rows).toHaveLength(0);
     expect(cleanBudget("abc")).toBe(100);
     expect(cleanBudget("$250")).toBe(250);
+  });
+});
+
+describe("time gates on an idle board", () => {
+  it("pauses an old coin's prices while the index and another coin stay fresh", () => {
+    vi.useFakeTimers();
+    const boundary = T14 + 90 * 60;
+    vi.setSystemTime(boundary * 1000);
+    docs.current["questions/index.json"] = { ...idx, prices_ts: boundary };
+    docs.current["questions/BTC.json"] = { ...btc, dates: [btc.dates[1]] };
+    docs.current["questions/HYPE.json"] = { ...hype, prices_ts: boundary, dates: [hype.dates[1]] };
+    show();
+    expect(screen.queryAllByRole("link", { name: /BTC .*see what it pays/ }).length).toBeGreaterThan(0);
+    expect(screen.queryAllByRole("link", { name: /HYPE .*see what it pays/ }).length).toBeGreaterThan(0);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.queryAllByRole("link", { name: /BTC .*see what it pays/ })).toHaveLength(0);
+    expect(screen.queryAllByRole("link", { name: /HYPE .*see what it pays/ }).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Prices paused")).toBeNull();
+  });
+
+  it("removes a settling date at 07:30 UTC without needing a new price publication", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(Date.UTC(2026, 9, 5, 7, 29, 59));
+    const pricesTs = Date.UTC(2026, 9, 5, 7, 15) / 1000;
+    docs.current["questions/index.json"] = { ...idx, prices_ts: pricesTs, coins: [{ und: "BTC" }] };
+    docs.current["questions/BTC.json"] = { ...btc, prices_ts: pricesTs, dates: [btc.dates[1]] };
+    show();
+    expect(screen.queryAllByRole("link", { name: /see what it pays/ }).length).toBeGreaterThan(0);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.queryAllByRole("link", { name: /see what it pays/ })).toHaveLength(0);
+  });
+
+  it("pauses old prices after 90 minutes even while the same files remain loaded", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime((T14 + 90 * 60) * 1000);
+    show();
+    expect(screen.queryAllByRole("link", { name: /see what it pays/ }).length).toBeGreaterThan(0);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.queryAllByRole("link", { name: /see what it pays/ })).toHaveLength(0);
+    expect(screen.getByText("Prices paused")).toBeTruthy();
+  });
+
+  it("stops comparing stale marks after 35 minutes without needing changed prices", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime((T14 + 35 * 60) * 1000);
+    const { container } = show();
+    const card = container.querySelector(".bd-card");
+    const comparison = card.querySelector("details");
+    comparison.open = true;
+    fireEvent(comparison, new Event("toggle"));
+    expect(card.querySelectorAll(".bd-over .bd-notyet")).toHaveLength(0);
+    expect(card.querySelectorAll(".bd-over").length).toBeGreaterThan(0);
+    act(() => vi.advanceTimersByTime(1000));
+    expect(card.querySelectorAll(".bd-over .bd-notyet").length).toBe(card.querySelectorAll("a.bd-choice").length);
+  });
+});
+
+describe("failed outcome reads", () => {
+  it("distinguishes failed coin data from a board with no matching outcomes", () => {
+    for (const und of ["BTC", "HYPE"]) {
+      delete docs.current[`questions/${und}.json`];
+      docs.errors[`questions/${und}.json`] = new Error("Unavailable");
+    }
+    show();
+    expect(screen.getByRole("heading", { name: "Outcome data is unavailable right now." })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "No outcomes match these filters." })).toBeNull();
+    expect(screen.queryAllByRole("link", { name: /see what it pays/ })).toHaveLength(0);
+  });
+
+  it("shows available coins and identifies missing coin data, including its selected empty state", async () => {
+    delete docs.current["questions/HYPE.json"];
+    docs.errors["questions/HYPE.json"] = new Error("Unavailable");
+    show();
+    expect(screen.getByText("HYPE data could not be loaded.")).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: /see what it pays/ }).every((a) => a.getAttribute("href").includes("BTC-"))).toBe(true);
+    await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("tab", { name: "HYPE" }));
+    expect(screen.getByRole("heading", { name: "Outcome data is unavailable right now." })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "No outcomes match these filters." })).toBeNull();
+  });
+
+  it.each(["questions/index.json", "questions/BTC.json"])("keeps last-good outcomes and reports a failed %s refresh", (path) => {
+    docs.errors[path] = new Error("Refresh unavailable");
+    show();
+    expect(screen.getByText("Refresh failed. Showing the last available data.")).toBeTruthy();
+    expect(screen.queryAllByRole("link", { name: /see what it pays/ }).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("heading", { name: "Outcome data is unavailable right now." })).toBeNull();
   });
 });
 

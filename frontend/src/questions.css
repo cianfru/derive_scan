@@ -169,6 +169,7 @@
 
 /* Ticket: a bottom sheet under 1280 px, the right column above */
 .q-sheet { display: none; }
+.q-sheet-backdrop { position: fixed; inset: 0; z-index: 39; background: color-mix(in srgb, var(--ground) 60%, transparent); }
 @media (min-width: 1280px) {
   .q-sheet { display: block; }
   .q-sheet-close { display: none; }

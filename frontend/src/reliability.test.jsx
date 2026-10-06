@@ -6,12 +6,32 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import Shell from "./components/Shell.jsx";
 import HistoryStatus, { coverageReady } from "./components/HistoryStatus.jsx";
 import AlignmentGrid, { AlignSquares } from "./components/Alignment.jsx";
+import { Info } from "./components/ui.jsx";
 import { useData } from "./lib/data.js";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 beforeEach(() => {
   vi.stubGlobal("matchMedia", () => ({ matches: true }));
   vi.stubGlobal("scrollTo", vi.fn(() => Promise.resolve()));
+});
+
+it("opens form help without submitting the journal, including keyboard activation", async () => {
+  const submit = vi.fn(e => e.preventDefault());
+  const user = userEvent.setup();
+  render(<form onSubmit={submit}>
+    <label>Amount<input name="amount" defaultValue="100" required /></label>
+    <Info label="About journal amount">The amount recorded in your journal.</Info>
+    <button type="submit">Save journal</button>
+  </form>);
+  const help = screen.getByRole("button", { name: "About journal amount" });
+  await user.click(help);
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  expect(submit).not.toHaveBeenCalled();
+  await user.keyboard("{Escape}{Enter}");
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  expect(submit).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Save journal" }));
+  expect(submit).toHaveBeenCalledTimes(1);
 });
 
 describe("route reliability", () => {

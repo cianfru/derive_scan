@@ -4,13 +4,18 @@ import { render, screen, cleanup, within, fireEvent } from "@testing-library/rea
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 
-vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: true, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false, TRADE_ON: false }));
+const flags = vi.hoisted(() => ({ QUESTIONS_ON: true, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false, TRADE_ON: false }));
+vi.mock("./lib/flags.js", () => flags);
+vi.mock("./lib/pilot.js", async (importOriginal) => ({ ...await importOriginal(), oneTapOffered: vi.fn(() => false) }));
 import Shell from "./components/Shell.jsx";
 import Landing from "./pages/Landing.jsx";
 import { SaloonCta } from "./pages/Coin.jsx";
+import { oneTapOffered } from "./lib/pilot.js";
 
 let fetchSpy;
 beforeEach(() => {
+  Object.assign(flags, { QUESTIONS_ON: true, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false, TRADE_ON: false });
+  vi.mocked(oneTapOffered).mockReturnValue(false);
   vi.stubGlobal("scrollTo", () => {});
   vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
   vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
@@ -201,7 +206,39 @@ it("carries no Testnet marker in a build without testnet fills", () => {
 
 it("never tells visitors to place trades on Derive themselves; before one tap it says one tap is coming (owner, 5 October 2026)", () => {
   const { container } = shell(<Landing />);
-  expect(container.textContent).not.toMatch(/place any trade on Derive yourself|placed by you on Derive/);
+  expect(container.textContent).not.toMatch(/place any trade on Derive yourself|placed by you on Derive|two option orders on Derive|lists the two option orders|Trade higher or lower in one tap/);
   expect(container.textContent).toMatch(/One-tap trading is coming/);
   expect(container.textContent).toMatch(/Trades settle on Derive, in your own account\./);
+  expect(container.querySelector(".hero-description").textContent).toContain("Explore higher-or-lower outcomes on Derive");
+});
+
+it("describes a dry run as practice without promising fills", () => {
+  flags.TRADE_ON = true;
+  vi.mocked(oneTapOffered).mockReturnValue(true);
+  const { container } = render(<MemoryRouter><Landing /></MemoryRouter>);
+  expect(container.querySelector(".hero-description").textContent).toContain("Nothing fills.");
+  expect(container.querySelector(".lp-execution-note").textContent).toContain("Practice mode: quotes are checked; nothing fills.");
+  expect(container.querySelector(".lp-faq-list").textContent).toContain("checks a quote without placing a trade");
+  expect(container.textContent).not.toMatch(/You trade in one tap|both options fill together at one price/);
+});
+
+it("labels filled testnet trading as practice with test USDC", () => {
+  Object.assign(flags, { TRADE_ON: true, ONE_TAP_FILLS: true, TESTNET_FILLS: true });
+  vi.mocked(oneTapOffered).mockReturnValue(true);
+  const { container } = render(<MemoryRouter><Landing /></MemoryRouter>);
+  expect(container.querySelector(".hero-description").textContent).toContain("Practice higher or lower in one tap with test USDC");
+  expect(container.querySelector(".lp-faq-list").textContent).toContain("This build uses test USDC on Derive’s testnet.");
+  expect(container.querySelector(".lp-execution-note").textContent).toContain("both options fill together at one price");
+});
+
+it("promises one-tap fills only to a mainnet pilot browser", () => {
+  Object.assign(flags, { TRADE_ON: true, ONE_TAP_FILLS: true, MAINNET_FILLS: true });
+  const { container, rerender } = render(<MemoryRouter><Landing /></MemoryRouter>);
+  expect(container.querySelector(".hero-description").textContent).toContain("Explore higher-or-lower outcomes on Derive");
+  expect(container.querySelector(".lp-faq-list").textContent).not.toContain("You trade in one tap");
+  vi.mocked(oneTapOffered).mockReturnValue(true);
+  rerender(<MemoryRouter><Landing /></MemoryRouter>);
+  expect(container.querySelector(".hero-description").textContent).toContain("Trade higher or lower in one tap");
+  expect(container.querySelector(".lp-faq-list").textContent).toContain("You trade in one tap from Cowboy");
+  expect(container.textContent).not.toMatch(/testnet|test USDC|Nothing fills\./);
 });

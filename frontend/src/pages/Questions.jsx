@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import { Arrow, Info, Loading, Failed, Tabs } from "../components/ui.jsx";
+import { useClock } from "../lib/useClock.js";
+import { Arrow, Info, Loading, Failed, RefreshNotice, Tabs } from "../components/ui.jsx";
 import CoinOverview from "../components/CoinOverview.jsx";
 import { Asset } from "../components/MarketVisuals.jsx";
 import { ASSET_NAMES } from "../lib/presentation.js";
@@ -25,6 +26,18 @@ import "../marketplace-detail.css";
 
 const clock = (t) => `${new Date(t * 1000).toISOString().slice(11, 16)} UTC`;
 const QUICK = [25, 100, 500];
+
+function answerKeyDown(e, choose) {
+  const answers = [...e.currentTarget.parentElement.querySelectorAll('[role="radio"]')];
+  const i = answers.indexOf(e.currentTarget);
+  const next = e.key === "Home" ? 0 : e.key === "End" ? answers.length - 1
+    : ["ArrowRight", "ArrowDown"].includes(e.key) ? (i + 1) % answers.length
+    : ["ArrowLeft", "ArrowUp"].includes(e.key) ? (i + answers.length - 1) % answers.length : null;
+  if (next == null) return;
+  e.preventDefault();
+  choose(next === 0 ? "yes" : "no");
+  answers[next].focus();
+}
 
 function PriceTime({ pricesTs, age }) {
   if (age.state === "paused") return <span className="q-time warn">Prices paused since {clock(pricesTs)}</span>;
@@ -80,17 +93,18 @@ function Settled({ board }) {
 /** The coin's research beside the trade: its three layers for both windows, in the coin page's own
  * overview card, with a way into the coin's page. */
 function Context({ und }) {
-  const { data } = useData("markets.json");
+  const { data, error } = useData("markets.json");
   const row = data?.coins?.find((c) => c.und === und);
   return (
     <section className="q-context md-context coin-detail" aria-label="Context, not advice">
       <h2 className="md-context-title">Context, not advice
         <Info label="About the context">What Cowboy's three layers show for {und} now, over the next 7 and 30 days: regime, wallets and options. They describe the market; they do not choose an answer.</Info>
       </h2>
+      <RefreshNotice error={data ? error : null} />
       {row?.align
         ? <CoinOverview alignment={row.align} und={und} label={`${und}: three layers`}
             footer={<><span>{ASSET_NAMES[und] || und}: chart, regime, wallets and options</span><Link to={`/coin/${und}#regime`}>Open {und}<Arrow /></Link></>} />
-        : <p className="status">Not available yet</p>}
+        : <p className="status">{error ? "Research context is unavailable right now." : "Not available yet"}</p>}
     </section>
   );
 }
@@ -98,7 +112,7 @@ function Context({ und }) {
 function Rules({ und }) {
   return (
     <Info label="Rules">
-      Each answer is two Derive options on {und}: one bought, one sold, both expiring on the date shown. Derive settles them in USDC on the average {und} index over the 30 minutes to 08:00 UTC, with no action from you. A settlement inside the zone pays part of the $1; that is normal. You can sell back on Derive at any time until a minute before 08:00 UTC; holding is fine too. Derive's fees apply per option. Cowboy shows prices from Derive's screen and places nothing. Derive is not open to everyone: its terms list who may not use it.
+      Each answer is two Derive options on {und}: one bought, one sold, both expiring on the date shown. Derive settles them in USDC on the average {und} index over the 30 minutes to 08:00 UTC, with no action from you. A settlement inside the zone pays part of the $1; that is normal. You can sell back on Derive at any time until a minute before 08:00 UTC; holding is fine too. Derive's fees are included in the total shown. Cowboy shows prices from Derive's screen. Opening a payout preview places no order. Derive is not open to everyone: its terms list who may not use it.
     </Info>
   );
 }
@@ -119,16 +133,39 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), summa
 /** The phone ticket sheet is a dialog: focus moves into it on open, Tab stays inside, Escape closes
  * it, and focus returns to the button that opened it. Wide screens show the ticket as a column. */
 export function useSheetFocus(open, sheetRef, openerRef, close) {
+  const [modal, setModal] = useState(() => typeof matchMedia !== "function" || matchMedia("(max-width: 1279px)").matches);
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return;
+    const media = matchMedia("(max-width: 1279px)");
+    const update = () => setModal(media.matches);
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
   useEffect(() => {
     const el = sheetRef.current;
-    const modal = typeof matchMedia !== "function" || matchMedia("(max-width: 1279px)").matches;
-    if (!open || !el || !modal) return undefined;
+    if (!open || !el) return undefined;
     const items = () => [...el.querySelectorAll(FOCUSABLE)]
-      .filter((x) => !x.closest(".sr-only") && !(x.tagName !== "SUMMARY" && x.closest("details:not([open])")));
+      .filter((x) => !x.closest(".sr-only, [hidden]") && !(x.tagName !== "SUMMARY" && x.closest("details:not([open])"))
+        && (modal || !x.classList.contains("q-sheet-close"))
+        && getComputedStyle(x).display !== "none" && getComputedStyle(x).visibility !== "hidden");
+    const background = [];
+    const bodyOverflow = document.body.style.overflow;
+    const rootOverflow = document.documentElement.style.overflow;
+    if (modal) {
+      for (let node = el; node && node !== document.body; node = node.parentElement) {
+        for (const sibling of node.parentElement?.children || []) {
+          if (sibling === node) continue;
+          background.push([sibling, sibling.getAttribute("inert")]);
+          sibling.setAttribute("inert", "");
+        }
+      }
+      document.body.style.overflow = "hidden";
+      document.documentElement.style.overflow = "hidden";
+    }
     (items()[0] || el).focus?.();
     const key = (e) => {
-      if (e.key === "Escape") { e.preventDefault(); close(); return; }
-      if (e.key !== "Tab") return;
+      if (e.key === "Escape" && !document.querySelector(".pop")) { e.preventDefault(); close(); return; }
+      if (!modal || e.key !== "Tab") return;
       const list = items();
       if (!list.length) return;
       const first = list[0], last = list[list.length - 1];
@@ -137,8 +174,20 @@ export function useSheetFocus(open, sheetRef, openerRef, close) {
     };
     document.addEventListener("keydown", key);
     const back = openerRef.current;
-    return () => { document.removeEventListener("keydown", key); back?.focus?.(); };
-  }, [open]);
+    return () => {
+      document.removeEventListener("keydown", key);
+      if (modal) {
+        for (const [node, inert] of background) {
+          if (inert == null) node.removeAttribute("inert");
+          else node.setAttribute("inert", inert);
+        }
+        document.body.style.overflow = bodyOverflow;
+        document.documentElement.style.overflow = rootOverflow;
+      }
+      back?.focus?.();
+    };
+  }, [open, modal]);
+  return modal;
 }
 
 /** No price for a side, with the reason in an (i). */
@@ -211,23 +260,22 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
   const question = questionText(und, level, date.expiry);
   const paused = age.state === "paused" || board.paused;
   const settling = settlingNow(level);
-  const [dollars, setDollars] = useState(() => Number.isFinite(initialDollars) && initialDollars > 0 ? initialDollars : loadBudget());
+  const [amountDraft, setAmountDraft] = useState(() => String(Number.isFinite(initialDollars) && initialDollars > 0 ? initialDollars : loadBudget()));
+  const dollars = Number(amountDraft);
+  const amountValid = Number.isFinite(dollars) && dollars > 0;
   const [sheet, setSheet] = useState(false);
   const { data: hist, error: historyError } = useData(`questions/history/${und}-${date.expiry}.json`, 15 * 60_000);
-  const t = !settling && sideKey && live(level, sideKey, paused) ? budgetTicket(level, sideKey, dollars, board) : null;
+  const t = amountValid && !settling && sideKey && live(level, sideKey, paused) ? budgetTicket(level, sideKey, dollars, board) : null;
   const ready = t && !t.belowMin;
   // Testnet builds: one tap needs the level's options listed on Derive's testnet (by hand stays open).
   const listed = useTestnetListing(TESTNET_FILLS && sideKey ? und : null);
   const offTestnet = TESTNET_FILLS && !!sideKey && missingLegs(level.id, sideKey, listed).length > 0;
   const sheetRef = useRef(null);
   const opener = useRef(null);
-  useSheetFocus(sheet && ready, sheetRef, opener, () => setSheet(false));
+  const modal = useSheetFocus(sheet && ready, sheetRef, opener, () => setSheet(false));
   useEffect(() => { if (!ready) setSheet(false); }, [ready]);
   const choose = (side) => { setSheet(false); setSide(side); };
-  const place = () => {
-    setSheet(true);
-    requestAnimationFrame(() => sheetRef.current?.querySelector("button, a")?.focus?.());
-  };
+  const place = () => setSheet(true);
   return (
     <div className={`md-detail${sideKey && !settling ? " md-chosen" : ""}`}>
       <header className="md-heading">
@@ -264,8 +312,8 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
             <div className="q-pick md-pick" role="radiogroup" aria-label="Answer">
               {["yes", "no"].map((side) => {
                 const c = buyCents(level, side, paused);
-                return <button key={side} role="radio" aria-checked={sideKey === side} className={`q-pick-btn ${side}${sideKey === side ? " on" : ""}`}
-                  aria-label={`${ANSWER[side]}, ${fullPay(level, side)}, ${c != null ? `${c} cents per $1` : "no price now"}`} onClick={() => choose(side)}>
+                return <button key={side} type="button" role="radio" aria-checked={sideKey === side} tabIndex={(sideKey || "yes") === side ? 0 : -1} className={`q-pick-btn ${side}${sideKey === side ? " on" : ""}`}
+                  aria-label={`${ANSWER[side]}, ${fullPay(level, side)}, ${c != null ? `${c} cents per $1` : "no price now"}`} onClick={() => choose(side)} onKeyDown={(e) => answerKeyDown(e, choose)}>
                   <span className="q-pick-name"><i className={`q-arrow ${side}`} aria-hidden="true" />{ANSWER[side]}</span><b className="mono">{c != null ? cents(c) : <small>No price now</small>}</b>
                   <span className="q-pick-zone"><small>{fullPay(level, side)}</small></span>
                 </button>;
@@ -274,23 +322,24 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
             {!sideKey ? <div className="md-unpicked"><p>Choose Higher or Lower to see your cost and payout.</p><small>Nothing is selected for you.</small></div> : <>
               <section className="q-amount md-amount" aria-label="Amount" hidden={sheet}>
                 <div className="q-amount-in"><label htmlFor="q-dollars" className="label">Amount, fees included<Info label="About the amount">The total you spend, Derive's fees included. Cowboy sizes the two options so their price plus Derive's fees fit this amount; what is left over from rounding stays with you.</Info></label>
-                  <span className="q-dollar-field"><span>$</span><input id="q-dollars" inputMode="decimal" value={dollars} onChange={(e) => setDollars(Math.max(0, Number(e.target.value.replace(/[^\d.]/g, "")) || 0))} /></span>
-                  <span className="q-quick">{QUICK.map((v) => <button key={v} className="text-control" aria-pressed={dollars === v} onClick={() => setDollars(v)}>${v}</button>)}</span>
+                  <span className="q-dollar-field"><span>$</span><input id="q-dollars" inputMode="decimal" value={amountDraft} onChange={(e) => setAmountDraft(e.target.value.replace(/[^\d.]/g, ""))} /></span>
+                  <span className="q-quick">{QUICK.map((v) => <button key={v} className="text-control" aria-pressed={dollars === v} onClick={() => setAmountDraft(String(v))}>${v}</button>)}</span>
                 </div>
                 {t ? <>
                   {t.belowMin && <p className="q-note warn">Smallest amount for this question: {money(t.minTotal, { cents: true })} with Derive's fees.</p>}
                   {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
                   {t.mostLose > 0 && t.mostLose < 50 && <p className="q-note">Fees are a large share of small amounts.</p>}
                   <section className="md-preview" aria-label="What it pays"><OutcomeFigures und={und} level={level} side={sideKey} t={t} expiry={date.expiry} settleTs={date.settle_ts} summary compact /><p className="md-loss-note">Your cost is the most you can lose.</p></section>
-                </> : <p className="status"><NoPrice level={level} side={sideKey} paused={paused} text={`No price now for ${ANSWER[sideKey]}`} /></p>}
+                </> : <p className="status">{amountValid ? <NoPrice level={level} side={sideKey} paused={paused} text={`No price now for ${ANSWER[sideKey]}`} /> : "Enter an amount greater than $0."}</p>}
                 {age.state === "stale" && <p className="q-note warn">Prices are {age.minutes} min old.</p>}
                 {offTestnet && <p className="q-note"><span className="q-noprice">{NOT_ON_TESTNET}<Info label={`Why ${ANSWER[sideKey]} at ${money(level.k)} is not on testnet`}>{NOT_ON_TESTNET_WHY}</Info></span></p>}
                 <div className="md-review-action"><button ref={opener} className="btn primary lg" disabled={!ready} onClick={place}>Review trade</button><small>{oneTapOffered() ? "One tap: both options at one price, or nothing." : "One-tap trading is coming to Cowboy."}</small></div>
               </section>
-              {sheet && ready && <div ref={sheetRef} className="q-sheet open md-ticket" role="dialog" aria-modal={typeof matchMedia !== "function" || matchMedia("(max-width: 1279px)").matches ? "true" : undefined} aria-label="Ticket">
+              {sheet && ready && <>{modal && <div className="q-sheet-backdrop" aria-hidden="true" />}
+                <div ref={sheetRef} className="q-sheet open md-ticket" role="dialog" aria-modal={modal ? "true" : undefined} aria-label="Ticket" tabIndex={-1}>
                 <button className="text-control q-sheet-close" onClick={() => setSheet(false)}>Back to payout</button>
                 <QuestionTicket und={und} question={question} answer={ANSWER[sideKey]} level={level} sideKey={sideKey} t={t} board={board} pricesTs={board.prices_ts} settleTs={date.settle_ts} expiry={date.expiry} stale={age.state === "stale"} />
-              </div>}
+              </div></>}
             </>}
           </>}
         </div>
@@ -302,16 +351,18 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
 /** The guided flow from step 3: Higher or Lower (never picked for the user), then the amount, then
  * what it pays, then the trade. One primary action per step. The full ladder of levels
  * sits under "Other levels". */
-function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, ladder, ladderOpen, onLadder, initialStep, initialDollars }) {
+function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, renderLadder, ladderOpen, onLadder, initialStep, initialDollars }) {
   const { date, level } = found;
   const question = questionText(und, level, date.expiry);
   const paused = age.state === "paused" || board.paused;
   // The first amount: the board's budget when opened from it, else the budget kept in this browser.
   // An amount is the total spend, Derive's fees included (budgetTicket), as on the board.
-  const [dollars, setDollars] = useState(() => (Number.isFinite(initialDollars) && initialDollars > 0 ? initialDollars : loadBudget()));
+  const [amountDraft, setAmountDraft] = useState(() => String(Number.isFinite(initialDollars) && initialDollars > 0 ? initialDollars : loadBudget()));
+  const dollars = Number(amountDraft);
+  const amountValid = Number.isFinite(dollars) && dollars > 0;
   const [sheet, setSheet] = useState(false);
   const [step, setStep] = useState(() => (sideKey ? initialStep || "preview" : "pick"));
-  const t = sideKey && live(level, sideKey, paused) ? budgetTicket(level, sideKey, dollars, board) : null;
+  const t = amountValid && sideKey && live(level, sideKey, paused) ? budgetTicket(level, sideKey, dollars, board) : null;
   const side = sideKey ? level[sideKey] : null;
   const settling = settlingNow(level); // by the clock now, from 07:30 UTC
   const sz = side?.size;
@@ -320,15 +371,12 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
   const opener = useRef(null);
   const amountRef = useRef(null);
   const previewRef = useRef(null);
-  useSheetFocus(sheet, sheetRef, opener, () => setSheet(false));
+  const modal = useSheetFocus(sheet, sheetRef, opener, () => setSheet(false));
+  useEffect(() => { if (!ready) setSheet(false); }, [ready]);
   useEffect(() => { if (initialStep === "amount") scrollTo(amountRef.current); }, []);
   const pick = (k) => { setSide(k); if (step === "pick") setStep("amount"); };
   const preview = () => { setStep("preview"); requestAnimationFrame(() => scrollTo(previewRef.current)); };
-  const place = () => {
-    setSheet(true);
-    // Wide screens show the ticket beside the flow: move focus to it.
-    if (typeof matchMedia === "function" && !matchMedia("(max-width: 1279px)").matches) sheetRef.current?.querySelector("a, button")?.focus?.();
-  };
+  const place = () => setSheet(true);
   const showPreview = !settling && sideKey && step === "preview";
   const bar = !settling && sideKey && (
     <ActionBar und={und} level={level} sideKey={sideKey} date={date} t={t} hidden={sheet}
@@ -350,9 +398,9 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
                 {["yes", "no"].map((k) => {
                   const c = buyCents(level, k, paused);
                   return (
-                    <button key={k} role="radio" aria-checked={sideKey === k} className={`q-pick-btn${sideKey === k ? " on" : ""}`}
+                    <button key={k} type="button" role="radio" aria-checked={sideKey === k} tabIndex={(sideKey || "yes") === k ? 0 : -1} className={`q-pick-btn${sideKey === k ? " on" : ""}`}
                       aria-label={`${ANSWER[k]}, ${fullPay(level, k)}, ${c != null ? `${c} cents per $1` : "no price now"}`}
-                      onClick={() => pick(k)}>
+                      onClick={() => pick(k)} onKeyDown={(e) => answerKeyDown(e, pick)}>
                       <span className="q-pick-name"><i className={`q-arrow ${k}`} aria-hidden="true" />{ANSWER[k]}</span>
                       <span className="q-pick-zone"><PayZone lo={level.lo} hi={level.hi} side={k} index={board.index} compact /><small>{fullPay(level, k)}</small></span>
                       <b className="mono">{c != null ? cents(c) : <small>No price now</small>}</b>
@@ -371,7 +419,7 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
           </article>
           <ZoneNote und={und} date={date} index={board.index} />
           <button className="text-control q-other" aria-expanded={ladderOpen} onClick={onLadder}>{ladderOpen ? "Hide other levels" : "Other levels"}</button>
-          {ladderOpen && ladder}
+          {ladderOpen && renderLadder(dollars)}
         </Step>
         {!settling && sideKey && (
           <Step n={4} title="Amount" stepRef={amountRef} className="q-step-amount">
@@ -381,9 +429,9 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
                   <Info label="About the amount">The total you spend, Derive's fees included. Cowboy sizes the two options so their price plus Derive's fees fit this amount; what is left over from rounding stays with you.</Info>
                 </label>
                 <span className="q-dollar-field"><span>$</span>
-                  <input id="q-dollars" inputMode="decimal" value={dollars} onChange={(e) => setDollars(Math.max(0, Number(e.target.value.replace(/[^\d.]/g, "")) || 0))} />
+                  <input id="q-dollars" inputMode="decimal" value={amountDraft} onChange={(e) => setAmountDraft(e.target.value.replace(/[^\d.]/g, ""))} />
                 </span>
-                <span className="q-quick">{QUICK.map((v) => <button key={v} className="text-control" aria-pressed={dollars === v} onClick={() => setDollars(v)}>${v}</button>)}</span>
+                <span className="q-quick">{QUICK.map((v) => <button key={v} className="text-control" aria-pressed={dollars === v} onClick={() => setAmountDraft(String(v))}>${v}</button>)}</span>
               </div>
               {t ? (
                 <>
@@ -393,7 +441,7 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
                 </>
               ) : (
                 <>
-                  <p className="status"><NoPrice level={level} side={sideKey} paused={paused} text={`No price now for ${ANSWER[sideKey]}`} /></p>
+                  <p className="status">{amountValid ? <NoPrice level={level} side={sideKey} paused={paused} text={`No price now for ${ANSWER[sideKey]}`} /> : "Enter an amount greater than $0."}</p>
                   <PayZone lo={level.lo} hi={level.hi} side={sideKey} index={board.index} />
                 </>
               )}
@@ -418,8 +466,9 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
         </p>
       </div>
       <aside className="q-aside">
+        {sheet && modal && <div className="q-sheet-backdrop" aria-hidden="true" />}
         {showPreview && ready ? (
-          <div ref={sheetRef} className={`q-sheet${sheet ? " open" : ""}`} role={sheet ? "dialog" : undefined} aria-modal={sheet ? "true" : undefined} aria-label="Ticket">
+          <div ref={sheetRef} className={`q-sheet${sheet ? " open" : ""}`} role={sheet ? "dialog" : undefined} aria-modal={sheet && modal ? "true" : undefined} aria-label="Ticket" tabIndex={-1}>
             <button className="text-control q-sheet-close" onClick={() => setSheet(false)}>Close</button>
             <QuestionTicket und={und} question={question} answer={ANSWER[sideKey]} level={level} sideKey={sideKey} t={t} board={board}
               pricesTs={board.prices_ts} settleTs={date.settle_ts} expiry={date.expiry} stale={age.state === "stale"} />
@@ -435,11 +484,12 @@ function OldQuestion({ id, onBack }) {
   const p = parseId(id);
   const { data: hist, error } = useData(p ? `questions/history/${p.und}-${p.expiry}.json` : null, 30 * 60_000);
   if (!p) return <p className="status">Unknown question.</p>;
-  if (error && !hist) return <p className="status">This question is no longer published.</p>;
+  if (error && !hist) return <p className="status">{error.status === 404 ? "This question is no longer published." : "Question history is unavailable right now. Try again shortly."}</p>;
   if (!hist) return <Loading />;
   const lv = { ...p, id };
   return (
     <article className="q-view">
+      <RefreshNotice error={error} />
       <button className="text-control q-back" onClick={onBack}>‹ {p.und}</button>
       <h1 className="q-title">{questionText(p.und, lv, p.expiry)}</h1>
       {hist.settle_price != null ? <SettledView und={p.und} level={lv} price={hist.settle_price} paid={payAt(hist.settle_price, p.lo, p.hi)} expiry={p.expiry} />
@@ -450,45 +500,60 @@ function OldQuestion({ id, onBack }) {
 }
 
 export default function Questions() {
+  const now = useClock();
   const { und: undParam, id } = useParams();
   const [search, setSearch] = useSearchParams();
   const navigate = useNavigate();
   const { theme } = useOutletContext() || {};
   const parsed = id ? parseId(id) : null;
   const { data: index, error: indexError } = useData("questions/index.json");
-  const und = parsed?.und || undParam || index?.coins?.[0]?.und;
+  const und = id ? parsed?.und : undParam || index?.coins?.[0]?.und;
   const { data: board, error } = useData(und ? `questions/${und}.json` : null);
   const [pickedDate, setPickedDate] = useState(null);
+  const [pickedOutcome, setPickedOutcome] = useState(null);
   const [more, setMore] = useState(false);
   const [ladder, setLadder] = useState(false);
   const location = useLocation();
   const sideParam = search.get("side");
   const sideKey = sideParam === "no" || sideParam === "yes" ? sideParam : null; // never picked for the user
-  const setSide = (k) => setSearch((s) => { const n = new URLSearchParams(s); n.set("side", k); return n; }, { replace: true });
-  useEffect(() => { setPickedDate(null); setMore(false); setLadder(false); }, [und]);
-
-  if (indexError && !index) return <div className="wrap page"><Failed error={indexError} /></div>;
-  if (!index || (und && !board && !error)) return <div className="wrap page"><Loading /></div>;
-  const coins = index.coins || [];
-  if (!und || (error && !board)) {
-    return <div className="wrap page q-page"><SaloonHead view="guided" /><p className="status">No questions with a price on Derive's screen right now.</p></div>;
-  }
-  const age = priceAge(board.prices_ts, Date.now() / 1000, board.paused || index.paused);
+  const setSide = (k) => {
+    if (!id && found) { setPickedDate(found.date.expiry); setPickedOutcome(found.level.id); }
+    setSearch((s) => { const n = new URLSearchParams(s); n.set("side", k); return n; }, { replace: true });
+  };
+  useEffect(() => { setPickedDate(null); setPickedOutcome(null); setMore(false); setLadder(false); }, [und]);
+  const back = () => { setPickedDate(null); setPickedOutcome(null); navigate(`/saloon/${und}`); };
+  const age = priceAge(board?.prices_ts, now, board?.paused || index?.paused);
   const paused = age.state === "paused";
-  const dates = board.dates.filter((d) => d.board);
-  const chosen = id ? findLevel(board, id) : null;
+  const dates = (board?.dates || []).filter((d) => d.board);
+  const chosen = id || pickedOutcome ? findLevel(board, id || pickedOutcome) : null;
   // Default tab: the nearest date whose headline can be bought on both sides, else the nearest with
-  // any live answer, else the nearest.
+  // any live answer, else the nearest. A chosen answer keeps its exact level and date.
   const liveHead = (d) => { const h = d.levels.find((x) => x.id === d.headline); return h && live(h, "yes", paused) && live(h, "no", paused); };
   const anyLive = (d) => d.levels.some((x) => x.ladder === 7 && (live(x, "yes", paused) || live(x, "no", paused)));
   const fallback = (dates.find(liveHead) || dates.find(anyLive) || dates[0])?.expiry;
   const expiry = chosen?.date?.expiry || pickedDate || fallback;
-  const date = dates.find((d) => d.expiry === expiry) || dates[0];
-  // The flow opens on the date's headline level; "Other levels" opens the full ladder.
-  const found = chosen || (date?.headline ? findLevel(board, date.headline) : null);
+  const date = chosen?.date || board?.dates.find((d) => d.expiry === expiry);
+  const found = id || pickedOutcome ? chosen : date?.headline ? findLevel(board, date.headline) : null;
+  useEffect(() => {
+    if (!id && sideKey && !pickedOutcome && found) {
+      setPickedDate(found.date.expiry);
+      setPickedOutcome(found.level.id);
+    }
+  }, [id, und, sideKey, pickedOutcome, found?.level.id]);
+
+  if (id && !parsed) return <div className="wrap page q-page"><p className="status">Unknown question.</p><Link className="text-control" to="/saloon">Browse the Saloon</Link></div>;
+  if (id && error?.status === 404 && !board) return <div className="wrap page q-page"><OldQuestion id={id} onBack={back} /></div>;
+  if (indexError && !index && !id) return <div className="wrap page"><Failed error={indexError} /></div>;
+  if ((!id && !index) || (und && !board && !error)) return <div className="wrap page"><Loading /></div>;
+  const coins = index?.coins || [];
+  if (error && !board) return <div className="wrap page q-page"><SaloonHead view="guided" /><p className="status">Outcome data is unavailable right now. Try again shortly.</p></div>;
+  if (!und) {
+    return <div className="wrap page q-page"><SaloonHead view="guided" /><p className="status">No questions with a price on Derive's screen right now.</p></div>;
+  }
   const coinItems = (coins.some((c) => c.und === und) ? coins : [...coins, { und }]).map((c) => [c.und, c.und]);
-  const back = () => navigate(`/saloon/${und}`);
   const thin = board.thin;
+  const dateItems = date && !dates.some((d) => d.expiry === date.expiry) ? [date, ...dates]
+    : pickedDate && !dates.some((d) => d.expiry === pickedDate) ? [{ expiry: pickedDate, label: dayLabel(pickedDate) }, ...dates] : dates;
   // Picking a row in the ladder opens that level at the amount step, the ladder folded away.
   const onPick = (e, lv, k, dollars) => {
     e.preventDefault();
@@ -506,11 +571,11 @@ export default function Questions() {
           <PriceTime pricesTs={board.prices_ts} age={age} />
         </div>
       </Step>
-      {dates.length > 0 && (
+      {dateItems.length > 0 && (
         <Step n={2} title="Date" className="q-step-date">
           <div className="q-dates">
-            <Tabs label="Settlement date" value={date.expiry} onChange={(e) => { setPickedDate(e); navigate(`/saloon/${und}`); }}
-              items={dates.map((d) => [d.expiry, d.label])} />
+            <Tabs label="Settlement date" value={expiry} onChange={(e) => { setPickedDate(e); setPickedOutcome(null); navigate(`/saloon/${und}`); }}
+              items={dateItems.map((d) => [d.expiry, d.label])} />
           </div>
         </Step>
       )}
@@ -526,11 +591,12 @@ export default function Questions() {
   return (
     <div className={`wrap page q-page${id ? " md-page" : ""}`}>
       {!id && <SaloonHead view="guided" />}
+      <RefreshNotice error={error || (index ? indexError : null)} />
       {found && !found.settled ? (
         id ? <OutcomeDetail key={found.level.id} und={und} board={board} found={found} sideKey={sideKey} setSide={setSide} age={age} theme={theme}
           renderLadder={renderLadder} ladderOpen={ladder} onLadder={() => setLadder((o) => !o)} initialDollars={location.state?.dollars} /> :
         <QuestionView key={found.level.id} und={und} board={board} found={found} sideKey={sideKey} setSide={setSide} age={age} theme={theme}
-          lead={lead} ladder={ladderEl} ladderOpen={ladder} onLadder={() => setLadder((o) => !o)} initialStep={location.state?.step}
+          lead={lead} renderLadder={renderLadder} ladderOpen={ladder} onLadder={() => setLadder((o) => !o)} initialStep={location.state?.step}
           initialDollars={location.state?.dollars} />
       ) : (
         <div className="q-layout">
@@ -543,7 +609,7 @@ export default function Questions() {
                   : <p className="q-big">Settling · average from 07:30 to 08:00 UTC</p>}
                 <button className="text-control" onClick={back}>Back to {und}'s open dates</button>
               </article>
-            ) : id ? <OldQuestion id={id} onBack={back} /> : dates.length ? ladderEl
+            ) : id ? <OldQuestion id={id} onBack={back} /> : pickedOutcome ? <><p className="status">This outcome is no longer on the board. Choose another date or level.</p>{ladderEl}</> : dates.length ? ladderEl
               : <p className="status">No dates with a price on Derive's screen right now.</p>}
           </div>
         </div>

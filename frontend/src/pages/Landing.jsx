@@ -5,7 +5,7 @@ import WalletTag from "../components/WalletTag.jsx";
 import { Info } from "../components/ui.jsx";
 import { HatMark, NeonSign } from "../components/Brand.jsx";
 import { REGIME } from "../lib/format.js";
-import { QUESTIONS_ON } from "../lib/flags.js";
+import { QUESTIONS_ON, TRADE_ON, ONE_TAP_FILLS, TESTNET_FILLS } from "../lib/flags.js";
 import { oneTapOffered } from "../lib/pilot.js";
 import SaloonDemo from "../components/SaloonDemo.jsx";
 import "../landing.css";
@@ -292,11 +292,12 @@ function ResearchExplorer() {
   );
 }
 
-const FAQ = [
+const FAQ = (canFill, practice) => [
   ["What is Cowboy?", QUESTIONS_ON
-    ? "Cowboy makes Derive’s price outcomes easier to explore. The Saloon shows costs and settlement payouts, with separate research on price regimes, wallet positioning and options. " + (oneTapOffered()
-      ? "You trade in one tap from Cowboy, with your own wallet; trades settle on Derive."
-      : "Trades settle on Derive, in your own account.")
+    ? "Cowboy makes Derive’s price outcomes easier to explore. The Saloon shows costs and settlement payouts, with separate research on price regimes, wallet positioning and options. " + (canFill
+      ? (TESTNET_FILLS ? "Practice trades use test USDC on Derive’s testnet." : "You trade in one tap from Cowboy, with your own wallet; trades settle on Derive.")
+      : practice ? "This practice build checks quotes on Derive’s testnet; nothing fills."
+        : "Trades settle on Derive, in your own account. One-tap trading is coming to Cowboy.")
     : "Independent research on Derive: price regimes, wallet positioning and options, read side by side."],
   [QUESTIONS_ON ? "Is a partial payout still a loss?" : "Do I need to trade options?", QUESTIONS_ON
     ? "It can be. Payout is the total returned at settlement. Profit or loss is that payout minus your total cost, including fees. A payout below your cost is a loss. Closing before settlement is valued differently."
@@ -304,9 +305,10 @@ const FAQ = [
   ["Where does the data come from?", "Derive’s public prices, option quotes and trades. Wider market context comes from public sources. The examples on this page are illustrations, not current market readings."],
   ["How often does it update?", "Options and flow every 15 minutes. The engine after each 4-hour and daily close. Wallet history once a day. Each research view shows its own time."],
   ["Does Cowboy trade for me?", QUESTIONS_ON
-    ? (oneTapOffered()
-      ? "No. You choose and confirm every trade. One tap sends it to Derive from your own wallet and account: both options fill together at one price, or nothing fills. Cowboy never holds your money or your keys."
-      : "Not yet: one-tap trading is coming. For now the Saloon lists the two option orders to place on Derive. The completed position’s defined cost applies after both orders fill. While only the first has filled, the cash needed and loss can be larger.")
+    ? (canFill
+      ? "No. You choose and confirm every trade. One tap sends it to Derive from your own wallet and account: both options fill together at one price, or nothing fills. " + (TESTNET_FILLS ? "This build uses test USDC on Derive’s testnet. " : "") + "Cowboy never holds your money or your keys."
+      : practice ? "No. This practice build checks a quote without placing a trade. Nothing fills."
+        : "No. One-tap trading is coming. The Saloon lets you explore costs and settlement payouts. A completed position’s defined cost applies after both options fill. While only the first has filled, the cash needed and loss can be larger.")
     : "No. Cowboy reads public market data. Any trade is yours to place on Derive."],
   ["Are the readings trade advice?", "No. The three research layers are context and stay separate. The study of whether wallet positioning leads price is still underway. Nothing here is investment advice."],
 ];
@@ -315,7 +317,7 @@ const EntryButton = () => (QUESTIONS_ON
   ? <Link className="btn primary lg" to="/saloon">Enter the Saloon</Link>
   : <Link className="btn primary lg" to="/markets">Open the markets</Link>);
 
-function SaloonIntro() {
+function SaloonIntro({ canFill, practice }) {
   return (
     <section id="how" className="wrap lp-saloon-draft" aria-labelledby="lp-saloon">
       <div className="lp-saloon-copy">
@@ -327,9 +329,11 @@ function SaloonIntro() {
           <li><span>Understand the payout</span><small>Full, partial or none. Cost always counts.</small></li>
           <li><span>Check the context</span><small>Regime, wallets and options alongside.</small></li>
         </ol>
-        {oneTapOffered()
+        {canFill
           ? <p className="lp-execution-note">One tap: both options fill together at one price, or nothing fills.<Info label="How one tap works">The demo describes a position held to settlement. One tap sends the whole answer to Derive as one package from your own wallet and account, at one firm price you see first. Closing early is valued differently.</Info></p>
-          : <p className="lp-execution-note">One-tap trading is coming. For now, two option orders on Derive.<Info label="How the orders work">The demo describes a completed two-option position held to settlement. Both orders need to fill for its defined cost to apply. With only the first order filled, cash needed and loss can be larger. Closing early is valued differently.</Info></p>}
+          : practice
+            ? <p className="lp-execution-note">Practice mode: quotes are checked; nothing fills.<Info label="How practice works">This build checks a two-option quote on Derive’s testnet without placing a trade. The illustration shows the payout of a completed position held to settlement.</Info></p>
+            : <p className="lp-execution-note">One-tap trading is coming. Explore costs and settlement payouts.<Info label="How outcomes work">The demo describes a completed two-option position held to settlement. Both orders need to fill for its defined cost to apply. With only the first order filled, cash needed and loss can be larger. Closing early is valued differently.</Info></p>}
       </div>
       <SaloonDemo />
     </section>
@@ -337,6 +341,9 @@ function SaloonIntro() {
 }
 
 export default function Landing() {
+  const offered = oneTapOffered();
+  const canFill = ONE_TAP_FILLS && offered;
+  const practice = TRADE_ON && !ONE_TAP_FILLS && offered;
   return (
     <div className="landing cowboy-landing cowboy-draft">
       <section className="hero-stage" aria-labelledby="lp-hero">
@@ -347,7 +354,10 @@ export default function Landing() {
             <h1 id="lp-hero">Know where<br />the herd stands.{QUESTIONS_ON && <span className="hero-then"> Then pick your side.</span>}</h1>
             <div className="hero-side">
               <p className="hero-description">{QUESTIONS_ON
-                ? `See market conditions and how traders are positioned. Trade higher or lower ${oneTapOffered() ? "in one tap" : "on Derive"}, with the cost shown before you confirm.`
+                ? "See market conditions and how traders are positioned. " + (canFill
+                  ? `${TESTNET_FILLS ? "Practice" : "Trade"} higher or lower in one tap${TESTNET_FILLS ? " with test USDC" : ""}, with the cost shown before you confirm.`
+                  : practice ? "Explore higher-or-lower outcomes and check quotes in practice mode. Nothing fills."
+                    : "Explore higher-or-lower outcomes on Derive, with costs and payouts shown first.")
                 : "Understand the price cycle, follow wallet positioning and see what the options market prices in."}</p>
               <div className="hero-cta">
                 <EntryButton />
@@ -358,13 +368,13 @@ export default function Landing() {
         </div>
       </section>
 
-      {QUESTIONS_ON && <SaloonIntro />}
+      {QUESTIONS_ON && <SaloonIntro canFill={canFill} practice={practice} />}
       <ResearchExplorer />
 
       <section className="wrap lp-faq" aria-labelledby="lp-faq">
         <div className="lp-faq-heading"><h2 id="lp-faq">Before you saddle up.</h2><p>A few things worth knowing.</p></div>
         <div className="lp-faq-list">
-          {FAQ.map(([q, a]) => (
+          {FAQ(canFill, practice).map(([q, a]) => (
             <details key={q}><summary>{q}<span aria-hidden="true">+</span></summary><p>{a}</p></details>))}
         </div>
       </section>

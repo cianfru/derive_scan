@@ -1,8 +1,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
+import { useClock } from "../lib/useClock.js";
 import { useFeeds } from "../components/Feeds.jsx";
-import { Info, Loading, Failed, Tabs } from "../components/ui.jsx";
+import { Info, Loading, Failed, RefreshNotice, Tabs } from "../components/ui.jsx";
 import { Asset, CoinIcon } from "../components/MarketVisuals.jsx";
 import { ChainMini, HORIZON_LABEL, LAYERS, LayerTile } from "../components/Chain.jsx";
 import { ASSET_NAMES } from "../lib/presentation.js";
@@ -223,7 +224,7 @@ export default function Board({ followingOnly = false, embedded = false }) {
   const doc = useFollowsDoc();
   const budget = REF;
   const coins = (index?.coins || []).map((c) => c.und);
-  const [feeds, files, ready] = useFeeds(coins.map((u) => `questions/${u}.json`));
+  const [feeds, files, ready, feedResults] = useFeeds(coins.map((u) => `questions/${u}.json`));
   const [coin, setCoin] = useState("all");
   const [range, setRange] = useState("all");
   const [side, setSide] = useState("all");
@@ -231,8 +232,11 @@ export default function Board({ followingOnly = false, embedded = false }) {
   const [search, setSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [shown, setShown] = useState(PAGE);
-  const now = Date.now() / 1000;
+  const now = useClock();
   const boards = coins.map((u) => files[`questions/${u}.json`]).filter(Boolean);
+  const missingCoins = coins.filter((u) => feedResults[`questions/${u}.json`]?.error && !files[`questions/${u}.json`]);
+  const feedFailed = ready && (coin === "all" ? coins.length > 0 && missingCoins.length === coins.length : missingCoins.includes(coin));
+  const refreshError = error || coins.map((u) => feedResults[`questions/${u}.json`]).find((r) => r?.data && r?.error)?.error;
   const age = priceAge(index?.prices_ts, now, index?.paused);
   const paused = age.state === "paused";
   const { rows, noPrice } = useMemo(() => {
@@ -240,7 +244,7 @@ export default function Board({ followingOnly = false, embedded = false }) {
     const byUnd = Object.fromEntries(boards.map((b) => [b.und, b]));
     for (const r of [...out.rows, ...out.noPrice]) r.board = byUnd[r.und];
     return out;
-  }, [boards.map((b) => `${b.und}:${b.prices_ts}`).join(","), budget, paused]);
+  }, [boards.map((b) => `${b.und}:${b.prices_ts}`).join(","), budget, paused, now]);
   const filters = { coin, range, side };
   const follows = new Set(doc.follows.map((f) => `${f.id}:${f.side}`));
   const query = search.trim().toLowerCase();
@@ -281,11 +285,13 @@ export default function Board({ followingOnly = false, embedded = false }) {
     <div className={embedded ? "bd-page bd-embedded" : "wrap page q-page bd-page bd-browser"}>
       {!embedded && <SaloonHead view={followingOnly ? "following" : "browse"} board quoteTs={index?.prices_ts} paused={paused} />}
       {feeds}
+      <RefreshNotice error={refreshError} />
+      {missingCoins.length > 0 && !feedFailed && <p className="page-meta" role="status">{missingCoins.join(", ")} data could not be loaded.</p>}
       <BoardContainer {...(embedded ? {} : { className: "bd-board", "aria-label": "Outcome board" })}>
       <section className="bd-controls" aria-label="Search, filters and order">
         <div className={`bd-control-top${embedded ? "" : " bd-toolbar"}`}>{!embedded && coinTabs}<label className="bd-search"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg><input type="search" aria-label="Search outcomes" placeholder="Search coin or price" value={search} onChange={(e) => setSearch(e.target.value)} /></label></div>
         <div className={`bd-filters${embedded ? "" : " bd-context"}`}>
-          {embedded ? coinTabs : <p className="bd-count status" aria-live="polite">{!index || !ready ? "Loading outcomes…" : scope}</p>}
+          {embedded ? coinTabs : <p className="bd-count status" aria-live="polite">{!index || !ready ? "Loading outcomes…" : feedFailed ? "Outcome data unavailable" : scope}</p>}
           <button className="bd-filter-toggle" aria-expanded={showFilters} aria-controls="bd-advanced-filters" onClick={() => setShowFilters((open) => !open)}>
             <svg viewBox="0 0 18 18" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M2 5h14M2 13h14M6 2v6M12 10v6" /></svg>Filters{activeFilters > 0 && <span className="mono">{activeFilters}</span>}
           </button>
@@ -300,7 +306,7 @@ export default function Board({ followingOnly = false, embedded = false }) {
         </div>
       </section>
       {followingOnly && <Following />}
-      {!index || !ready ? <Loading /> : (
+      {!index || !ready ? <Loading /> : feedFailed ? <div className="bd-empty" role="status"><h2>Outcome data is unavailable right now.</h2><p>Prices could not be loaded. Try again shortly.</p></div> : (
         <>
           {embedded && <p className="bd-count status" aria-live="polite">
             {scope}
