@@ -52,7 +52,7 @@ export function Info({ children, label = "More information" }) {
   }, [open]);
   return (
     <>
-      <button ref={btn} className="info" aria-label={label} aria-expanded={open} aria-controls={open ? id : undefined}
+      <button type="button" ref={btn} className="info" aria-label={label} aria-expanded={open} aria-controls={open ? id : undefined}
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>i</button>
       {open && createPortal(<div id={id} ref={pop} className="pop" role="dialog" aria-label={label} style={pos}
         onClick={(e) => e.stopPropagation()}>{children}</div>, document.body)}
