@@ -28,9 +28,11 @@ body = f"""<style>
 .hi b {{ color: #8ff0c6; margin-left: 6px; }}
 .lo {{ background: linear-gradient(90deg, rgba(255,157,144,.22), rgba(255,157,144,.42)); color: #fff0ed; justify-content: flex-end; border-radius: 4px 14px 14px 4px; }}
 .lo b {{ color: #ff9d90; margin-right: 6px; }}
-.now {{ position: relative; height: 20px; }}
-.now::before {{ content: ""; position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: linear-gradient(90deg, rgba(255,255,255,.0), rgba(255,255,255,.75), rgba(255,255,255,.0)); }}
-.now span {{ position: absolute; left: 50%; top: 0; transform: translateX(-50%); padding: 2px 12px; border-radius: 999px; background: #f7f3ed; color: #0e0d0b; font: 700 14px 'Chivo Mono'; }}
+.now {{ display: flex; align-items: center; gap: 16px; height: 22px; }}
+.now::before, .now::after {{ content: ""; flex: 1; height: 2px; }}
+.now::before {{ background: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.7)); }}
+.now::after {{ background: linear-gradient(90deg, rgba(255,255,255,.7), rgba(255,255,255,0)); }}
+.now span {{ font: 700 16px 'Chivo Mono'; color: #f7f3ed; letter-spacing: -.02em; }}
 .tiles {{ position: absolute; left: 58px; right: 58px; top: 852px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }}
 .tile {{ padding: 16px 18px; }}
 .tile b {{ display: block; font: 800 24px/1.1 Manrope; letter-spacing: -.03em; }} .tile b.m {{ font-family: 'Chivo Mono'; font-weight: 700; letter-spacing: -.05em; }}

@@ -15,7 +15,7 @@ body {{ width: {W}px; height: {W}px; overflow: hidden; position: relative; color
   background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.01)); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 30px 80px rgba(0,0,0,.45); }}
 .top {{ position: absolute; left: 58px; right: 58px; top: 52px; display: flex; justify-content: space-between; align-items: center; }}
 .top img {{ height: 40px; }}
-.chip {{ font: 500 15px/1 'Chivo Mono'; color: #e4ded5; padding: 10px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); }}
+.chip {{ font: 500 15px/1 'Chivo Mono'; color: #e4ded5; }}
 .eyebrow {{ position: absolute; left: 58px; top: 138px; font: 700 18px/1 Manrope; letter-spacing: .16em; text-transform: uppercase; color: #ffb27a; }}
 h1 {{ position: absolute; left: 58px; right: 58px; top: 172px; font: 800 58px/1.04 Manrope; letter-spacing: -.04em; }}
 .g {{ color: #8ff0c6; }} .r {{ color: #ff9d90; }} .n {{ font-family: 'Chivo Mono'; font-weight: 600; letter-spacing: -.06em; }}

@@ -29,8 +29,8 @@ while g < hi:
     g += 5000
 ticks = "".join(f'<line x1="{X(t):.1f}" x2="{X(t):.1f}" y1="{Y0-10}" y2="{Y1}" class="exp"/><text x="{X(t):.1f}" y="{Y1+28}" class="ax mid">{"Fri " if i == 0 else ""}{dm(t)}</text>' for i, (t, _) in enumerate(cone[1:]))
 e0 = cone[1]
-labels = (f'<g class="pin"><rect x="{X(e0[0])+10:.1f}" y="{Y(e0[1][3])-34:.1f}" width="86" height="28" rx="14" class="pinu"/><text x="{X(e0[0])+53:.1f}" y="{Y(e0[1][3])-15:.1f}" class="pt mid">{k(e0[1][3])}</text></g>'
-          f'<g class="pin"><rect x="{X(e0[0])+10:.1f}" y="{Y(e0[1][1])+6:.1f}" width="86" height="28" rx="14" class="pind"/><text x="{X(e0[0])+53:.1f}" y="{Y(e0[1][1])+25:.1f}" class="pt mid">{k(e0[1][1])}</text></g>')
+labels = (f'<text x="{X(e0[0])+4:.1f}" y="{Y(e0[1][3])-30:.1f}" class="pt up">{k(e0[1][3])}</text>'
+          f'<text x="{X(e0[0])+4:.1f}" y="{Y(e0[1][1])+46:.1f}" class="pt dn">{k(e0[1][1])}</text>')
 html = f"""<!doctype html><html><head><meta charset="utf-8"><style>
 @font-face {{ font-family: Manrope; src: url(manrope-latin-variable.woff2) format('woff2'); font-weight: 200 800; }}
 @font-face {{ font-family: Chivo Mono; src: url(chivo-mono-latin-variable.woff2) format('woff2'); font-weight: 100 900; }}
@@ -45,7 +45,7 @@ body {{ width: {W}px; height: {W}px; overflow: hidden; position: relative; color
   background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.01)); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 30px 80px rgba(0,0,0,.45); }}
 .top {{ position: absolute; left: 58px; right: 58px; top: 52px; display: flex; justify-content: space-between; align-items: center; }}
 .top img {{ height: 40px; }}
-.chip {{ font: 500 15px/1 'Chivo Mono'; color: #e4ded5; padding: 10px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.05); }}
+.chip {{ font: 500 15px/1 'Chivo Mono'; color: #e4ded5; }}
 .eyebrow {{ position: absolute; left: 58px; top: 138px; font: 700 18px/1 Manrope; letter-spacing: .16em; text-transform: uppercase; color: #ffb27a; }}
 h1 {{ position: absolute; left: 58px; right: 58px; top: 172px; font: 800 58px/1.04 Manrope; letter-spacing: -.04em; }}
 h1 .dn {{ color: #ff9d90; }} h1 .up {{ color: #8ff0c6; }} h1 .n {{ font-family: 'Chivo Mono'; font-weight: 600; letter-spacing: -.06em; }}
@@ -54,7 +54,7 @@ h1 .dn {{ color: #ff9d90; }} h1 .up {{ color: #8ff0c6; }} h1 .n {{ font-family: 
 svg {{ position: absolute; left: 0; top: 0; }}
 .grid {{ stroke: rgba(255,255,255,.07); }} .exp {{ stroke: rgba(255,255,255,.14); stroke-dasharray: 2 6; }}
 .ax {{ font: 400 15px 'Chivo Mono'; fill: #b9b0a4; }} .mid {{ text-anchor: middle; }}
-.pt {{ font: 600 15px 'Chivo Mono'; fill: #0e0d0b; }} .pinu {{ fill: #8ff0c6; }} .pind {{ fill: #ff9d90; }}
+.pt {{ font: 700 20px 'Chivo Mono'; letter-spacing: -.03em; }} .pt.up {{ fill: #8ff0c6; }} .pt.dn {{ fill: #ff9d90; }}
 .tiles {{ position: absolute; left: 58px; right: 58px; top: 850px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }}
 .tile {{ border-radius: 20px; padding: 18px 20px; border: 1px solid rgba(255,255,255,.12); background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.025)); box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }}
 .tile b {{ display: block; font: 700 30px/1.05 'Chivo Mono'; letter-spacing: -.05em; }}
