@@ -6,7 +6,9 @@ const REG = { MARKUP: "Trending up", REACC: "Cooling off", ACCUM: "Building a ba
 const ICON = { CC: "CC.png", HYPE: "HYPE.jpg", LIT: "LIT.png", PUMP: "PUMP.jpg", VVV: "VVV.png" };
 export const TAG = "@derivexyz";
 
-const k = (v) => `$${(v / 1000).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k`;
+const k0 = (v) => `$${(v / 1000).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k`;
+const k = (v) => (Math.abs(v) >= 20000 ? k0(v) : Math.abs(v) >= 1000 ? `$${Math.round(v).toLocaleString("en-US")}` : `$${v.toLocaleString("en-US", { maximumFractionDigits: 2 })}`);
+const tick = (v) => (v >= 20000 ? k0(v) : v >= 1000 ? `$${(v / 1000).toFixed(2)}k` : `$${v.toFixed(2)}`);
 const usd = (v) => `$${Math.round(v).toLocaleString("en-US")}`;
 const cents = (p) => `${Math.round(p * 100)}¢`;
 const utc = (t, opts) => new Date(t * 1000).toLocaleString("en-GB", { timeZone: "UTC", ...opts });
@@ -41,6 +43,11 @@ export function rangeModel(coin, und = "BTC") {
     hist: [...candles.slice(-30).map((c) => [c[0] + 86400, c[4]]), [now, spot]],
     cone: [[now, [spot, spot, spot, spot, spot]], ...fridays.map((e) => [e.expiry, e.q])],
     head: fridays[0],
+    past: (() => {
+      const n = Math.max(2, Math.ceil(fridays[0].days));
+      const closes = [...candles.slice(-n).map((c) => c[4]), spot];
+      return { n, lo: Math.min(...closes), hi: Math.max(...closes) };
+    })(),
     swing: o.features.atm_iv_30d * Math.sqrt(30 / 365) * 100,
     skew: o.features.rr25_30d,
     wall: o.levels?.call_wall,
@@ -61,7 +68,8 @@ function RangeCard({ m }) {
   const band = (i, j) => path([...m.cone.map(([t, q]) => [t, q[j]]), ...[...m.cone].reverse().map(([t, q]) => [t, q[i]])]) + " Z";
   const edge = (i) => path(m.cone.map(([t, q]) => [t, q[i]]));
   const area = path(m.hist) + ` L${X(m.now).toFixed(1)},${Y1} L${X(t0).toFixed(1)},${Y1} Z`;
-  const step = (hi - lo) > 40000 ? 10000 : 5000;
+  const raw = (hi - lo) / 4, mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((f) => f * mag).find((x) => x >= raw);
   const grid = [];
   for (let g = Math.ceil(lo / step) * step; g < hi; g += step) grid.push(g);
   const e0 = m.cone[1];
@@ -70,7 +78,7 @@ function RangeCard({ m }) {
     <Frame kind="range" stamp={stampText("Derive options", m.now)} footRight="What option prices imply, not a forecast · Not investment advice">
       <div className="eyebrow">{NAME[m.und] || m.und} · {weekday(m.head.expiry)} {dm(m.head.expiry)}</div>
       <h1>Options traders price {m.und} between <span className="n r">{k(m.head.q[1])}</span> and <span className="n g">{k(m.head.q[3])}</span> on {weekday(m.head.expiry)}</h1>
-      <div className="sub">That's the middle half of the outcomes they're paying for. {m.und} is at <b>{k(m.spot)}</b> now, and the range gets wider the further out you look.</div>
+      <div className="sub">That's the middle half of what they're paying for. Over the last {m.past.n} days {m.und} swung between <b>{k(m.past.lo)}</b> and <b>{k(m.past.hi)}</b>, so options price a {calmer(m) ? "calmer" : "busier"} stretch ahead.</div>
       <svg width="1080" height="1080" viewBox="0 0 1080 1080">
         <defs>
           <linearGradient id="xr-gu" x1="0" x2="1"><stop offset="0" stopColor="#8ff0c6" stopOpacity=".08" /><stop offset="1" stopColor="#8ff0c6" stopOpacity=".42" /></linearGradient>
@@ -79,7 +87,7 @@ function RangeCard({ m }) {
           <filter id="xr-glow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="6" /></filter>
         </defs>
         {grid.map((g) => (
-          <g key={g}><line x1={X0} x2={X1} y1={Y(g)} y2={Y(g)} stroke="rgba(255,255,255,.07)" /><text x={X1 + 12} y={Y(g) + 5} {...AX}>{k(g)}</text></g>
+          <g key={g}><line x1={X0} x2={X1} y1={Y(g)} y2={Y(g)} stroke="rgba(255,255,255,.07)" /><text x={X1 + 12} y={Y(g) + 5} {...AX}>{tick(g)}</text></g>
         ))}
         {m.cone.slice(1).map(([t], i) => (
           <g key={t}><line x1={X(t)} x2={X(t)} y1={Y0 - 10} y2={Y1} stroke="rgba(255,255,255,.14)" strokeDasharray="2 6" /><text x={X(t)} y={Y1 + 28} {...AX} textAnchor="middle">{i === 0 ? "Fri " : ""}{dm(t)}</text></g>
@@ -107,9 +115,12 @@ function RangeCard({ m }) {
   );
 }
 
-const rangeText = (m) =>
-  `Options traders on ${TAG} price ${m.und} between ${k(m.head.q[1])} and ${k(m.head.q[3])} for ${weekday(m.head.expiry)}. ` +
-  `That's the middle half of what they're paying for. ${m.skew < 0 ? "Drops cost more to protect against than rises" : "Rises cost more to protect against than drops"} right now.`;
+const calmer = (m) => m.head.q[3] - m.head.q[1] < m.past.hi - m.past.lo;
+const rangeAngles = (m) => [
+  `Options traders on ${TAG} price ${m.und} between ${k(m.head.q[1])} and ${k(m.head.q[3])} for ${weekday(m.head.expiry)}. In the last ${m.past.n} days it swung between ${k(m.past.lo)} and ${k(m.past.hi)}. They're paying for a ${calmer(m) ? "calmer" : "busier"} stretch than the one just gone.`,
+  `Where does ${m.und} settle on ${weekday(m.head.expiry)}? Nobody knows, but options on ${TAG} put the middle half of outcomes between ${k(m.head.q[1])} and ${k(m.head.q[3])}. ${m.skew < 0 ? "And protection against a drop costs more than a bet on a rise." : "And bets on a rise cost more than protection against a drop."}`,
+  m.wall ? `${m.und} at ${k(m.spot)}. The most open bets on ${TAG} sit at ${usd(m.wall)}, and options price the middle of ${weekday(m.head.expiry)}'s outcomes between ${k(m.head.q[1])} and ${k(m.head.q[3])}. A normal month's swing: ±${Math.round(m.swing)}%.` : null,
+].filter(Boolean);
 
 // 2. The herd: how every coin with options reads over the next 30 days.
 export function herdModel(markets) {
@@ -119,7 +130,10 @@ export function herdModel(markets) {
   const agree = (c) => ["engine", "wallets", "options"].every((key) => st(c, key) === "up");
   const rows = coins.map((c) => ({ und: c.und, chg: c.chg_7d || 0, regime: c.regime_1d, all: agree(c), engine: st(c, "engine"), wallets: st(c, "wallets"), options: st(c, "options") }));
   rows.sort((a, b) => (b.all - a.all) || ((b.regime === "MARKUP") - (a.regime === "MARKUP")) || (b.chg - a.chg));
-  return { ts: markets.generated_at, rows: rows.slice(0, 12), total: coins.length, up: coins.filter((c) => c.regime_1d === "MARKUP").length, both: rows.filter((r) => r.all).map((r) => r.und) };
+  const b = markets.breadth_1d, opt = new Set(coins.map((c) => c.und));
+  const ago = b?.members?.length > 30 ? (b.members.at(-31)?.[b.cols.indexOf("MARKUP")] || []).filter((u) => opt.has(u)).length : null;
+  const hot = [...rows].sort((a, b2) => b2.chg - a.chg)[0];
+  return { ts: markets.generated_at, rows: rows.slice(0, 12), total: coins.length, up: coins.filter((c) => c.regime_1d === "MARKUP").length, both: rows.filter((r) => r.all).map((r) => r.und), ago, hot };
 }
 
 function Dot({ s, label }) {
@@ -133,7 +147,7 @@ function HerdCard({ m }) {
     <Frame kind="herd" stamp={stampText("Derive data", m.ts)} footRight="What the data shows today · Not investment advice">
       <div className="eyebrow">Derive options markets · next 30 days</div>
       <h1>{m.up} of {m.total} coins are <span className={most ? "g" : ""}>trending up</span></h1>
-      <div className="sub">Three things we watch for every coin: the engine's price signal, how smart wallets are positioned, and what options traders pay for. {m.both.length ? <>On <b>{join(m.both)}</b> all three point up.</> : "Today no coin has all three pointing up."}</div>
+      <div className="sub">Three things we watch for every coin: the engine's price signal, how smart wallets are positioned, and what options traders pay for. {m.both.length ? <>On <b>{join(m.both)}</b> all three point up.</> : "Today no coin has all three pointing up."}{m.ago != null && m.ago !== m.up ? <> A month ago, {m.ago} were trending up.</> : null}</div>
       <div className="grid">
         {m.rows.map((c) => (
           <div key={c.und} className={`tile glass${c.all ? " all" : ""}`}>
@@ -153,10 +167,11 @@ function HerdCard({ m }) {
   );
 }
 
-const herdText = (m) =>
-  `${m.up} of ${m.total} coins with options on ${TAG} are trending up. ` +
-  (m.both.length ? `On ${join(m.both)}, the engine, smart wallets and options all point the same way. ` : "No coin has all three pointing up today. ") +
-  "Here's the whole board.";
+const herdAngles = (m) => [
+  `${m.up} of ${m.total} coins with options on ${TAG} are trending up${m.ago != null && m.ago !== m.up ? ` (a month ago: ${m.ago})` : ""}. ` + (m.both.length ? `On ${join(m.both)}, the engine, smart wallets and options all point the same way.` : "No coin has all three pointing up today."),
+  m.both.length ? `Three different crowds, one direction: on ${join(m.both)}, our trend engine, the most profitable options wallets and option prices on ${TAG} all point up. It doesn't happen often. Here's the whole board.` : `Our engine, smart wallets and option prices on ${TAG} disagree on every coin today. When they don't line up, nobody has the full story.`,
+  `Hottest week: ${m.hot.und} ${m.hot.chg >= 0 ? "+" : ""}${m.hot.chg.toFixed(1)}%. But price is one read of three. For every coin with options on ${TAG}, we check the trend, the smart wallets and what options traders pay for.`,
+];
 
 // 3. Higher or lower on the next Friday with a full ladder.
 export function ladderModel(q) {
@@ -184,7 +199,7 @@ function LadderCard({ m }) {
     if (!placed && l.k < m.idx) { rows.push(<div key="now" className="now"><span>{m.und} now {usd(m.idx)}</span></div>); placed = true; }
     rows.push(
       <div key={l.id} className="lvl glass">
-        <div className="k"><b>{usd(l.k)}</b><small>pays in part ${Math.round(l.lo / 1000)}k–${Math.round(l.hi / 1000)}k</small></div>
+        <div className="k"><b>{usd(l.k)}</b><small>pays in part {k(l.lo)}–{k(l.hi)}</small></div>
         <div className="bar">
           <div className="hi" style={{ flex: l.yes.buy }}><span>Higher <b>{cents(l.yes.buy)}</b></span></div>
           <div className="lo" style={{ flex: l.no.buy }}><span><b>{cents(l.no.buy)}</b> Lower</span></div>
@@ -207,12 +222,14 @@ function LadderCard({ m }) {
   );
 }
 
-const ladderText = (m) =>
-  `${m.und} on ${weekday(m.settle)}: higher or lower? Higher than ${usd(m.mid.k)} costs ${cents(m.mid.yes.buy)} today and pays up to $1 at ${weekday(m.settle)}'s 08:00 UTC settlement. ` +
-  `Only what you pay can be lost. Prices from ${TAG}.`;
+const ladderAngles = (m) => [
+  `${m.und} on ${weekday(m.settle)}: higher or lower? Higher than ${usd(m.mid.k)} costs ${cents(m.mid.yes.buy)} today and pays up to $1 at ${weekday(m.settle)}'s 08:00 UTC settlement. Only what you pay can be lost. Prices from ${TAG}.`,
+  `Read the ladder: the higher the level, the cheaper Higher gets and the dearer Lower. Each price is what the market charges for that view on ${m.und} by ${weekday(m.settle)}. Built from options on ${TAG}.`,
+  `${m.und} is at ${usd(m.idx)}. "Higher than ${usd(m.levels[0].k)}" costs ${cents(m.levels[0].yes.buy)}; "Lower than ${usd(m.levels.at(-1).k)}" costs ${cents(m.levels.at(-1).no.buy)}. Pick a side, pay once, settle ${weekday(m.settle)}. ${TAG}`,
+];
 
-export const CARDS = [
-  { id: "range", title: "Options range, BTC", files: ["coins/BTC.json"], model: ([c]) => rangeModel(c, "BTC"), Card: RangeCard, text: rangeText },
-  { id: "herd", title: "The herd", files: ["markets.json"], model: ([m]) => herdModel(m), Card: HerdCard, text: herdText },
-  { id: "ladder", title: "Higher or lower, BTC Friday", files: ["questions/BTC.json"], model: ([q]) => ladderModel(q), Card: LadderCard, text: ladderText },
+export const ORIGINAL = [
+  { id: "herd", group: "Market", title: "The herd", files: () => ["markets.json"], model: ([m]) => herdModel(m), View: HerdCard, angles: herdAngles },
+  { id: "range", group: "Options", title: "Friday's priced range", params: ["BTC", "ETH"], files: (u) => [`coins/${u}.json`], model: ([c], u) => rangeModel(c, u), View: RangeCard, angles: rangeAngles },
+  { id: "ladder", group: "Saloon", title: "Higher or lower ladder", params: ["BTC", "ETH"], files: (u) => [`questions/${u}.json`], model: ([q]) => ladderModel(q), View: LadderCard, angles: ladderAngles },
 ];

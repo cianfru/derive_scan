@@ -135,7 +135,17 @@ Built 5 October 2026 (design P8) and **off**: nothing trades until the owner swi
 
 ## X cards (`/control`)
 
-`cowboy.trading/control` is a page for the owner: the X cards built from the latest `site-data` files (BTC options range, the herd, BTC higher or lower on Friday; the first copies are in `docs/x-cards/`), each with its post text to edit (character count, a warning without @derivexyz or with a link or address), Download PNG (2160x2160, drawn in the browser) and Copy text, and one card marked as today's in turn. Posting stays by hand. The page is its own build entry (`frontend/control.html`, `src/control/`), not part of the app's bundle, and opens only with the password in the Vercel environment variable `CONTROL_PASSWORD` (project `torq`, Production); while it is unset the page stays shut. The browser asks for a name and a password: any name, the password set there.
+`cowboy.trading/control` is the owner's page for posting on X by hand. It shows the card catalogue built from the latest `site-data` files (`frontend/src/control/`: `kit.jsx` for the frame, layout, charts and formatting; `cards.jsx` for the first three; `cards/market.jsx`, `options.jsx`, `saloon.jsx`, `traders.jsx`; `index.js` lists them). There are 22 cards and 45 card-and-coin entries:
+
+- **Market:** the herd, weekly movers, market mood, the trend mix over 120 days, and funding.
+- **Coins:** a trend spotlight per coin.
+- **Options:** Friday's priced range, protection cost, a normal month's swing, where the open bets sit, the priced range by date, and the last 24 hours of flow.
+- **Saloon:** the higher-or-lower ladder, how a price moved, what settlement paid, the long shot, and how 55¢ becomes $1.
+- **Traders:** the leaderboard, the biggest trades of the day, smart wallets' lean, and winners against losers.
+
+Each card says what the number is and why it matters, with a comparison (a week or a month ago, the share of recent days, the last few days' real move). Each card drafts two or three post angles. Every angle tags @derivexyz, stays under 280 characters, and uses no links, addresses or forecast words. A card whose data has nothing to say returns no model and sits out, as funding does while every perp pays the same rate. The page shows today's four picks (one per group, turning over daily), the full catalogue by group, a coin switch, Next angle, editable text with checks, Download PNG (2160x2160, drawn in the browser with both fonts embedded) and Copy text.
+
+The page is its own build entry (`frontend/control.html`), outside the app's bundle. It opens only with the password set in the Vercel environment variable `CONTROL_PASSWORD` (project `torq`, Production); while that variable is unset, the page stays shut. The browser asks for a name and a password: any name works, with the password set there.
 
 ## Tracking values over time
 

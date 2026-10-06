@@ -3,8 +3,13 @@ import { render, screen } from "@testing-library/react";
 import vercel from "../../vercel.json";
 import middleware, { allowed } from "../../middleware.js";
 import btcQuestions from "../fixtures/questions/BTC.json";
-import { CARDS, TAG, herdModel, ladderModel, rangeModel } from "./cards.jsx";
-import { todaysCard } from "./ControlPage.jsx";
+import { ORIGINAL, herdModel, ladderModel, rangeModel } from "./cards.jsx";
+import { checkText, todaysCard, todaysPicks } from "./ControlPage.jsx";
+import { CATALOGUE, ENTRIES, GROUPS, buildModel } from "./index.js";
+import { TAG } from "./kit.jsx";
+import { fundingModel, moodModel, moversModel } from "./cards/market.jsx";
+import { cohortModel, plainTrade, smartModel } from "./cards/traders.jsx";
+import { settledModel } from "./cards/saloon.jsx";
 
 const basic = (user, pass) => "Basic " + btoa(`${user}:${pass}`);
 const FORECAST = /\b(will|expect|likely|predict|target|probability|odds)\b/i;
@@ -53,11 +58,14 @@ const coin = {
 };
 const markets = {
   generated_at: now,
-  coins: ["BTC", "ETH", "SOL", "XRP", "ADA"].map((und, i) => ({
-    und, has_options: true, chg_7d: i - 1, regime_1d: i < 3 ? "MARKUP" : "REACC",
+  context: { sentiment: { fear_greed_value: 73, fear_greed_label: "Greed" }, sentiment_at: now, stablecoin: { change_7d_pct: -0.1, total_cap: 2.58e11 }, global_metrics: { btc_dominance: 59.3 } },
+  consensus_detail: { "1d": { counts: { markup: 12, total: 15 } } },
+  coins: ["BTC", "ETH", "SOL", "XRP", "ADA", "HYPE"].map((und, i) => ({
+    und, has_options: true, chg_7d: i * 3 - 6, regime_1d: i < 3 ? "MARKUP" : "REACC", funding_ann: 0.1095,
     align: { readings: { "30d": { engine: { state: "up" }, wallets: { state: i === 2 ? "up" : "neutral" }, options: { state: "up" } } } },
   })),
 };
+const trade = (instrument, direction, premium) => ({ kind: "option", instrument, direction, premium_usd: premium, notional_usd: premium * 20, wallet: "0x15eECd2e60E8Adb788826E71ef46d6921524E041" });
 
 describe("cards", () => {
   it("prices the Friday range from the first Friday expiry", () => {
@@ -81,24 +89,74 @@ describe("cards", () => {
     expect(m.levels.some((l) => l.k < m.idx) && m.levels.some((l) => l.k >= m.idx)).toBe(true);
   });
 
-  it("drafts posts that tag Derive, stay short and carry no links or forecast words", () => {
-    const models = { range: rangeModel(coin), herd: herdModel(markets), ladder: ladderModel(btcQuestions) };
-    for (const card of CARDS) {
-      const m = models[card.id];
-      if (!m) continue;
-      const text = card.text(m);
-      expect(text).toContain(TAG);
-      expect(text.length).toBeLessThanOrEqual(280);
-      expect(text).not.toMatch(/https?:|www\.|0x[0-9a-f]/i);
-      expect(text).not.toMatch(FORECAST);
-      render(<card.Card m={m} />);
-    }
-    expect(screen.getAllByText("cowboy.trading").length).toBeGreaterThan(0);
+  it("sits a card out when the data has nothing to say", () => {
+    expect(fundingModel(markets)).toBeNull();
+    expect(moodModel({ context: {} })).toBeNull();
+    expect(smartModel({ coins: {} })).toBeNull();
   });
 
-  it("turns over one card a day", () => {
-    const ids = ["a", "b", "c"];
+  it("says in plain words what each kind of options trade does", () => {
+    expect(plainTrade(trade("BTC-20261030-88000-C", "buy", 2230))).toBe("paid $2K to bet on BTC above $88,000 on 30 Oct");
+    expect(plainTrade(trade("BTC-20261030-80000-P", "buy", 1000))).toMatch(/^paid \$1K for protection if BTC ends below \$80,000/);
+    expect(plainTrade(trade("ETH-20270326-5500-C", "sell", 39000))).toMatch(/^collected \$39K to give up ETH's gains above \$5,500/);
+    expect(plainTrade(trade("XRP-20261030-1_35-P", "sell", 500))).toMatch(/at \$1.35 if it ends below/);
+  });
+
+  it("splits the winners from the losers by what they hold", () => {
+    const w = { generated_at: now, cohorts: { pnl: [
+      { name: "Money Printer", wallets: 3, "7d": { net_delta_usd: 575000, positions: 47 } },
+      { name: "Grinder", wallets: 132, "7d": { net_delta_usd: 20000, positions: 18 } },
+      { name: "Full Rekt", wallets: 37, "7d": { net_delta_usd: -47.7e6, positions: 10 } },
+    ] } };
+    const m = cohortModel(w, "BTC");
+    expect(m.win).toBeGreaterThan(0);
+    expect(m.lose).toBeLessThan(0);
+    expect(m.biggest.name).toBe("Full Rekt");
+  });
+
+  it("reads the last settlement around its price", () => {
+    const m = settledModel({ settled: [{ settle_ts: now, label: "Tue 6 Oct", settle_price: 2704, zone: 200, levels: Array.from({ length: 20 }, (_, i) => ({ id: `L${i}`, k: 2500 + i * 50, lo: 2400 + i * 50, hi: 2600 + i * 50, paid: Math.min(1, Math.max(0, (2704 - (2400 + i * 50)) / 200)) })) }] }, "ETH");
+    expect(m.levels).toHaveLength(7);
+    expect(m.levels.some((l) => l.paid > 0 && l.paid < 1)).toBe(true);
+  });
+
+  it("drafts posts that tag Derive, stay short and carry no links or forecast words", () => {
+    const drafts = [
+      ...ORIGINAL[0].angles(herdModel(markets)), ...ORIGINAL[1].angles(rangeModel(coin, "BTC")), ...ORIGINAL[2].angles(ladderModel(btcQuestions)),
+      ...CATALOGUE.find((c) => c.id === "mood").angles(moodModel(markets)),
+      ...CATALOGUE.find((c) => c.id === "movers").angles(moversModel(markets)),
+    ];
+    expect(drafts.length).toBeGreaterThan(10);
+    for (const text of drafts) {
+      expect(checkText(text)).toEqual([]);
+      expect(text).not.toMatch(FORECAST);
+    }
+    render(<>{ORIGINAL.map((c) => <c.View key={c.id} m={c.id === "herd" ? herdModel(markets) : c.id === "range" ? rangeModel(coin, "BTC") : ladderModel(btcQuestions)} />)}</>);
+    expect(screen.getAllByText("cowboy.trading").length).toBe(3);
+  });
+
+  it("loads a card's second file only when the first asks for it", async () => {
+    const card = { files: () => ["a.json"], model: ([a]) => ({ need: [`b-${a.x}.json`], then: ([b]) => ({ x: a.x, y: b.y }) }) };
+    const seen = [];
+    const m = await buildModel(card, null, async (p) => { seen.push(p); return p === "a.json" ? { x: 1 } : { y: 2 }; });
+    expect(m).toEqual({ x: 1, y: 2 });
+    expect(seen).toEqual(["a.json", "b-1.json"]);
+  });
+
+  it("offers over twenty cards across every group, each with at least two angles", () => {
+    expect(CATALOGUE.length).toBeGreaterThanOrEqual(20);
+    expect(new Set(CATALOGUE.map((c) => c.id)).size).toBe(CATALOGUE.length);
+    for (const g of GROUPS) expect(CATALOGUE.some((c) => c.group === g)).toBe(true);
+    expect(ENTRIES.length).toBeGreaterThan(CATALOGUE.length);
+  });
+
+  it("turns over the cards and picks across groups each day", () => {
     const d = new Date(Date.UTC(2026, 9, 6, 12));
+    const ids = ["a", "b", "c"];
     expect(todaysCard(ids, new Date(d.getTime() + 86400000))).not.toBe(todaysCard(ids, d));
+    const picks = todaysPicks(ENTRIES, d);
+    expect(picks).toHaveLength(4);
+    expect(new Set(picks.map((p) => p.card.group)).size).toBe(4);
+    expect(todaysPicks(ENTRIES, new Date(d.getTime() + 86400000)).map((p) => p.key)).not.toEqual(picks.map((p) => p.key));
   });
 });
