@@ -122,8 +122,8 @@
 .bd-answer .fl-btn svg { width: 15px; height: 15px; }
 .bd-answer .fl-text { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 .bd-card.single .bd-answer { grid-column: 2 / -1; }
-/* Every tile keeps its size whatever it holds: each answer fills its row's height, and a short-size note sits
-   beside the price rather than on a line of its own. */
+/* Every tile keeps its size whatever it holds: a fixed minimum height per screen size that fits a priced tile,
+   each answer filling its row's height, and a short-size note beside the price rather than on a line of its own. */
 .bd-answer { align-self: stretch; align-items: stretch; }
 .bd-answer .fl-btn { align-self: center; }
 .bd-price { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
@@ -295,7 +295,7 @@
 .bd-browser .bd-card .asset small, .bd-browser .bd-settle, .bd-browser .bd-settle small { color: var(--muted); font-size: 12px; }
 
 .bd-browser .bd-answer { gap: 4px; }
-.bd-browser .bd-choice { min-height: 72px; padding: 12px 14px; border-radius: 8px; box-shadow: none; transform: none; transition: background 160ms var(--ease), border-color 160ms var(--ease); }
+.bd-browser .bd-choice { min-height: 76px; padding: 12px 14px; border-radius: 8px; box-shadow: none; transform: none; transition: background 160ms var(--ease), border-color 160ms var(--ease); }
 .bd-browser .bd-choice.yes, .bd-browser .bd-choice.no { border-color: color-mix(in srgb, var(--side) 20%, var(--seam)); background: color-mix(in srgb, var(--side) 6%, var(--surface-1)); box-shadow: none; }
 .bd-browser .bd-choice.yes:hover, .bd-browser .bd-choice.no:hover, .bd-browser .bd-choice.yes:focus-visible, .bd-browser .bd-choice.no:focus-visible { border-color: color-mix(in srgb, var(--side) 60%, var(--seam)); background: color-mix(in srgb, var(--side) 10%, var(--surface-1)); box-shadow: none; }
 .bd-browser .bd-choice:active { transform: none; box-shadow: none; }
@@ -372,7 +372,7 @@
   .bd-browser .bd-level { display: block; grid-column: auto; padding-right: 0; }
   .bd-browser .bd-card.single .bd-answer { grid-column: 2 / -1; }
   .bd-browser .bd-partial { margin-top: 8px; }
-  .bd-browser .bd-choice { align-items: flex-start; flex-direction: column; gap: 9px; }
+  .bd-browser .bd-choice { min-height: 120px; align-items: flex-start; flex-direction: column; gap: 9px; }
   .bd-browser .bd-choice-out { grid-auto-flow: row; justify-items: start; gap: 3px; text-align: left; }
   .bd-browser .bd-choice-out small { display: block; font-size: 11px; }
   .bd-browser .bd-choice-name { padding-right: 20px; }
@@ -417,7 +417,7 @@
   .bd-browser .bd-partial { margin-top: 0; font-size: 12px; }
   .bd-browser .bd-partial b { font-size: 12px; }
   .bd-browser .bd-card.single .bd-answer { grid-column: 1 / -1; }
-  .bd-browser .bd-choice { min-height: 106px; padding: 12px; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .bd-browser .bd-choice { min-height: 120px; padding: 12px; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 10px; }
   .bd-browser .bd-choice-name { padding-right: 26px; font-size: 13px; }
   .bd-browser .bd-choice-out { display: grid; grid-auto-flow: row; justify-items: start; gap: 3px; text-align: left; }
   .bd-browser .bd-choice-out b { font-size: 15px; }
