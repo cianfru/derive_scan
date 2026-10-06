@@ -196,7 +196,7 @@ describe("the board page", () => {
     expect(within(card).getAllByRole("link", { name: /see what it pays/ }).map((a) => a.getAttribute("href"))).toEqual([`${href}?side=yes`, `${href}?side=no`]);
     expect(card.textContent).toMatch(/Pays in part\$[\d,]+–\$[\d,]+/);
     expect(card.textContent).toMatch(/\+[\d,.]+%most you make/);
-    expect(container.querySelector(".bd-key").textContent).toMatch(/Price per \$1 · most you make, as a share of what you pay/);
+    expect(container.querySelector(".bd-key").textContent).toMatch(/Price per \$1 · most you make, as a share of cost/);
     // The share is the $100 ticket's most you can make over its total, fees included.
     const r = boardRows([btc, hype], 100, { now: NOW }).rows.find((x) => `/q/${x.id}` === href && x.side === "yes");
     expect(card.querySelector("a.bd-choice.yes .bd-choice-out b").textContent).toBe(returnText(r.make, r.total));

@@ -133,7 +133,7 @@ function NowMark({ und, index }) {
 
 /** The key over a ladder: what each answer's two figures are. */
 function LadderKey() {
-  return <div className="bd-key"><span aria-hidden="true">Level</span><span>Price per $1 · most you make, as a share of what you pay<Info label="About these figures">The price is the cost per $1 of maximum payout, before fees. Most you make is the profit if the answer pays in full, as a share of the total you pay, Derive's fees included, worked out for {usd(REF)}. Derive charges a small fixed fee per option, so smaller amounts make a little less and larger ones a little more. Choose your amount when you open an outcome.</Info></span></div>;
+  return <div className="bd-key"><span aria-hidden="true">Level</span><span>Price per $1 · most you make, as a share of <span className="bd-key-end">cost<Info label="About these figures">The price is the cost per $1 of maximum payout, before fees. Most you make is the profit if the answer pays in full, as a share of the total you pay, Derive's fees included, worked out for {usd(REF)}. Derive charges a small fixed fee per option, so smaller amounts make a little less and larger ones a little more. Choose your amount when you open an outcome.</Info></span></span></div>;
 }
 
 /** One coin and settlement date: a header, then its levels from low to high with the index marked. */
