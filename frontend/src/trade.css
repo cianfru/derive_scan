@@ -31,9 +31,6 @@
 .tr-seat .text-control { margin-left: auto; padding: 0; font-size: 12px; }
 .tr-money .q-lose dd { font-size: 16px; }
 .tr-firm { color: var(--text-2); }
-.tr-switch { border-top: 1px solid var(--border); padding-top: 10px; }
-.tr-switch .text-control { padding: 0; font-size: 12px; }
-.tr-hand .q-ticket { border: 0; padding: 0; background: none; }
 @media (max-width: 1279px) {
   .q-sheet .tr { border: 0; padding: 0; background: none; }
   .q-sheet .tr-head { padding-right: 56px; } /* room for the sheet's Close */

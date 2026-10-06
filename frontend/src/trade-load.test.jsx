@@ -39,25 +39,23 @@ async function show() {
 it("shows a loading line, not the manual ticket, while the trade code loads", async () => {
   await show();
   expect(screen.getByRole("status").textContent).toBe("Loading one-tap…");
-  expect(screen.queryByRole("region", { name: "Place on Derive" })).toBeNull();
+  expect(screen.queryByRole("region", { name: "Your trade" })).toBeNull();
   release();
   expect(await screen.findByRole("region", { name: "One tap" })).toBeTruthy();
   expect(screen.queryByText("Loading one-tap…")).toBeNull();
 });
 
-it("offers a reload when the trade code fails to load, and the manual ticket behind Place by hand", async () => {
+it("offers a reload when the trade code fails to load, and no way to place by hand", async () => {
   ctl.fail = true;
   release();
   const reload = vi.fn();
   vi.stubGlobal("location", { ...window.location, reload });
   await show();
   expect(await screen.findByText("Reload to trade in one tap")).toBeTruthy();
-  expect(screen.queryByRole("region", { name: "Place on Derive" })).toBeNull();
+  expect(screen.queryByRole("region", { name: "Your trade" })).toBeNull();
   const u = userEvent.setup();
   await u.click(screen.getByRole("button", { name: "Reload" }));
   expect(reload).toHaveBeenCalledTimes(1);
-  await u.click(screen.getByRole("button", { name: "Place by hand" }));
-  const hand = screen.getByRole("region", { name: "Place on Derive" });
-  expect(hand.querySelector(".q-onetap-note")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Place by hand" })).toBeNull();
   vi.unstubAllGlobals();
 });

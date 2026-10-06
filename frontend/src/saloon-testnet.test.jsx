@@ -115,7 +115,7 @@ describe("one tap on Derive's testnet", () => {
     saveBudget(Math.ceil(ticket(level, "yes", 100, btc).mostLose * 100) / 100);
     const user = userEvent.setup();
     page(`/q/${ID}?side=yes`);
-    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    await user.click(screen.getByRole("button", { name: "Review trade" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     // The testnet badge, and what it means, on the trade screen.
     expect(within(panel).getByText("Testnet")).toBeTruthy();
@@ -227,13 +227,13 @@ describe("one tap on Derive's testnet", () => {
     const user = userEvent.setup();
     docs.current["questions/index.json"] = { ...index, trading: "sell_only" };
     page(`/q/${ID}?side=yes`);
-    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    await user.click(screen.getByRole("button", { name: "Review trade" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     expect(within(panel).getAllByText("Cowboy has paused new buys. Selling back still works.").length).toBeGreaterThan(0);
     cleanup();
     docs.current["questions/index.json"] = { ...index, trading: "off" };
     page(`/q/${ID}?side=yes`);
-    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    await user.click(screen.getByRole("button", { name: "Review trade" }));
     const off = await screen.findByRole("region", { name: "Higher through Derive" });
     expect(within(off).getAllByText(/Cowboy has paused one-tap trading/).length).toBeGreaterThan(0);
     expect(within(off).queryByRole("button", { name: "Get price" })).toBeNull();
@@ -286,7 +286,7 @@ describe("the wallet in the header", () => {
       .toMatch(new RegExp(`${wallet.address.slice(0, 4)}…${wallet.address.slice(-2)}`));
 
     // The ticket sees the same connection: no second "Connect wallet", the same terms step.
-    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    await user.click(screen.getByRole("button", { name: "Review trade" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     expect(within(panel).queryByRole("button", { name: "Connect wallet" })).toBeNull();
     expect(within(panel).getByRole("button", { name: "Continue" })).toBeTruthy();
@@ -335,7 +335,7 @@ describe("the wallet in the header", () => {
     const user = userEvent.setup();
     withShell(`/q/${ID}?side=yes`);
     await headerWallet();
-    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    await user.click(screen.getByRole("button", { name: "Review trade" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     await user.click(within(panel).getByRole("button", { name: "Connect wallet" }));
     await within(panel).findByRole("button", { name: "Approve Cowboy" });

@@ -104,7 +104,7 @@ describe("one tap through Derive (testnet, dry run)", () => {
     const user = userEvent.setup();
     show(`/q/${ID}?side=yes`);
     expect(screen.queryByRole("region", { name: "Higher through Derive" })).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    await user.click(screen.getByRole("button", { name: "Review trade" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     expect(within(panel).getByText("Testnet · dry run")).toBeTruthy();
     await wordcheck(user, panel);
@@ -155,7 +155,7 @@ describe("one tap through Derive (testnet, dry run)", () => {
     localStorage.setItem("cowboy-saloon-terms:testnet", JSON.stringify({ at: 1 }));
     const user = userEvent.setup();
     show(`/q/${ID}?side=yes`);
-    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    await user.click(screen.getByRole("button", { name: "Review trade" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     await user.click(within(panel).getByRole("button", { name: "Connect wallet" }));
     await within(panel).findByText("Add USDC to your Derive account #90212");
@@ -170,24 +170,24 @@ describe("one tap through Derive (testnet, dry run)", () => {
     await wordcheck(user, panel);
   });
 
-  it("keeps stage 1's ticket one tap from order review, and offers one tap for every coin (owner, 5 October 2026)", async () => {
+  it("offers one tap for every coin (owner, 5 October 2026), with no way to place by hand", async () => {
     setup();
     const user = userEvent.setup();
     show(`/q/${ID}?side=yes`);
-    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    await user.click(screen.getByRole("button", { name: "Review trade" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });
-    await user.click(within(panel).getByRole("button", { name: "Place by hand" }));
-    expect(within(panel).getByText("Place these two orders on Derive, in this order.")).toBeTruthy();
+    expect(within(panel).queryByRole("button", { name: "Place by hand" })).toBeNull();
+    expect(within(panel).queryByRole("link", { name: /Open Derive/ })).toBeNull();
     cleanup();
     // The old HYPE credit package stays unavailable; its live debit neighbour opens one tap too.
     show("/q/HYPE-20261009-A-85-91?side=yes");
-    expect(screen.getByRole("button", { name: "Review orders" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Review trade" }).disabled).toBe(true);
     expect(screen.queryByRole("region", { name: /through Derive/ })).toBeNull();
     cleanup();
     show("/q/HYPE-20261009-A-89-95?side=yes");
-    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    await user.click(screen.getByRole("button", { name: "Review trade" }));
     const hype = await screen.findByRole("region", { name: "Higher through Derive" });
-    expect(within(hype).getByRole("button", { name: "Place by hand" })).toBeTruthy();
+    expect(within(hype).queryByRole("button", { name: "Place by hand" })).toBeNull();
   });
 });
 

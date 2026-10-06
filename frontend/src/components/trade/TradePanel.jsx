@@ -74,13 +74,12 @@ function useStep(ticket) {
 
 /**
  * Saloon stage 2 beside stage 1: connect, agree to Derive's terms, fund the Saloon account, approve
- * Cowboy, then the one-tap ticket. "Place by hand" always shows stage 1's ticket. With `sell` (a
+ * Cowboy, then the one-tap ticket. With `sell` (a
  * one-tap position on Positions), the ticket sells it back. Loaded only in builds with
  * VITE_SALOON_TRADE on.
  */
 export default function TradePanel({ und, question, answer, level, sideKey, board, t, pricesTs, closing = false, fallback = null, sell = null }) {
   const seat = useSeat();
-  const [byHand, setByHand] = useState(false);
   const listed = useTestnetListing(MODE === "testnet" && !sell ? und : null);
   const { data: index } = useData("questions/index.json");
   const { data: markets } = useData("markets.json");
@@ -124,7 +123,7 @@ export default function TradePanel({ und, question, answer, level, sideKey, boar
     ? <p className="tr-msg" role="status">This position is in Derive account #{from}. Connect its wallet and choose that account to sell it back in one tap.</p>
     : <TradeTicket plan={plan} trading={trading} onFill={onFill} {...(MODE === "mainnet" ? { readSwitch: readMainnetSwitch } : {})} />;
   const step = useStep(ticket);
-  // Real money: only a pilot browser gets one tap; everyone else places the orders by hand, with the
+  // Real money: only a pilot browser gets one tap; everyone else sees the trade's figures with the
   // note that one tap is on its way.
   if (MODE === "mainnet" && !oneTapOffered()) return sell ? fallback : handWithNote(fallback);
   if ((closing && !sell) || !canTrade(und)) return fallback;
@@ -135,13 +134,8 @@ export default function TradePanel({ und, question, answer, level, sideKey, boar
         <TestnetTag />
       </header>
       {trading !== "on" && trading !== "loading" && <p className="tr-msg" role="status">{TRADING_NOTICE[trading]}</p>}
-      {!byHand && !missing.length && seat.stage === "ready" && <SeatLine />}
-      {byHand ? <div className="tr-hand">{fallback}</div> : missing.length ? <NotListed missing={missing} /> : step}
-      {!sell && fallback && (
-        <div className="tr-switch">
-          <button className="text-control" onClick={() => setByHand((b) => !b)} aria-pressed={byHand}>{byHand ? "Back to one tap" : "Place by hand"}</button>
-        </div>
-      )}
+      {!missing.length && seat.stage === "ready" && <SeatLine />}
+      {missing.length ? <NotListed missing={missing} /> : step}
     </section>
   );
 }

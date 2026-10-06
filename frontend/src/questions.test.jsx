@@ -167,14 +167,14 @@ describe("the question page", () => {
     expect(container.querySelector(".q-amount")).toBeNull();
     expect(container.querySelector(".q-ticket")).toBeNull();
     expect(container.querySelector(".md-unpicked .payzone")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Review orders" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Review trade" })).toBeNull();
     const user = userEvent.setup({ advanceTimers: () => {} });
     await user.click(radios[0]);
     // A marketplace selection shows amount and payout immediately. Orders stay behind review.
     expect(container.querySelector(".q-amount")).not.toBeNull();
     expect(container.querySelector(".q-ticket")).toBeNull();
     expect(screen.getByRole("region", { name: "What it pays" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Review orders" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Review trade" })).toBeTruthy();
     expect(screen.getByTestId("chart")).toBeTruthy();
   });
 
@@ -191,10 +191,10 @@ describe("the question page", () => {
     expect(container.querySelector(".md-heading").textContent).toContain("Settles Fri 9 Oct, 08:00 UTC");
     const user = userEvent.setup({ advanceTimers: () => {} });
     await user.click(screen.getByRole("button", { name: "What you pay" }));
-    expect(document.querySelector(".pop").textContent).toContain("$97.05 for the two options plus Derive's fees, about $2.95. It is the most you can lose once both orders fill.");
+    expect(document.querySelector(".pop").textContent).toContain("$97.05 for the two options plus Derive's fees, about $2.95. It is the most you can lose.");
     await user.click(screen.getByRole("button", { name: "What you pay" }));
-    const lose = screen.getByText("Your cost is the most you can lose once both orders fill.");
-    const get = screen.getByRole("button", { name: "Review orders" });
+    const lose = screen.getByText("Your cost is the most you can lose.");
+    const get = screen.getByRole("button", { name: "Review trade" });
     expect(lose.compareDocumentPosition(get) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const ex = [...container.querySelectorAll(".md-payoff-study .op-ex tbody tr")].map((r) => r.textContent);
     expect(ex).toEqual(["$83,000 or lower$0.00-$100.00", "$86,000$128.31+$28.31", "$89,000 or higher$256.62+$156.62"]);
@@ -233,7 +233,7 @@ describe("the question page", () => {
     const amount = parseFloat(container.querySelector(".md-preview .op-total dd").textContent.replace(/[$,]/g, ""));
     expect(amount).toBeLessThanOrEqual(200);
     expect(amount).toBeGreaterThan(199.9);
-    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    await user.click(screen.getByRole("button", { name: "Review trade" }));
     expect(screen.getByRole("dialog", { name: "Ticket" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: "What it pays" })).toBeNull();
     await user.click(screen.getByRole("button", { name: "Back to payout" }));
@@ -253,77 +253,34 @@ describe("the question page", () => {
     else b.dates.find((d) => d.expiry === "20261009").levels.find((lv) => lv.id === Q86.slice(3)).state = "retired";
     docs.current["questions/BTC.json"] = b;
     const { container } = show(`${Q86}?side=yes`);
-    expect(screen.getByRole("button", { name: "Review orders" }).disabled).toBe(true);
+    expect(screen.getByRole("button", { name: "Review trade" }).disabled).toBe(true);
     expect(container.querySelector(".q-ticket")).toBeNull();
     expect(container.querySelector(".md-preview")).toBeNull();
     expect(container.textContent).toContain("No price now for Higher");
   });
 
-  it("keeps the orders inside a closed Order details, the bought leg first, on the tick", async () => {
+  it("keeps the trade on Cowboy: no orders to place by hand, no link to Derive, one-tap coming", async () => {
     const { container } = show(`${Q86}?side=yes`);
-    await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("button", { name: "Review orders" }));
-    const details = container.querySelector(".q-ticket details.q-details");
-    expect(details.open).toBe(false);
-    expect(details.querySelector("summary").textContent).toBe("Order details");
+    await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("button", { name: "Review trade" }));
     const ticket = container.querySelector(".q-ticket");
-    const outside = [...ticket.childNodes].filter((n) => n !== details).map((n) => n.textContent).join(" ");
-    expect(outside).not.toMatch(/BTC-20261009-\d+-[CP]/);
-    const legs = [...details.querySelectorAll(".q-legs li")].map((li) => li.textContent);
-    expect(legs[0]).toMatch(/^1BuyBTC-20261009-83000-CAmount0.04277Limit2431$/);
-    expect(legs[1]).toMatch(/^2SellBTC-20261009-89000-CAmount0.04277Limit162$/);
-    expect(details.textContent).toContain("Place line 2 only after line 1 has filled.");
-    expect(container.textContent).not.toMatch(/guarantee/i);
-  });
-
-  it("shows what the first order needs on its own, and what it can lose if line 2 never fills", async () => {
-    const { container } = show(`${Q86}?side=yes`);
-    await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("button", { name: "Review orders" }));
-    const hand = container.querySelector(".q-hand").textContent;
-    // Line 1 buys the 83,000 call alone: 0.04277 x 2,431 = $103.97, plus its fee.
-    expect(hand).toContain("Cash needed for line 1$103.97");
-    expect(hand).toMatch(/If only line 1 fills, most you can lose\$105\.56/);
-    expect(hand).toContain("Once both fill, most you can lose$100.00");
+    expect(ticket.querySelector(".q-onetap-note").textContent).toContain("One-tap trading is coming to Cowboy.");
+    expect(ticket.querySelector("details.q-details, .q-hand, a[href]")).toBeNull();
+    expect(ticket.textContent).not.toMatch(/Open Derive|I placed it|BTC-20261009-\d+-[CP]/);
+    expect(ticket.textContent).toMatch(/You payi\$[\d.,]+ incl\. fees/);
   });
 
   it("words the Lower ticket as a payment, never cash received", async () => {
     const { container } = show(`${Q86}?side=no`);
-    await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("button", { name: "Review orders" }));
+    await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("button", { name: "Review trade" }));
     const t = container.querySelector(".q-ticket").textContent;
     expect(t).not.toMatch(/receive now|Derive holds/i);
     expect(t).toMatch(/You payi\$[\d.,]+ incl\. fees/);
   });
 
-  it("asks what filled before saving a position, and saves nothing for Not yet", async () => {
-    localStorage.clear();
-    const user = userEvent.setup({ advanceTimers: () => {} });
-    const { container } = show(`${Q86}?side=yes`);
-    await user.click(screen.getByRole("button", { name: "Review orders" }));
-    const ticket = container.querySelector(".q-ticket");
-    await user.click(within(ticket).getByRole("button", { name: "I placed it" }));
-    await user.click(within(ticket).getByRole("radio", { name: "Not yet" }));
-    expect(within(ticket).getByText(/Nothing saved/)).toBeTruthy();
-    expect(within(ticket).queryByRole("button", { name: "Save to Positions" })).toBeNull();
-    await user.click(within(ticket).getByRole("radio", { name: "Only the first" }));
-    // The board's estimate is never filled in as the user's fill (journal J1).
-    const premium = within(ticket).getByRole("textbox", { name: "Premium paid, before fees" });
-    expect(premium.value).toBe("");
-    fireEvent.change(within(ticket).getByLabelText("When it filled, UTC"), { target: { value: "2026-10-03T14:05" } });
-    await user.type(premium, "107.10");
-    await user.type(within(ticket).getByRole("textbox", { name: "Derive's fees" }), "1.40");
-    await user.click(within(ticket).getByRole("button", { name: "Save to Positions" }));
-    const saved = JSON.parse(localStorage.getItem("cowboy-questions"));
-    expect(saved).toHaveLength(1);
-    expect(saved[0].estimate).toBeCloseTo(100.00, 2); // the $100 typed, fees included
-    expect(saved[0]).toMatchObject({ exec: "hand_partial", paid: 108.5, side: "yes", network: "mainnet",
-      legs: ["BTC-20261009-83000-C", "BTC-20261009-89000-C"] });
-    expect(saved[0].journal.fill).toMatchObject({ complete: false, premium: 107.1, fees: 1.4, limitation: "package_total" });
-    localStorage.clear();
-  });
-
   it("opens the phone ticket as a dialog: focus moves in, Escape closes it and focus returns", async () => {
     const user = userEvent.setup({ advanceTimers: () => {} });
     const { container } = show(`${Q86}?side=yes`);
-    const open = screen.getByRole("button", { name: "Review orders" });
+    const open = screen.getByRole("button", { name: "Review trade" });
     await user.click(open);
     const sheet = screen.getByRole("dialog", { name: "Ticket" });
     expect(sheet.getAttribute("aria-modal")).toBe("true");
@@ -341,7 +298,7 @@ describe("the question page", () => {
     vi.setSystemTime(Date.UTC(2026, 9, 9, 7, 45));
     const { container } = show(`${Q86}?side=yes`);
     expect(container.textContent).toContain("Settling · average from 07:30 to 08:00 UTC");
-    expect(screen.queryByRole("button", { name: "Review orders" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Review trade" })).toBeNull();
     expect(container.querySelector(".q-ticket")).toBeNull();
   });
 
