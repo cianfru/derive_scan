@@ -26,7 +26,7 @@ import { isPilot } from "../pilot.js";
 /** Fills go only where this build points: the right mode, network, endpoint and signing domain. */
 const FILL_MODES = ["testnet", "mainnet"];
 /** Real money, a wallet outside the pilot: never a request. */
-export const PILOT_ONLY = "One-tap trading is open to a few test wallets for now. Place the orders by hand on Derive.";
+export const PILOT_ONLY = "One-tap trading is open to a few test wallets for now.";
 
 const secs = (t) => (t > 1e12 ? Math.floor(t / 1000) : Math.floor(t)); // Derive times can be ms
 

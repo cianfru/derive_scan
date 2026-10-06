@@ -1,6 +1,6 @@
 // Testnet builds: the board comes from mainnet chains, and Derive's testnet lists other strikes. A
 // level the testnet does not list reads "Not on testnet" on the board and the outcome panel, and its
-// ticket says so plainly instead of "No price"; stage 1's "Place by hand" stays, shown once.
+// ticket says so plainly instead of "No price"; there is no way to place it by hand.
 import React from "react";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
@@ -106,17 +106,17 @@ describe("a level the testnet does not list", () => {
     expect(within(card).getByRole("button", { name: /is not on testnet/ })).toBeTruthy();
   });
 
-  it("says so in the outcome panel and the ticket, with Place by hand once", async () => {
+  it("says so in the outcome panel and the ticket", async () => {
     setup({ instruments: listing([C88]), pagination: { num_pages: 1 } });
     const user = userEvent.setup();
     show(`/q/${H}?side=yes`);
     await screen.findByText("Not on testnet", {}, LOAD);
-    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    await user.click(screen.getByRole("button", { name: "Review trade" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" }, LOAD);
     await within(panel).findByText("Derive's testnet doesn't list this level. Pick another level.", {}, LOAD);
     expect(within(panel).queryByRole("button", { name: "Connect wallet" })).toBeNull();
     expect(within(panel).queryByRole("button", { name: /Try again|Get price/ })).toBeNull();
-    expect(within(panel).getAllByRole("button", { name: "Place by hand" })).toHaveLength(1);
+    expect(within(panel).queryByRole("button", { name: "Place by hand" })).toBeNull();
     await user.click(within(panel).getByRole("button", { name: "Details for testing" }));
     expect(document.body.textContent).toContain(C88);
   });
@@ -127,10 +127,10 @@ describe("a level the testnet does not list", () => {
     show(`/q/${H}?side=yes`);
     await waitFor(() => expect(fake.calls("public/get_all_instruments").length).toBeGreaterThan(0));
     expect(screen.queryByText("Not on testnet")).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Review orders" }));
+    await user.click(screen.getByRole("button", { name: "Review trade" }));
     const panel = await screen.findByRole("region", { name: "Higher through Derive" });
     expect(within(panel).getByText("One tap needs a browser wallet.")).toBeTruthy();
     expect(within(panel).queryByText(/doesn't list this level/)).toBeNull();
-    expect(within(panel).getAllByRole("button", { name: "Place by hand" })).toHaveLength(1);
+    expect(within(panel).queryByRole("button", { name: "Place by hand" })).toBeNull();
   });
 });

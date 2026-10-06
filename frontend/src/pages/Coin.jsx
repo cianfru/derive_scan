@@ -9,7 +9,7 @@ import CandleChart from "../components/CandleChart.jsx";
 import { CoinIcon } from "../components/MarketVisuals.jsx";
 import EngineComparison from "../components/EngineComparison.jsx";
 import OptionsWorkspace from "../components/OptionsWorkspace.jsx";
-import { LAYERS, LayerIcon, LayerTile, chainAgreed } from "../components/Chain.jsx";
+import { LayerIcon } from "../components/Chain.jsx";
 import CoinWallets from "../components/CoinWallets.jsx";
 import MetricHistory from "../components/MetricHistory.jsx";
 import { currentEngine } from "../lib/research.js";
@@ -20,6 +20,7 @@ import { QUESTIONS_ON } from "../lib/flags.js";
 import { HatMark } from "../components/Brand.jsx";
 import { ASSET_NAMES } from "../lib/presentation.js";
 import "../coin-detail.css";
+import CoinOverview from "../components/CoinOverview.jsx";
 
 // The chart shows the priced range for the next 30 days only, so candles keep most of the width.
 const CONE_DAYS = 30;
@@ -65,28 +66,6 @@ function Step({ id, n, kind, title, right, children }) {
       </div>
       <div className="cd-section-body">{children}</div>
     </section>
-  );
-}
-
-/** Both windows keep their engine cadence visible, even when their current readings match. */
-function JourneyStrip({ alignment, und }) {
-  if (!alignment) return null;
-  return (
-    <nav className="journey-strip cd-overview" aria-label="Three layers">
-      <div className="cd-overview-head">
-        <span>Window</span>
-        {LAYERS.map(([kind, name, anchor]) => <Link key={kind} className="cd-layer-link" to={`/coin/${und}#${anchor}`}><LayerIcon kind={kind} size={15} />{name}<Arrow /></Link>)}
-      </div>
-      {["7d", "30d"].map((h) => {
-        const agreed = chainAgreed(alignment, h);
-        return (
-          <div key={h} className={`journey-row cd-overview-row${agreed ? " agreed" : ""}`}>
-            <div className="cd-window"><span>{h === "7d" ? "7 days" : "30 days"}</span><small>{h === "7d" ? "4H engine" : "1D engine"}</small>{agreed && <small className="cd-agreement">All agree</small>}</div>
-            {LAYERS.map(([kind]) => <LayerTile key={kind} alignment={alignment} horizon={h} kind={kind} sub="detail" icon={false} />)}
-          </div>);
-      })}
-      <div className="cd-overview-footer"><span>Context, not a signal</span><Link to={`/coin/${und}#metric-history`}>Explore history<Arrow /></Link></div>
-    </nav>
   );
 }
 
@@ -156,7 +135,7 @@ export default function Coin() {
         </div>
       </header>
       <Lead lead={coinLead(und, data)} />
-      <JourneyStrip alignment={data.alignment} und={und} />
+      <CoinOverview alignment={data.alignment} und={und} />
       <SaloonCta und={und} live={data.questions === true} />
 
       <Step id="regime" n={1} kind="engine" title="Regime">

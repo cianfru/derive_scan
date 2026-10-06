@@ -68,7 +68,7 @@ export function publicClient() {
 
 /** Real money (mainnet builds): only the pilot's wallets take a seat. Other builds: every wallet. */
 export const pilotAllows = (wallet) => MODE !== "mainnet" || isPilot(wallet);
-export const NOT_PILOT = "One-tap trading is open to a few test wallets for now. Place the orders by hand on Derive.";
+export const NOT_PILOT = "One-tap trading is open to a few test wallets for now.";
 
 export const canTrade = (und) => typeof und === "string" && /^[A-Z0-9]+$/.test(und) && (TRADE_COINS === "all" || TRADE_COINS.includes(und));
 export const termsAccepted = () => !!read(KEYS.terms());

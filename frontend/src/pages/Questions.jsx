@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import { Info, Loading, Failed, Tabs } from "../components/ui.jsx";
-import { Asset, CoinIcon } from "../components/MarketVisuals.jsx";
+import { Arrow, Info, Loading, Failed, Tabs } from "../components/ui.jsx";
+import CoinOverview from "../components/CoinOverview.jsx";
+import { Asset } from "../components/MarketVisuals.jsx";
 import { ASSET_NAMES } from "../lib/presentation.js";
-import Chain from "../components/Chain.jsx";
 import QuestionLadder from "../components/QuestionLadder.jsx";
 import PayZone from "../components/PayZone.jsx";
 import QuestionChart from "../components/QuestionChart.jsx";
@@ -77,23 +77,20 @@ function Settled({ board }) {
   );
 }
 
-/** The coin's research, one tap away: its three layers now and a large way into the coin's page
- * (the reverse of the coin page's "in the Saloon" card). */
-function Context({ und, days }) {
+/** The coin's research beside the trade: its three layers for both windows, in the coin page's own
+ * overview card, with a way into the coin's page. */
+function Context({ und }) {
   const { data } = useData("markets.json");
   const row = data?.coins?.find((c) => c.und === und);
-  const h = days <= 10 ? "7d" : "30d";
   return (
-    <section className="q-context md-context" aria-label="Context, not advice">
+    <section className="q-context md-context coin-detail" aria-label="Context, not advice">
       <h2 className="md-context-title">Context, not advice
-        <Info label="About the context">What Cowboy's three layers show for {und} now, for the next {h === "7d" ? "7" : "30"} days: regime, wallets and options. They describe the market; they do not choose an answer.</Info>
+        <Info label="About the context">What Cowboy's three layers show for {und} now, over the next 7 and 30 days: regime, wallets and options. They describe the market; they do not choose an answer.</Info>
       </h2>
-      <Link className="md-coin-cta" to={`/coin/${und}#regime`}>
-        <CoinIcon und={und} />
-        <span className="md-coin-cta-text"><b>Open {und}</b><small>{ASSET_NAMES[und] || und}: chart, regime, wallets and options</small></span>
-        <span className="md-coin-cta-chain">{row?.align ? <Chain alignment={row.align} horizon={h} linked={false} compact /> : <span className="status">Unavailable</span>}</span>
-        <span className="md-coin-cta-go" aria-hidden="true">→</span>
-      </Link>
+      {row?.align
+        ? <CoinOverview alignment={row.align} und={und} label={`${und}: three layers`}
+            footer={<><span>{ASSET_NAMES[und] || und}: chart, regime, wallets and options</span><Link to={`/coin/${und}#regime`}>Open {und}<Arrow /></Link></>} />
+        : <p className="status">Not available yet</p>}
     </section>
   );
 }
@@ -249,7 +246,7 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
           <div className="md-history-key"><span>Price history</span><Info label="About the price chart">Question shows Derive's mark, buy and sell-back prices in cents per $1 of maximum payout for {ANSWER[sideKey || "yes"]}. Select {und} to see the coin's index instead. These are prices, not a measure of how often an outcome happens.</Info></div>
           {historyError && !hist ? <p className="status">Price history is unavailable right now.</p> : <QuestionChart hist={hist} id={level.id} side={sideKey || "yes"} level={level} und={und} theme={theme} />}
         </section>
-        <Context und={und} days={(date.settle_ts - Date.now() / 1000) / 86400} />
+        <Context und={und} />
         {t && <section className="md-payoff-study" aria-label="Settlement payout"><h2>What it pays at settlement</h2><OutcomePayoffStudy und={und} level={level} side={sideKey} t={t} index={board.index} expiry={date.expiry} /></section>}
         <section className="md-settlement" aria-label="How settlement works">
           <div className="md-section-heading"><h2>It can pay in part.</h2><Rules und={und} /></div>
@@ -284,11 +281,11 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
                   {t.belowMin && <p className="q-note warn">Smallest amount for this question: {money(t.minTotal, { cents: true })} with Derive's fees.</p>}
                   {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
                   {t.mostLose > 0 && t.mostLose < 50 && <p className="q-note">Fees are a large share of small amounts.</p>}
-                  <section className="md-preview" aria-label="What it pays"><OutcomeFigures und={und} level={level} side={sideKey} t={t} expiry={date.expiry} settleTs={date.settle_ts} summary compact /><p className="md-loss-note">Your cost is the most you can lose once both orders fill.</p></section>
+                  <section className="md-preview" aria-label="What it pays"><OutcomeFigures und={und} level={level} side={sideKey} t={t} expiry={date.expiry} settleTs={date.settle_ts} summary compact /><p className="md-loss-note">Your cost is the most you can lose.</p></section>
                 </> : <p className="status"><NoPrice level={level} side={sideKey} paused={paused} text={`No price now for ${ANSWER[sideKey]}`} /></p>}
-                {age.state === "stale" && <p className="q-note warn">Prices are {age.minutes} min old. Check Derive's screen before placing orders.</p>}
+                {age.state === "stale" && <p className="q-note warn">Prices are {age.minutes} min old.</p>}
                 {offTestnet && <p className="q-note"><span className="q-noprice">{NOT_ON_TESTNET}<Info label={`Why ${ANSWER[sideKey]} at ${money(level.k)} is not on testnet`}>{NOT_ON_TESTNET_WHY}</Info></span></p>}
-                <div className="md-review-action"><button ref={opener} className="btn primary lg" disabled={!ready} onClick={place}>Review orders</button><small>{oneTapOffered() ? "One tap: both options at one price, or nothing." : "One-tap trading is coming. For now, two orders on Derive."}</small></div>
+                <div className="md-review-action"><button ref={opener} className="btn primary lg" disabled={!ready} onClick={place}>Review trade</button><small>{oneTapOffered() ? "One tap: both options at one price, or nothing." : "One-tap trading is coming to Cowboy."}</small></div>
               </section>
               {sheet && ready && <div ref={sheetRef} className="q-sheet open md-ticket" role="dialog" aria-modal={typeof matchMedia !== "function" || matchMedia("(max-width: 1279px)").matches ? "true" : undefined} aria-label="Ticket">
                 <button className="text-control q-sheet-close" onClick={() => setSheet(false)}>Back to payout</button>
@@ -303,7 +300,7 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
 }
 
 /** The guided flow from step 3: Higher or Lower (never picked for the user), then the amount, then
- * what it pays, then the orders for Derive. One primary action per step. The full ladder of levels
+ * what it pays, then the trade. One primary action per step. The full ladder of levels
  * sits under "Other levels". */
 function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, ladder, ladderOpen, onLadder, initialStep, initialDollars }) {
   const { date, level } = found;
@@ -317,7 +314,6 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
   const t = sideKey && live(level, sideKey, paused) ? budgetTicket(level, sideKey, dollars, board) : null;
   const side = sideKey ? level[sideKey] : null;
   const settling = settlingNow(level); // by the clock now, from 07:30 UTC
-  const days = (date.settle_ts - Date.now() / 1000) / 86400;
   const sz = side?.size;
   const ready = t && !t.belowMin;
   const sheetRef = useRef(null);
@@ -336,7 +332,7 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
   const showPreview = !settling && sideKey && step === "preview";
   const bar = !settling && sideKey && (
     <ActionBar und={und} level={level} sideKey={sideKey} date={date} t={t} hidden={sheet}
-      label={step === "preview" ? "Place on Derive" : "See what it pays"} goRef={step === "preview" ? opener : null}
+      label={step === "preview" ? "Review trade" : "See what it pays"} goRef={step === "preview" ? opener : null}
       onGo={step === "preview" ? place : preview} disabled={step === "preview" ? !ready : !t} />
   );
   return (
@@ -413,7 +409,7 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, l
             {bar}
           </Step>
         )}
-        <Context und={und} days={days} />
+        <Context und={und} />
         <History und={und} date={date} level={level} sideKey={sideKey} theme={theme} />
         <p className="q-small mono">
           <span>Rules<Rules und={und} /></span>

@@ -62,7 +62,7 @@ describe("the guided flow", () => {
     expect(preview.querySelector(".op-figs")).not.toBeNull();
     expect(primaries(preview)).toHaveLength(1);
     expect(primaries(step("Amount"))).toHaveLength(0);
-    expect(within(preview).getByRole("button", { name: "Place on Derive" })).toBeTruthy();
+    expect(within(preview).getByRole("button", { name: "Review trade" })).toBeTruthy();
     // The selection reads the same in the picks, the bar and the ticket.
     expect(screen.getAllByRole("radio")[1].getAttribute("aria-checked")).toBe("true");
     expect(document.querySelector(".q-ticket h3").textContent).toMatch(/Lower · full \$1 at or below/);
@@ -72,7 +72,7 @@ describe("the guided flow", () => {
   it("lands a deep link with an answer on the preview", () => {
     show("/q/BTC-20261009-A-83000-89000?side=yes");
     expect(step("What it pays")).not.toBeNull();
-    expect(screen.getByRole("button", { name: "Review orders" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Review trade" })).toBeTruthy();
   });
 
   it("puts the full ladder under Other levels; a pick opens that outcome with its amount and payout", async () => {

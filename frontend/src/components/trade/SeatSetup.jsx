@@ -58,7 +58,7 @@ export function ConnectStep() {
     return (
       <div className="tr-step">
         <p className="tr-lead">One tap needs a browser wallet.</p>
-        <p className="tr-note">Open Cowboy in a browser with a wallet such as MetaMask or Rabby, or place the two orders by hand below.</p>
+        <p className="tr-note">Open Cowboy in a browser with a wallet such as MetaMask or Rabby.</p>
       </div>
     );
   }

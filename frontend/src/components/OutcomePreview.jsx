@@ -21,7 +21,7 @@ export function OutcomeFigures({ und, level, side, t, expiry, settleTs, summary,
   return (
     <dl className={`op-figs${summary ? " summary" : ""}`}>
       {summary ? (
-        <div className="op-total"><dt>You pay<Info label="What you pay">{usd(t.premium)} for the two options plus Derive's fees, about {usd(t.fees)}. It is the most you can lose once both orders fill.</Info></dt>
+        <div className="op-total"><dt>You pay<Info label="What you pay">{usd(t.premium)} for the two options plus Derive's fees, about {usd(t.fees)}. It is the most you can lose.</Info></dt>
           <dd className="mono">{usd(t.mostLose)} <small>incl. fees</small>{compact && <small className="op-fees-line">Derive fees {usd(t.fees)}</small>}</dd></div>
       ) : (
         <>

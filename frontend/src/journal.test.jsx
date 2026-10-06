@@ -6,7 +6,7 @@ import { MemoryRouter, Routes, Route } from "react-router-dom";
 import btc from "./fixtures/questions/BTC.json";
 import index from "./fixtures/questions/index.json";
 import hist from "./fixtures/questions/history-BTC-20261009.json";
-import { BANNED, findLevel } from "./lib/questions.js";
+import { BANNED, budgetTicket, findLevel, orderedLegs, questionText } from "./lib/questions.js";
 import {
   _resetMemory, addPosition, exportPositions, importPositions, loadPositions, persistent, positionFigures, prune, savePositions,
 } from "./lib/positions.js";
@@ -17,6 +17,7 @@ vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.curren
 vi.mock("./components/QuestionChart.jsx", () => ({ default: () => <div data-testid="chart" /> }));
 import Questions from "./pages/Questions.jsx";
 import MyQuestions from "./pages/MyQuestions.jsx";
+import JournalPlaced from "./components/JournalPlaced.jsx";
 
 const T14 = 1791036000; // Sat 3 Oct 2026 14:00 UTC
 const G = T14 - 900;   // markets.json published 13:45 UTC
@@ -50,12 +51,24 @@ const show = (path) => render(
   </MemoryRouter>,
 );
 
+// "I placed it" is no longer reachable from the ticket (trades happen on Cowboy); the form still
+// writes the journal records Positions reads, so it is mounted here as the ticket mounted it.
+function journalForm() {
+  const date = btc.dates.find((d) => d.expiry === "20261009");
+  const { container } = render(
+    <MemoryRouter>
+      <div className="q-ticket">
+        <JournalPlaced und="BTC" level={lv} sideKey="yes" t={budgetTicket(lv, "yes", 100, btc)} board={btc} legs={orderedLegs(lv.yes)}
+          settleTs={date.settle_ts} pricesTs={btc.prices_ts} question={questionText("BTC", lv, "20261009")} answer="Higher" />
+      </div>
+    </MemoryRouter>,
+  );
+  return container.querySelector(".q-ticket");
+}
+
 async function place({ fillAt = "2026-10-03T13:55", choice = "Both filled", perOption = true, fees = "1.52" } = {}) {
   const user = userEvent.setup({ advanceTimers: () => {} });
-  const { container } = show(`${Q86}?side=yes`);
-  await user.click(screen.getByRole("button", { name: "Review orders" }));
-  const ticket = container.querySelector(".q-ticket");
-  await user.click(within(ticket).getByRole("button", { name: "I placed it" }));
+  const ticket = journalForm();
   await user.click(within(ticket).getByRole("radio", { name: choice }));
   if (fillAt) fireEvent.change(within(ticket).getByLabelText("When it filled, UTC"), { target: { value: fillAt } });
   else await user.click(within(ticket).getByRole("checkbox", { name: "I don't know when" }));
@@ -74,6 +87,30 @@ async function place({ fillAt = "2026-10-03T13:55", choice = "Both filled", perO
 }
 
 describe("journal J1: recording a manual trade", () => {
+  it("asks what filled before saving a position, and saves nothing for Not yet", async () => {
+    localStorage.clear();
+    const user = userEvent.setup({ advanceTimers: () => {} });
+    const ticket = journalForm();
+    await user.click(within(ticket).getByRole("radio", { name: "Not yet" }));
+    expect(within(ticket).getByText(/Nothing saved/)).toBeTruthy();
+    expect(within(ticket).queryByRole("button", { name: "Save to Positions" })).toBeNull();
+    await user.click(within(ticket).getByRole("radio", { name: "Only the first" }));
+    // The board's estimate is never filled in as the user's fill (journal J1).
+    const premium = within(ticket).getByRole("textbox", { name: "Premium paid, before fees" });
+    expect(premium.value).toBe("");
+    fireEvent.change(within(ticket).getByLabelText("When it filled, UTC"), { target: { value: "2026-10-03T14:05" } });
+    await user.type(premium, "107.10");
+    await user.type(within(ticket).getByRole("textbox", { name: "Derive's fees" }), "1.40");
+    await user.click(within(ticket).getByRole("button", { name: "Save to Positions" }));
+    const saved = JSON.parse(localStorage.getItem("cowboy-questions"));
+    expect(saved).toHaveLength(1);
+    expect(saved[0].estimate).toBeCloseTo(100.00, 2); // the $100 typed, fees included
+    expect(saved[0]).toMatchObject({ exec: "hand_partial", paid: 108.5, side: "yes", network: "mainnet",
+      legs: ["BTC-20261009-83000-C", "BTC-20261009-89000-C"] });
+    expect(saved[0].journal.fill).toMatchObject({ complete: false, premium: 107.1, fees: 1.4, limitation: "package_total" });
+    localStorage.clear();
+  });
+
   it("keeps the package, fills, costs, mark and readings, and survives reload and export/import intact", async () => {
     const [p] = await place();
     const j = p.journal;

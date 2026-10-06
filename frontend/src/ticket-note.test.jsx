@@ -1,5 +1,6 @@
-// Builds with the Saloon on but no one-tap (production today): one plain line above the manual ticket,
-// with why there are two orders in an (i). Selling back by hand carries no such line.
+// Builds with the Saloon on but no one-tap (production today): the trade's figures under one plain
+// line, one-tap trading is coming, with how an answer trades in an (i); no orders to place by hand
+// and no link to Derive. Selling back a position placed by hand earlier carries no such line.
 import React from "react";
 import { afterEach, it, expect, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -18,15 +19,18 @@ const t = budgetTicket(level, "yes", 100, btc);
 const show = (props = {}) => render(<MemoryRouter><QuestionTicket und="BTC" question="BTC above $85,000?" answer="Higher" level={level} sideKey="yes"
   t={t} board={btc} pricesTs={btc.prices_ts} settleTs={date.settle_ts} expiry={date.expiry} {...props} /></MemoryRouter>);
 
-it("says plainly above the manual ticket that one-tap trading is coming, with the two orders explained in an (i)", async () => {
+it("says plainly that one-tap trading is coming, with how an answer trades in an (i), and no way to Derive", async () => {
   show();
-  const ticket = screen.getByRole("region", { name: "Place on Derive" });
+  const ticket = screen.getByRole("region", { name: "Your trade" });
   const note = ticket.querySelector(".q-onetap-note");
-  expect(note.textContent).toContain("One-tap trading is coming to Cowboy. For now, place the two orders on Derive yourself.");
+  expect(note.textContent).toContain("One-tap trading is coming to Cowboy.");
+  expect(note.textContent).not.toMatch(/yourself|by hand/);
   expect(ticket.firstElementChild).toBe(note);
-  await userEvent.setup().click(within(note).getByRole("button", { name: "Why two orders" }));
+  expect(ticket.querySelector("a[href], details.q-details")).toBeNull();
+  expect(ticket.textContent).not.toMatch(/Open Derive|I placed it/);
+  await userEvent.setup().click(within(note).getByRole("button", { name: "About one-tap trading" }));
   const why = screen.getByRole("dialog").textContent;
-  expect(why).toContain("two options traded together");
+  expect(why).toContain("two Derive options traded together at one price");
   for (const s of [note.textContent, why]) expect(s).not.toMatch(BANNED);
 });
 

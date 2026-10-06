@@ -8,10 +8,10 @@
 /* The guided flow: numbered steps down the left, the ticket (or a summary) beside it on wide screens. */
 .q-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; align-items: start; }
 @media (min-width: 1280px) {
-  .q-layout { grid-template-columns: minmax(0, 1fr) 380px; column-gap: 40px; }
+  .q-layout { grid-template-columns: minmax(0, 1fr) 400px; column-gap: 32px; }
   .q-aside { position: sticky; top: calc(var(--header-h) + 16px); }
 }
-.q-flow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 26px; min-width: 0; max-width: 760px; }
+.q-flow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 32px; min-width: 0; }
 .q-flow > * { min-width: 0; }
 .q-step { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; }
 .q-step > * { min-width: 0; }
@@ -35,7 +35,7 @@
 @media (max-width: 1279px) { .q-aside .q-summary { display: none; } }
 
 /* The step's one action: in the page on wide screens, a bar fixed to the bottom on phones. */
-.q-actbar { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; padding: 14px 16px; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface-1); max-width: 560px; }
+.q-actbar { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; padding: 18px 24px; border: 1px solid var(--border-strong); border-radius: var(--r-lg); background: var(--surface-1); }
 .q-actbar-sum { display: grid; gap: 3px; min-width: 0; }
 .q-actbar-sum b { font: 600 14px/1.3 var(--font-sans); }
 .q-actbar-sum small { color: var(--text-3); font-size: 12px; }
@@ -119,8 +119,8 @@
 .q-title { font: 600 24px/1.25 var(--font-sans); letter-spacing: -.01em; }
 .q-settles { margin: -6px 0 0; color: var(--text-3); font-size: 13px; display: flex; align-items: center; }
 .q-big { font: 500 18px/1.4 var(--font-sans); margin: 0; }
-.q-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 560px; }
-.q-pick-btn { min-height: 76px; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name price" "zone zone"; align-items: center; gap: 6px 10px; padding: 10px 16px; text-align: left; border-radius: var(--r-md); border: 1px solid var(--border-strong); background: var(--surface-1); font: 600 16px/1 var(--font-sans); transition: border-color 120ms var(--ease), background 120ms var(--ease); }
+.q-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.q-pick-btn { min-height: 92px; display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name price" "zone zone"; align-items: center; gap: 8px 12px; padding: 16px 20px; text-align: left; border-radius: var(--r-md); border: 1px solid var(--border-strong); background: var(--surface-1); font: 600 16px/1 var(--font-sans); transition: border-color 120ms var(--ease), background 120ms var(--ease); }
 .q-pick-btn b { grid-area: price; font-size: 18px; font-weight: 500; }
 .q-pick-btn b small { font: 500 12px var(--font-sans); color: var(--text-3); }
 .q-pick-name { grid-area: name; display: inline-flex; align-items: center; gap: 6px; }
@@ -133,7 +133,17 @@
 .q-chart-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .q-chart-head .tabs button { padding: 6px 0; font-size: 13px; }
 .q-chart-box { height: 200px; }
-.q-amount { display: grid; gap: 12px; padding: 16px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); max-width: 560px; }
+.q-amount { display: grid; gap: 14px; padding: 24px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); }
+/* The payout card fills the flow's width: figures on the left, the settlement slider and dollar
+   examples on the right, once there is room for both. */
+.q-preview .op-sim, .q-preview .payzone-fig, .q-preview .op-ex { max-width: none; }
+.q-preview .op-range { max-width: none; }
+@media (min-width: 900px) {
+  .q-preview .op { grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr); column-gap: 48px; row-gap: 0; align-items: start; }
+  .q-preview .op > .op-figs { grid-column: 1; grid-row: 1 / span 8; }
+  .q-preview .op > :not(.op-figs) { grid-column: 2; margin-bottom: 14px; }
+  .q-preview .op > :last-child { margin-bottom: 0; }
+}
 .q-amount-in { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 .q-dollar-field { display: inline-flex; align-items: center; gap: 4px; height: 40px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--ground); font-family: var(--font-mono); }
 .q-dollar-field input { width: 90px; border: 0; background: none; outline: none; font: 500 16px var(--font-mono); }
