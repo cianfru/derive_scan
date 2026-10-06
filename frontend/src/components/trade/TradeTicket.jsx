@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Info } from "../ui.jsx";
-import { cents, centsUp, money, parseId, sameLegs } from "../../lib/questions.js";
+import { breakeven, cents, centsUp, money, parseId, sameLegs, signed } from "../../lib/questions.js";
 import {
   maxTotalCost, minTotalCost, packageLegs, rfqFee, toleranceFor, wireLegs,
 } from "../../lib/trade/package.js";
@@ -38,6 +38,7 @@ export function ticketPlan({ und, level, sideKey, board, contracts, direction = 
   return {
     legs, wire: wireLegs(legs, contracts), payout, fee, limit, board: board$, T, direction, contracts,
     aboutLose: direction === "buy" && board$ != null ? payout * board$ + fee : null,
+    outcome: direction === "buy" ? { und, side: sideKey, lo: level.lo, hi: level.hi } : null,
     label: direction === "buy" ? buyLabel(level.id, sideKey) : closeLabel(level.id, sideKey),
   };
 }
@@ -159,6 +160,11 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE,
   const firmLeft = st.firmUntil ? Math.max(0, Math.ceil((st.firmUntil - now) / 1000)) : 0;
   const quoted = st.phase === "quoted";
   const firm = !!c?.ok && ["quoted", "checking", "checked", "executing"].includes(st.phase); // figures from Derive's firm quote
+  const firmOutcome = buy && firm && plan.outcome ? { payout: plan.payout, mostLose: c.mostLose } : null;
+  const mostMake = firmOutcome ? firmOutcome.payout - firmOutcome.mostLose : null;
+  const fullOnlyBreakEven = firmOutcome && firmOutcome.mostLose === firmOutcome.payout;
+  const breakEven = fullOnlyBreakEven ? plan.outcome.side === "yes" ? plan.outcome.hi : plan.outcome.lo
+    : firmOutcome ? breakeven(firmOutcome, plan.outcome, plan.outcome.side) : null;
   const cap = quoted && buy ? capGate(c.mostLose, seat.wallet) : { ok: true };
   const busy = ["asking", "checking", "executing", "confirming"].includes(st.phase);
   const waitText = { asking: st.attempt > 1 ? `Looking for a quote as good as Derive's order book (${st.attempt} of ${st.attempts})…` : "Asking Derive for a firm price…", checking: "Checking with Derive…", executing: "Filling on Derive…", confirming: "Checking your fill…" }[st.phase];
@@ -178,7 +184,12 @@ export default function TradeTicket({ plan, onFill, trading = "on", mode = MODE,
         <div><dt>Derive fees
           <Info label="About Derive's fees">Derive charges one $0.50 base fee per answer plus a small share of the coin's price on the costliest option; both options fill as one package. Cowboy adds no fee. The firm total includes the maximum approved fee; the final receipt shows what Derive charged.</Info></dt>
           <dd className="mono">{firm ? <>up to {money(c.maxFee, { cents: true })}</> : plan.fee != null ? <>about {money(plan.fee, { cents: true })}</> : "From Derive"}</dd></div>
+        {firmOutcome && <>
+          <div><dt>Most you can make<small>after the maximum approved fee</small></dt><dd className={`mono${mostMake > 0 ? " up" : ""}`}>{mostMake > 0 ? signed(mostMake) : "None at this price"}</dd></div>
+          <div><dt>Breakeven at settlement<Info label="About the firm breakeven">The settlement price where the payout equals this firm total, including the maximum approved fee. Derive's final fee can be lower.</Info></dt><dd className="mono">{breakEven == null ? "None at this price" : fullOnlyBreakEven ? <>{plan.outcome.und} {plan.outcome.side === "yes" ? "at or above" : "at or below"} {money(breakEven)} · full payout only</> : <>{plan.outcome.und} at {money(breakEven)}</>}</dd></div>
+        </>}
       </dl>
+      {firmOutcome && <p className="tr-note">The firm total can differ from your earlier preview; these figures include the maximum approved fee.</p>}
 
       {!allowed && <p className="tr-msg" role="status">{TRADING_NOTICE[trading] || TRADING_NOTICE.off}</p>}
       {allowed && st.phase === "idle" && preCap.warn && !short && <p className="tr-msg" role="note">{capMessage(preCap)}</p>}

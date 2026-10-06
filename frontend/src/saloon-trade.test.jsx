@@ -21,7 +21,9 @@ import Questions from "./pages/Questions.jsx";
 import Shell from "./components/Shell.jsx";
 import { BANNED, findLevel, ticket } from "./lib/questions.js";
 import { saveBudget } from "./lib/follows.js";
-import { _setSeatDeps } from "./lib/trade/seat.js";
+import { _setSeatDeps, _setSeatState } from "./lib/trade/seat.js";
+import * as rfq from "./lib/trade/rfq.js";
+import TradeTicket, { sellPlan, ticketPlan } from "./components/trade/TradeTicket.jsx";
 import { createClient } from "./lib/trade/derive.js";
 import { fakeDerive } from "./lib/trade/fakeSocket.js";
 import { fakeWallet } from "./lib/trade/fakeWallet.js";
@@ -92,7 +94,7 @@ beforeEach(() => {
   localStorage.clear(); _resetTradeStorage();
   docs.current = { "questions/index.json": index, "questions/BTC.json": btc, "questions/HYPE.json": hype, "questions/history/BTC-20261009.json": hist, "markets.json": { coins: [] } };
 });
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
 
 describe("one tap through Derive (testnet, dry run)", () => {
   it("walks connect, terms, approval and a dry run, and fills nothing", async () => {
@@ -136,6 +138,9 @@ describe("one tap through Derive (testnet, dry run)", () => {
     await user.click(within(panel).getByRole("button", { name: "Get price" }));
     const buy = await within(panel).findByRole("button", { name: "Dry run: buy for $98.94" });
     expect(within(panel).getByText(/49c per \$1/)).toBeTruthy();
+    expect(within(panel).getByText("Most you can make").closest("div").querySelector("dd").textContent).toBe("+$99.00");
+    expect(within(panel).getByText("Breakeven at settlement").closest("div").querySelector("dd").textContent).toBe("BTC at $84,999");
+    expect(within(panel).getByText(/The firm total can differ from your earlier preview/)).toBeTruthy();
     expect(fake.calls("private/send_rfq")[0].params).toMatchObject({ subaccount_id: 90212, max_total_cost: "103.95", label: `${ID}:yes`,
       legs: [{ instrument_name: "BTC-20261009-82000-C", direction: "buy", amount: "0.03299" }, { instrument_name: "BTC-20261009-88000-C", direction: "sell", amount: "0.03299" }] });
     await wordcheck(user, panel);
@@ -188,6 +193,53 @@ describe("one tap through Derive (testnet, dry run)", () => {
     await user.click(screen.getByRole("button", { name: "Review trade" }));
     const hype = await screen.findByRole("region", { name: "Higher through Derive" });
     expect(within(hype).queryByRole("button", { name: "Place by hand" })).toBeNull();
+  });
+});
+
+describe("firm outcome figures", () => {
+  function readyPlan(side = "yes", sell = false) {
+    _setSeatDeps({ findProvider: () => null });
+    _setSeatState({ stage: "ready", wallet: "0x0000000000000000000000000000000000000001", saloon: { id: 90212, usdc: 1000 }, client: { close: vi.fn() }, key: { secret: newKey().privateKey } });
+    const level = findLevel(btc, ID).level;
+    return sell ? sellPlan({ position: { id: ID, side, lo: level.lo, hi: level.hi, contracts: 0.01 }, level, board: btc })
+      : ticketPlan({ und: "BTC", level, sideKey: side, board: btc, contracts: 0.01 });
+  }
+
+  async function firm(plan, cost = 24) {
+    const create = vi.spyOn(rfq, "createTicket").mockReturnValue({ start: vi.fn(), close: vi.fn(), confirm: vi.fn() });
+    const view = render(<MemoryRouter><TradeTicket plan={plan} /></MemoryRouter>);
+    expect(screen.queryByText("Most you can make")).toBeNull();
+    await userEvent.setup().click(screen.getByRole("button", { name: plan.direction === "buy" ? "Get price" : "Get sell-back price" }));
+    act(() => create.mock.calls[0][0].onChange({ phase: "quoted", quote: { quote_id: "display-only" }, check: { ok: true, total: cost - 1, fee: 0.5, maxFee: 1, perDollar: (cost - 1) / plan.payout, mostLose: cost, net: cost - 2 }, firmUntil: Date.now() + 12000 }));
+    return view;
+  }
+
+  it.each([["yes", "$84,400"], ["no", "$85,600"]])("uses maximum approved fees for %s profit and breakeven", async (side, expected) => {
+    await firm(readyPlan(side));
+    expect(screen.getByText("Most you can make").closest("div").querySelector("dd").textContent).toBe("+$36.00");
+    expect(screen.getByText("Breakeven at settlement").closest("div").querySelector("dd").textContent).toBe(`BTC at ${expected}`);
+    expect(screen.getByRole("button", { name: "Dry run: buy for $24.00" })).toBeTruthy();
+    expect(screen.getByText(/The firm total can differ from your earlier preview/)).toBeTruthy();
+  });
+
+  it.each([["yes", "BTC at or above $88,000 · full payout only"], ["no", "BTC at or below $82,000 · full payout only"]])("shows full-payout-only breakeven for %s when cost equals maximum payout", async (side, expected) => {
+    await firm(readyPlan(side), 60);
+    expect(screen.getByText("Most you can make").closest("div").querySelector("dd").textContent).toBe("None at this price");
+    expect(screen.getByText("Breakeven at settlement").closest("div").querySelector("dd").textContent).toBe(expected);
+  });
+
+  it("shows no profit or breakeven when the firm cost exceeds the maximum payout", async () => {
+    await firm(readyPlan(), 60.5);
+    expect(screen.getByText("Most you can make").closest("div").querySelector("dd").textContent).toBe("None at this price");
+    expect(screen.getByText("Breakeven at settlement").closest("div").querySelector("dd").textContent).toBe("None at this price");
+  });
+
+  it("keeps sell-back proceeds free of buy-only payout and breakeven figures", async () => {
+    await firm(readyPlan("yes", true));
+    expect(screen.getByText("You get").closest("div").querySelector("dd").textContent).toBe("$22.00");
+    expect(screen.queryByText("Most you can make")).toBeNull();
+    expect(screen.queryByText("Breakeven at settlement")).toBeNull();
+    expect(screen.queryByText(/The firm total can differ from your earlier preview/)).toBeNull();
   });
 });
 

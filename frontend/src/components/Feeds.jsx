@@ -9,8 +9,8 @@ function Feed({ path, refresh, onData }) {
 
 /**
  * Several published files at once (one hook per file, as data.js serves them, cached and shared).
- * Returns the elements to render (they draw nothing), the files by path, and `ready` once every
- * file has loaded or failed.
+ * Returns the elements to render (they draw nothing), the files by path, `ready` once every
+ * file has loaded or failed, and the per-file loading results.
  */
 export function useFeeds(paths, refresh = 5 * 60_000) {
   const [got, setGot] = useState({});
@@ -18,5 +18,5 @@ export function useFeeds(paths, refresh = 5 * 60_000) {
   const els = paths.map((p) => <Feed key={p} path={p} refresh={refresh} onData={onData} />);
   const ready = paths.every((p) => got[p] && (got[p].data != null || got[p].error != null));
   const data = Object.fromEntries(paths.map((p) => [p, got[p]?.data ?? null]));
-  return [els, data, ready];
+  return [els, data, ready, got];
 }
