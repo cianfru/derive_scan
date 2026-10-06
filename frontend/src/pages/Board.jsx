@@ -9,7 +9,8 @@ import { ChainMini, HORIZON_LABEL, LAYERS, LayerTile } from "../components/Chain
 import { ASSET_NAMES } from "../lib/presentation.js";
 import SaloonHead from "../components/SaloonNotices.jsx";
 import { FollowButton, FollowLevel } from "../components/Follow.jsx";
-import { DEFAULT_SORT, RANGES, SIDES, SORTS, boardRows, contextHorizon, dateRows, filterRows, sortRows } from "../lib/board.js";
+import { DEFAULT_SORT, RANGES, SIDES, SORTS, boardRows, contextHorizon, dateRows, filterRows, nearRow, sortRows } from "../lib/board.js";
+import { viewReading } from "../lib/presentation.js";
 import { exportFollows, importFollows, unfollow, useFollowsDoc } from "../lib/follows.js";
 import { TESTNET_FILLS } from "../lib/flags.js";
 import { NOT_ON_TESTNET, NOT_ON_TESTNET_WHY, missingLegs, useTestnetListing } from "../lib/testnetLevels.js";
@@ -48,9 +49,8 @@ function AnswerChoice({ r, budget }) {
     <div className={`bd-answer ${r.side}${available ? "" : " off"}`}>
       {offTestnet ? <div className="bd-choice off">{side}<span className="q-noprice">{NOT_ON_TESTNET}<Info label={`Why ${name} is not on testnet`}>{NOT_ON_TESTNET_WHY}</Info></span></div>
         : available ? <Link to={`/q/${r.id}?side=${r.side}`} state={{ step: "preview" }} className={`bd-choice ${r.side}`} aria-label={`${name}: see what it pays`}>
-          <span className="bd-choice-side">{side}<span className="bd-price"><b className="mono">{r.buyCents}<small>¢</small></b>
-            {r.capped && <small className="bd-capped" title="Small size at this price">Small size</small>}</span></span>
-          <span className="bd-choice-out"><b className="mono">{returnText(r.make, r.total)}</b><small>most you make</small></span>
+          <span className="bd-choice-top">{side}<span className="bd-price mono" title={r.capped ? "Small size at this price" : undefined}>{r.buyCents}¢{r.capped && <small className="bd-capped" aria-label="small size at this price">*</small>}</span></span>
+          <span className="bd-choice-ret">{r.make > 0 && <small>up to</small>}<b className={`mono${returnText(r.make, r.total).length > 6 ? " long" : ""}`}>{returnText(r.make, r.total)}</b></span>
         </Link>
         : <div className="bd-choice off">{side}<span className="q-noprice">No price now<Info label={`Why ${name} has no price`}>{r.reason}</Info></span></div>}
       <FollowButton id={r.id} side={r.side} k={r.k} board={r.board} compact />
@@ -66,6 +66,7 @@ function Comparison({ r }) {
         <div><dt>You pay, for {usd(REF)}</dt><dd className="mono">{usd(r.total)}</dd></div>
         <div><dt>Most it pays</dt><dd className="mono">{usd(r.payout)}</dd></div>
         <div><dt>Full payout</dt><dd>{fullPay(r.level, r.side)}</dd></div>
+        <div><dt>Pays in part</dt><dd className="mono">{money(r.level.lo)}–{money(r.level.hi)}</dd></div>
         <div><dt>Derive fees included</dt><dd className="mono">{usd(r.fees)}</dd></div>
         <div><dt>Most you can make</dt><dd className="mono">{r.make > 0 ? signed(r.make) : "None"}</dd></div>
         <div className="bd-over"><dt>Cost over mark</dt><dd className="mono">{r.overMark != null
@@ -111,7 +112,7 @@ function OutcomeCard({ outcome: r, align, budget, inRow = false, boardStyle = fa
         <Heading className="bd-card-q"><Link className="bd-question" to={`/q/${r.id}`}  aria-label={`${r.und} at ${money(r.k)} on ${dayLabel(r.expiry)}: view outcome`}>
           <span className="bd-q-text">Higher or lower than</span> <strong className="mono">{money(r.k)}</strong><span className="bd-q-text">?</span>
         </Link></Heading>
-        <div className="bd-partial"><span>Pays in part</span><b className="mono">{money(r.lo)}–{money(r.hi)}</b><Info label={`About partial payout for ${r.und} at ${money(r.k)}`}>Between these prices, the spread pays part of its maximum, in a straight line. Higher reaches full payout at the upper price; Lower reaches full payout at the lower price. Opening an outcome shows the complete payout curve.</Info>{r.thin && <span className="bd-thin">Thin book</span>}</div>
+        {r.thin && <span className="bd-thin">Thin book</span>}
       </div>
       {answers.map((a) => <AnswerChoice key={a.side} r={a} budget={budget} />)}
       <details className="bd-comparison" onToggle={(e) => setExpanded(e.currentTarget.open)}>
@@ -134,24 +135,35 @@ function NowMark({ und, index }) {
 
 /** The key over a ladder: what each answer's two figures are. */
 function LadderKey() {
-  return <div className="bd-key"><span aria-hidden="true">Level</span><span>Price per $1 · most you make, as a share of <span className="bd-key-end">cost<Info label="About these figures">The price is the cost per $1 of maximum payout, before fees. Most you make is the profit if the answer pays in full, as a share of the total you pay, Derive's fees included, worked out for {usd(REF)}. Derive charges a small fixed fee per option, so smaller amounts make a little less and larger ones a little more. Choose your amount when you open an outcome.</Info></span></span></div>;
+  return <div className="bd-key"><span aria-hidden="true">Level</span><span>Up to: the most you make if it pays in full, <span className="bd-key-end">fees included<Info label="About these figures">The big figure is the profit if the answer pays in full, as a share of the total you pay, Derive's fees included, worked out for {usd(REF)}. The small price is the cost per $1 of maximum payout, before fees. Near its level an answer pays in part; opening an outcome shows the full payout curve. Derive charges a small fixed fee per option, so smaller amounts make a little less and larger ones a little more. * marks a price with only a small size available.</Info></span></span></div>;
+}
+
+const SMART_WORD = { up: "Long", defensive: "Short", neutral: "Balanced" };
+/** How the smart wallets hold the coin over the window this date falls in, as one word, or nothing. */
+function SmartWord({ und, align, settleTs, now }) {
+  const horizon = contextHorizon(settleTs);
+  const { state } = viewReading(align, horizon, "wallets", now);
+  if (!SMART_WORD[state]) return null;
+  return <span className="bd-row-smart">Smart wallets <b className={state}>{SMART_WORD[state]}</b><Info label={`About smart wallets on ${und}`}>How the most profitable fifth of Derive traders who bet on direction hold {und} options settling in the next {horizon === "7d" ? "7" : "30"} days. Context, not a signal: it never changes the order of this board.</Info></span>;
 }
 
 /** One coin and settlement date: a header, then its levels from low to high with the index marked. */
-function DateRow({ row, align, budget, boardStyle = false }) {
-  const name = ASSET_NAMES[row.und] || row.und;
-  const when = `${dayLabel(row.expiry)}, 08:00 UTC`;
-  const n = row.items.length;
+function DateRow({ row: full, align, budget, boardStyle = false, all = false, now }) {
+  const [open, setOpen] = useState(false);
+  const row = all || open ? full : nearRow(full);
+  const name = ASSET_NAMES[full.und] || full.und;
+  const when = `${dayLabel(full.expiry)}, 08:00 UTC`;
+  const n = full.items.length;
   const cards = row.items.map((g) => <OutcomeCard key={g.id} outcome={g} align={align} budget={budget} inRow boardStyle={boardStyle} />);
   if (row.nowAt != null) cards.splice(row.nowAt, 0, <NowMark key="now" und={row.und} index={row.index} />);
   return (
     <section className="bd-row" aria-label={`${name}, settles ${when}`}>
       <header className="bd-row-head">
         <h2><CoinIcon und={row.und} /><span className="bd-row-name">{name}</span><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-date">{when}</span>{countdown(row.settleTs) && <><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-in mono">{countdown(row.settleTs)}</span></>}</h2>
-        <span className="bd-row-meta"><span className="bd-row-n">{n} {n === 1 ? "level" : "levels"}</span>{row.index != null && <span className="bd-row-index mono">now {money(row.index)}</span>}</span>
+        <span className="bd-row-meta">{row.index != null && <span className="bd-row-index mono">now {money(row.index)}</span>}<SmartWord und={row.und} align={align} settleTs={row.settleTs} now={now} /></span>
       </header>
-      <LadderKey />
       <ol className="bd-row-cards" aria-label={`${name} levels on ${dayLabel(row.expiry)}, low to high`}>{cards}</ol>
+      {!all && (row.hidden > 0 || open) && <button type="button" className="bd-row-all" aria-expanded={open} onClick={() => setOpen((o) => !o)}>{open ? "Show the levels near the price" : `View all ${n} levels`}</button>}
     </section>
   );
 }
@@ -258,8 +270,8 @@ export default function Board({ followingOnly = false, embedded = false }) {
   const rowsByDate = byDate ? dateRows(groups, coins) : [];
   // The rows shown: whole rows until about PAGE cards are on screen.
   const shownRows = [];
-  for (let i = 0, cards = 0; i < rowsByDate.length && cards < shown; i++) { shownRows.push(rowsByDate[i]); cards += rowsByDate[i].items.length; }
-  const shownCards = shownRows.reduce((n, r) => n + r.items.length, 0);
+  for (let i = 0, cards = 0; i < rowsByDate.length && cards < shown; i++) { shownRows.push(rowsByDate[i]); cards += Math.min(rowsByDate[i].items.length, 4); }
+  const shownCards = shownRows.reduce((n, r) => n + Math.min(r.items.length, 4), 0);
   const activeFilters = Number(range !== "all") + Number(side !== "all") + Number(sort !== DEFAULT_SORT);
   const alignOf = Object.fromEntries((markets?.coins || []).map((c) => [c.und, c.align]));
   useEffect(() => { setShown(PAGE); }, [coin, range, side, sort, budget, search, followingOnly]);
@@ -317,7 +329,8 @@ export default function Board({ followingOnly = false, embedded = false }) {
           {list.length ? (
             <div className="bd-marketplace" role="region" aria-label="Outcomes">
               {byDate ? <>
-                <div className="bd-rows">{shownRows.map((row) => <DateRow key={row.key} row={row} align={alignOf[row.und]} budget={budget} boardStyle={!embedded} />)}</div>
+                <LadderKey />
+                <div className="bd-rows">{shownRows.map((row) => <DateRow key={row.key} row={row} align={alignOf[row.und]} budget={budget} boardStyle={!embedded} all={!!query || followingOnly} now={now} />)}</div>
                 {rowsByDate.length > shownRows.length && <button className="text-control bd-more" onClick={() => setShown(shownCards + PAGE)}>Show later dates</button>}
               </> : <>
                 <LadderKey />

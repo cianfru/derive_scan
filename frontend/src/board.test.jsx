@@ -11,8 +11,8 @@ const docs = vi.hoisted(() => ({ current: {}, errors: {} }));
 vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.current[path] ?? null : null, error: docs.errors[path] ?? null }) }));
 import Board, { returnText } from "./pages/Board.jsx";
 import { SaloonNotices } from "./components/SaloonNotices.jsx";
-import { BANNED, ticket } from "./lib/questions.js";
-import { DEFAULT_SORT, SORTS, boardRows, budgetTicket, cleanBudget, coinRank, costOverMark, dateRows, exitCost, filterRows, markFor, sortRows } from "./lib/board.js";
+import { BANNED, dayLabel, ticket } from "./lib/questions.js";
+import { DEFAULT_SORT, SORTS, boardRows, budgetTicket, cleanBudget, coinRank, costOverMark, dateRows, exitCost, filterRows, markFor, nearRow, sortRows } from "./lib/board.js";
 import {
   KEY, _resetMemory, computeNotices, dismiss, exportFollows, follow, importFollows, loadBudget, loadDoc, migrate,
   researchChanges, saveBudget, saveDoc, setLevel,
@@ -281,12 +281,13 @@ describe("the board page", () => {
     const card = [...container.querySelectorAll(".bd-card")].find((c) => c.querySelectorAll("a.bd-choice").length === 2);
     const href = card.querySelector(".bd-question").getAttribute("href");
     expect(within(card).getAllByRole("link", { name: /see what it pays/ }).map((a) => a.getAttribute("href"))).toEqual([`${href}?side=yes`, `${href}?side=no`]);
-    expect(card.textContent).toMatch(/Pays in part\$[\d,]+–\$[\d,]+/);
-    expect(card.textContent).toMatch(/\+[\d,.]+%most you make/);
-    expect(container.querySelector(".bd-key").textContent).toMatch(/Price per \$1 · most you make, as a share of cost/);
+    // The tile: side and price per $1 on a small line, the most it makes as the big figure; nothing else.
+    expect(card.textContent).not.toMatch(/Pays in part|most you make/);
+    expect(container.querySelector(".bd-key").textContent).toMatch(/Up to: the most you make if it pays in full, fees included/);
     // The share is the $100 ticket's most you can make over its total, fees included.
     const r = boardRows([btc, hype], 100, { now: NOW }).rows.find((x) => `/q/${x.id}` === href && x.side === "yes");
-    expect(card.querySelector("a.bd-choice.yes .bd-choice-out b").textContent).toBe(returnText(r.make, r.total));
+    expect(card.querySelector("a.bd-choice.yes .bd-choice-ret b").textContent).toBe(returnText(r.make, r.total));
+    expect(card.querySelector("a.bd-choice.yes .bd-choice-top").textContent).toBe(`Higher${r.buyCents}¢${r.capped ? "*" : ""}`);
     cleanup();
     docs.current = { ...docs.current, "markets.json": markets("defensive") }; show(); expect(order()).toEqual(byDate); await pick(); expect(order()).toEqual(first);
     cleanup();
@@ -378,6 +379,19 @@ describe("the board page", () => {
   });
 });
 
+describe("the levels near the price", () => {
+  const one = (k, index = 84823) => ({ und: "BTC", expiry: "20261009", settleTs: 1, k, id: String(k), index });
+  it("keeps the three levels nearest the index, low to high, with the index mark recomputed", () => {
+    const row = dateRows([80000, 82000, 84000, 85000, 86000, 88000, 90000].map((k) => one(k)))[0];
+    const near = nearRow(row);
+    expect(near.items.map((it) => it.k)).toEqual([84000, 85000, 86000]);
+    expect(near.nowAt).toBe(1);
+    expect(near.hidden).toBe(4);
+    expect(nearRow(dateRows([84000, 85000, 86000, 87000].map((k) => one(k)))[0]).items).toHaveLength(4);
+    expect(nearRow(dateRows([1, 2, 3, 4, 5, 6].map((k) => one(k, null)))[0]).items.map((it) => it.k)).toEqual([2, 3, 4]);
+  });
+});
+
 describe("by date", () => {
   const eth = { ...JSON.parse(JSON.stringify(btc).replaceAll("BTC-", "ETH-")), und: "ETH", index: 84500 };
   const groupsOf = (rows) => [...new Map(rows.map((r) => [r.id, r])).values()];
@@ -450,6 +464,31 @@ describe("by date", () => {
     expect(container.querySelector(".bd-grid .bd-card-top")).toBeTruthy();
     expect(screen.getByRole("button", { name: /^Filters/ }).textContent).toBe("Filters1");
     expect(container.textContent).not.toMatch(BANNED);
+  });
+  it("shows the levels near the price first, with View all for the rest, and the smart wallets' word", async () => {
+    const u = userEvent.setup({ advanceTimers: () => {} });
+    const { container } = show();
+    const full = dateRows([...new Map(boardRows([btc, hype], 100, { now: NOW }).rows.map((r) => [r.id, r])).values()], ["BTC", "ETH", "HYPE"]);
+    const big = full.find((r) => r.items.length > 4);
+    const row = [...container.querySelectorAll(".bd-row")].find((el) => el.getAttribute("aria-label").includes(dayLabel(big.expiry)) && el.getAttribute("aria-label").startsWith(big.und === "BTC" ? "Bitcoin" : "Hyperliquid"));
+    expect(row.querySelectorAll(".bd-card")).toHaveLength(3);
+    await u.click(within(row).getByRole("button", { name: `View all ${big.items.length} levels` }));
+    expect(row.querySelectorAll(".bd-card")).toHaveLength(big.items.length);
+    expect(container.querySelectorAll(".bd-key")).toHaveLength(1);
+    // Without a current wallets reading the header says nothing about them.
+    expect(container.querySelector(".bd-row-smart")).toBeNull();
+  });
+  it("names how the smart wallets hold the coin, in one word, from a current reading only", () => {
+    const wallets = (state, at) => ({ version: 2, wallet_coverage: { ready: true, status: "ready" },
+      readings: Object.fromEntries(["7d", "30d"].map((h) => [h, { wallets: { state, status: "ready", valuation_at: at } }])) });
+    docs.current = { ...docs.current, "markets.json": { coins: [{ und: "BTC", align: wallets("up", NOW - 60) }, { und: "HYPE", align: wallets("defensive", NOW - 60) }] } };
+    const { container } = show();
+    const words = [...container.querySelectorAll(".bd-row")].map((r) => [r.getAttribute("aria-label").split(",")[0], r.querySelector(".bd-row-smart b")?.textContent]);
+    expect(words.find(([n]) => n === "Bitcoin")[1]).toBe("Long");
+    expect(words.find(([n]) => n === "Hyperliquid")[1]).toBe("Short");
+    cleanup();
+    docs.current = { ...docs.current, "markets.json": { coins: [{ und: "BTC", align: wallets("up", NOW - 4000) }] } };
+    expect(show().container.querySelector(".bd-row-smart")).toBeNull(); // stale: left out
   });
 });
 
