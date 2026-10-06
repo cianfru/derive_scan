@@ -36,7 +36,7 @@ export default function QuestionChart({ hist, id, side, level, und, theme }) {
     const chart = createChart(box.current, {
       autoSize: true,
       layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: c("--muted"), fontFamily: "Chivo Mono, monospace", fontSize: 11, attributionLogo: false },
-      grid: { vertLines: { visible: false }, horzLines: { color: c("--seam") + "66" } },
+      grid: { vertLines: { visible: false }, horzLines: { color: c("--seam") + "99" } },
       rightPriceScale: { borderColor: c("--seam") },
       timeScale: { borderColor: c("--seam"), timeVisible: true },
       localization: { priceFormatter: view === "q" ? (v) => `${v.toFixed(0)}c` : (v) => money(v) },
