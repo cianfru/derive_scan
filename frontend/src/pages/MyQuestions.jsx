@@ -1,13 +1,14 @@
 import { Fragment, Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
+import { useFeeds } from "../components/Feeds.jsx";
 import { Info, Tabs } from "../components/ui.jsx";
 import { Asset } from "../components/MarketVisuals.jsx";
 import PayZone from "../components/PayZone.jsx";
 import SettleChart from "../components/SettleChart.jsx";
 import "../settle-chart.css";
 import QuestionTicket from "../components/QuestionTicket.jsx";
-import { ExposureChart, ExposureTotal, MostLose, amount, breakevenText, groupNotes } from "../components/Exposure.jsx";
+import { ExposureTotal, MostLose, amount, breakevenText, groupNotes } from "../components/Exposure.jsx";
 import {
   ANSWER, cents, closeTicket, countdown, dayLabel, findLevel, fullPay, money, noPriceReason, parseId, priceAge, questionText, signed,
 } from "../lib/questions.js";
@@ -337,18 +338,18 @@ function NowFigs({ v }) {
   if (pendingReceipt) {
     return (
       <>
-        <Fig label="Value now" missing={na(partWhy, "Why no value")} />
         <Fig label="Profit / loss now" missing={na(partWhy, "Why no result")} />
+        <Fig label="Value now" missing={na(partWhy, "Why no value")} />
       </>
     );
   }
   return (
     <>
+      <Fig label="Profit / loss now" sub="if sold back now" value={plNode(f.plNow)} className="q-pl q-pl-lead"
+        missing={entryFeesUnknown ? na(DERIVE_ENTRY_FEES, "Why no result") : half ? na("With only one option filled there is no result for the answer.", "Why no result") : na("There is a result once Derive shows a sell-back price, or at settlement.", "Why no result")} />
       <Fig label="Value now" sub="sell-back, after fees"
         info={f.mark != null && f.valueNow != null && <Info label="At Derive's mark">At Derive's mark: {usd(f.mark)}. Value now is Derive's sell-back price on its screen minus Derive's fees to sell back, about {usd(f.fees)}.</Info>}
         value={usdOr(f.valueNow)} missing={half ? na(partWhy, "Why no value") : <Missing text="No price now" label="Why no price" why={reason} />} />
-      <Fig label="Profit / loss now" sub="if sold back now" value={plNode(f.plNow)} className="q-pl"
-        missing={entryFeesUnknown ? na(DERIVE_ENTRY_FEES, "Why no result") : half ? na("With only one option filled there is no result for the answer.", "Why no result") : na("There is a result once Derive shows a sell-back price, or at settlement.", "Why no result")} />
     </>
   );
 }
@@ -548,14 +549,12 @@ const sumOr = (vals) => (vals.every((x) => Number.isFinite(x)) ? vals.reduce((a,
 /** The coin's candles up to this date's settlement, with the position's pay zone and breakeven (owner,
  * 7 October 2026: to watch a position against its breakeven). Loaded only when opened. */
 function PositionPriceChart({ und, board, settleTs, solo, g }) {
-  const [open, setOpen] = useState(false);
-  const { data: coin, error } = useData(open ? `coins/${und}.json` : null);
+  const { data: coin, error } = useData(`coins/${und}.json`);
   const q = solo?.q;
   const bes = g?.breakevens || [];
   return (
-    <details className="q-group-price" onToggle={(e) => setOpen(e.currentTarget.open)}>
-      <summary>{und} price up to the settlement</summary>
-      {open && (coin ? <>
+    <div className="q-group-price">
+      {(coin ? <>
         <SettleChart und={und} candles={coin.candles} index={board?.index} settleTs={settleTs} lo={q?.lo ?? null} hi={q?.hi ?? null} side={q ? solo.p.side : null} breakeven={bes}
           payout={g && Number.isFinite(g.cost) ? (S) => { const pl = g.pl(S); return { payout: pl + g.cost, pl }; } : null} />
         <p className="sc-key"><span><i className="settle" />Settles 08:00 UTC</span>
@@ -564,7 +563,7 @@ function PositionPriceChart({ und, board, settleTs, solo, g }) {
           {bes.length > 0 && <span><i className="be" />Breakeven {bes.map((b) => money(b)).join(" and ")}</span>}
           {g && <span>Point at the future to see what you get at that price</span>}</p>
       </> : error ? <p className="status">The {und} chart is unavailable right now.</p> : <p className="status">Loading the {und} chart…</p>)}
-    </details>
+    </div>
   );
 }
 
@@ -598,18 +597,18 @@ function GroupCard({ und, expiry, items, g, scope, syncs, onRemove, onClose }) {
         </p>
       </header>
       <div className={`q-group-body${g ? "" : " no-chart"}`}>
-        {g && (
-          <section className="q-group-chart" aria-label={`At settlement, ${label}`}>
-            <ExposureChart und={und} index={board?.index} curves={[{ combo: g, label: "What you hold", kind: "held" }]} />
+        {settleTs && (
+          <section className="q-group-chart" aria-label={`${und} price up to the settlement, ${label}`}>
+            <PositionPriceChart und={und} board={board} settleTs={settleTs} solo={solo} g={g && !left ? g : null} />
             {left > 0 && <p className="q-note">{left} of {n} positions not in this chart<Info label="Why left out">Derive's trade records or entry fees for {left === 1 ? "it" : "them"} are not complete yet, so the chart and the settlement figures cover the other {inChart}. {left === 1 ? "Its" : "Their"} own figures show below.</Info></p>}
           </section>
         )}
         <dl className="q-figs grid q-position-figures">
-          {solo ? <><PaidFig v={solo} /><NowFigs v={solo} /><MostPaysFig v={solo} /></> : (
+          {solo ? <><NowFigs v={solo} /><PaidFig v={solo} /><MostPaysFig v={solo} /></> : (
             <>
+              <Fig label="Profit / loss now" sub="if all sold back now" className="q-pl q-pl-lead" value={plNode(sumOr(views.map((v) => (v.pendingReceipt ? null : v.f.plNow))))} missing={many("One or more positions here have no result now; each line shows why.")} />
               <Fig label="You paid" sub="fees included, all positions" value={usdOr(sumOr(views.map((v) => (v.pendingEntry ? null : v.f.paid))))} missing={many("One or more positions here have no total cost yet; each line shows why.")} />
               <Fig label="Value now" sub="sell-back, after fees" value={usdOr(sumOr(views.map((v) => (v.pendingReceipt ? null : v.f.valueNow))))} missing={many("One or more positions here have no sell-back value now; each line shows why.")} />
-              <Fig label="Profit / loss now" sub="if all sold back now" className="q-pl" value={plNode(sumOr(views.map((v) => (v.pendingReceipt ? null : v.f.plNow))))} missing={many("One or more positions here have no result now; each line shows why.")} />
               <Fig label="Most it pays" sub="at settlement, combined" value={g && !left ? amount(g.mostPays) : null} missing={many(noCombined)} />
             </>
           )}
@@ -617,7 +616,6 @@ function GroupCard({ und, expiry, items, g, scope, syncs, onRemove, onClose }) {
           <Fig label="Breakeven" sub="at settlement" className="q-breakeven" value={g && !left ? breakevenText(g) : null} missing={na(noCombined, "Why no breakeven at settlement")} />
         </dl>
       </div>
-      {settleTs && <PositionPriceChart und={und} board={board} settleTs={settleTs} solo={solo} g={g && !left ? g : null} />}
       {solo ? (
         <>
           <div className="q-group-pos">
@@ -638,6 +636,41 @@ function GroupCard({ und, expiry, items, g, scope, syncs, onRemove, onClose }) {
         </ul>
       )}
     </article>
+  );
+}
+
+/**
+ * P&L first (owner, 7 October 2026: "The first thing I want to see is P&L"): the total, what the open
+ * positions make if sold back now, what closed ones made, and, with Derive connected, the account's cash.
+ * Open positions are valued from each coin's published board; one without a price now is left out and said.
+ */
+function PnlHero({ open, summary, scope, usdc }) {
+  const unds = [...new Set(open.map((p) => p.und).filter(Boolean))];
+  const [feeds, files] = useFeeds(unds.map((u) => `questions/${u}.json`));
+  const now = Date.now() / 1000;
+  const views = open.map((p) => positionView(p, { board: files[`questions/${p.und}.json`], now, scope }));
+  const valued = views.filter((v) => !v.pendingReceipt && Number.isFinite(v.f.plNow));
+  const left = views.length - valued.length;
+  const openPl = valued.length ? valued.reduce((a, v) => a + v.f.plNow, 0) : null;
+  const inPositions = valued.length ? valued.reduce((a, v) => a + (Number.isFinite(v.f.valueNow) ? v.f.valueNow : 0), 0) : null;
+  const realizedTotal = summary.count > 0 ? summary.total : 0;
+  const total = openPl != null ? openPl + realizedTotal : summary.count > 0 ? realizedTotal : null;
+  const fig = (label, value, cls = "") => <div className={`q-pnl-fig ${cls}`}><dt>{label}</dt><dd className="mono">{value}</dd></div>;
+  return (
+    <section className="q-pnl" aria-label="Profit and loss">
+      {feeds}
+      <div className="q-pnl-total">
+        <span className="label">P&amp;L<Info label="About P&amp;L">What the open positions make if sold back now at Derive's published sell-back price, after Derive's fees, plus the result of positions sold back or settled. {left > 0 ? `${left} open ${left === 1 ? "position has" : "positions have"} no price now and ${left === 1 ? "is" : "are"} left out. ` : ""}Prices update every 15 minutes.</Info></span>
+        <b className={`mono ${tone(total ?? 0)}`}>{total != null ? signed(total) : "Not available yet"}</b>
+      </div>
+      <dl className="q-pnl-figs">
+        {fig("Open now", openPl != null ? <span className={tone(openPl)}>{signed(openPl)}</span> : "Not available yet")}
+        <div className="q-pnl-fig q-realized-sum"><dt>Realized</dt><dd className="mono"><span className={tone(realizedTotal)}>{summary.count ? signed(summary.total) : "$0.00"}</span></dd>
+          {summary.count > 0 && <small>{summary.count} {summary.count === 1 ? "result" : "results"}: {summary.closes} sold back, {summary.settles} settled</small>}</div>
+        {fig("In positions", inPositions != null ? money(inPositions, { cents: true }) : "Not available yet")}
+        {Number.isFinite(usdc) && fig("Cash on Derive", money(usdc, { cents: true }))}
+      </dl>
+    </section>
   );
 }
 
@@ -699,26 +732,20 @@ export default function MyQuestions() {
     <div className="wrap page q-page q-mine marketplace-positions">
       <header className="q-head">
         <div className="q-head-top">
-          <h1>Positions</h1>
-          <Link to="/saloon" className="btn">Browse the Saloon<span aria-hidden="true">↗</span></Link>
-        </div>
-        <p className="q-position-intro">Your record of trades placed on Derive.<Info label="About Positions">{TESTNET_FILLS
+          <div className="q-title-row"><h1>Positions</h1><Info label="About Positions">{TESTNET_FILLS
           ? "One-tap trades are recorded from Derive's own records and checked against your Saloon account on Derive's testnet; trades placed by hand are records you entered. Everything is saved in this browser. Values use the published sell-back price after exit fees when available; an unavailable value stays unknown."
           : MAINNET_FILLS
           ? "One-tap trades are recorded from Derive's own records and checked against your Derive account; trades placed by hand are records you entered. Everything is saved in this browser. Values use the published sell-back price after exit fees when available; an unavailable value stays unknown."
-          : "These are records you entered, saved in this browser. Cowboy cannot see your Derive account. Values use the published sell-back price after exit fees when available; an unavailable value stays unknown."}</Info></p>
+          : "These are records you entered, saved in this browser. Cowboy cannot see your Derive account. Values use the published sell-back price after exit fees when available; an unavailable value stays unknown."}</Info></div>
+          <Link to="/saloon" className="btn">Browse the Saloon<span aria-hidden="true">↗</span></Link>
+        </div>
         {!persistent() && <p className="q-note warn" role="status">This browser is not saving data: Positions last only for this visit. Export a copy to keep them.</p>}
+        {list.length > 0 && <PnlHero open={list.filter((p) => !done(p) && !incompleteReceipt(p))} summary={summary} scope={scope} usdc={scope?.usdc} />}
         {list.length > 0 && (
           <p className="q-portfolio-line" aria-label="Your saved records">
             <span><b className="mono">{openCount}</b> open</span>
             <span><b className="mono">{list.length - openCount}</b> closed or settled</span>
             {incompleteCount > 0 && <span className="q-incomplete-count"><b className="mono">{incompleteCount}</b> incomplete {incompleteCount === 1 ? "fill" : "fills"}<Info label="About incomplete fills">Records with only part of the package filled. These stay visible in the record and have no full-answer valuation, including after settlement. Check the individual options on Derive.</Info></span>}
-            {summary.count > 0 && (
-              <span className="q-realized-sum">Realized <b className={`mono ${tone(summary.total)}`}>{signed(summary.total)}</b>
-                <small>{summary.count} {summary.count === 1 ? "result" : "results"}: {summary.closes} sold back, {summary.settles} settled</small>
-                <Info label="About realized">The results of positions sold back or settled, after Derive's fees, from what you entered and Derive's settlement prices. {summary.wins} ended above what was paid, {summary.losses} below.{summary.partialCloses ? ` ${summary.partialCloses} ${summary.partialCloses === 1 ? "is a part" : "are parts"} of positions still open.` : ""}{summary.estimated ? ` ${summary.estimated} ${summary.estimated === 1 ? "uses" : "use"} estimated fees.` : ""}{summary.unknown ? ` ${summary.unknown} without a known result ${summary.unknown === 1 ? "is" : "are"} left out of the total.` : ""}</Info>
-              </span>
-            )}
           </p>
         )}
         <Tabs label="Positions" value={tab} onChange={setTab} items={[["open", "Open"], ["closed", "Closed"], ["following", "Following"]]} />

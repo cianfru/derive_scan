@@ -329,7 +329,7 @@ describe("a full receipt whose Derive fees are unavailable", () => {
       expect(figure(top, "You paid").textContent).toBe("$1.60");
       expect(figure(top, "Profit / loss now").textContent).toMatch(/\$[\d.]+/);
       expect(screen.queryByText("Derive's entry fees are not available yet. These positions are left out of the combined settlement figures.")).toBeNull();
-      expect(screen.getByRole("region", { name: /^At settlement/ })).toBeTruthy();
+      expect(figure(top, "Breakeven").textContent).toMatch(/\$\d/); // the combined figures, now that the fees are known
     } else {
       await finishRead(0, unknownRows());
       expect(mock.settlements).toHaveLength(1);

@@ -65,9 +65,8 @@ describe("combined exposure on Positions", () => {
     const g = cards[0];
     expect(g.querySelector("h2").textContent).toBe("BTC · Fri 9 Oct, 08:00 UTC");
     expect(g.querySelector(".q-group-meta").textContent).toMatch(/^in 5d 18hnow \$84,8232 positions/);
-    const chart = within(g).getByRole("region", { name: "At settlement, BTC on Fri 9 Oct" });
-    expect(chart.querySelector("svg.ex-chart")).not.toBeNull();
-    expect(chart.querySelector("line.pz-now")).not.toBeNull(); // today's index marked
+    // The card's picture is BTC's own price up to the settlement (owner, 7 October 2026), not a payoff line.
+    expect(within(g).getByRole("region", { name: "BTC price up to the settlement, BTC on Fri 9 Oct" })).toBeTruthy();
     const figs = g.querySelector(".q-position-figures");
     // At 86,000 Lower pays nothing and Higher half its width: $191.60 - $128.31.
     expect(fig(figs, "Most you can lose")).toMatch(/^\$63\.29 · tickets one by one \$191\.60/);

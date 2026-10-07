@@ -152,7 +152,7 @@ describe("one tap on Derive's testnet", () => {
     vi.setSystemTime((T14 + 800) * 1000);
     page("/saloon/mine");
     const sync = await screen.findByRole("region", { name: "Your Saloon account on Derive" });
-    await within(sync).findByText(/Checked with Derive at/);
+    await within(sync).findByText(/^Checked \d{2}:\d{2} UTC$/);
     expect(fake.calls("private/get_positions")).toHaveLength(1);
     const card = document.querySelector(".q-position");
     expect(within(card).getByText("Bought in one tap")).toBeTruthy();

@@ -98,7 +98,7 @@
 .q-group-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: 0; color: var(--text-3); font-size: 13px; }
 .q-group-meta b { color: var(--text-1); font-weight: 500; }
 .q-group-n { display: inline-flex; align-items: center; }
-.q-group-body { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 12px 36px; align-items: center; }
+.q-group-body { display: grid; grid-template-columns: minmax(0, 3fr) minmax(260px, 2fr); gap: 16px 36px; align-items: center; }
 .q-group-body.no-chart { grid-template-columns: minmax(0, 1fr); }
 .q-group-chart { display: grid; gap: 4px; min-width: 0; }
 .q-group-chart .ex-chart { width: 100%; max-width: 440px; }
@@ -144,3 +144,28 @@
 .q-group-price { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); }
 .q-group-price > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font: 600 14px var(--font-sans); color: var(--text-1); }
 .q-group-price .sc-frame { margin-top: 6px; }
+
+/* P&L first (owner, 7 October 2026: "The first thing I want to see is P&L"). */
+.q-mine .q-title-row { display: flex; align-items: center; gap: 6px; }
+.q-pnl { display: grid; grid-template-columns: minmax(200px, auto) 1fr; gap: 16px 40px; align-items: end; margin: 8px 0 14px; padding: 20px 22px; border: 1px solid var(--border); border-radius: 12px; background: var(--elev-fill, var(--surface-1)); box-shadow: var(--elev-1, none); }
+.q-pnl-total { display: grid; gap: 4px; }
+.q-pnl-total .label { display: inline-flex; align-items: center; gap: 4px; color: var(--text-3); font-size: 13px; }
+.q-pnl-total b { font-size: clamp(32px, 4.4vw, 46px); font-weight: 600; letter-spacing: -.03em; line-height: 1.05; color: var(--text-1); }
+.q-pnl-figs { display: flex; flex-wrap: wrap; gap: 12px 36px; margin: 0; }
+.q-pnl-fig { display: grid; gap: 2px; }
+.q-pnl-fig dt { color: var(--text-3); font-size: 13px; }
+.q-pnl-fig dd { margin: 0; font-size: 19px; font-weight: 600; color: var(--text-1); }
+.q-pnl-fig small { color: var(--text-3); font-size: 12px; }
+.q-pnl .up { color: var(--up); } .q-pnl .down { color: var(--down); }
+.q-mine .q-portfolio-line { font-size: 13px; }
+.q-pl-lead dd { font-size: 20px; }
+.tr-sync-slim { padding: 10px 14px; }
+.tr-sync-slim .tr-actions { gap: 6px 14px; }
+@media (max-width: 700px) {
+  .q-pnl { grid-template-columns: 1fr; padding: 16px; }
+  .q-pnl-figs { gap: 10px 24px; }
+}
+/* The coin's chart is the card's picture; the figures sit beside it in two columns. */
+.q-group .q-position-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.q-group-price .sc-frame.tall { height: 360px; }
+@media (max-width: 700px) { .q-group-price .sc-frame.tall { height: 300px; } }
