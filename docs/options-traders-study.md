@@ -73,7 +73,7 @@ Otherwise the result is "context, not a signal", and positioning is shown withou
 - Market makers left out of Flow and of taker sides as soon as the rebuilt history classes them; every other wallet shows its type.
 - Alignment (built 2 October 2026): for the next 7 and 30 days, the engine (4H, 1D), option prices and the Smart tier's open positions on expiries inside the window (net delta as a share of gross, from `history/positions.json`), each read as up, neutral or defensive. Side by side, never combined into a signal.
 
-## Addendum A: did their side settle in the money? (DRAFT, awaiting the owner's approval; nothing computed)
+## Addendum A: did their side settle in the money? (APPROVED by the owner on 7 October 2026 as written, before any result)
 
 Owner, 7 October 2026: "see if directional traders ... actually predict price movements into the future by looking at their bets and then the price that followed". A track record for the Saloon's directional traders' line, with its own rules, fixed before any result.
 
@@ -98,3 +98,26 @@ Owner, 7 October 2026: "see if directional traders ... actually predict price mo
 3. ETH's hit rate is above its own chance rate.
 
 Otherwise the app shows the record as history only: "Of N dates, their side settled their way M times (X%); by chance about Y%." The headline is "no better than chance so far" unless the bar is met. No probability, odds, likely or predict wording appears in the app in either case.
+
+### Result (computed 7 October 2026, after the approval above)
+
+Run: `python backend/research/settlement_record/run.py DATA_DIR` on the data branch's day files through 6 October 2026 (settlements through 7 October). Readings at 00:00 UTC, 7 days (1 day) before the settlement day, from the day files up to then.
+
+**Verdict: the bar is not met. Their side has settled their way no more often than chance so far.**
+
+| 7 days before | Dates | Scored (Long or Short) | Their way | Chance | Shuffles at least as good | First half vs chance | Second half |
+|---|---|---|---|---|---|---|---|
+| BTC | 100 | 50 | 27 (54%) | 51% | 45% | -11 pts | +17 pts |
+| ETH | 100 | 49 | 29 (59%) | 55% | 34% | -6 pts | +13 pts |
+
+- **Why it fails.** BTC has 50 scored dates, short of the 60 the bar needs. Its 54% beats chance (51%) by 3 points, and 45% of random shuffles do at least as well. The two halves point opposite ways. ETH's 59% is 4 points over its chance rate (55%), and 34% of shuffles match it.
+- **The app's current count form** (each wallet counted from $1,000, 3 wallets; reported, not deciding):
+  - BTC: 75 scored, 55% against 51% by chance, 33% of shuffles at least as good.
+  - ETH: 57% against 53%, 31% of shuffles.
+- **1 day before** (reported, not deciding):
+  - BTC: 318 scored, 54% against 51% by chance, 11% of shuffles at least as good. The halves are +5 and +3 points.
+  - ETH: 382 scored, 48% against 50%.
+- **Other coins** (7 days before, too few dates to read):
+  - HYPE: 28 scored, 39% against 45%.
+  - SOL, XRP, XAUT and ZEC: 5 to 9 each.
+- **What it means.** The line stays context, not a signal. If the app shows the record, it shows it as history with "no better than chance so far". The test can be rerun as dates settle; BTC reaches 60 scored dates at the 7-day lead in two to three months at the current pace (about 4 to 5 a month).

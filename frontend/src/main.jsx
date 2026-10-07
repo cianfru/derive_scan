@@ -10,6 +10,8 @@ import "./people.css";
 import Shell from "./components/Shell.jsx";
 import Landing from "./pages/Landing.jsx";
 import { QUESTIONS_ON } from "./lib/flags.js";
+import { watchStaleBuild } from "./lib/staleBuild.js";
+watchStaleBuild();
 const Radar = lazy(() => import("./pages/Radar.jsx"));
 const Markets = lazy(() => import("./pages/Markets.jsx"));
 const Coin = lazy(() => import("./pages/Coin.jsx"));

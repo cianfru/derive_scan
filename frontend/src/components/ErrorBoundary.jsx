@@ -1,10 +1,16 @@
 import { Component } from "react";
+import { isChunkError, reloadOnce } from "../lib/staleBuild.js";
 
 export default class ErrorBoundary extends Component {
-  state = { failed: false };
-  static getDerivedStateFromError() { return { failed: true }; }
+  state = { failed: false, reloading: false };
+  static getDerivedStateFromError(error) { return { failed: true, reloading: isChunkError(error) }; }
+  componentDidCatch(error) {
+    // A view from an older build: reload onto the current one, once.
+    if (isChunkError(error) && !reloadOnce()) this.setState({ reloading: false });
+  }
   render() {
     if (!this.state.failed) return this.props.children;
+    if (this.state.reloading) return <div className="wrap page" role="status"><p className="sub">Updating to the latest version…</p></div>;
     return <div className="wrap page" role="alert">
       <h1>This view couldn’t load</h1>
       <p className="sub">Reload to try again, or use the navigation to open another view.</p>
