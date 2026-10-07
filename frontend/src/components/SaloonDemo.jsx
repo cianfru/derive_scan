@@ -32,7 +32,7 @@ function BubbleChart({ coin, selection, onSelect }) {
   const { index, gap } = COINS[coin];
   return (
     <div className="sd-discovery">
-      <div className="sd-chart-heading"><span>Tap a bubble to explore</span><small>Max profit on a $100 budget</small></div>
+      <div className="sd-chart-heading"><span>Tap a bubble to explore</span><small>Most you make on $100, fees included</small></div>
       <div className="sd-bubble-chart" role="group" aria-label={`${coin} illustrative outcomes by level and date`}>
         {[0, 1, 2].map((row) => <div key={row} className="sd-price-row" style={{ top: `${18 + row * 31}%` }} aria-hidden="true"><span>{money(index + (1 - row) * gap)}</span><i /></div>)}
         <div className="sd-history" aria-hidden="true">
@@ -50,9 +50,9 @@ function BubbleChart({ coin, selection, onSelect }) {
           const profit = ticket.payout - ticket.mostLose;
           return <button type="button" key={`${col}-${row}`} className={`sd-bubble ${side}${selected ? " is-selected" : ""}`}
             style={{ left: `${col ? 83 : 55}%`, top: `${18 + row * 31}%`, "--bubble-size": `${Math.round(64 + Math.min(32, profit / 8))}px` }}
-            aria-pressed={selected} aria-label={`${coin} ${side === "yes" ? "Higher" : "Lower"}, ${money(level.k)}, ${date}, most you can make ${usd(profit)}`}
+            aria-pressed={selected} aria-label={`${coin} ${side === "yes" ? "Higher" : "Lower"}, ${money(level.k)}, ${date}, most you can make ${usd(profit)}, +${Math.round(profit / ticket.mostLose * 100)}%`}
             onClick={() => onSelect({ date: col, row, side })}>
-            <b>+${Math.round(profit)}</b><small>{side === "yes" ? "Higher" : "Lower"}</small>
+            <b>+{Math.round(profit / ticket.mostLose * 100)}%</b><small>{side === "yes" ? "Higher" : "Lower"}</small>
           </button>;
         }))}
       </div>

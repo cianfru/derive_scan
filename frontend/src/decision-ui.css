@@ -13,3 +13,6 @@
 .bd-answer .decision-compare { align-self: center; min-height: 36px; font-size: 11px; padding-inline: 4px; }
 .sl-panel[aria-modal="true"] { z-index: 40; }
 @media (max-width: 700px) { .sl-backdrop { z-index: 39; } .decision-failure { padding: 18px; } }
+/* Phones and narrow tablets (owner, 8 October 2026: tiles overflowed): the board's tiles keep their full width;
+   comparing outcomes stays on the outcome page and the chart's trade panel. */
+@media (max-width: 860px) { .bd-answer .decision-compare { display: none; } }
