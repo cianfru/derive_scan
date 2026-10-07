@@ -50,7 +50,7 @@
 .sch-ghost { pointer-events: none; filter: drop-shadow(0 8px 16px rgb(0 0 0 / .45)); }
 @media (prefers-reduced-motion: reduce) { .sch-float, .sch-pop { animation: none; } .sch-bubble circle { transition: none; } }
 
-.sch-zoom { display: flex; justify-content: flex-end; align-items: center; gap: 6px; padding: 10px 12px 0; }
+.sch-zoom { display: flex; justify-content: flex-start; align-items: center; gap: 6px; padding: 10px 12px 0; }
 .sch-zoom button { min-width: 44px; height: 44px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-2); color: var(--text-1); font: 600 16px var(--font-sans); cursor: pointer; }
 .sch-zoom .sch-reset { font-size: 13px; }
 .sch-zoom button:hover { border-color: var(--accent); }
@@ -108,3 +108,8 @@
 .sl-traders { margin: 0; color: var(--text-2); font-size: 13px; }
 .sch-lane-dot { cursor: default; outline: none; }
 .sch-lane-dot:focus-visible circle { stroke: var(--accent); stroke-width: 2.5; }
+/* The panel scrolls; its parts keep their own height (the Review trade button was squeezed on phones). */
+.sl-panel > * { flex: none; }
+.sl-panel .btn.primary { min-height: 48px; }
+/* Guide lines and labels never take a tap: the date's dashed line runs through the bubbles' centres. */
+.sch-svg line, .sch-svg polyline, .sch-svg > text, .sch-svg > rect { pointer-events: none; }
