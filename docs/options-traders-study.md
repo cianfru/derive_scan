@@ -73,7 +73,7 @@ Otherwise the result is "context, not a signal", and positioning is shown withou
 - Market makers left out of Flow and of taker sides as soon as the rebuilt history classes them; every other wallet shows its type.
 - Alignment (built 2 October 2026): for the next 7 and 30 days, the engine (4H, 1D), option prices and the Smart tier's open positions on expiries inside the window (net delta as a share of gross, from `history/positions.json`), each read as up, neutral or defensive. Side by side, never combined into a signal.
 
-## Addendum A: did their side settle in the money? (DRAFT, awaiting the owner's approval; nothing computed)
+## Addendum A: did their side settle in the money? (APPROVED by the owner on 7 October 2026 as written, before any result)
 
 Owner, 7 October 2026: "see if directional traders ... actually predict price movements into the future by looking at their bets and then the price that followed". A track record for the Saloon's directional traders' line, with its own rules, fixed before any result.
 
