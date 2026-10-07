@@ -63,6 +63,14 @@ export function chartLevels(dates, index) {
 }
 export const smartOf = (r) => r?.level?.[r.side]?.smart || null;
 
+/** Mixes two #rrggbb colours: t = 0 gives a, 1 gives b. */
+export function mix(a, b, t) {
+  const h = (c) => (/^#[0-9a-f]{6}$/i.test(c) ? [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16)) : null);
+  const x = h(a), y = h(b);
+  if (!x || !y) return a;
+  return `#${x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, "0")).join("")}`;
+}
+
 function palette(theme) {
   const light = theme === "light";
   return {
@@ -113,10 +121,44 @@ function mount(host, cfg) {
     const g = el("linearGradient", { id: "sch-wash", x1: "0", x2: "1", y1: "0", y2: "0" }, defs);
     el("stop", { offset: "0", "stop-color": C.accent, "stop-opacity": C.light ? "0.07" : "0.10" }, g);
     el("stop", { offset: "1", "stop-color": C.accent, "stop-opacity": "0.02" }, g);
+    // Bubbles read as lit glass spheres (owner, 7 October 2026: "more depth ... some sort of 3D effect"): light from
+    // the top left, a highlight, a darker lower edge, and a soft shadow on the chart beneath.
+    const orb = (id, base) => {
+      const gr = el("radialGradient", { id, cx: "0.36", cy: "0.3", r: "0.78", fx: "0.32", fy: "0.24" }, defs);
+      el("stop", { offset: "0", "stop-color": mix(base, "#ffffff", C.light ? 0.38 : 0.34) }, gr);
+      el("stop", { offset: "0.5", "stop-color": base }, gr);
+      el("stop", { offset: "1", "stop-color": mix(base, "#000000", C.light ? 0.38 : 0.5) }, gr);
+    };
+    orb("sch-orb-up", C.upFill);
+    orb("sch-orb-down", C.downFill);
+    const shine = el("radialGradient", { id: "sch-shine", cx: "0.5", cy: "0.5", r: "0.5" }, defs);
+    el("stop", { offset: "0", "stop-color": "#ffffff", "stop-opacity": C.light ? "0.6" : "0.5" }, shine);
+    el("stop", { offset: "1", "stop-color": "#ffffff", "stop-opacity": "0" }, shine);
+    const shade = el("radialGradient", { id: "sch-shade", cx: "0.5", cy: "0.5", r: "0.5" }, defs);
+    el("stop", { offset: "0", "stop-color": "#000000", "stop-opacity": C.light ? "0.22" : "0.55" }, shade);
+    el("stop", { offset: "1", "stop-color": "#000000", "stop-opacity": "0" }, shade);
+    const gold = el("linearGradient", { id: "sch-gold", x1: "0", y1: "0", x2: "0", y2: "1" }, defs);
+    el("stop", { offset: "0", "stop-color": mix(C.gold, "#ffffff", 0.45) }, gold);
+    el("stop", { offset: "0.55", "stop-color": C.gold }, gold);
+    el("stop", { offset: "1", "stop-color": mix(C.gold, "#000000", 0.35) }, gold);
+    // Warm orange light behind the future, so the bubbles' shadows have something to fall on.
+    const glow = (id, op) => {
+      const gr = el("radialGradient", { id, cx: "0.5", cy: "0.5", r: "0.5" }, defs);
+      el("stop", { offset: "0", "stop-color": C.accent, "stop-opacity": op }, gr);
+      el("stop", { offset: "1", "stop-color": C.accent, "stop-opacity": "0" }, gr);
+    };
+    glow("sch-glow-a", C.light ? "0.10" : "0.16");
+    glow("sch-glow-b", C.light ? "0.07" : "0.11");
     const clip = el("clipPath", { id: "sch-plot" }, defs);
     el("rect", { x: 0, y: m.t - 8, width: W - m.r, height: H - m.t - m.b + 8 }, clip);
     // The future is where you act: a faint orange wash from now to the last settlement.
     el("rect", { x: futX, y: 0, width: pw - pastW, height: H - m.b, fill: "url(#sch-wash)" }, svg);
+    {
+      const fw = pw - pastW, yNow = Math.min(Math.max(m.t + (hi - index) / (hi - lo) * (H - m.t - m.b), m.t), H - m.b);
+      const glows = el("g", { class: "sch-glows" }, svg);
+      el("ellipse", { cx: futX + fw * 0.42, cy: yNow, rx: fw * 0.55, ry: (H - m.t - m.b) * 0.48, fill: "url(#sch-glow-a)" }, glows);
+      el("ellipse", { cx: futX + fw * 0.9, cy: m.t + (H - m.t - m.b) * 0.18, rx: fw * 0.38, ry: (H - m.t - m.b) * 0.36, fill: "url(#sch-glow-b)" }, glows);
+    }
     const plot = el("g", { "clip-path": "url(#sch-plot)" }, svg);
     const span = hi - lo, base = 10 ** Math.floor(Math.log10(span / 6));
     const step = [1, 2, 5, 10].map((x) => x * base).find((s) => span / s <= 8);
@@ -213,16 +255,23 @@ function mount(host, cfg) {
     if (current && current.key === r.key) b.classList.add("on");
     const seed = ((l.k / Math.max(1, index)) * 997 + col * 13) % 10;
     const pop = el("g", { class: firstPaint ? "sch-pop" : "", style: `--pd:${col * 90 + rank * 45}ms` }, b);
+    const orbFill = `url(#sch-orb-${yes ? "up" : "down"})`, ring = yes ? C.upRing : C.downRing;
+    // The shadow stays on the chart while the bubble floats above it.
+    const sr = full ? R : 6;
+    el("ellipse", { cx: cx + sr * 0.12, cy: by + sr * 0.98, rx: sr * 0.95, ry: sr * 0.3, fill: "url(#sch-shade)", class: "sch-shadow" }, pop);
     const fl = el("g", { class: "sch-float", style: `--dur:${(3.4 + seed * 0.18).toFixed(2)}s;--delay:-${(seed * 0.4).toFixed(2)}s` }, pop);
-    const fill = yes ? C.upFill : C.downFill, ring = yes ? C.upRing : C.downRing;
+    const body = el("g", { class: "sch-body" }, fl);
     if (full) {
-      if (smart) el("circle", { cx, cy: by, r: R + 5, fill: "none", stroke: C.gold, "stroke-width": 2.5, class: "sch-gold" }, fl);
-      el("circle", { cx, cy: by, r: R, fill, stroke: ring, "stroke-width": 1.5 }, fl);
+      if (smart) el("circle", { cx, cy: by, r: R + 5, fill: "none", stroke: "url(#sch-gold)", "stroke-width": 3, class: "sch-gold" }, body);
+      el("circle", { cx, cy: by, r: R, fill: orbFill, stroke: ring, "stroke-width": 1.2, "stroke-opacity": 0.85 }, body);
+      el("ellipse", { cx: cx - R * 0.28, cy: by - R * 0.42, rx: R * 0.5, ry: R * 0.3, fill: "url(#sch-shine)", class: "sch-shine" }, body);
       const label = returnPct(r.make, r.total), long = label.length > 6;
-      el("text", { x: cx, y: by + 4, fill: C.ink, "font-size": long ? (phone ? 9.5 : 10.5) : phone ? 11 : 12, "font-weight": 600, "text-anchor": "middle" }, fl).textContent = label;
+      el("text", { x: cx, y: by + 4, fill: C.ink, "font-size": long ? (phone ? 9.5 : 10.5) : phone ? 11 : 12, "font-weight": 700, "text-anchor": "middle",
+        stroke: "rgba(0,0,0,.35)", "stroke-width": 2, "paint-order": "stroke", "stroke-linejoin": "round" }, body).textContent = label;
       el("text", { x: cx + R + (smart ? 11 : 6), y: by + 4, fill: C.text3, "font-size": 10.5 }, fl).textContent = levelText(l.k);
     } else {
-      el("circle", { cx, cy: by, r: 6, fill, stroke: smart ? C.gold : ring, "stroke-width": smart ? 2 : 1.2 }, fl);
+      el("circle", { cx, cy: by, r: 6, fill: orbFill, stroke: smart ? "url(#sch-gold)" : ring, "stroke-width": smart ? 2 : 1 }, body);
+      el("ellipse", { cx: cx - 1.8, cy: by - 2.4, rx: 2.6, ry: 1.6, fill: "url(#sch-shine)" }, body);
     }
     const show = () => { if (!drag) hover(d, r, cx, by, full); };
     b.addEventListener("pointerenter", show);
@@ -337,9 +386,11 @@ function mount(host, cfg) {
   function makeGhost() {
     const g = el("g", { class: "sch-ghost", style: `transform: translate(${drag.cx}px, ${drag.by}px)` }, svg);
     el("rect", { x: -92, y: -geo.R - 30, width: 184, height: 22, rx: 6, fill: C.surface, stroke: C.strong }, g);
-    el("circle", { cx: 0, cy: 0, r: geo.R + 5, fill: "none", stroke: C.gold, "stroke-width": 2.5, class: "gring" }, g);
-    el("circle", { cx: 0, cy: 0, r: geo.R + 3, fill: C.upFill, stroke: C.upRing, "stroke-width": 2, class: "gbody" }, g);
-    el("text", { x: 0, y: 4, fill: C.ink, "font-size": 13, "font-weight": 700, "text-anchor": "middle", class: "gtext" }, g);
+    el("circle", { cx: 0, cy: 0, r: geo.R + 5, fill: "none", stroke: "url(#sch-gold)", "stroke-width": 3, class: "gring" }, g);
+    el("circle", { cx: 0, cy: 0, r: geo.R + 3, fill: "url(#sch-orb-up)", stroke: C.upRing, "stroke-width": 1.5, class: "gbody" }, g);
+    el("ellipse", { cx: -(geo.R + 3) * 0.28, cy: -(geo.R + 3) * 0.42, rx: (geo.R + 3) * 0.5, ry: (geo.R + 3) * 0.3, fill: "url(#sch-shine)" }, g);
+    el("text", { x: 0, y: 4, fill: C.ink, "font-size": 13, "font-weight": 700, "text-anchor": "middle", class: "gtext",
+      stroke: "rgba(0,0,0,.35)", "stroke-width": 2, "paint-order": "stroke", "stroke-linejoin": "round" }, g);
     el("text", { x: 0, y: -geo.R - 14, fill: C.text1, "font-size": 11, "text-anchor": "middle", class: "glab" }, g);
     return g;
   }
@@ -347,7 +398,7 @@ function mount(host, cfg) {
     const g = drag.ghost, r = tl.r, yes = r.side === "yes";
     g.style.transition = "none";
     g.style.transform = `translate(${px}px, ${py}px)`;
-    g.querySelector(".gbody").setAttribute("fill", yes ? C.upFill : C.downFill);
+    g.querySelector(".gbody").setAttribute("fill", `url(#sch-orb-${yes ? "up" : "down"})`);
     g.querySelector(".gbody").setAttribute("stroke", yes ? C.upRing : C.downRing);
     g.querySelector(".gring").setAttribute("stroke-opacity", smartOf(r) ? 1 : 0);
     g.querySelector(".glab").textContent = `${yes ? "Higher" : "Lower"} ${money(tl.k)} · ${dayName(td.settle)}`;
