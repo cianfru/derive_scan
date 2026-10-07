@@ -267,7 +267,7 @@ function mount(host, cfg) {
       const span = view[1] - view[0], shift = up ? next - view[1] + span * 0.25 : next - view[0] - span * 0.25;
       animateTo(clampView([view[0] + shift, view[1] + shift]));
     };
-    g.addEventListener("pointerdown", (e) => { if (e.pointerType !== "touch") e.stopPropagation(); });
+    g.addEventListener("pointerdown", (e) => { moved = false; if (e.pointerType !== "touch") e.stopPropagation(); });
     g.addEventListener("click", (e) => { e.stopPropagation(); if (!moved) go(); });
     g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
   }
