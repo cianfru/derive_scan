@@ -15,17 +15,16 @@
 .lp-hero-link span { color: var(--accent-text); }
 .cowboy-draft section[id] { scroll-margin-top: calc(var(--header-h) + 24px); }
 .lp-kicker { display: flex; align-items: center; gap: 10px; margin: 0 0 20px; color: var(--accent-text); font-size: 14px; font-weight: 600; }
-.lp-saloon-draft { display: grid; grid-template-columns: minmax(0, .83fr) minmax(0, 1.17fr); gap: clamp(36px, 5vw, 72px); align-items: center; padding-block: 88px; }
+.lp-saloon-draft { display: grid; gap: 32px; padding-block: 64px; }
+.lp-saloon-copy { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: end; }
+.lp-saloon-copy > .lp-body { max-width: 45ch; margin-bottom: 0; }
+.lp-execution-strip { display: flex; align-items: center; justify-content: space-between; gap: 36px; padding: 4px 0; }
+.lp-execution-strip h3 { margin: 0 0 8px; font-size: 23px; line-height: 1.3; letter-spacing: -.025em; }
+.lp-execution-strip p { max-width: 75ch; margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.6; }
+.lp-execution-strip .info { margin-left: 8px; vertical-align: middle; }
+.lp-execution-strip > .lp-text-link { flex: none; }
 .lp-saloon-copy h2, .lp-research-intro h2 { font-size: clamp(28px, 2.7vw, 36px); line-height: 1.22; letter-spacing: -.025em; text-wrap: initial; }
 .lp-saloon-copy .lp-body { margin-top: 20px; }
-.lp-saloon-steps { list-style: none; padding: 0; margin: 30px 0 22px; display: grid; gap: 20px; counter-reset: saloon-step; }
-.lp-saloon-steps li { position: relative; padding-left: 36px; display: grid; gap: 3px; counter-increment: saloon-step; }
-.lp-saloon-steps li::before { content: counter(saloon-step, decimal-leading-zero); position: absolute; left: 0; top: 2px; font: 400 12px/1.6 var(--font-mono); color: var(--text-3); }
-.lp-saloon-steps li:not(:last-child)::after { content: ""; position: absolute; left: 8px; top: 26px; bottom: -12px; width: 1px; background: var(--border); }
-.lp-saloon-steps span { font-size: 14px; font-weight: 600; }
-.lp-saloon-steps small { font-size: 13px; color: var(--text-3); line-height: 1.6; }
-.lp-execution-note { color: var(--text-3); font-size: 12px; line-height: 1.7; }
-.lp-execution-note .info, .lp-detail .info { margin-left: 8px; vertical-align: middle; }
 .lp-research { border-top: 1px solid var(--border); padding-block: 48px 72px; }
 .lp-research-intro { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: end; padding-top: 24px; }
 .lp-research-intro .lp-body { max-width: 45ch; }
@@ -82,8 +81,10 @@
 .lp-research-panel[hidden] { display: none; }
 .lp-research-copy h3 { font-size: 25px; line-height: 1.25; letter-spacing: -.025em; max-width: 20ch; text-wrap: initial; }
 .lp-research-copy .lp-body { margin-top: 18px; max-width: 42ch; }
+.lp-detail .info { margin-left: 8px; vertical-align: middle; }
 .lp-detail { color: var(--text-3); font-size: 12px; margin: 20px 0; }
 .lp-text-link { display: inline-flex; align-items: center; gap: 16px; min-height: 44px; font-size: 14px; font-weight: 600; border-bottom: 1px solid var(--border-strong); }
+.lp-text-link .lp-link-arrow { width: 14px; height: 14px; transform: rotate(-45deg); }
 .lp-text-link:hover { color: var(--accent-text); border-color: var(--accent); }
 .cowboy-draft .lp-figure { background: linear-gradient(135deg, var(--surface-2), var(--surface-1) 55%); border-color: var(--border); box-shadow: 0 1px 0 rgb(255 255 255 / .035) inset; padding: 42px 24px 24px; gap: 24px; }
 .cowboy-draft .lp-checks { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px 8px; }
@@ -112,14 +113,11 @@
 .hdr-landing .nav-research, .hdr-landing .nav-divider { display: none; }
 .hdr-landing .nav-more { display: flex; }
 .hdr-landing .tools { margin-left: 0; }
-/* Tablets and desktops (owner, 5 October 2026): the first screen shows the header and the hero alone.
-   The stage fills the viewport below the header and centres its content; the sign shrinks with the
-   viewport's height so short screens keep everything in view, and when the content is taller still the
-   stage grows rather than clips. */
+/* The sign retains its character while the interactive example comes into reach sooner. */
 @media (min-width: 761px) {
-  .cowboy-draft .hero-stage { display: flex; min-height: calc(100vh - var(--header-h, 60px)); min-height: calc(100svh - var(--header-h, 60px)); }
-  .cowboy-draft .hero-inner { flex: 1; width: 100%; justify-content: center; padding-block: clamp(24px, 5svh, 56px) clamp(32px, 7svh, 80px); gap: clamp(18px, 3.4svh, 34px); }
-  .cowboy-draft .sign-wrap { width: min(1060px, 100%, 124svh); padding-block: clamp(4px, 1.2svh, 12px) clamp(8px, 2.4svh, 24px); }
+  .cowboy-draft .hero-stage { display: flex; }
+  .cowboy-draft .hero-inner { flex: 1; width: 100%; justify-content: center; padding-block: clamp(24px, 4svh, 40px) clamp(32px, 5svh, 56px); gap: clamp(18px, 2.8svh, 28px); }
+  .cowboy-draft .sign-wrap { width: min(820px, 100%, 100svh); padding-block: 4px 12px; }
   .cowboy-draft .hero-row h1 { font-size: clamp(40px, min(4.6vw, 7.4svh), 62px); }
 }
 @media (max-width: 950px) {
@@ -127,7 +125,7 @@
   .cowboy-draft .hero-row h1 { font-size: 44px; }
   .cowboy-draft .hero-description { font-size: 15px; }
   .cowboy-draft .hero-cta { gap: 12px 20px; }
-  .lp-saloon-draft { gap: 32px; grid-template-columns: 1fr 1.2fr; }
+  .lp-saloon-copy { gap: 32px; }
   .lp-research-intro, .lp-research-panel { gap: 28px; }
   .lp-tab-question { max-width: 21ch; }
   .cowboy-draft .lp-figure { padding-inline: 18px; }
@@ -135,14 +133,9 @@
   .cowboy-draft .lp-faq { gap: 32px; }
 }
 @media (max-width: 760px) {
-  /* The first screen shows the hero alone (svh: Safari with its bars showing): eyebrow, sign,
-     headline, subhead and both buttons as one tight group, centred, a little higher than the middle;
-     the next section starts below the fold (owner, 5 October 2026: closer together, a bigger sign,
-     nothing of the Saloon section on the first screen). */
-  .cowboy-draft .hero-stage { display: flex; min-height: calc(100vh - var(--header-h)); min-height: calc(100svh - var(--header-h)); }
+  .cowboy-draft .hero-stage { display: flex; min-height: 0; }
   .cowboy-draft .hero-inner { flex: 1; width: 100%; justify-content: flex-start; padding-block: clamp(16px, 3svh, 32px); gap: clamp(10px, 2.2svh, 20px); }
-  .cowboy-draft .hero-inner::before { content: ""; flex: 2 1 0; margin-bottom: calc(-1 * clamp(10px, 2.2svh, 20px)); }
-  .cowboy-draft .hero-inner::after { content: ""; flex: 3 1 0; margin-top: calc(-1 * clamp(10px, 2.2svh, 20px)); }
+  .cowboy-draft .hero-inner::before, .cowboy-draft .hero-inner::after { content: none; }
   .cowboy-draft .sign-wrap { width: min(94%, 420px); padding: 0; }
   .cowboy-draft .hero-row { display: flex; flex-direction: column; align-items: stretch; gap: clamp(12px, 2.4svh, 20px); margin-top: 0; }
   .cowboy-draft .hero-side { display: flex; flex-direction: column; }
@@ -153,10 +146,14 @@
   .cowboy-draft .hero-cta { flex-wrap: nowrap; gap: 8px 18px; }
   .cowboy-draft .hero-cta .btn.lg { white-space: nowrap; }
   .lp-hero-link { gap: 8px; font-size: 15px; color: var(--text-1); white-space: nowrap; }
-  .lp-saloon-draft { grid-template-columns: 1fr; gap: 32px; padding-block: 52px; }
+  .lp-saloon-draft { gap: 22px; padding-block: 32px; }
+  .lp-saloon-copy { grid-template-columns: 1fr; gap: 14px; }
+  .lp-saloon-copy > .lp-body { margin-top: 0; font-size: 14px; line-height: 1.6; }
+  .lp-execution-strip { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .lp-execution-strip h3 { font-size: 23px; }
+  .lp-execution-strip p { font-size: 12px; }
   .lp-saloon-copy h2, .lp-research-intro h2 { font-size: 30px; }
   .lp-saloon-copy .lp-body { max-width: 50ch; }
-  .lp-saloon-steps { gap: 15px; margin-top: 24px; }
   .lp-kicker { margin-bottom: 15px; }
   .lp-research { padding-block: 40px; }
   .lp-research-intro { grid-template-columns: 1fr; gap: 16px; padding-top: 0; }

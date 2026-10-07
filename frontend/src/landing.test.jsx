@@ -85,7 +85,7 @@ describe("landing with the Saloon disabled", () => {
   it("labels each research example as an illustration and keeps layers in their declared order", () => {
     show();
     const tabs = within(screen.getByRole("tablist", { name: "Research layers" })).getAllByRole("tab");
-    expect(tabs.map((tab) => tab.querySelector(".lp-tab-name").textContent)).toEqual(["Regime", "Wallets", "Options"]);
+    expect(tabs.map((tab) => tab.querySelector(".lp-tab-name").textContent)).toEqual(["Regime", "Smart wallets", "Options"]);
     for (const tab of tabs) {
       fireEvent.click(tab);
       const panel = screen.getByRole("tabpanel");
@@ -101,7 +101,7 @@ describe("landing with the Saloon disabled", () => {
   it("shows one small illustration per layer in order, each stamped and explained in one sentence", () => {
     const { container } = show();
     const minis = within(screen.getByRole("list", { name: "The three layers at a glance" })).getAllByRole("listitem");
-    expect(minis.map((li) => li.querySelector(".lp-mini-head b").textContent)).toEqual(["Regime", "Wallets", "Options"]);
+    expect(minis.map((li) => li.querySelector(".lp-mini-head b").textContent)).toEqual(["Regime", "Smart wallets", "Options"]);
     for (const li of minis) {
       expect(within(li).getByText("Illustration")).not.toBeNull();
       expect(li.querySelectorAll("p")).toHaveLength(1);
@@ -141,7 +141,7 @@ describe("landing with the Saloon disabled", () => {
     const { container } = show();
     expect(screen.getAllByRole("link", { name: "Open the markets" }).every((link) => link.getAttribute("href") === "/markets")).toBe(true);
     expect(screen.queryByRole("link", { name: "Enter the Saloon" })).toBeNull();
-    expect(screen.queryByRole("region", { name: "See what it pays" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Explore an outcome" })).toBeNull();
     const how = screen.getByRole("link", { name: /See how it works/ });
     expect(how.getAttribute("href")).toBe("#how");
     expect(container.querySelector("#how [role=tablist]")).not.toBeNull();
