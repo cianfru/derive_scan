@@ -127,16 +127,20 @@ function mount(host, cfg) {
       const gr = el("radialGradient", { id, cx: "0.36", cy: "0.3", r: "0.78", fx: "0.32", fy: "0.24" }, defs);
       el("stop", { offset: "0", "stop-color": mix(base, "#ffffff", C.light ? 0.38 : 0.34) }, gr);
       el("stop", { offset: "0.5", "stop-color": base }, gr);
-      el("stop", { offset: "1", "stop-color": mix(base, "#000000", C.light ? 0.38 : 0.5) }, gr);
+      el("stop", { offset: "1", "stop-color": mix(base, "#000000", C.light ? 0.22 : 0.32) }, gr);
     };
     orb("sch-orb-up", C.upFill);
     orb("sch-orb-down", C.downFill);
     const shine = el("radialGradient", { id: "sch-shine", cx: "0.5", cy: "0.5", r: "0.5" }, defs);
-    el("stop", { offset: "0", "stop-color": "#ffffff", "stop-opacity": C.light ? "0.6" : "0.5" }, shine);
+    el("stop", { offset: "0", "stop-color": "#ffffff", "stop-opacity": C.light ? "0.32" : "0.24" }, shine);
     el("stop", { offset: "1", "stop-color": "#ffffff", "stop-opacity": "0" }, shine);
-    const shade = el("radialGradient", { id: "sch-shade", cx: "0.5", cy: "0.5", r: "0.5" }, defs);
-    el("stop", { offset: "0", "stop-color": "#000000", "stop-opacity": C.light ? "0.22" : "0.55" }, shade);
-    el("stop", { offset: "1", "stop-color": "#000000", "stop-opacity": "0" }, shade);
+    const halo = (id, base) => {
+      const gr = el("radialGradient", { id, cx: "0.5", cy: "0.5", r: "0.5" }, defs);
+      el("stop", { offset: "0.6", "stop-color": base, "stop-opacity": C.light ? "0.22" : "0.3" }, gr);
+      el("stop", { offset: "1", "stop-color": base, "stop-opacity": "0" }, gr);
+    };
+    halo("sch-halo-up", C.up);
+    halo("sch-halo-down", C.down);
     const gold = el("linearGradient", { id: "sch-gold", x1: "0", y1: "0", x2: "0", y2: "1" }, defs);
     el("stop", { offset: "0", "stop-color": mix(C.gold, "#ffffff", 0.45) }, gold);
     el("stop", { offset: "0.55", "stop-color": C.gold }, gold);
@@ -198,6 +202,9 @@ function mount(host, cfg) {
       for (const l of visible) if (!big.some((b) => Math.abs(y(b.k) - y(l.k)) < R * 2 + 4)) big.push(l);
       for (const l of visible) if (!big.includes(l)) bubble(plot, d, l, cx, false, i);
       big.forEach((l, j) => bubble(plot, d, l, cx, true, i, j));
+      const above = d.levels.filter((l) => y(l.k) <= m.t + R * 0.7), below = d.levels.filter((l) => y(l.k) >= H - m.b - R * 0.7);
+      if (above.length) more(svg, cx, m.t - 2, true, above, d);
+      if (below.length) more(svg, cx, H - m.b - 14, false, below, d);
     });
     if (lane) traderLane(svg, lane);
     if (current) paintSelected();
@@ -247,6 +254,24 @@ function mount(host, cfg) {
     }
   }
 
+  // "More levels this way": an arrow with how many, at the top or bottom of a date; a tap brings the nearest into view.
+  function more(parent, cx, y0, up, list, d) {
+    const n = list.length, word = `${n} more ${up ? "above" : "below"}`;
+    const g = el("g", { class: "sch-more", tabindex: 0, role: "button", "aria-label": `${dayName(d.settle)}: ${word}. Show them` }, parent);
+    el("rect", { x: cx - 34, y: y0 - 12, width: 68, height: 38, fill: "transparent" }, g); // the tap area
+    const a = up ? `M${cx - 22} ${y0 + 10} l5 -5 l5 5` : `M${cx - 22} ${y0 + 5} l5 5 l5 -5`;
+    el("path", { d: a, fill: "none", stroke: C.text2, "stroke-width": 1.6, "stroke-linecap": "round", "stroke-linejoin": "round" }, g);
+    el("text", { x: cx - 9, y: y0 + 11, fill: C.text2, "font-size": 10.5, "text-anchor": "start" }, g).textContent = `${n} more`;
+    const go = () => {
+      const next = up ? Math.min(...list.map((l) => l.k)) : Math.max(...list.map((l) => l.k));
+      const span = view[1] - view[0], shift = up ? next - view[1] + span * 0.25 : next - view[0] - span * 0.25;
+      animateTo(clampView([view[0] + shift, view[1] + shift]));
+    };
+    g.addEventListener("pointerdown", (e) => { moved = false; if (e.pointerType !== "touch") e.stopPropagation(); });
+    g.addEventListener("click", (e) => { e.stopPropagation(); if (!moved) go(); });
+    g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+  }
+
   function bubble(parent, d, l, cx, full, col = 0, rank = 0) {
     const { y, R, phone } = geo, r = l.r, yes = r.side === "yes", by = y(l.k), smart = smartOf(r);
     const name = `${yes ? "Higher" : "Lower"} than ${money(l.k)} on ${dayName(d.settle)}, up to ${returnPct(r.make, r.total)}${smart ? ", smart wallets hold positions this way" : ""}`;
@@ -258,13 +283,14 @@ function mount(host, cfg) {
     const orbFill = `url(#sch-orb-${yes ? "up" : "down"})`, ring = yes ? C.upRing : C.downRing;
     // The shadow stays on the chart while the bubble floats above it.
     const sr = full ? R : 6;
-    el("ellipse", { cx: cx + sr * 0.12, cy: by + sr * 0.98, rx: sr * 0.95, ry: sr * 0.3, fill: "url(#sch-shade)", class: "sch-shadow" }, pop);
+    // A soft glow of the bubble's own colour on the side the light comes from (top left), so it lifts off the chart.
+    el("circle", { cx: cx - sr * 0.14, cy: by - sr * 0.14, r: sr * 1.32, fill: `url(#sch-halo-${yes ? "up" : "down"})`, class: "sch-halo" }, pop);
     const fl = el("g", { class: "sch-float", style: `--dur:${(3.4 + seed * 0.18).toFixed(2)}s;--delay:-${(seed * 0.4).toFixed(2)}s` }, pop);
     const body = el("g", { class: "sch-body" }, fl);
     if (full) {
       if (smart) el("circle", { cx, cy: by, r: R + 5, fill: "none", stroke: "url(#sch-gold)", "stroke-width": 3, class: "sch-gold" }, body);
       el("circle", { cx, cy: by, r: R, fill: orbFill, stroke: ring, "stroke-width": 1.2, "stroke-opacity": 0.85 }, body);
-      el("ellipse", { cx: cx - R * 0.28, cy: by - R * 0.42, rx: R * 0.5, ry: R * 0.3, fill: "url(#sch-shine)", class: "sch-shine" }, body);
+      el("ellipse", { cx: cx - R * 0.28, cy: by - R * 0.42, rx: R * 0.42, ry: R * 0.24, fill: "url(#sch-shine)", class: "sch-shine" }, body);
       const label = returnPct(r.make, r.total), long = label.length > 6;
       el("text", { x: cx, y: by + 4, fill: C.ink, "font-size": long ? (phone ? 9.5 : 10.5) : phone ? 11 : 12, "font-weight": 700, "text-anchor": "middle",
         stroke: "rgba(0,0,0,.35)", "stroke-width": 2, "paint-order": "stroke", "stroke-linejoin": "round" }, body).textContent = label;
