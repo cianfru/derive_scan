@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { createChart, CandlestickSeries, ColorType, CrosshairMode, LineStyle } from "lightweight-charts";
 import { cssVar, price } from "../lib/format.js";
 import { money } from "../lib/questions.js";
-import { useLivePrice } from "../lib/livePrice.js";
+import { recentBars, useLivePrice } from "../lib/livePrice.js";
 
 const STEP = { "4h": 14400, "1d": 86400 };
 // Up to 10 days to settlement the 4-hour candles, beyond that the daily ones (the Saloon's 7- and 30-day windows).
@@ -158,7 +158,22 @@ export default function SettleChart({ und, candles, index, settleTs, lo = null, 
     ro?.observe(box.current);
     schedule();
     if (lpRef.current) applyLive.current(lpRef.current.price, lpRef.current.ts);
-    return () => { applyLive.current = null; cancelAnimationFrame(frame); ro?.disconnect(); chart.unsubscribeCrosshairMove(onMove); chart.timeScale().unsubscribeVisibleLogicalRangeChange(schedule); chart.remove(); };
+    // The file holds closed bars only: catch up to now (the forming bar too) from Derive's own candles.
+    let gone = false;
+    recentBars(und, STEP[tf], lastT).then((fresh) => {
+      if (gone) return;
+      for (const [t, o, h, l, cl] of fresh) {
+        if (t < lastT || !bars.some((b) => b.time === t)) continue;
+        last = { time: t, open: o, high: h, low: l, close: cl };
+        lastT = t;
+        try { candle.update(last, true); } catch { return; }
+      }
+      if (!fresh.length) return;
+      nowLine?.applyOptions({ price: last.close });
+      if (lpRef.current) applyLive.current?.(lpRef.current.price, lpRef.current.ts);
+      schedule();
+    }).catch(() => {});
+    return () => { gone = true; applyLive.current = null; cancelAnimationFrame(frame); ro?.disconnect(); chart.unsubscribeCrosshairMove(onMove); chart.timeScale().unsubscribeVisibleLogicalRangeChange(schedule); chart.remove(); };
   }, [rows, settleTs, tf, lo, hi, side, [].concat(breakeven ?? []).join(","), index, levels.join(","), theme, compact]);
   useEffect(() => { if (lp) applyLive.current?.(lp.price, lp.ts); }, [lp]);
   if (!rows?.length) return <p className="status">The {und} chart is not available right now.</p>;

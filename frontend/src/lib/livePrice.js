@@ -13,6 +13,8 @@ const RETRY_MS = 3000;
 
 const latest = new Map(); // und -> {price, prev, ts}
 const listeners = new Map(); // und -> Set(fn)
+const pending = new Map(); // request id -> {resolve, reject, timer}
+const queued = []; // requests waiting for the connection
 let ws = null, retry = 0, id = 0;
 
 /** A spot_feed notification -> [[und, {price, prev, ts}]]. */
@@ -28,12 +30,22 @@ function send(method, channels) {
 }
 
 function open() {
-  if (ws || typeof WebSocket === "undefined" || !listeners.size) return;
+  // Tests never reach the network: the feed stays closed and pages show the published prices.
+  if (ws || typeof WebSocket === "undefined" || !listeners.size || import.meta.env.MODE === "test") return;
   ws = new WebSocket(LIVE_WS);
-  ws.onopen = () => send("subscribe", [...listeners.keys()].map((u) => `spot_feed.${u}`));
+  ws.onopen = () => {
+    send("subscribe", [...listeners.keys()].map((u) => `spot_feed.${u}`));
+    while (queued.length) ws.send(queued.shift());
+  };
   ws.onmessage = (e) => {
     let msg;
     try { msg = JSON.parse(e.data); } catch { return; }
+    const req = msg?.id != null && pending.get(msg.id);
+    if (req) {
+      pending.delete(msg.id); clearTimeout(req.timer);
+      if (msg.error) req.reject(new Error(msg.error.message || "Derive error")); else req.resolve(msg.result);
+      return;
+    }
     for (const [und, v] of parseSpot(msg)) {
       latest.set(und, v);
       for (const fn of listeners.get(und) || []) fn(v);
@@ -44,6 +56,25 @@ function open() {
     if (listeners.size) { clearTimeout(retry); retry = setTimeout(open, RETRY_MS); }
   };
   ws.onerror = () => { try { ws?.close(); } catch { /* closing */ } };
+}
+
+function request(method, params) {
+  return new Promise((resolve, reject) => {
+    const rid = ++id, body = JSON.stringify({ id: rid, method, params });
+    const timer = setTimeout(() => { pending.delete(rid); reject(new Error("timeout")); }, 10000);
+    pending.set(rid, { resolve, reject, timer });
+    if (ws?.readyState === 1) ws.send(body); else queued.push(body);
+    open();
+  });
+}
+
+/** Index candles [t, o, h, l, c] (seconds) of `und` from `start`, the forming one included: what the published
+ * file has not caught up with yet. Asked over the shared connection, which a listener on `und` keeps open. */
+export async function recentBars(und, period, start) {
+  const now = Math.floor(Date.now() / 1000);
+  const rows = await request("public/get_index_chart_data", { currency: und, period, start_timestamp: Math.max(start, now - 20 * period), end_timestamp: now });
+  return (Array.isArray(rows) ? rows : []).map((c) => [Number(c.timestamp), +c.open_price, +c.high_price, +c.low_price, +c.close_price])
+    .filter((b) => b.slice(1).every((v) => Number.isFinite(v) && v > 0) && b[0] >= start).sort((a, b) => a[0] - b[0]);
 }
 
 /** Calls fn with each live price of `und`; returns the unsubscribe. */

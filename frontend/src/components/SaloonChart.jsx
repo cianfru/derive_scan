@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { cssVar } from "../lib/format.js";
 import { money } from "../lib/questions.js";
-import { useLivePrice } from "../lib/livePrice.js";
+import { recentBars, useLivePrice } from "../lib/livePrice.js";
 
 /*
  * The Saloon's chart (owner, 7 October 2026: "the chart is probably the best way to represent and show where
@@ -534,6 +534,16 @@ function mount(host, cfg) {
   return {
     zoomIn: () => zoomBy(0.6), zoomOut: () => zoomBy(1.6), reset: () => animateTo([...HOME]),
     select: (r) => { current = r || null; paintSelected(); },
+    // Bars Derive has but the published file not yet (the forming one too): replace or append, keep the length.
+    setBars: (bars) => {
+      for (const b of bars) {
+        const i = cs.findIndex((c) => c[0] === b[0]);
+        if (i >= 0) cs[i] = [...b];
+        else if (b[0] > cs[cs.length - 1][0]) { cs.push([...b]); cs.shift(); }
+      }
+      if (bars.length) price = bars[bars.length - 1][4];
+      paintPrice();
+    },
     setLive: (p, ts) => {
       if (!(p > 0)) return;
       const last = cs[cs.length - 1];
@@ -586,6 +596,18 @@ export default function SaloonChart({ und, name, index, candles, dates, amount, 
   }, [ready, und, index, candles, dataKey, theme, amount]);
   useEffect(() => { api.current?.select(selected); }, [selected?.key]);
   useEffect(() => { if (live) api.current?.setLive(live.price, live.ts); }, [live]);
+  // Catch the candles up to now once per coin and chart: the file holds closed bars only, published after each close.
+  useEffect(() => {
+    if (!ready) return undefined;
+    let gone = false;
+    const last = candles[candles.length - 1][0];
+    recentBars(und, 14400, last).then((bars) => {
+      if (gone || !api.current) return;
+      api.current.setBars(bars);
+      if (liveRef.current) api.current.setLive(liveRef.current.price, liveRef.current.ts);
+    }).catch(() => {});
+    return () => { gone = true; };
+  }, [ready, und, index, candles, dataKey, theme, amount]);
   if (!ready) return <p className="status">The {und} chart is not available right now.</p>;
   return (
     <div ref={stage} className="sch-stage">
