@@ -65,11 +65,16 @@ export function SaloonNotices() {
   );
 }
 
-/** Browsing is the default. Guided setup remains available without duplicating the main nav. */
+/** The Saloon's heading, with the Chart / List switch. */
 export default function SaloonHead({ view, board = false, quoteTs, paused = false }) {
   const following = view === "following";
   const guided = view === "guided";
-  const viewLink = <Link className="saloon-view-link" to={guided ? "/saloon" : "/saloon/guided"}>{guided ? "Browse outcomes" : "Guided setup"}<span aria-hidden="true"><Arrow /></span></Link>;
+  // Chart or List (owner, 7 October 2026): the chart is the Saloon's front door, the list the same answers in rows.
+  const viewLink = guided ? <Link className="saloon-view-link" to="/saloon">Browse outcomes<span aria-hidden="true"><Arrow /></span></Link>
+    : <nav className="saloon-views" aria-label="View">
+      <Link to="/saloon" aria-current={view === "chart" ? "page" : undefined}>Chart</Link>
+      <Link to="/saloon?view=list" aria-current={view === "chart" ? undefined : "page"}>List</Link>
+    </nav>;
   return (
     <header className={`q-head sn-head-wrap${board ? " bd-heading" : ""}`}>
       <div className="q-head-top">

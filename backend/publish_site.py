@@ -809,7 +809,8 @@ def smart_marks(level: dict, settle_ts: int, legs: list, und: str) -> dict:
 
 def annotate_smart(site: Path, legs: list) -> None:
     """Marks the published questions/{UND}.json answers the smart wallets lean toward (`smart` on the
-    answer) and counts them per coin in questions/index.json (`smart`); recomputed on every publish."""
+    answer) and counts the board's marked answers per coin in questions/index.json (`smart`); recomputed on
+    every publish."""
     idx_path = site / "questions" / "index.json"
     try:
         idx = json.loads(idx_path.read_text())
@@ -825,6 +826,7 @@ def annotate_smart(site: Path, legs: list) -> None:
         for date in board.get("dates") or []:
             for level in date.get("levels") or []:
                 marks = smart_marks(level, date["settle_ts"], legs, und)
+                shown = date.get("board") and level.get("ladder") and level.get("state") not in ("retired", "tail")
                 for side in ("yes", "no"):
                     ans = level.get(side)
                     if not isinstance(ans, dict):
@@ -832,7 +834,7 @@ def annotate_smart(site: Path, legs: list) -> None:
                     ans.pop("smart", None)
                     if side in marks:
                         ans["smart"] = marks[side]
-                        count += 1
+                        count += bool(shown)
         _write(path, board)
         coin["smart"] = count
     _write(idx_path, idx)

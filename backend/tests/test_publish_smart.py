@@ -27,13 +27,19 @@ def test_marks_need_two_wallets_and_the_floor():
 def test_annotate_writes_answers_and_counts(tmp_path):
     q = tmp_path / "questions"
     q.mkdir()
-    board = {"und": "BTC", "dates": [{"settle_ts": T, "levels": [_level(84_000, 86_000), _level(90_000, 92_000)]}]}
+    board = {"und": "BTC", "dates": [{"settle_ts": T, "board": True, "levels": [_level(84_000, 86_000), _level(90_000, 92_000)]},
+                                     {"settle_ts": T + 86400, "levels": [_level(84_000, 86_000)]}]}  # not on the board: marked, not counted
+    for d in board["dates"]:
+        for lv in d["levels"]:
+            lv["ladder"] = 7
     board["dates"][0]["levels"][1]["no"]["smart"] = {"delta_usd": -1, "wallets": 9}  # stale mark is cleared
     (q / "BTC.json").write_text(json.dumps(board))
     (q / "index.json").write_text(json.dumps({"coins": [{"und": "BTC"}]}))
-    P.annotate_smart(tmp_path, [("0xa", "BTC", T, 85_000, 8_000), ("0xb", "BTC", T, 85_000, 4_000)])
+    P.annotate_smart(tmp_path, [("0xa", "BTC", T, 85_000, 8_000), ("0xb", "BTC", T, 85_000, 4_000),
+                                ("0xa", "BTC", T + 86400, 85_000, 8_000), ("0xb", "BTC", T + 86400, 85_000, 4_000)])
     out = json.loads((q / "BTC.json").read_text())
     a, b = out["dates"][0]["levels"]
+    assert out["dates"][1]["levels"][0]["yes"]["smart"]["wallets"] == 2
     assert a["yes"]["smart"] == {"delta_usd": 12_000, "wallets": 2} and "smart" not in a["no"]
     assert "smart" not in b["no"]
     assert json.loads((q / "index.json").read_text())["coins"][0]["smart"] == 1

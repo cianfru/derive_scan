@@ -92,7 +92,7 @@ function Evidence({ c, id }) {
       <div className="mk-evidence-foot">
         <span>Context, not a signal. The three readings are independent.</span>
         <span className="mk-evidence-links">
-          {QUESTIONS_ON && c.questions && <Link to={`/saloon/${c.und}`}>{c.und} in the Saloon<Arrow /></Link>}
+          {QUESTIONS_ON && c.questions && <Link to={`/saloon?coin=${c.und}`}>{c.und} in the Saloon<Arrow /></Link>}
           <Link to={`/coin/${c.und}`}>Open {c.und}<Arrow /></Link>
         </span>
       </div>
