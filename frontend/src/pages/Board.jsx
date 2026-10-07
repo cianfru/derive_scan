@@ -1,7 +1,9 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { useClock } from "../lib/useClock.js";
+import { useIndexPrice } from "../lib/livePrice.js";
+import { useSheetFocus } from "../components/DecisionSheet.jsx";
 import { useFeeds } from "../components/Feeds.jsx";
 import { Info, Loading, Failed, RefreshNotice, Tabs } from "../components/ui.jsx";
 import { Asset, CoinIcon } from "../components/MarketVisuals.jsx";
@@ -20,6 +22,9 @@ import "../settle-chart.css";
 import "../questions.css";
 import "../board.css";
 import LiveMoney from "../components/LiveMoney.jsx";
+import { recordProductEvent } from "../lib/diagnostics.js";
+import DecisionComparison, { CompareControl, ViewComparison } from "../components/OutcomeDecision.jsx";
+import { retainOutcome, updateDecision, useDecision } from "../lib/decision.js";
 
 const PAGE = 24;
 const usd = (v) => money(v, { cents: true });
@@ -43,6 +48,9 @@ function NotYet({ label, why }) {
 /** One answer in a level's row: its price per $1 and the most it makes as a share of its cost; the tile opens the
  * outcome at that answer; the bookmark beside it follows the answer. */
 function AnswerChoice({ r, budget }) {
+  const [decision] = useDecision();
+  const dollars = Number(decision.amountDraft);
+  const location = useLocation();
   const listed = useTestnetListing(TESTNET_FILLS && !r.reason ? r.und : null);
   const offTestnet = TESTNET_FILLS && missingLegs(r.id, r.side, listed).length > 0;
   const available = !r.reason && !offTestnet;
@@ -51,12 +59,13 @@ function AnswerChoice({ r, budget }) {
   return (
     <div className={`bd-answer ${r.side}${available ? "" : " off"}`}>
       {offTestnet ? <div className="bd-choice off">{side}<span className="q-noprice">{NOT_ON_TESTNET}<Info label={`Why ${name} is not on testnet`}>{NOT_ON_TESTNET_WHY}</Info></span></div>
-        : available ? <Link to={`/q/${r.id}?side=${r.side}`} state={{ step: "preview" }} className={`bd-choice ${r.side}`} aria-label={`${name}: see what it pays`}>
+        : available ? <Link to={`/q/${r.id}?side=${r.side}`} state={{ step: "preview", amountDraft: decision.amountDraft, ...(Number.isFinite(dollars) && dollars > 0 ? { dollars } : {}), returnTo: `${location.pathname}${location.search}` }} onClick={() => { retainOutcome(r); recordProductEvent("outcome_opened"); }} className={`bd-choice ${r.side}`} aria-label={`${name}: see what it pays`}>
           <span className="bd-choice-top">{side}<span className="bd-price mono" title={r.capped ? "Small size at this price" : undefined}>{r.buyCents}¢{r.capped && <small className="bd-capped" aria-label="small size at this price">*</small>}</span></span>
           <span className="bd-choice-ret">{r.make > 0 && <small>up to</small>}<b className={`mono${returnText(r.make, r.total).length > 6 ? " long" : ""}`}>{returnText(r.make, r.total)}</b></span>
         </Link>
         : <div className="bd-choice off">{side}<span className="q-noprice">No price now<Info label={`Why ${name} has no price`}>{r.reason}</Info></span></div>}
       <FollowButton id={r.id} side={r.side} k={r.k} board={r.board} compact />
+      {available && <CompareControl selection={r} compact />}
     </div>
   );
 }
@@ -132,8 +141,8 @@ function OutcomeCard({ outcome: r, align, budget, inRow = false, boardStyle = fa
 }
 
 /** Where the coin's index sits within a row's ladder: a lit line across the ladder between two levels. */
-function NowMark({ und, index }) {
-  return <li className="bd-now" aria-label={`${money(index)}, the coin's index now, sits here`}><span className="bd-now-line" aria-hidden="true" /><span className="bd-now-text" aria-hidden="true">{und} now <b className="mono"><LiveMoney und={und} value={index} /></b></span><span className="bd-now-line end" aria-hidden="true" /></li>;
+function NowMark({ und, index, current }) {
+  return <li className="bd-now" aria-label={`${money(index)}, the coin's ${current?.fresh ? "index now" : "last index"}, sits here`}><span className="bd-now-line" aria-hidden="true" /><span className="bd-now-text" aria-hidden="true">{und} {current?.fresh ? "now" : "last index"} <b className="mono">{money(index)}</b></span><span className="bd-now-line end" aria-hidden="true" /></li>;
 }
 
 /** The key over a ladder: what each answer's two figures are. */
@@ -159,21 +168,16 @@ function QuickLook({ row, name, when, levels, children }) {
   const { data: coin, error } = useData(peek || open ? `coins/${row.und}.json` : null);
   const btn = useRef(null);
   const closeBtn = useRef(null);
+  const windowRef = useRef(null);
+  useSheetFocus(open, windowRef, btn, () => setOpen(false), "(min-width: 0px)");
   const timer = useRef(0);
   useEffect(() => () => clearTimeout(timer.current), []);
-  useEffect(() => {
-    if (!open) return undefined;
-    closeBtn.current?.focus();
-    const key = (e) => { if (e.key === "Escape") { e.preventDefault(); setOpen(false); } };
-    document.addEventListener("keydown", key);
-    return () => { document.removeEventListener("keydown", key); btn.current?.focus(); };
-  }, [open]);
   const hover = (on) => {
     clearTimeout(timer.current);
     if (typeof window !== "undefined" && window.matchMedia && !window.matchMedia("(hover: hover)").matches) return;
     timer.current = setTimeout(() => setPeek(on), on ? 180 : 120);
   };
-  const chart = (compact) => coin ? <SettleChart und={row.und} candles={coin.candles} index={row.index} settleTs={row.settleTs} levels={levels} compact={compact} />
+  const chart = (compact) => coin ? <SettleChart und={row.und} candles={coin.candles} index={row.index} publishedTs={row.pricesTs} settleTs={row.settleTs} levels={levels} compact={compact} />
     : error ? <p className="status">The {name} chart is unavailable right now.</p> : <p className="status">Loading the {name} chart…</p>;
   return <>
     <button ref={btn} type="button" className="bd-look" aria-haspopup="dialog" aria-expanded={open} onClick={() => { setPeek(false); setOpen(true); }}
@@ -181,15 +185,15 @@ function QuickLook({ row, name, when, levels, children }) {
       {children}<span className="bd-look-icon" aria-hidden="true" /><span className="sr-only">: open the {name} chart</span>
     </button>
     {peek && !open && <div className="bd-look-peek" aria-hidden="true">
-      <div className="bd-look-peek-head"><b>{name}</b><span className="mono">now <LiveMoney und={row.und} value={row.index} /></span><span>Settles {when}</span></div>
+      <div className="bd-look-peek-head"><b>{name}</b><span className="mono">index <LiveMoney und={row.und} value={row.index} publishedTs={row.pricesTs} /></span><span>Settles {when}</span></div>
       {chart(true)}
       <small>Click to open</small>
     </div>}
     {open && <>
       <div className="bd-look-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
-      <div className="bd-look-window" role="dialog" aria-modal="true" aria-label={`${name} price up to ${when}`}>
+      <div ref={windowRef} className="bd-look-window" tabIndex={-1} role="dialog" aria-modal="true" aria-label={`${name} price up to ${when}`}>
         <div className="bd-look-window-head">
-          <div><h3>{name} <span className="mono">now <LiveMoney und={row.und} value={row.index} /></span></h3><p>Settles {when}{countdown(row.settleTs) && <> · {countdown(row.settleTs)}</>}</p></div>
+          <div><h3>{name} <span className="mono">index <LiveMoney und={row.und} value={row.index} publishedTs={row.pricesTs} /></span></h3><p>Settles {when}{countdown(row.settleTs) && <> · {countdown(row.settleTs)}</>}</p></div>
           <button ref={closeBtn} type="button" className="text-control" onClick={() => setOpen(false)}>Close</button>
         </div>
         {chart(false)}
@@ -203,17 +207,20 @@ function QuickLook({ row, name, when, levels, children }) {
 /** One coin and settlement date: a header, then its levels from low to high with the index marked. */
 function DateRow({ row: full, align, budget, boardStyle = false, all = false, now }) {
   const [open, setOpen] = useState(false);
-  const row = all || open ? full : nearRow(full);
+  const pricesTs = full.items[0]?.board?.prices_ts;
+  const current = useIndexPrice(full.und, full.index, pricesTs);
+  const indexed = { ...full, index: current.price, pricesTs };
+  const row = all || open ? { ...indexed, nowAt: Number.isFinite(current.price) ? indexed.items.filter((it) => it.k <= current.price).length : null } : nearRow(indexed);
   const name = ASSET_NAMES[full.und] || full.und;
   const when = `${dayLabel(full.expiry)}, 08:00 UTC`;
   const n = full.items.length;
   const cards = row.items.map((g) => <OutcomeCard key={g.id} outcome={g} align={align} budget={budget} inRow boardStyle={boardStyle} />);
-  if (row.nowAt != null) cards.splice(row.nowAt, 0, <NowMark key="now" und={row.und} index={row.index} />);
+  if (row.nowAt != null) cards.splice(row.nowAt, 0, <NowMark key="now" und={row.und} index={row.index} current={current} />);
   return (
     <section className="bd-row" aria-label={`${name}, settles ${when}`}>
       <header className="bd-row-head">
         <h2 className="bd-look-wrap"><QuickLook row={row} name={name} when={when} levels={row.items.map((g) => g.k)}><CoinIcon und={row.und} /><span className="bd-row-name">{name}</span><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-date">{when}</span>{countdown(row.settleTs) && <><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-in mono">{countdown(row.settleTs)}</span></>}</QuickLook></h2>
-        <span className="bd-row-meta">{row.index != null && <span className="bd-row-index mono">now <LiveMoney und={row.und} value={row.index} /></span>}<SmartWord und={row.und} align={align} settleTs={row.settleTs} now={now} /></span>
+        <span className="bd-row-meta">{row.index != null && <span className="bd-row-index mono">{current.fresh ? "now" : "last index"} <LiveMoney und={row.und} value={row.index} publishedTs={pricesTs} /></span>}<SmartWord und={row.und} align={align} settleTs={row.settleTs} now={now} /></span>
       </header>
       <ol className="bd-row-cards" aria-label={`${name} levels on ${dayLabel(row.expiry)}, low to high`}>{cards}</ol>
       {!all && (row.hidden > 0 || open) && <button type="button" className="bd-row-all" aria-expanded={open} onClick={() => setOpen((o) => !o)}>{open ? "Show the levels near the price" : `View all ${n} levels`}</button>}
@@ -284,23 +291,32 @@ function Following() {
 /** Browse: every live answer across coins and dates, priced for one amount, in the order the
  * user picks. Ordered by facts about the price only; the three layers sit on each row as context. */
 export default function Board({ followingOnly = false, embedded = false }) {
-  const { data: index, error } = useData("questions/index.json");
+  const { data: index, error, retry: retryIndex } = useData("questions/index.json");
+  const [params, setParams] = useSearchParams();
+  const [decision] = useDecision();
   const { data: markets } = useData("markets.json");
   const doc = useFollowsDoc();
   const budget = REF;
   const coins = (index?.coins || []).map((c) => c.und);
-  const [feeds, files, ready, feedResults] = useFeeds(coins.map((u) => `questions/${u}.json`));
-  const [coin, setCoin] = useState("all");
-  const [range, setRange] = useState("all");
-  const [side, setSide] = useState("all");
-  const [sort, setSort] = useState(DEFAULT_SORT);
-  const [search, setSearch] = useState("");
+  const [feeds, files, ready, feedResults] = useFeeds(coins.map((u) => `questions/${u}.json`), undefined, { revision: index?.publication_revision, retry: retryIndex });
+  const [coin, setCoinState] = useState(() => (params.get("coin") || decision.coin || "all").toUpperCase().replace(/^ALL$/, "all"));
+  const [range, setRange] = useState(() => RANGES.some(([v]) => v === decision.list.range) ? decision.list.range : "all");
+  const [side, setSide] = useState(() => SIDES.some(([v]) => v === decision.list.side) ? decision.list.side : "all");
+  const [sort, setSort] = useState(() => SORTS.some(([v]) => v === decision.list.sort) ? decision.list.sort : DEFAULT_SORT);
+  const [search, setSearch] = useState(() => typeof decision.list.search === "string" ? decision.list.search : "");
+  const setCoin = (value) => {
+    setCoinState(value);
+    if (!embedded) setParams((p) => { const n = new URLSearchParams(p); if (value === "all") n.delete("coin"); else n.set("coin", value); return n; }, { replace: true });
+  };
+  useEffect(() => {
+    if (!embedded) updateDecision({ coin: coin === "all" ? null : coin, view: "list", list: { range, side, sort, search } });
+  }, [coin, range, side, sort, search, embedded]);
   const [showFilters, setShowFilters] = useState(false);
   const [shown, setShown] = useState(PAGE);
   const now = useClock();
   const boards = coins.map((u) => files[`questions/${u}.json`]).filter(Boolean);
   const missingCoins = coins.filter((u) => feedResults[`questions/${u}.json`]?.error && !files[`questions/${u}.json`]);
-  const feedFailed = ready && (coin === "all" ? coins.length > 0 && missingCoins.length === coins.length : missingCoins.includes(coin));
+  const feedFailed = ready && (coin === "all" ? coins.length > 0 && missingCoins.length === coins.length : missingCoins.includes(coin) || !coins.includes(coin));
   const refreshError = error || coins.map((u) => feedResults[`questions/${u}.json`]).find((r) => r?.data && r?.error)?.error;
   const age = priceAge(index?.prices_ts, now, index?.paused);
   const paused = age.state === "paused";
@@ -348,12 +364,14 @@ export default function Board({ followingOnly = false, embedded = false }) {
   if (error && !index) return <div className={embedded ? "" : "wrap page"}><Failed error={error} /></div>;
   return (
     <div className={embedded ? "bd-page bd-embedded" : "wrap page q-page bd-page bd-browser"}>
-      {!embedded && <SaloonHead view={followingOnly ? "following" : "browse"} board quoteTs={index?.prices_ts} paused={paused} />}
+      {!embedded && <SaloonHead view={followingOnly ? "following" : "browse"} board coin={coin === "all" ? null : coin} quoteTs={coin === "all" ? index?.prices_ts : files[`questions/${coin}.json`]?.prices_ts || index?.prices_ts} paused={paused} />}
       {feeds}
       <RefreshNotice error={refreshError} />
-      {missingCoins.length > 0 && !feedFailed && <p className="page-meta" role="status">{missingCoins.join(", ")} data could not be loaded.</p>}
+      {coins.some((u) => feedResults[`questions/${u}.json`]?.data && feedResults[`questions/${u}.json`]?.error) && <p className="page-meta" role="status">{coins.filter((u) => feedResults[`questions/${u}.json`]?.data && feedResults[`questions/${u}.json`]?.error).join(", ")} option refresh failed.</p>}
+      {missingCoins.length > 0 && !feedFailed && <p className="page-meta" role="status">{missingCoins.join(", ")} data could not be loaded. <button type="button" className="text-control" onClick={() => missingCoins.forEach((u) => feedResults[`questions/${u}.json`]?.retry?.())}>Retry</button></p>}
+      {boards.filter((b) => priceAge(b.prices_ts, now, b.paused).state !== "fresh").map((b) => <p key={b.und} className="page-meta" role="status">{b.und} option prices {priceAge(b.prices_ts, now, b.paused).state === "paused" ? "paused" : `are ${priceAge(b.prices_ts, now, b.paused).minutes} min old`}.</p>)}
       <BoardContainer {...(embedded ? {} : { className: "bd-board", "aria-label": "Outcome board" })}>
-      <section className="bd-controls" aria-label="Search, filters and order">
+      <section className="bd-controls" aria-label="Search, filters and order"><ViewComparison />
         <div className={`bd-control-top${embedded ? "" : " bd-toolbar"}`}>{!embedded && coinTabs}<label className="bd-search"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg><input type="search" aria-label="Search outcomes" placeholder="Search coin or price" value={search} onChange={(e) => setSearch(e.target.value)} /></label></div>
         <div className={`bd-filters${embedded ? "" : " bd-context"}`}>
           {embedded ? coinTabs : <p className="bd-count status" aria-live="polite">{!index || !ready ? "Loading outcomes…" : feedFailed ? "Outcome data unavailable" : scope}</p>}
@@ -371,7 +389,7 @@ export default function Board({ followingOnly = false, embedded = false }) {
         </div>
       </section>
       {followingOnly && <Following />}
-      {!index || !ready ? <Loading /> : feedFailed ? <div className="bd-empty" role="status"><h2>Outcome data is unavailable right now.</h2><p>Prices could not be loaded. Try again shortly.</p></div> : !followingOnly && !coins.length ? <div className="bd-empty" role="status"><h2>No prices on Derive right now.</h2><p>Derive's order books are empty, so no outcome can be priced. Outcomes return here once Derive quotes again.</p></div> : (
+      {!index || !ready ? <Loading /> : feedFailed ? <div className="bd-empty" role="status"><h2>Outcome data is unavailable right now.</h2><p>{coin === "all" ? "Prices could not be loaded." : `${coin} outcome data is unavailable.`}</p><button type="button" className="text-control" onClick={() => coin === "all" ? coins.forEach((u) => feedResults[`questions/${u}.json`]?.retry?.()) : feedResults[`questions/${coin}.json`]?.retry?.()}>Retry</button></div> : !followingOnly && !coins.length ? <div className="bd-empty" role="status"><h2>No prices on Derive right now.</h2><p>Derive's order books are empty, so no outcome can be priced. Outcomes return here once Derive quotes again.</p></div> : (
         <>
           {embedded && <p className="bd-count status" aria-live="polite">
             {scope}
@@ -397,6 +415,7 @@ export default function Board({ followingOnly = false, embedded = false }) {
           <NoPriceList list={off} />
         </>
       )}
+      <DecisionComparison boards={Object.fromEntries(boards.map((b) => [b.und, b]))} now={now} index={index} retryIndex={retryIndex} />
       {!embedded && <footer className="bd-footer"><span>Prices before fees · Returns include fees, for a {usd(REF)} total</span><details><summary>How to read this board</summary><p>{listGuide}</p></details></footer>}
       </BoardContainer>
     </div>

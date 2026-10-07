@@ -19,7 +19,7 @@ const MS_PER_CLOSE = 450, REDUCED_MS = 700;
 const signedPct = (v) => (Number.isFinite(v) ? `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v * 100).toFixed(0)}%` : DASH);
 
 const RADAR_HELP = "Across: the 1D engine's price stretch, in standard deviations from its trend. Up: the Smart cohort's net option delta divided by its gross absolute option delta, from −100% to +100%, on expiries inside the selected window (7 or 30 days). Circle area: gross dollar delta exposure, relative to the largest shown; fill: the daily engine's reading. Markets without a current wallet reading sit on the strip above the axis at their price stretch. Exposure, not a count of traders; context side by side, not an entry score.";
-const RADAR_HISTORY_HELP = "History: each circle trails its last 7 daily closes, oldest faintest; Replay steps through the last 30, with circle sizes and the stretch axis on one scale across them. Past wallet readings are rebuilt from Derive's trade history with the Smart cohort as it stood on each day, so later results never choose the wallets. Hollow dot: delta modelled from trade prices; filled dot: delta from recorded option quotes. Dotted step: expiries left or entered the window at that close, so the move comes from the window, not from trading. Where no option quotes were recorded and a position had no recent traded implied volatility, the close is shown as unavailable rather than modelled. In Replay every figure beside the map is the selected close's; options readings are not kept per close. Grey circle: no recorded engine reading for that close. Context, not a signal.";
+const RADAR_HISTORY_HELP = "History: the selected market trails its last 7 daily closes, oldest faintest; All trails shows every plotted market's trail. Replay steps through the last 30, with circle sizes and the stretch axis on one scale across them. Past wallet readings are rebuilt from Derive's trade history with the Smart cohort as it stood on each day, so later results never choose the wallets. Hollow dot: delta modelled from trade prices; filled dot: delta from recorded option quotes. Dotted step: expiries left or entered the window at that close, so the move comes from the window, not from trading. Where no option quotes were recorded and a position had no recent traded implied volatility, the close is shown as unavailable rather than modelled. In Replay every figure beside the map is the selected close's; options readings are not kept per close. Grey circle: no recorded engine reading for that close. Context, not a signal.";
 
 /** Places strip labels in up to three rows so neighbours never overlap. */
 function stripRows(items, x) {
@@ -336,6 +336,9 @@ export default function Radar() {
 
   // Replay: t is the playhead (0 .. last, last = now); null means now.
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState("map");
+  const [allTrails, setAllTrails] = useState(false);
+  const [returnFocus, setReturnFocus] = useState(null);
   const [t, setTState] = useState(null);
   const [playing, setPlaying] = useState(false);
   const tRef = useRef(null), timer = useRef(null);
@@ -371,6 +374,12 @@ export default function Radar() {
     timer.current = { raf: requestAnimationFrame(frame) };
   }, [last, setT, stop]);
   useEffect(() => stop, [stop]);
+  useEffect(() => {
+    if (view !== "map" || returnFocus !== selected?.und) return;
+    detailRef.current?.focus({ preventScroll: true });
+    detailRef.current?.scrollIntoView?.({ behavior: reducedMotion() ? "auto" : "smooth", block: "nearest" });
+    setReturnFocus(null);
+  }, [returnFocus, selected?.und, view]);
   const scrub = useCallback((v) => { stop(); setT(v); }, [stop, setT]);
 
   if (error && !data) return <div className="wrap page"><Failed error={error} /></div>;
@@ -397,7 +406,7 @@ export default function Radar() {
   const stripSets = H ? H.steps.map((_, s) => coins.filter((c) => !H.frames.get(c.und)?.[s] && Number.isFinite(H.series.get(c.und)?.z[s]))
     .map((c) => ({ und: c.und, x: H.series.get(c.und).z[s] }))) : null;
   // Trails: up to 7 closes behind each plotted circle.
-  const trails = H ? new Map([...H.frames].filter(([und]) => plotted.has(und)).map(([und, row]) => [und, trailAt(row, tt)])) : null;
+  const trails = H ? new Map([...H.frames].filter(([und]) => plotted.has(und) && (allTrails || und === selected?.und)).map(([und, row]) => [und, trailAt(row, tt)])) : null;
   // One size scale and one stretch range across the replay window, the same at rest.
   const shown = H ? [...H.frames.values()].flat().filter(Boolean) : [];
   const maxGross = Math.max(0, ...shown.map((p) => p.gross));
@@ -435,16 +444,20 @@ export default function Radar() {
   const info = H ? <div className="radar-help"><p>{RADAR_HELP}</p><p>{RADAR_HISTORY_HELP}</p></div> : RADAR_HELP;
 
   return (
-    <div className="wrap page market-research-page radar-page">
+    <div className="wrap page market-research-page radar-page research-refined">
       <MarketResearchHeader error={error} title="Radar" description="Price stretch beside Smart wallet positioning." info={info} meta={<>{coins.length} markets · {clock(data.generated_at)}</>} />
       <Lead lead={radarLead(coins, horizon)} />
-      <div className="plate radar-workspace">
+      <div className="radar-view-switch"><Tabs label="Radar view" value={view} onChange={(next) => { stop(); setView(next); }} items={[["map", "Positioning map"], ["readings", "Market readings"]]} /></div>
+      {view === "map" ? <div className="plate radar-workspace">
         <div className="mr-controls radar-map-toolbar">
           <span className="radar-window-label">Wallet expiry window</span>
           {tabs}
         </div>
         <section className="radar-stage" aria-label="Positioning map">
-          <PanelHead title="Positioning map" right={<span className="radar-map-count"><span>On the map</span><b className="radar-count" title={atNow ? "Markets plotted with daily stretch and a current Smart wallet reading" : "Markets plotted with daily stretch and a Smart wallet reading at that close"}>{points.length}/{coins.length}</b></span>} />
+          <PanelHead title="Positioning map" right={<>
+            {H && <button type="button" className="text-control radar-all-trails" aria-pressed={allTrails} onClick={() => setAllTrails((value) => !value)}>All trails</button>}
+            <span className="radar-map-count"><span>On the map</span><b className="radar-count" title={atNow ? "Markets plotted with daily stretch and a current Smart wallet reading" : "Markets plotted with daily stretch and a Smart wallet reading at that close"}>{points.length}/{coins.length}</b></span>
+          </>} />
           {points.length || strip.length
             ? <RadarMap points={points} strip={strip} focus={selected?.und} onSelect={(v) => choose("focus", v)}
                 trails={trails} steps={H?.steps} past={!atNow} maxGross={maxGross} xBound={xBound} labelPoints={labelPoints} stripSets={stripSets} />
@@ -454,28 +467,32 @@ export default function Radar() {
             onOpen={() => { setOpen(true); setT(null); }} onClose={() => { stop(); setOpen(false); setT(null); }} />}
         </section>
         {selected && (
-          <aside ref={detailRef} className="radar-detail" aria-live={playing ? "off" : "polite"} aria-label={`${selected.und} radar detail`}>
+          <aside ref={detailRef} tabIndex={-1} className="radar-detail" aria-live={playing ? "off" : "polite"} aria-label={`${selected.und} radar detail`}>
             <div className="rd-coin">
               <Asset und={selected.und} />
               <span className="rd-price">{atNow || k >= last ? `$${price(selected.price)}` : <><span className="rd-when">{closeLabel(closeAt)} close</span>{Number.isFinite(closePrice) && ` $${price(closePrice)}`}</>}</span>
             </div>
-            <Link to={`/coin/${selected.und}`} className="rd-trace-link" aria-label={`Open ${selected.und} chart`}>
-              <RailTrace values={traceValues} label={past ? `${selected.und} daily closes to ${closeLabel(closeAt)}` : `${selected.und} daily closes`} />
-            </Link>
             <div className="rd-figs">
               <div><span>1D stretch<Info label="About stretch">How far the price sits from its daily trend, in standard deviations, from the 1D engine. Context, not a signal.</Info></span><b>{Number.isFinite(zShown) ? z(zShown) : <Empty />}</b></div>
               <div><span>Delta balance<Info label="About delta balance">The Smart cohort's net option delta divided by its gross option delta on expiries in the window: +100% all long delta, −100% all short. Exposure, not a count of traders.</Info>{wUnavailable && <> <Info label="Why the wallet reading is unavailable">{NO_IV_HELP}</Info></>}</span>
                 <b>{wValue ? `${(wValue.y * 100).toFixed(0)}%` : wUnavailable ? "Unavailable" : <Empty />}</b></div>
               <div><span>Gross delta<Info label="About gross delta">The dollar size of the Smart cohort's option delta on this coin, long and short added together.</Info></span><b>{wValue ? usd(wValue.gross) : wUnavailable ? "Unavailable" : <Empty />}</b></div>
             </div>
-            {hasHist && (
+            <details className="rd-history-details">
+              <summary>History</summary>
+              <Link to={`/coin/${selected.und}`} className="rd-trace-link" aria-label={`Open ${selected.und} chart`}>
+                <RailTrace values={traceValues} label={past ? `${selected.und} daily closes to ${closeLabel(closeAt)}` : `${selected.und} daily closes`} />
+              </Link>
+              {hasHist && (
               <div className="rd-hist" aria-label={`${selected.und}: balance and stretch over the last ${last} closes`}>
                 <HistTrace label="Balance" values={wSeries} t={tt} lo={-1} hi={1} fmt={signedPct} last={last} past={past} />
                 <HistTrace label="Stretch" values={zSeries} t={tt} lo={-sBound} hi={sBound} fmt={(v) => z(v)} last={last} plain past={past} />
                 <HistAxis steps={H.steps} />
               </div>
-            )}
-            <div className="rd-reading-label">{past ? `${closeLabel(closeAt)} close` : `${horizon === "7d" ? "7" : "30"}-day readings`}</div>
+              )}
+            </details>
+            <details className="rd-reading-details">
+            <summary className="rd-reading-label">{past ? `${closeLabel(closeAt)} close readings` : `${horizon === "7d" ? "7" : "30"}-day readings`}</summary>
             <div className="rd-readings">
               {KINDS.map(([kind, name]) => {
                 if (past) {
@@ -500,15 +517,16 @@ export default function Radar() {
                 );
               })}
             </div>
+            </details>
             <Link className="rd-open" to={`/coin/${selected.und}`}>Open {selected.und}<Arrow /></Link>
           </aside>
         )}
-      </div>
-      <section className="plate radar-list" aria-label="Market readings">
+      </div> : <section className="plate radar-list" aria-label="Market readings">
         <PanelHead title="Market readings" right={<span className="rl-context">Latest · {horizon === "7d" ? "7" : "30"}-day window</span>} />
+        <div className="mr-controls radar-map-toolbar"><span className="radar-window-label">Wallet expiry window</span>{tabs}</div>
         <div className="rl-head" aria-hidden="true"><span>Market</span>{KINDS.map(([kind, name]) => <span key={kind}>{name}</span>)}</div>
         {coins.map((c) => (
-          <button className="rl-row" key={c.und} aria-pressed={c.und === selected?.und} onClick={() => choose("focus", c.und)}>
+          <button className="rl-row" key={c.und} aria-pressed={c.und === selected?.und} onClick={() => { choose("focus", c.und); setView("map"); setReturnFocus(c.und); }}>
             <Asset und={c.und} />
             {KINDS.map(([kind, name]) => {
               const r = viewReading(c.align, horizon, kind);
@@ -522,7 +540,7 @@ export default function Radar() {
             })}
           </button>
         ))}
-      </section>
+      </section>}
     </div>
   );
 }

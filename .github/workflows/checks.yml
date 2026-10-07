@@ -33,3 +33,16 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: npm run build
+        name: Build testnet configuration
+        env:
+          VITE_QUESTIONS: "1"
+          VITE_SALOON_TRADE: testnet
+      - run: npm run build
+        name: Build mainnet configuration
+        env:
+          VITE_QUESTIONS: "1"
+          VITE_SALOON_TRADE: mainnet
+          VITE_SALOON_PILOT: all
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser

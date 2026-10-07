@@ -54,14 +54,16 @@ export function MoveBand({ index, iv, days = 30, compact = false, bare = false, 
   );
 }
 /** Board cell: signed 25-delta risk reversal in vol points on a clamp shared by every row. */
-function SkewCell({ rr, clamp }) {
+function SkewCell({ rr, clamp, caption = false }) {
   if (!Number.isFinite(rr)) return <span className="empty-dash" aria-label="Unavailable">—</span>;
   const pts = rr * 100, clipped = Math.abs(pts) > clamp;
   const pos = 50 + (Math.max(-clamp, Math.min(clamp, pts)) / clamp) * 50;
   const side = Math.abs(pts) < 0.05 ? "even" : pts < 0 ? "put" : "call";
   return (
     <span className="skew-cell" title={side === "even" ? "Even pricing" : `${side === "put" ? "Puts" : "Calls"} richer by ${Math.abs(pts).toFixed(2)} pts`}>
+      {caption && <span className="skew-caption">30D · {side === "even" ? "Even pricing" : `${side === "put" ? "Puts" : "Calls"} richer`}</span>}
       <b className={`skew-${side}`}>{pts > 0 ? "+" : pts < 0 ? "−" : ""}{Math.abs(pts).toFixed(1)}</b>
+      {caption && <span className="skew-unit">pts</span>}
       <span className="skew-track" aria-hidden="true">
         <i />
         <em className={`skew-${side}${clipped ? (pts < 0 ? " clip-lo" : " clip-hi") : ""}`} style={{ left: `${pos}%` }} />
@@ -69,8 +71,8 @@ function SkewCell({ rr, clamp }) {
     </span>
   );
 }
-export function SkewInstrument({ rr, bare = false, clamp }) {
-  if (clamp) return <SkewCell rr={rr} clamp={clamp} />;
+export function SkewInstrument({ rr, bare = false, clamp, caption = false }) {
+  if (clamp) return <SkewCell rr={rr} clamp={clamp} caption={caption} />;
   const valid = Number.isFinite(rr);
   return (
     <div className="skew-instrument">

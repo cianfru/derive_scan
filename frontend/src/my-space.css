@@ -1,0 +1,29 @@
+.fl-session { display: inline-flex; align-items: center; gap: 4px; color: var(--text-2); font-size: 11px; white-space: nowrap; }
+.fl-session .info { width: 18px; height: 18px; font-size: 11px; }
+.q-pnl-coverage { color: var(--text-2); font-size: 12px; line-height: 1.5; margin: 2px 0 0; }
+.q-pnl-estimate { color: var(--text-2); font-size: 12px; }
+.q-pnl-total > b.q-pnl-unavailable { font: 500 clamp(20px, 3vw, 28px)/1.25 var(--font-sans); letter-spacing: -.025em; }
+.my-return { display: grid; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+.my-return-facts { display: flex; flex-wrap: wrap; gap: 12px 36px; }
+.my-return-item { display: grid; gap: 5px; align-content: start; text-align: left; }
+.my-return-item > span { display: flex; align-items: center; gap: 4px; color: var(--text-3); font-size: 12px; font-weight: 400; }
+.my-return-item b { font-weight: 500; font-size: 13px; }
+.my-return-item small { font-weight: 400; color: var(--text-3); }
+.my-return-notices > summary, .my-backup > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; font-size: 13px; color: var(--text-2); }
+.my-return-notices > summary .mono { margin-left: auto; }
+.my-return-notices .sn { margin-block: 0 12px; }
+.my-backup-counts { display: flex; flex-wrap: wrap; gap: 18px 28px; margin: 6px 0 16px; }
+.my-backup-counts > div { display: grid; gap: 4px; }
+.my-backup-counts dt { color: var(--text-3); font-size: 12px; }
+.my-backup-counts dd { margin: 0; font-size: 16px; }
+.my-backup .q-card-actions { display: flex; flex-wrap: wrap; gap: 10px 20px; }
+.my-restore { margin-top: 16px; padding: 16px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-1); }
+.my-restore h3 { margin: 0 0 8px; font-size: 15px; font-weight: 500; }
+.my-restore p { font-size: 13px; line-height: 1.6; margin: 6px 0; }
+.my-restore .q-card-actions { margin-top: 12px; }
+@media (max-width: 600px) {
+  .my-return-facts { gap: 12px 20px; }
+  .my-return-item { flex: 1 1 140px; }
+  .my-backup-counts { gap: 16px; }
+  .my-restore { padding: 12px; }
+}

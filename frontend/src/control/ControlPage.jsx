@@ -81,6 +81,7 @@ function CardBlock({ entry, pick }) {
   }, [card, param, attempt]);
 
   async function download() {
+    if (!state.m?.provenance?.eligible?.()) return setNote("This card's data is no longer current. Refresh the card before exporting.");
     setNote("Drawing…");
     try {
       const { toPng } = await import("html-to-image");
@@ -96,6 +97,7 @@ function CardBlock({ entry, pick }) {
   }
 
   async function copy() {
+    if (!state.m?.provenance?.eligible?.()) return setNote("This card's data is no longer current. Refresh the card before exporting.");
     try { await navigator.clipboard.writeText(text); setNote("Text copied"); }
     catch { setNote("Copy blocked by the browser"); }
   }
@@ -136,6 +138,7 @@ function CardBlock({ entry, pick }) {
             <div className="cc-actions">
               <button type="button" onClick={download}>Download PNG</button>
               <button type="button" onClick={copy}>Copy text</button>
+              <button type="button" className="quiet" onClick={() => setAttempt((n) => n + 1)}>Refresh card</button>
               <button type="button" className="quiet" onClick={() => setText(state.angles[angle])}>Reset text</button>
             </div>
             <p className="cc-note" role="status">{note}</p>

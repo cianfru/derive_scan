@@ -1,8 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
 import vercel from "../../vercel.json";
 import middleware, { allowed } from "../../middleware.js";
-import btcQuestions from "../fixtures/questions/BTC.json";
+import btcSnapshot from "../fixtures/questions/BTC.json";
 import { ORIGINAL, herdModel, ladderModel, rangeModel } from "./cards.jsx";
 import { checkText, todaysCard, todaysPicks } from "./ControlPage.jsx";
 import { CATALOGUE, ENTRIES, GROUPS, buildModel } from "./index.js";
@@ -42,10 +42,15 @@ describe("control gate", () => {
 
 const day = 86400;
 const now = 1791286200; // Tue 6 Oct 2026, 11:30 UTC
+const btcQuestions = { ...btcSnapshot, prices_ts: now };
+beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(now * 1000); });
+afterEach(() => { cleanup(); vi.useRealTimers(); });
 const fri = 1791532800; // Fri 9 Oct 2026, 08:00 UTC
 const coin = {
+  generated_at: now,
   candles: { "1d": Array.from({ length: 40 }, (_, i) => [now - (40 - i) * day, 0, 0, 0, 80000 + i * 150]) },
   options: {
+    status: "ready",
     ts: now,
     features: { index_price: 86215, atm_iv_30d: 0.42, rr25_30d: -0.03 },
     levels: { call_wall: 88000 },
@@ -62,7 +67,9 @@ const markets = {
   consensus_detail: { "1d": { counts: { markup: 12, total: 15 } } },
   coins: ["BTC", "ETH", "SOL", "XRP", "ADA", "HYPE"].map((und, i) => ({
     und, has_options: true, chg_7d: i * 3 - 6, regime_1d: i < 3 ? "MARKUP" : "REACC", funding_ann: 0.1095,
-    align: { readings: { "30d": { engine: { state: "up" }, wallets: { state: i === 2 ? "up" : "neutral" }, options: { state: "up" } } } },
+    align: { readings: { "30d": { engine: { state: "up", status: "ready", observed_at: now, timeframe: "1d" },
+      wallets: { state: i === 2 ? "up" : "neutral", status: "ready", valuation_at: now },
+      options: { state: "up", status: "ready", observed_at: now } } } },
   })),
 };
 const trade = (instrument, direction, premium) => ({ kind: "option", instrument, direction, premium_usd: premium, notional_usd: premium * 20, wallet: "0x15eECd2e60E8Adb788826E71ef46d6921524E041" });

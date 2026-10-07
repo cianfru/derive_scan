@@ -1,6 +1,7 @@
 import { viewReading } from "../lib/presentation.js";
 import { Info } from "./ui.jsx";
 import { REGIME } from "../lib/format.js";
+import "../research-refinement.css";
 
 // The three layers of a market, always in this order and always drawn the same way (soft tiles
 // joined by a thin line that lights orange when all three agree):
@@ -55,9 +56,9 @@ const HOVER = {
 /** Is every layer pointing the same way for this window (and not balanced)? */
 export const chainAgreed = (alignment, horizon) => agreedOf(chainReadings(alignment, horizon));
 
-/** One layer as a wide tile: its icon and reading in words, coloured by state, with the explanation on
- * hover or focus. `aligned` frames it in orange when all three layers agree for its window. */
-export function LayerTile({ alignment, horizon = "30d", kind, sub = null, tag = null, aligned = false, icon = true }) {
+/** One layer with a dismissible explanation on tap or keyboard activation.
+ * `aligned` frames it in orange when all three layers agree for its window. */
+export function LayerTile({ alignment, horizon = "30d", kind, sub = null, tag = null, aligned = false, icon = true, explain = true }) {
   const [, name] = LAYERS.find(([k]) => k === kind);
   const { label, state, why, row } = viewReading(alignment, horizon, kind);
   // "detail": what the reading rests on, per layer (the regime; the positions counted; skew alone or with flow).
@@ -70,11 +71,16 @@ export function LayerTile({ alignment, horizon = "30d", kind, sub = null, tag = 
   const span = `, next ${days} days${kind === "engine" ? (horizon === "7d" ? " (4-hour bars)" : " (daily bars)") : ""}`;
   const young = kind === "engine" && state && row?.data_status === "warming up" ? " Young history: the engine damps its readings until the coin has about 500 bars." : "";
   const tip = `${name}${span}: ${label}${sub ? ` (${sub})` : ""}. ${why || HOVER[kind]}${young}${aligned ? " All three layers point the same way for this window." : ""}`;
+  const content = <>{icon && <span className="lt-icon"><LayerIcon kind={kind} size={16} /></span>}
+    <span className="lt-text">{tag && <small className="lt-tag">{tag}</small>}<b>{word}</b>{sub && <small>{sub}</small>}</span></>;
+  // Markets' entire research area opens its evidence. Avoid competing controls inside that scope.
+  if (!explain) return <span className={`layer-tile ${state || "unknown"}${aligned ? " aligned" : ""}`} role="img" aria-label={tip}>{content}</span>;
   return (
-    <span className={`layer-tile ${state || "unknown"}${aligned ? " aligned" : ""}`} tabIndex={0} role="img" aria-label={tip} data-tip={tip}>
-      {icon && <span className="lt-icon"><LayerIcon kind={kind} size={16} /></span>}
-      <span className="lt-text">{tag && <small className="lt-tag">{tag}</small>}<b>{word}</b>{sub && <small>{sub}</small>}</span>
-    </span>
+    <Info className={`layer-tile reading-help ${state || "unknown"}${aligned ? " aligned" : ""}`}
+      label={`${name}, next ${days} days: ${label}. Explain reading`}
+      trigger={content}>
+      {tip}
+    </Info>
   );
 }
 

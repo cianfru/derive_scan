@@ -242,3 +242,30 @@ python main.py                         # local API with its own recorder, http:/
 ```
 
 Settings: see `.env.example` (the Action uses the defaults). The API's recorder holds a file lock in `DATA_DIR`, so several workers never record twice.
+
+## Product regression checks
+
+Run `npm test` in `frontend/` for the financial models and component tests. Run
+`npx playwright install chromium` once, then `npm run test:browser` for desktop and
+phone journeys. These browser checks use deterministic published-data fixtures and
+mock public sockets; they do not connect a wallet or submit orders. Set
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use an existing Chromium installation. CI also
+builds the default, testnet and mainnet configurations.
+
+The decision draft (coin, outcome, side, decimal budget and comparison choices) is
+kept in the current browser session; live prices are read afresh. My space offers
+a combined backup of journal records across both networks and Following, with a
+preview before restore. Existing separate backup formats remain readable.
+
+Each completed data publication has a `publication_revision` and a `manifest.json`
+with artifact hashes. Observation timestamps retain their original meaning. Screens
+combining files retry a revision mismatch once and identify it if it persists.
+The recorder checks published health even when no collection is due. Coverage
+problems fail the run while valid partial publication remains available; flow
+recovery has a 45-minute grace period. The separate health workflow remains useful
+for detecting a recorder that stops altogether.
+
+Fixed product diagnostic codes are retained in a small in-memory buffer. Sending
+these codes to the existing Vercel Analytics integration is opt-in through
+`VITE_PRODUCT_EVENTS=1`; it is off by default. Events include only a predefined
+kind and screen category, without addresses, amounts, query strings or error text.

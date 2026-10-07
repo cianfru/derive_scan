@@ -248,10 +248,26 @@ export function exportPositions() {
 export function importRows(doc) {
   if (Array.isArray(doc)) return { mainnet: doc, testnet: [] };
   if (!doc || typeof doc !== "object") throw new Error("Not a Positions file");
+  if (doc.kind && !["cowboy-journal", "cowboy-questions"].includes(doc.kind)) throw new Error("Not a Positions file");
   if (Number(doc.version) > JOURNAL_VERSION) throw new Error("Saved by a newer Cowboy");
   if (doc.networks) return { mainnet: doc.networks.mainnet || [], testnet: doc.networks.testnet || [] };
   if (Array.isArray(doc.positions)) return { mainnet: doc.positions, testnet: [] };
   throw new Error("Not a Positions file");
+}
+
+export function preparePositionImport(doc) {
+  const rows = importRows(doc);
+  const incoming = { mainnet: [], testnet: [] };
+  for (const net of NETWORKS) {
+    if (!Array.isArray(rows[net])) throw new Error("Not a Positions file");
+    for (const r of rows[net]) {
+      if (!valid(r) || typeof r.key !== "string") continue;
+      const m = migrateRecord(r, net);
+      incoming[netOf(m.network)].push(m);
+    }
+  }
+  if (NETWORKS.some((n) => rows[n].length) && !NETWORKS.some((n) => incoming[n].length)) throw new Error("Not a Positions file");
+  return incoming;
 }
 
 // The more complete of two copies of one record: more exits, then closed beats open, then the later update.
@@ -279,15 +295,7 @@ function mergeRfqCopies(a, b) {
  * file twice adds nothing; a record placed under the wrong network goes to its own. Returns the
  * mainnet list (what Positions shows). */
 export function importPositions(text) {
-  const rows = importRows(JSON.parse(text));
-  const incoming = { mainnet: [], testnet: [] };
-  for (const net of NETWORKS) {
-    for (const r of rows[net] || []) {
-      if (!valid(r) || typeof r.key !== "string") continue;
-      const m = migrateRecord(r, net);
-      incoming[netOf(m.network)].push(m);
-    }
-  }
+  const incoming = preparePositionImport(JSON.parse(text));
   for (const net of NETWORKS) {
     if (!incoming[net].length) continue;
     const list = loadPositions(net);

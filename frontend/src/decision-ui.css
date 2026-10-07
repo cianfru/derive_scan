@@ -1,0 +1,15 @@
+.decision-price-note { display: block; font-size: 11px; color: var(--text-3); }
+.decision-consequence { margin: 0; padding-block: 10px; border-block: 1px solid var(--border); font-size: 13px; color: var(--text-2); }
+.decision-consequence b { font-family: var(--font-mono); }
+.decision-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
+.decision-actions .text-control { min-height: 44px; }
+.decision-comparison-wrap { margin-top: 24px; }
+.decision-compare-amount { display: flex; gap: 12px; align-items: center; color: var(--text-2); font-size: 13px; }
+.decision-compare-amount .q-dollar-field { max-width: 160px; }
+.decision-compare-amount input { width: 100%; min-width: 0; }
+.decision-failure { width: 100%; padding: 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); }
+.decision-failure h2 { margin: 0 0 8px; font-size: 20px; }
+.decision-failure p { margin: 0 0 10px; }
+.bd-answer .decision-compare { align-self: center; min-height: 36px; font-size: 11px; padding-inline: 4px; }
+.sl-panel[aria-modal="true"] { z-index: 40; }
+@media (max-width: 700px) { .sl-backdrop { z-index: 39; } .decision-failure { padding: 18px; } }

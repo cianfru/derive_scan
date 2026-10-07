@@ -1,18 +1,19 @@
 import { useId, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { DASH, price, chg, pct, usd, z, dayTime, clock, utc, SIGNAL_RANK, SIGNAL_LABEL, REGIME } from "../lib/format.js";
 import { REGIME_LINE } from "../lib/regime.js";
 import { QUESTIONS_ON } from "../lib/flags.js";
-import { viewReading } from "../lib/presentation.js";
+import { ASSET_NAMES, viewReading } from "../lib/presentation.js";
 import { Tabs, Loading, Failed, Empty, RefreshNotice, Arrow } from "../components/ui.jsx";
 import { marketsLead } from "../lib/takeaway.js";
 import { Asset, MarketTrace } from "../components/MarketVisuals.jsx";
 import { EnginePair, Convergence, CONVERGENCE_HELP } from "../components/EngineComparison.jsx";
 import { currentEngine } from "../lib/research.js";
-import StructureBand, { isSignal } from "../components/StructureBand.jsx";
+import StructureBand, { isSignal, LADDER } from "../components/StructureBand.jsx";
 import { LAYERS, LayerIcon, LayerTile, chainAgreed, chainReadings } from "../components/Chain.jsx";
 import "../markets.css";
+import "../research-refinement.css";
 
 const SCOPE = { options: "options markets", entries: "daily entries", perps: "perps only" };
 const inView = (c, view) => (view === "perps" ? !c.has_options : c.has_options) && (view !== "entries" || (SIGNAL_RANK[c.signal_1d] ?? 0) >= 3);
@@ -27,7 +28,7 @@ function agreement(c, horizon) {
   return states.slice(1).reduce((n, s) => n + (s === dir ? 1 : s && s !== "neutral" ? -1 : 0), 0);
 }
 
-const BOARD_HELP = "Each market is read in three steps, always in this order: 1 Regime (the engine: on 4-hour bars for the next 7 days, about 28 bars, and on daily bars for the next 30 days, about 30 bars), 2 Wallets (what Derive's best options traders hold on expiries in the window), 3 Options (what option prices lean towards). Each market has one line for the next 7 days and one for the next 30; “All agree” in orange means the three layers point the same way for that window: context side by side, not a combined signal. The trace is the last 30 daily closes. Hover any reading for what it reads; open a market for the figures behind each one. Price is the latest options index where available; the daily change compares the two latest completed UTC days.";
+const BOARD_HELP = "Each market is read in three steps, always in this order: 1 Regime (the engine: on 4-hour bars for the next 7 days, about 28 bars, and on daily bars for the next 30 days, about 30 bars), 2 Wallets (what Derive's best options traders hold on expiries in the window), 3 Options (what option prices lean towards). Each market has one line for the next 7 days and one for the next 30; “All agree” in orange means the three layers point the same way for that window: context side by side, not a combined signal. The trace is the last 30 daily closes. Select the readings area for the supporting figures; select the coin and price area for its chart and data. Price is the latest options index where available; the daily change compares the two latest completed UTC days.";
 
 const WINDOWS = [["7d", "7 days", "4H"], ["30d", "30 days", "1D"]];
 const SORTS = [["a7", "Agreement, 7 days"], ["a30", "Agreement, 30 days"], ["und", "Market name"], ["chg_1d", "Daily change"],
@@ -41,7 +42,7 @@ function Fact({ term, num = false, children }) {
 }
 
 /** What each of a market's readings rests on, for both windows: opened from the row. */
-function Evidence({ c, id }) {
+function Evidence({ c, id, backTo }) {
   const r = (h, kind) => viewReading(c.align, h, kind);
   const e7 = r("7d", "engine"), e30 = r("30d", "engine");
   const w7 = r("7d", "wallets"), w30 = r("30d", "wallets");
@@ -93,19 +94,19 @@ function Evidence({ c, id }) {
         <span>Context, not a signal. The three readings are independent.</span>
         <span className="mk-evidence-links">
           {QUESTIONS_ON && c.questions && <Link to={`/saloon?coin=${c.und}`}>{c.und} in the Saloon<Arrow /></Link>}
-          <Link to={`/coin/${c.und}`}>Open {c.und}<Arrow /></Link>
+          <Link to={`/coin/${c.und}`} state={{ marketsReturnTo: backTo }}>Open {c.und}<Arrow /></Link>
         </span>
       </div>
     </div>
   );
 }
 
-function MarketRow({ c, open, onToggle }) {
+function MarketRow({ c, open, onToggle, backTo }) {
   const id = useId();
   return (
     <article className={`mk-market${open ? " open" : ""}`} aria-label={`${c.und} market`}>
       <div className="mk-row">
-        <Link className="mk-coin-link" to={`/coin/${c.und}`} aria-label={`Open ${c.und} chart and data`}>
+        <Link className="mk-coin-link" to={`/coin/${c.und}`} state={{ marketsReturnTo: backTo }} aria-label={`Open ${c.und} chart and data`}>
           <div className="mk-asset">
             <Asset und={c.und} />
             <span className="mk-price">${price(c.price)}<small className={c.chg_1d > 0 ? "up" : c.chg_1d < 0 ? "down" : "dim"}>{chg(c.chg_1d)}</small></span>
@@ -122,7 +123,7 @@ function MarketRow({ c, open, onToggle }) {
               return (
                 <div key={h} className={`mk-win${aligned ? " aligned" : ""}`}>
                   <span className="mk-win-label"><b>{name}</b><small>{aligned ? "All agree" : `${tf} engine`}</small></span>
-                  {LAYERS.map(([kind]) => <LayerTile key={kind} alignment={c.align} kind={kind} horizon={h} icon={false} aligned={aligned} sub="detail" />)}
+                  {LAYERS.map(([kind]) => <LayerTile key={kind} alignment={c.align} kind={kind} horizon={h} icon={false} aligned={aligned} sub="detail" explain={false} />)}
                 </div>);
             })}
           </div>
@@ -132,25 +133,44 @@ function MarketRow({ c, open, onToggle }) {
           </button>
         </div>
       </div>
-      {open && <Evidence c={c} id={id} />}
+      {open && <Evidence c={c} id={id} backTo={backTo} />}
     </article>
   );
 }
 
 export default function Markets() {
   const { data, error } = useData("markets.json");
-  const [q, setQ] = useState(""),
-    [signalFilter, setSignalFilter] = useState(null),
-    [view, setView] = useState("options"),
-    [details, setDetails] = useState(false),
-    [expanded, setExpanded] = useState(null),
-    [sort, setSort] = useState(["a7", -1]);
+  const location = useLocation();
+  const backTo = `${location.pathname}${location.search}`;
+  const [params, setParams] = useSearchParams();
+  const [expanded, setExpanded] = useState(null);
+  const q = params.get("q") || "";
+  const view = Object.hasOwn(SCOPE, params.get("view")) ? params.get("view") : "options";
+  const details = params.get("details") === "1";
+  const signalFilter = LADDER.includes(params.get("signal")) ? params.get("signal") : null;
+  const sortName = SORTS.some(([key]) => key === params.get("sort")) ? params.get("sort") : "a7";
+  const sort = [sortName, params.get("dir") === "asc" ? 1 : -1];
+  const update = (changes, replace = false) => {
+    const next = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value == null || value === "" || (key === "view" && value === "options") || (key === "sort" && value === "a7") || (key === "dir" && value === "desc")) next.delete(key);
+      else next.set(key, value);
+    }
+    setParams(next, { replace, preventScrollReset: true });
+  };
+  const setSignalFilter = (signal) => update({ signal });
+  const setSort = (next) => {
+    const [key, direction] = typeof next === "function" ? next(sort) : next;
+    update({ sort: key, dir: direction > 0 ? "asc" : "desc" });
+  };
   const scoped = useMemo(() => scopeOf(data?.coins, view), [data, view]);
   const overview = !details && view !== "perps";
   // Agreement only means something on the overview; elsewhere it falls back to the name.
-  const sortKey = !overview && (sort[0] === "a7" || sort[0] === "a30") ? ["und", 1] : sort;
+  const sortKey = overview && !OVERVIEW_SORTS.has(sort[0]) ? ["a7", -1]
+    : !overview && (sort[0] === "a7" || sort[0] === "a30") ? ["und", 1] : sort;
   const rows = useMemo(() => {
-    let r = (data?.coins || []).filter((c) => inView(c, view) && c.und.toLowerCase().includes(q.trim().toLowerCase()));
+    const search = q.trim().toLowerCase();
+    let r = (data?.coins || []).filter((c) => inView(c, view) && `${c.und} ${ASSET_NAMES[c.und] || ""}`.toLowerCase().includes(search));
     if (signalFilter) r = r.filter((c) => currentEngine(c.engine_comparison?.["1d"]) && isSignal(c, signalFilter));
     const [k, dir] = sortKey;
     const key = (c) => (k === "a7" ? agreement(c, "7d") : k === "a30" ? agreement(c, "30d") : c[k]);
@@ -174,12 +194,19 @@ export default function Markets() {
   );
   // A view change keeps the signal filter only while the new view still holds that signal.
   const changeView = (next) => {
-    setView(next);
     setExpanded(null);
-    if (signalFilter && !scopeOf(data.coins, next).some((c) => isSignal(c, signalFilter))) setSignalFilter(null);
+    update({ view: next, signal: signalFilter && !scopeOf(data.coins, next).some((c) => isSignal(c, signalFilter)) ? null : signalFilter });
   };
   const sorts = SORTS.filter(([k]) => (overview ? OVERVIEW_SORTS.has(k) : k !== "a7" && k !== "a30"));
-  const lead = marketsLead(data);
+  const lead = view === "options" ? marketsLead(data) : (() => {
+    const current = scoped.filter((c) => c.regime_1d);
+    const scopeName = view === "perps" ? "markets without options" : "daily entry markets";
+    if (!current.length) return { text: `No ${scopeName} have a current daily regime reading.`, note: "The structure band covers every perpetual market with a current daily reading." };
+    const counts = {};
+    current.forEach((c) => { counts[c.regime_1d] = (counts[c.regime_1d] || 0) + 1; });
+    const top = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+    return { text: `${counts[top]} of ${current.length} ${scopeName} ${counts[top] === 1 ? "is" : "are"} ${(REGIME[top] || "unread").toLowerCase()} on the daily close.`, note: "The structure band covers every perpetual market with a current daily reading." };
+  })();
 
   return (
     <div className="wrap page markets-page mk">
@@ -205,7 +232,7 @@ export default function Markets() {
               items={[["options", "Options markets", "Options"], ["entries", "Daily entries", "Entries"], ["perps", "Perps only", "Perps"]]} />
             <label className="mk-find">
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5" /><path d="m10.5 10.5 3.5 3.5" /></svg>
-              <input placeholder="Find a market" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Find a market" />
+              <input placeholder="Find a market" value={q} onChange={(e) => update({ q: e.target.value }, true)} aria-label="Find a market" />
             </label>
           </div>
           <div className="mk-context">
@@ -217,7 +244,7 @@ export default function Markets() {
               </select>
             </label>
             {view !== "perps" && (
-              <button className="mk-toggle" aria-pressed={details} onClick={() => setDetails((v) => !v)}>
+              <button className="mk-toggle" aria-pressed={details} onClick={() => update({ details: details ? null : "1" })}>
                 {details ? "Overview" : <><span className="t-long">More measurements</span><span className="t-short">More</span></>}
               </button>)}
           </div>
@@ -235,7 +262,7 @@ export default function Markets() {
                   <span />
                 </div>)}
               <div className="mk-rows">
-                {rows.map((c) => <MarketRow key={c.und} c={c} open={expanded === c.und}
+                {rows.map((c) => <MarketRow key={c.und} c={c} open={expanded === c.und} backTo={backTo}
                   onToggle={() => setExpanded((u) => (u === c.und ? null : c.und))} />)}
               </div>
             </>
@@ -259,7 +286,7 @@ export default function Markets() {
                     <tr key={c.und} aria-label={`${c.und} market`}>
                       <td className="market-td">
                         <div className="market-cell">
-                          <Link className="asset-link" to={`/coin/${c.und}`}><Asset und={c.und} compact /></Link>
+                          <Link className="asset-link" to={`/coin/${c.und}`} state={{ marketsReturnTo: backTo }}><Asset und={c.und} compact /></Link>
                           <span className="market-price">${price(c.price)}<small className={c.chg_1d > 0 ? "up" : c.chg_1d < 0 ? "down" : "dim"}>{chg(c.chg_1d)}</small></span>
                         </div>
                       </td>
@@ -279,7 +306,7 @@ export default function Markets() {
           {!rows.length && (
             <div className="empty-state">
               <Empty label="No markets in this view" />
-              <button className="text-control" onClick={() => { setQ(""); setSignalFilter(null); setView("options"); }}>Reset filters</button>
+              <button className="text-control" onClick={() => update({ q: null, signal: null, view: null })}>Reset filters</button>
             </div>
           )}
           <footer className="mk-foot">

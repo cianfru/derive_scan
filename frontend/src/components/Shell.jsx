@@ -8,6 +8,7 @@ import { MAINNET_FILLS, QUESTIONS_ON, TESTNET_FILLS } from "../lib/flags.js";
 import { notePilotInvite, oneTapOffered } from "../lib/pilot.js";
 import "../marketplace.css";
 import walletCss from "../hdr-wallet.css?inline";
+import { usePageNavigation } from "../lib/pageNavigation.js";
 
 function useTheme() {
   const [theme, setTheme] = useState(
@@ -98,15 +99,13 @@ function HeaderWallet() {
 
 export default function Shell() {
   const [theme, toggle] = useTheme();
-  const { pathname, hash } = useLocation();
+  const { pathname } = useLocation();
+  usePageNavigation();
   const header = useRef(null);
   const [space, setSpace] = useState(null);
   // A build constant decides whether the hook runs at all, so builds without fills carry none of it.
   const headerWallet = TESTNET_FILLS || MAINNET_FILLS ? useHeaderWallet(pathname) : false; // eslint-disable-line react-hooks/rules-of-hooks
   const saloonActive = pathname !== "/saloon/mine" && pathname !== "/saloon/following" && (pathname.startsWith("/saloon") || pathname.startsWith("/q/"));
-  useEffect(() => {
-    if (!hash) window.scrollTo(0, 0);
-  }, [pathname, hash]);
   // Sticky elements sit under the header: its height is published as --header-h.
   useEffect(() => {
     const el = header.current;

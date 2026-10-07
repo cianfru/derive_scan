@@ -2,7 +2,8 @@ import { useEffect, useRef } from "react";
 import { createChart, CandlestickSeries, ColorType, CrosshairMode, LineStyle } from "lightweight-charts";
 import { cssVar, price } from "../lib/format.js";
 import { money } from "../lib/questions.js";
-import { recentBars, useLivePrice } from "../lib/livePrice.js";
+import { recentBars, useIndexPrice } from "../lib/livePrice.js";
+import "../live-price.css";
 
 const STEP = { "4h": 14400, "1d": 86400 };
 // Up to 10 days to settlement the 4-hour candles, beyond that the daily ones (the Saloon's 7- and 30-day windows).
@@ -35,12 +36,12 @@ export function payZones(lo, hi, side) {
  * (the board's quick look) it draws the date's levels as dotted lines.
  */
 export default function SettleChart({ und, candles, index, settleTs, lo = null, hi = null, side = null, breakeven = null,
-  levels = [], theme, compact = false, label, payout = null }) {
+  levels = [], theme, compact = false, label, payout = null, publishedTs = null }) {
   const box = useRef(null);
   const over = useRef(null);
   const tip = useRef(null);
   const applyLive = useRef(null);
-  const lp = useLivePrice(und);
+  const lp = useIndexPrice(und, index, publishedTs);
   const lpRef = useRef(lp);
   lpRef.current = lp;
   const payRef = useRef(payout);
@@ -77,8 +78,9 @@ export default function SettleChart({ und, candles, index, settleTs, lo = null, 
     const keep = tf === "4h" ? (compact ? 48 : 72) : (compact ? 45 : 60);
     const bars = settleBars(rows, settleTs, tf, keep);
     candle.setData(bars);
-    const line = (p, color, title, style = LineStyle.Dotted, width = 1) => candle.createPriceLine({ price: p, color, lineWidth: width, lineStyle: style, axisLabelVisible: !compact || title === "Now", title: compact ? "" : title });
-    const nowLine = Number.isFinite(index) ? line(index, c("--fg"), "Now", LineStyle.Solid) : null;
+    const line = (p, color, title, style = LineStyle.Dotted, width = 1) => candle.createPriceLine({ price: p, color, lineWidth: width, lineStyle: style, axisLabelVisible: !compact || ["Now", "Published index", "Last index"].includes(title), title: compact ? "" : title });
+    const indexTitle = (reading) => reading?.fresh ? "Now" : reading?.source === "published" ? "Published index" : "Last index";
+    const nowLine = Number.isFinite(index) ? line(index, c("--fg"), indexTitle(lpRef.current), LineStyle.Solid) : null;
     if (Number.isFinite(lo) && Number.isFinite(hi)) {
       line(hi, side === "yes" ? up : c("--muted"), side === "yes" ? "Full payout" : "");
       line(lo, side === "no" ? down : c("--muted"), side === "no" ? "Full payout" : "");
@@ -89,7 +91,10 @@ export default function SettleChart({ und, candles, index, settleTs, lo = null, 
     let last = { ...bars.find((b) => b.time === lastT) };
     // Live prices from Derive's index feed: the last candle moves with each one, the next opens when its period
     // starts, and the Now line follows.
-    applyLive.current = (p, at) => {
+    applyLive.current = (p, at, fresh = false) => {
+      if (!(p > 0)) return;
+      nowLine?.applyOptions({ price: p, title: compact ? "" : indexTitle(lpRef.current) });
+      if (!fresh) return;
       const step = STEP[tf];
       if (at >= lastT + step) {
         const t = lastT + Math.floor((at - lastT) / step) * step;
@@ -157,7 +162,7 @@ export default function SettleChart({ und, candles, index, settleTs, lo = null, 
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
     ro?.observe(box.current);
     schedule();
-    if (lpRef.current) applyLive.current(lpRef.current.price, lpRef.current.ts);
+    if (lpRef.current) applyLive.current(lpRef.current.price, lpRef.current.ts, lpRef.current.fresh);
     // The file holds closed bars only: catch up to now (the forming bar too) from Derive's own candles.
     let gone = false;
     recentBars(und, STEP[tf], lastT).then((fresh) => {
@@ -170,19 +175,20 @@ export default function SettleChart({ und, candles, index, settleTs, lo = null, 
       }
       if (!fresh.length) return;
       nowLine?.applyOptions({ price: last.close });
-      if (lpRef.current) applyLive.current?.(lpRef.current.price, lpRef.current.ts);
+      if (lpRef.current) applyLive.current?.(lpRef.current.price, lpRef.current.ts, lpRef.current.fresh);
       schedule();
     }).catch(() => {});
     return () => { gone = true; applyLive.current = null; cancelAnimationFrame(frame); ro?.disconnect(); chart.unsubscribeCrosshairMove(onMove); chart.timeScale().unsubscribeVisibleLogicalRangeChange(schedule); chart.remove(); };
   }, [rows, settleTs, tf, lo, hi, side, [].concat(breakeven ?? []).join(","), index, levels.join(","), theme, compact]);
-  useEffect(() => { if (lp) applyLive.current?.(lp.price, lp.ts); }, [lp]);
+  useEffect(() => { if (lp) applyLive.current?.(lp.price, lp.ts, lp.fresh); }, [lp]);
   if (!rows?.length) return <p className="status">The {und} chart is not available right now.</p>;
   const what = side ? `${side === "yes" ? "Higher" : "Lower"} pays in full ${side === "yes" ? `at ${money(hi)} or above` : `at ${money(lo)} or below`}` : "the date's levels";
-  return (
-    <div className={`sc-frame${compact ? " compact" : ""}${payout ? " tall" : ""}`} role="img" aria-label={label || `${und} ${tf === "4h" ? "4-hour" : "daily"} candles up to the settlement, with ${what}`}>
+  return <>
+    {!lp.fresh && <p className="index-source-notice">{lp.notice}</p>}
+    <div className={`sc-frame${compact ? " compact" : ""}${payout ? " tall" : ""}`} role="img" aria-label={`${label || `${und} ${tf === "4h" ? "4-hour" : "daily"} candles up to the settlement, with ${what}`}. ${lp.notice}`}>
       <div ref={box} className="sc-box" />
       <div ref={over} className="sc-over" aria-hidden="true" />
       {payout && <div ref={tip} className="sc-tip" hidden aria-hidden="true" />}
     </div>
-  );
+  </>;
 }

@@ -64,7 +64,8 @@ describe("combined exposure on Positions", () => {
     expect(cards).toHaveLength(1);
     const g = cards[0];
     expect(g.querySelector("h2").textContent).toBe("BTC · Fri 9 Oct, 08:00 UTC");
-    expect(g.querySelector(".q-group-meta").textContent).toMatch(/^in 5d 18hnow \$84,8232 positions/);
+    expect(g.querySelector(".q-group-meta").textContent).toMatch(/^in 5d 18hnow \$84,823/);
+    expect(g.querySelector(".q-group-meta").textContent).toContain("2 positions");
     // The card's picture is BTC's own price up to the settlement (owner, 7 October 2026), not a payoff line.
     expect(within(g).getByRole("region", { name: "BTC price up to the settlement, BTC on Fri 9 Oct" })).toBeTruthy();
     const figs = g.querySelector(".q-position-figures");

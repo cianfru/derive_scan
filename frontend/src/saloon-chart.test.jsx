@@ -1,3 +1,4 @@
+import { _resetDecision } from "./lib/decision.js";
 import React from "react";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -28,6 +29,7 @@ smartBtc.dates[5].traders = { state: null, score: null, long: 1, short: 1, net_d
 marked.smart_wallets = { long: 3, short: 1 };
 
 beforeEach(() => {
+  _resetDecision();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW * 1000);
   localStorage.clear();
@@ -82,7 +84,7 @@ describe("Saloon chart page", () => {
     expect(btcTab.textContent).toContain("-1.7%");
     expect(btcTab.getAttribute("aria-label")).toMatch(/1 with smart wallets/);
     expect(screen.getByRole("link", { name: "Chart" }).getAttribute("aria-current")).toBe("page");
-    expect(screen.getByRole("link", { name: "List" }).getAttribute("href")).toBe("/saloon?view=list");
+    expect(screen.getByRole("link", { name: "List" }).getAttribute("href")).toBe("/saloon?coin=BTC&view=list");
     expect(document.querySelectorAll(".sch-bubble").length).toBeGreaterThan(5);
     expect(document.querySelectorAll(".sch-gold").length).toBeGreaterThanOrEqual(1);
   });
@@ -91,7 +93,7 @@ describe("Saloon chart page", () => {
     show();
     const bubble = [...document.querySelectorAll(".sch-bubble:not(.sch-dot)")].find((b) => /^Higher/.test(b.getAttribute("aria-label")));
     fireEvent.keyDown(bubble, { key: "Enter" });
-    const panel = screen.getByRole("complementary", { name: "Your trade" });
+    const panel = screen.getByRole("dialog", { name: "Your trade" });
     expect(within(panel).getByRole("heading").textContent).toMatch(/^BTC higher than \$/);
     expect(within(within(panel).getByRole("group", { name: "Answer" })).getByRole("button", { name: /Higher/ }).getAttribute("aria-pressed")).toBe("true");
     expect(within(panel).getByText(/You pay/)).toBeTruthy();
@@ -99,10 +101,10 @@ describe("Saloon chart page", () => {
     const lower = within(within(panel).getByRole("group", { name: "Answer" })).getByRole("button", { name: /Lower/ });
     if (!lower.disabled) {
       fireEvent.click(lower);
-      expect(within(screen.getByRole("complementary", { name: "Your trade" })).getByRole("heading").textContent).toMatch(/^BTC lower than/);
+      expect(within(screen.getByRole("dialog", { name: "Your trade" })).getByRole("heading").textContent).toMatch(/^BTC lower than/);
     }
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.queryByRole("complementary", { name: "Your trade" })).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "Your trade" })).toBeNull();
   });
 
   it("follows the coin in the address and says so when there are no prices", () => {
@@ -126,7 +128,7 @@ describe("Saloon chart page", () => {
     const bubble = [...document.querySelectorAll(".sch-bubble:not(.sch-dot)")].find((b) => b.getAttribute("aria-label").includes(dayLabelOf(smartBtc.dates[4])));
     expect(bubble).toBeTruthy();
     fireEvent.keyDown(bubble, { key: "Enter" });
-    expect(screen.getByRole("complementary", { name: "Your trade" }).textContent).toContain("Directional traders on this date: 7 long · 8 short, most of the money short");
+    expect(screen.getByRole("dialog", { name: "Your trade" }).textContent).toContain("Directional traders on this date: 7 long · 8 short, most of the money short");
   });
 
   it("counts smart wallets at a level in the panel", () => {
@@ -134,7 +136,7 @@ describe("Saloon chart page", () => {
     const b = document.querySelector(`.sch-bubble[data-key="${marked.id}:yes"]`);
     expect(b).toBeTruthy();
     fireEvent.keyDown(b, { key: "Enter" });
-    expect(screen.getByRole("complementary", { name: "Your trade" }).textContent).toContain("Smart wallets here: 3 long · 1 short.");
+    expect(screen.getByRole("dialog", { name: "Your trade" }).textContent).toContain("Smart wallets here: 3 long · 1 short.");
   });
 
   it("uses no forecast words", () => {

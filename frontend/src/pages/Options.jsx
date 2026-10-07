@@ -4,7 +4,7 @@ import { useData } from "../lib/data.js";
 import { price, strike, clock, pct } from "../lib/format.js";
 import { Asset } from "../components/MarketVisuals.jsx";
 import { MoveBand, SkewInstrument, VolatilityTenors } from "../components/OptionsInstruments.jsx";
-import { Loading, Failed, PanelHead, Tabs, Empty, Arrow, Lead } from "../components/ui.jsx";
+import { Loading, Failed, PanelHead, Tabs, Empty, Arrow, Lead, Info } from "../components/ui.jsx";
 import { MarketResearchHeader } from "../components/MarketResearchHeader.jsx";
 import { optionsLead } from "../lib/takeaway.js";
 import "../options-page.css";
@@ -18,7 +18,7 @@ const BOARD_HELP = (
   <>
     <b>Priced move</b>: index × ATM implied volatility × √(days/365), one standard deviation of priced movement. Every band shares the scale in the column head; it is market pricing, symmetric and ignores skew.
     <br /><br /><b>30D skew</b>: 25-delta call IV minus put IV at 30 days, in vol points. Negative means puts are priced richer for comparable delta.
-    <br /><br /><b>ATM IV</b>: ATM implied volatility at 7, 30 and 90 days on one scale for every market; the figure is the 30-day level. Hover a curve for all three percentages.
+    <br /><br /><b>ATM IV</b>: ATM implied volatility at 7, 30 and 90 days on one scale for every market; the figure is the 30-day level. Open Details for all three percentages and the priced dollar range.
     <br /><br /><b>OI</b>: the put wall is the strike below the index with the most puts open, the call wall the strike above it with the most calls, across expiries in the next 30 days. P/C is put contracts over call contracts across all expiries. Open positions, not support or resistance.
   </>
 );
@@ -45,14 +45,16 @@ export default function Options() {
     const o = c.options, lv = o.levels;
     const stale = o.status !== "ready" || !Number.isFinite(o.ts) || Date.now() / 1000 - o.ts > 1800 || o.ts > Date.now() / 1000;
     return (
-      <Link key={c.und} className="ob-row" to={`/coin/${c.und}#options`} aria-label={`Open ${c.und} options`}>
+      <article key={c.und} className="ob-market" aria-label={`${c.und} option pricing`}>
+      <Link className="ob-row" to={`/coin/${c.und}#options`} aria-label={`Open ${c.und} options`}>
         <span className="ob-coin">
           <Asset und={c.und} compact />
+          <span className="ob-mobile-index">${price(c.price)}</span>
           {stale && <small className="ob-stale">as of {clock(o.ts).replace(" UTC", "")}</small>}
         </span>
         <span className="ob-num ob-index" data-key="Index"><span className="ob-cell-label">Index</span>${price(c.price)}</span>
         <span className="ob-move" data-key={`${days}D move`}><span className="ob-cell-label">Priced move · {days}D</span><MoveBand index={c.price} iv={ivOf(c)} days={days} scale={moveMax} /></span>
-        <span className="ob-skew" data-key="Skew"><span className="ob-cell-label">30D skew · vol pts</span><SkewInstrument rr={o.rr25_30d} clamp={skewMax} /></span>
+        <span className="ob-skew" data-key="Skew"><span className="ob-cell-label">30D skew · vol pts</span><SkewInstrument rr={o.rr25_30d} clamp={skewMax} caption /></span>
         <span className="ob-term" data-key="Term"><span className="ob-cell-label">ATM IV · 7 / 30 / 90D</span><VolatilityTenors features={o} ivScale={ivScale} /><span className="ob-tenor-values">{[7, 30, 90].map((d) => <span key={d}><small>{d}D</small><b>{pct(o[`atm_iv_${d}d`])}</b></span>)}</span></span>
         <span className="ob-num ob-walls" data-key="Walls">
           <span className="ob-cell-label">Put / Call walls</span>
@@ -63,11 +65,21 @@ export default function Options() {
         <span className="ob-num ob-pc" data-key="P/C"><span className="ob-cell-label">P/C OI</span>{Number.isFinite(o.pc_oi_ratio) ? o.pc_oi_ratio.toFixed(2) : <Empty />}</span>
         <span className="ob-arrow" aria-hidden="true"><Arrow /></span>
       </Link>
+      <details className="ob-details">
+        <summary aria-label={`${c.und} pricing details`}><span>Details</span><svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true"><path d="m2.5 4.5 3.5 3.5 3.5-3.5" /></svg></summary>
+        <div className="ob-detail-grid">
+          <div className="ob-detail-move"><span className="ob-detail-label">Priced move · {days}D<Info label={`About ${c.und} priced movement`}>Index × ATM implied volatility × √({days}/365). A symmetric one-standard-deviation scale of priced movement; it ignores skew. Market pricing, not our view.</Info></span><MoveBand index={c.price} iv={ivOf(c)} days={days} bare /></div>
+          <div><span className="ob-detail-label">ATM IV<Info label={`About ${c.und} implied volatility`}>Annualised at-the-money implied volatility, interpolated to 7, 30 and 90 days. Missing tenors are not estimated.</Info></span><div className="ob-detail-tenors">{[7, 30, 90].map((d) => <span key={d}><small>{d}D</small><b>{pct(o[`atm_iv_${d}d`])}</b></span>)}</div></div>
+          <div><span className="ob-detail-label">30D skew<Info label={`About ${c.und} skew`}>25-delta call IV minus put IV, in volatility points. Negative means puts are priced richer for comparable delta; positive means calls are richer. Pricing, not trade direction.</Info></span><SkewInstrument rr={o.rr25_30d} bare /></div>
+          <div><span className="ob-detail-label">Put / Call walls<Info label={`About ${c.und} open interest`}>The strikes below and above the index with the most put and call contracts open, across expiries in the next 30 days. P/C counts put contracts over call contracts across all expiries. Open positions, not support or resistance.</Info></span><div className="ob-detail-walls"><b className="put">{lv?.put_wall ? strike(lv.put_wall) : <Empty />}</b><span>/</span><b className="call">{lv?.call_wall ? strike(lv.call_wall) : <Empty />}</b></div><span className="ob-detail-ratio">P/C OI <b>{Number.isFinite(o.pc_oi_ratio) ? o.pc_oi_ratio.toFixed(2) : <Empty />}</b></span></div>
+        </div>
+      </details>
+      </article>
     );
   };
 
   return (
-    <div className="wrap page market-research-page options-page">
+    <div className="wrap page market-research-page options-page research-refined">
       <MarketResearchHeader error={error} title="Options" description="Compare option pricing across markets." info={PAGE_HELP} meta={<>{coins.length} markets · {clock(data.generated_at)}</>} />
       <Lead lead={optionsLead(data)} />
       <section className="plate options-board" aria-label="Options markets">

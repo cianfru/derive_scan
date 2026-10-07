@@ -1,6 +1,6 @@
 import { usd } from "../lib/format.js";
 import { Asset } from "./MarketVisuals.jsx";
-import { Info } from "./ui.jsx";
+import { Info, Arrow } from "./ui.jsx";
 export const FLOW_PARTS = [
   ["call", "buy_premium_usd", "Calls bought", "call-buy"],
   ["call", "sell_premium_usd", "Calls sold", "call-sell"],
@@ -19,7 +19,7 @@ export function summarizeFlow(byCoin) {
 }
 /** Track length on a square-root scale of premium, so small markets stay visible. */
 export const trackWidth = (total, max) => (max > 0 ? Math.max(6, Math.sqrt(total / max) * 100) : 0);
-export default function FlowSummary({ data, selected, onSelect }) {
+export default function FlowSummary({ data, selected, onSelect, selectionCount, selectionKind = "trades", onViewTrades }) {
   const rows = summarizeFlow(data.by_coin),
     total = rows.reduce((s, r) => s + r.total, 0),
     max = rows[0]?.total || 0;
@@ -59,6 +59,10 @@ export default function FlowSummary({ data, selected, onSelect }) {
           </button>
         ))}
       </div>
+      {selected !== "all" && onViewTrades && <div className="flow-selection">
+        <span>{selected} · {selectionCount} recorded {selectionKind}</span>
+        <button type="button" className="text-control" onClick={onViewTrades}>View {selected} trades<Arrow /></button>
+      </div>}
     </section>
   );
 }

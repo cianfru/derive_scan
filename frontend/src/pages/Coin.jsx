@@ -3,7 +3,7 @@ import { useEffect } from "react";
 import { useOutletContext, useParams, useLocation } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { price, chg, pct, usd, title, utc, dayTime, strike, DASH } from "../lib/format.js";
-import { Arrow, Plate, Loading, Failed, Lead } from "../components/ui.jsx";
+import { Arrow, Plate, Loading, Failed, Lead, Info } from "../components/ui.jsx";
 import { coinLead } from "../lib/takeaway.js";
 import CandleChart from "../components/CandleChart.jsx";
 import { CoinIcon } from "../components/MarketVisuals.jsx";
@@ -21,6 +21,8 @@ import { HatMark } from "../components/Brand.jsx";
 import { ASSET_NAMES } from "../lib/presentation.js";
 import "../coin-detail.css";
 import CoinOverview from "../components/CoinOverview.jsx";
+import { useIndexPrice } from "../lib/livePrice.js";
+import "../research-refinement.css";
 
 // The chart shows the priced range for the next 30 days only, so candles keep most of the width.
 const CONE_DAYS = 30;
@@ -99,8 +101,11 @@ export default function Coin() {
   const { und } = useParams();
   const { theme } = useOutletContext();
   const { data, error } = useData(`coins/${und}.json`);
+  const index = useIndexPrice(und, data?.options?.features?.index_price, data?.options?.ts);
   const tf = "1d";
-  const { hash } = useLocation();
+  const { hash, state } = useLocation();
+  const marketsReturnTo = typeof state?.marketsReturnTo === "string"
+    && (state.marketsReturnTo === "/markets" || state.marketsReturnTo.startsWith("/markets?")) ? state.marketsReturnTo : "/markets";
   useEffect(() => {
     if (!data || !hash) return;
     const frame = requestAnimationFrame(() => document.getElementById(hash.slice(1))?.scrollIntoView({ block: "start", behavior: "instant" }));
@@ -125,30 +130,39 @@ export default function Coin() {
       <RefreshNotice error={error} />
       <header className="coin-heading">
         <div className="cd-identity">
-          <Link className="cd-back" to="/markets"><Arrow />Markets</Link>
+          <Link className="cd-back" to={marketsReturnTo}><Arrow />Markets</Link>
           <div className="cd-title"><CoinIcon und={und} /><h1>{ASSET_NAMES[und] || und}</h1><span className="cd-symbol">{und}</span></div>
         </div>
         <div className="cd-price-block">
-          <span className="cd-price-label">Daily index close</span>
-          <div className="cd-price-line"><span className="coin-price mono">{last?.[4] != null ? `$${price(last[4])}` : DASH}</span><span className={`coin-chg mono ${dayChg > 0 ? "up" : dayChg < 0 ? "down" : "dim"}`}>{chg(dayChg)}</span></div>
-          {closed && <time className="coin-stamp mono" dateTime={new Date(closed * 1000).toISOString()}>Closed {dayTime(closed)}</time>}
+          <span className="cd-price-label">{index.fresh ? "Index now" : index.source === "unavailable" ? "Index unavailable" : "Index snapshot"}</span>
+          <div className="cd-price-line"><span className="coin-price mono">{index.price != null ? `$${price(index.price)}` : DASH}</span></div>
+          {index.ts ? <time className="coin-stamp mono" dateTime={new Date(index.ts * 1000).toISOString()} title={index.notice}>
+            {index.fresh ? "Live" : index.state === "disconnected" ? "Disconnected · last received" : index.state === "stale" ? "Stale · last received" : "Published"} {dayTime(index.ts)}
+          </time> : index.notice && <span className="cd-index-notice">{index.notice}</span>}
+          <div className="cd-daily-reference"><span>Daily close</span><span className="mono">{last?.[4] != null ? `$${price(last[4])}` : DASH}</span><span className={`mono ${dayChg > 0 ? "up" : dayChg < 0 ? "down" : "dim"}`}>{chg(dayChg)}</span>
+            <Info label="About the daily index close">{closed ? `Closed ${dayTime(closed)}. ` : ""}The daily change compares the two latest completed UTC days. The chart and engine readings use completed daily candles, independently of the current index.</Info>
+          </div>
         </div>
       </header>
-      <Lead lead={coinLead(und, data)} />
-      <CoinOverview alignment={data.alignment} und={und} />
-      <SaloonCta und={und} live={data.questions === true} />
+      <nav className="coin-layer-nav" aria-label="Coin research sections">
+        <a href="#regime"><LayerIcon kind="engine" size={14} />Regime</a>
+        {data.options && <><a href="#wallets"><LayerIcon kind="wallets" size={14} />Wallets</a><a href="#options"><LayerIcon kind="options" size={14} />Options</a></>}
+      </nav>
 
       <Step id="regime" n={1} kind="engine" title="Regime">
-        <RegimeHeader row={row} row4={row4} history={data.history} band={data.band} current={engineReady} current4={fourReady}
-          status={data.engine_comparison?.["1d"]?.status} />
         <Plate className="price-stage" id="price-chart" title={`${und} · 1D`} info={chartInfo(data.options, data.backfilled?.[tf])}
           right={<ChartLegend opts={data.options} />}>
           <CandleChart candles={candles} signals={data.signals?.[tf]} tf={tf} theme={theme} implied={data.options?.implied}
             levels={data.options?.levels} optionsAt={data.options?.ts} optionsIndex={data.options?.features?.index_price} coneDays={CONE_DAYS}
             ribbon={ribbon} />
         </Plate>
-        <Readings row={row} history={data.history} ribbon={ribbon} candles={candles} />
-        <Checks row={row} ctx={data.engine_context} />
+        <details className="research-disclosure">
+          <summary>Regime readings</summary>
+          <RegimeHeader row={row} row4={row4} history={data.history} band={data.band} current={engineReady} current4={fourReady}
+            status={data.engine_comparison?.["1d"]?.status} />
+          <Readings row={row} history={data.history} ribbon={ribbon} candles={candles} />
+          <Checks row={row} ctx={data.engine_context} />
+        </details>
         <details className="engine-detail">
           <summary>Engine detail</summary>
           <div>
@@ -158,6 +172,13 @@ export default function Coin() {
           </div>
         </details>
       </Step>
+
+      <details className="research-disclosure coin-context">
+        <summary>Three readings · 7 and 30 days</summary>
+        <Lead lead={coinLead(und, data)} />
+        <CoinOverview alignment={data.alignment} und={und} />
+      </details>
+      <SaloonCta und={und} live={data.questions === true} />
 
       {data.options ? (
         <>

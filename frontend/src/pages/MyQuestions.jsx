@@ -13,7 +13,7 @@ import {
   ANSWER, cents, closeTicket, countdown, dayLabel, findLevel, fullPay, money, noPriceReason, parseId, priceAge, questionText, signed,
 } from "../lib/questions.js";
 import {
-  closePosition, exportPositions, forWallet, importPositions, incompleteReceipt, loadPositions, openPart, partial, persistent, positionFigures, positionStatus, prune, removePosition,
+  closePosition, forWallet, incompleteReceipt, loadPositions, onPositionsChange, openPart, partial, persistent, positionFigures, positionStatus, prune, removePosition,
   settlePosition,
 } from "../lib/positions.js";
 import { breakdownRows, closeEvent, incompleteEntryReceipt, realized, realizedSummary, remainingQty } from "../lib/realized.js";
@@ -25,6 +25,11 @@ import "../questions.css";
 import "../journal.css";
 import "../marketplace-positions.css";
 import LiveMoney from "../components/LiveMoney.jsx";
+import MySpaceBackup from "../components/MySpaceBackup.jsx";
+import PositionsReturn from "../components/PositionsReturn.jsx";
+import { followsPersistent, useFollowsDoc } from "../lib/follows.js";
+import { pnlCoverage } from "../lib/positionsPnl.js";
+import { useClock } from "../lib/useClock.js";
 
 // Saloon stage 2 with fills (testnet, or real money on mainnet): Positions reads that network's journal
 // and the Saloon account on Derive, and one-tap positions sell back through Derive. On mainnet the
@@ -592,7 +597,7 @@ function GroupCard({ und, expiry, items, g, scope, syncs, onRemove, onClose }) {
           <span>{expiry ? `${dayLabel(expiry)}, 08:00 UTC` : "Settlement date not saved"}</span></h2>
         <p className="q-group-meta">
           <span className="mono">{settling ? "settling now" : countdown(settleTs, now) || ""}</span>
-          {Number.isFinite(board?.index) && <span>now <b className="mono"><LiveMoney und={und} value={board.index} /></b></span>}
+          {Number.isFinite(board?.index) && <span>now <b className="mono"><LiveMoney und={und} value={board.index} publishedTs={board.prices_ts} /></b></span>}
           <span className="q-group-n">{n} {n === 1 ? "position" : "positions"}<Info label="How these are combined">
             Every open position on {und} settling {expiry ? dayLabel(expiry) : "on this date"} at 08:00 UTC, against Derive's {settleRef(und)}, from the exact options and amounts you recorded, after what you paid. The line is the result for each settlement price, not a view of where it settles. {groupNotes(g)}</Info></span>
         </p>
@@ -645,30 +650,27 @@ function GroupCard({ und, expiry, items, g, scope, syncs, onRemove, onClose }) {
  * positions make if sold back now, what closed ones made, and, with Derive connected, the account's cash.
  * Open positions are valued from each coin's published board; one without a price now is left out and said.
  */
-function PnlHero({ open, summary, scope, usdc }) {
+function PnlHero({ open, summary, scope, usdc, pendingSettlementCount = 0 }) {
   const unds = [...new Set(open.map((p) => p.und).filter(Boolean))];
   const [feeds, files] = useFeeds(unds.map((u) => `questions/${u}.json`));
-  const now = Date.now() / 1000;
+  const now = useClock();
   const views = open.map((p) => positionView(p, { board: files[`questions/${p.und}.json`], now, scope }));
-  const valued = views.filter((v) => !v.pendingReceipt && Number.isFinite(v.f.plNow));
-  const left = views.length - valued.length;
-  const openPl = valued.length ? valued.reduce((a, v) => a + v.f.plNow, 0) : null;
-  const inPositions = valued.length ? valued.reduce((a, v) => a + (Number.isFinite(v.f.valueNow) ? v.f.valueNow : 0), 0) : null;
-  const realizedTotal = summary.count > 0 ? summary.total : 0;
-  const total = openPl != null ? openPl + realizedTotal : summary.count > 0 ? realizedTotal : null;
+  const c = pnlCoverage(views, summary, pendingSettlementCount);
   const fig = (label, value, cls = "") => <div className={`q-pnl-fig ${cls}`}><dt>{label}</dt><dd className="mono">{value}</dd></div>;
   return (
     <section className="q-pnl" aria-label="Profit and loss">
       {feeds}
       <div className="q-pnl-total">
-        <span className="label">P&amp;L<Info label="About P&amp;L">What the open positions make if sold back now at Derive's published sell-back price, after Derive's fees, plus the result of positions sold back or settled. {left > 0 ? `${left} open ${left === 1 ? "position has" : "positions have"} no price now and ${left === 1 ? "is" : "are"} left out. ` : ""}Prices update every 15 minutes.</Info></span>
-        <b className={`mono ${tone(total ?? 0)}`}>{total != null ? signed(total) : "Not available yet"}</b>
+        <span className="label">{c.incomplete ? "Known P&L" : "P&L"}<Info label="About P&L">Open positions at Derive's published sell-back price after fees, plus known results from sold-back or settled positions. Unavailable prices, incomplete receipts and missing entry fees stay unknown and are left out. {c.estimated && "Some fees are estimated. "}Option quotes update every 15 minutes; this is not a firm sale price.</Info></span>
+        <b className={`mono ${c.total == null ? "q-pnl-unavailable" : tone(c.total)}`}>{c.total != null ? signed(c.total) : "Not available yet"}</b>
+        {c.incomplete && <p className="q-pnl-coverage" role="status">Incomplete{open.length > 0 && <> · {c.knownOpen} of {open.length} open valued</>}{summary.count > 0 && <> · {c.knownResults} of {summary.count} results known</>}{pendingSettlementCount > 0 && <> · {pendingSettlementCount} awaiting settlement records</>}</p>}
+        {c.estimated && <span className="q-pnl-estimate">Estimated fees included</span>}
       </div>
       <dl className="q-pnl-figs">
-        {fig("Open now", openPl != null ? <span className={tone(openPl)}>{signed(openPl)}</span> : "Not available yet")}
-        <div className="q-pnl-fig q-realized-sum"><dt>Realized</dt><dd className="mono"><span className={tone(realizedTotal)}>{summary.count ? signed(summary.total) : "$0.00"}</span></dd>
+        {fig("Open now", c.open != null ? <span className={tone(c.open)}>{signed(c.open)}</span> : "Not available yet")}
+        <div className="q-pnl-fig q-realized-sum"><dt>Realized</dt><dd className="mono">{c.realized != null ? <span className={tone(c.realized)}>{signed(c.realized)}</span> : "Not available yet"}</dd>
           {summary.count > 0 && <small>{summary.count} {summary.count === 1 ? "result" : "results"}: {summary.closes} sold back, {summary.settles} settled</small>}</div>
-        {fig("In positions", inPositions != null ? money(inPositions, { cents: true }) : "Not available yet")}
+        {fig("In positions", c.inPositions != null ? money(c.inPositions, { cents: true }) : "Not available yet")}
         {Number.isFinite(usdc) && fig("Cash on Derive", money(usdc, { cents: true }))}
       </dl>
     </section>
@@ -679,7 +681,13 @@ function PnlHero({ open, summary, scope, usdc }) {
 export default function MyQuestions() {
   const [stored, setListRaw] = useState(() => prune(loadPositions(NET)));
   const setList = (l) => setListRaw(prune(l));
-  const other = loadPositions(NET === "testnet" ? "mainnet" : "testnet").length;
+  const follows = useFollowsDoc();
+  useEffect(() => {
+    const reread = () => setListRaw(prune(loadPositions(NET)));
+    const off = onPositionsChange(reread);
+    window.addEventListener("storage", reread);
+    return () => { off(); window.removeEventListener("storage", reread); };
+  }, []);
   const [sync, setSync] = useState(null);
   const [scope, setScope] = useState(null);
   // Testnet: with a wallet connected, its own one-tap records (and those naming no wallet); other
@@ -688,9 +696,7 @@ export default function MyQuestions() {
   const [params, setParams] = useSearchParams();
   const tab = ["open", "closed", "following"].includes(params.get("tab")) ? params.get("tab") : "open";
   const setTab = (t) => setParams(t === "open" ? {} : { tab: t }, { replace: true });
-  const [importError, setImportError] = useState(null);
-  const file = useRef(null);
-  const now = Date.now() / 1000;
+  const now = useClock();
   const settleOf = (p) => p.settle_ts || 0;
   const done = (p) => !!p.closed_at || now >= settleOf(p);
   const openCount = list.filter((p) => !done(p)).length;
@@ -715,20 +721,8 @@ export default function MyQuestions() {
   const syncs = sync?.statuses || {};
   const summary = realizedSummary(list);
   const toSettle = list.filter((p) => !p.closed_at && settleOf(p) && now >= settleOf(p) && remainingQty(p) > 0 && !(p.exits || []).some((e) => e.kind === "settle"));
-  const download = () => {
-    const a = document.createElement("a");
-    a.href = `data:application/json;charset=utf-8,${encodeURIComponent(exportPositions())}`;
-    a.download = "cowboy-questions.json";
-    a.click();
-  };
-  const upload = async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    try { importPositions(await f.text()); setList(loadPositions(NET)); setImportError(null); } catch (err) {
-      setImportError(err?.message === "Saved by a newer Cowboy" ? "This file was saved by a newer Cowboy; nothing was imported." : "That is not a Positions file; nothing was imported.");
-    }
-    e.target.value = "";
-  };
+  const canCheckDerive = ONE_TAP_FILLS && (!MAINNET_FILLS || oneTapOffered());
+  const disconnected = canCheckDerive && !scope?.wallet;
   return (
     <div className="wrap page q-page q-mine marketplace-positions">
       <header className="q-head">
@@ -740,8 +734,9 @@ export default function MyQuestions() {
           : "These are records you entered, saved in this browser. Cowboy cannot see your Derive account. Values use the published sell-back price after exit fees when available; an unavailable value stays unknown."}</Info></div>
           <Link to="/saloon" className="btn">Browse the Saloon<span aria-hidden="true">↗</span></Link>
         </div>
-        {!persistent() && <p className="q-note warn" role="status">This browser is not saving data: Positions last only for this visit. Export a copy to keep them.</p>}
-        {list.length > 0 && <PnlHero open={list.filter((p) => !done(p) && !incompleteReceipt(p))} summary={summary} scope={scope} usdc={scope?.usdc} />}
+        {!persistent() && <p className="q-note warn" role="status">This browser is not saving data: Positions last only for this visit. Download a backup to keep them.</p>}
+        {follows.follows.length > 0 && !followsPersistent() && <p className="q-note warn" role="status">Following is saved for this visit only. Download a backup to keep it.</p>}
+        {list.length > 0 && <PnlHero open={list.filter((p) => !done(p))} summary={summary} scope={scope} usdc={scope?.usdc} pendingSettlementCount={toSettle.length} />}
         {list.length > 0 && (
           <p className="q-portfolio-line" aria-label="Your saved records">
             <span><b className="mono">{openCount}</b> open</span>
@@ -754,6 +749,7 @@ export default function MyQuestions() {
       {NET === "mainnet" && toSettle.map((p) => <SettleWatch key={p.key} p={p} onSettle={(k, price) => setList(settlePosition(k, price))} />)}
       {ONE_TAP_FILLS && (!MAINNET_FILLS || oneTapOffered()) && <Suspense fallback={null}><DeriveSync onScope={(s) => { setScope(s); setSync(null); }}
         onSynced={(r) => { setList(r.list); setSync(r); }} /></Suspense>}
+      <PositionsReturn list={list} now={now} onTab={setTab} />
       {tab === "following" ? <Suspense fallback={null}><Board followingOnly embedded /></Suspense> : <>
       {tab === "open" && <ExposureTotal groups={groups} />}
       {tab === "open" && pendingReceipts.length > 0 && <p className="q-note">Derive's trade records are still being checked. These positions are left out of the combined settlement figures.</p>}
@@ -772,23 +768,14 @@ export default function MyQuestions() {
             <Link className="btn" to="/saloon">Browse the Saloon</Link>
           </section>
         ) : (
-          <section className="q-empty-card" aria-label="No positions yet">
-            <h2>No positions yet</h2>
-            <p>Your trades, costs and settlement dates, in one place.</p>
+          <section className="q-empty-card" aria-label={canCheckDerive && !sync ? "No local positions" : "No positions yet"}>
+            <h2>{canCheckDerive && !sync ? "No positions saved here" : "No positions yet"}</h2>
+            <p>{disconnected ? "Connect your wallet to check Derive, or restore a backup below." : scope?.wallet && !sync ? "Your Derive records appear here after a successful check. You can also restore a backup below." : "Your trades, costs and settlement dates, in one place."}</p>
             <Link className="btn primary lg" to="/saloon">Open the Saloon</Link>
           </section>
         )}
       </>}
-      {tab !== "following" && <details className="q-saved">
-        <summary>Saved in this browser<Info label="Where these are kept">Saved from "I placed it", in this browser only. Nothing is sent anywhere, and clearing the browser's data removes them: export a copy to keep one. The export keeps closed trades, entry records and partial fills; importing a file twice adds nothing.</Info></summary>
-        <div className="q-card-actions">
-          <button className="text-control" onClick={download} disabled={!list.length}>Export</button>
-          <button className="text-control" onClick={() => file.current?.click()}>Import</button>
-          <input ref={file} type="file" accept="application/json" hidden onChange={upload} aria-label="Import a saved file" />
-        </div>
-        {importError && <p className="q-note warn" role="alert">{importError}</p>}
-        {other > 0 && <p className="q-note">{other} {NET === "testnet" ? "mainnet" : "testnet"} {other === 1 ? "record is" : "records are"} kept apart from these and included in Export.</p>}
-      </details>}
+      <MySpaceBackup onRestored={() => setList(loadPositions(NET))} />
     </div>
   );
 }

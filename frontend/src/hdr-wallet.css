@@ -55,6 +55,7 @@
 @media (max-width: 384px) {
   .hw-long { display: none; }
   .hw-short { display: inline; }
+  .hdr.hdr-marketplace.hdr-wallet nav.nav-saloon { gap: 12px; }
 }
 @media (max-width: 340px) {
   .hdr .hw-btn { padding: 0 10px; }

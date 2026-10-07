@@ -1,10 +1,12 @@
 import { Component } from "react";
 import { isChunkError, reloadOnce } from "../lib/staleBuild.js";
+import { recordProductEvent } from "../lib/diagnostics.js";
 
 export default class ErrorBoundary extends Component {
   state = { failed: false, reloading: false };
   static getDerivedStateFromError(error) { return { failed: true, reloading: isChunkError(error) }; }
   componentDidCatch(error) {
+    recordProductEvent(isChunkError(error) ? "view_update_required" : "view_failed");
     // A view from an older build: reload onto the current one, once.
     if (isChunkError(error) && !reloadOnce()) this.setState({ reloading: false });
   }
