@@ -234,6 +234,7 @@ function mount(host, cfg) {
     let touch = false;
     b.addEventListener("pointerdown", (e) => {
       touch = e.pointerType === "touch";
+      moved = false; // a new press: an earlier pan never blocks this bubble's click
       if (touch) return;
       if (full) startDrag(e, b, d, l, cx, by);
       else e.stopPropagation();
@@ -400,14 +401,19 @@ function mount(host, cfg) {
   let moved = false, start = null;
   // One finger or the mouse moves the chart both ways: up and down along the price axis, left and right
   // through the dates (the frame scrolls sideways when the chart is wider than the screen).
+  // pts: pointer id -> [x, y]; a pan or pinch restarts from the pointers still down.
+  const restart = () => {
+    const ps = [...pts.values()];
+    start = { view: [...view], ys: ps.map((q) => q[1]), x: ps[0][0], left: scroller.scrollLeft };
+  };
   const onDown = (e) => {
-    pts.set(e.pointerId, e.clientY);
+    pts.set(e.pointerId, [e.clientX, e.clientY]);
     moved = false;
-    start = { view: [...view], ys: [...pts.values()], x: e.clientX, left: scroller.scrollLeft };
+    restart();
   };
   const onMove = (e) => {
     if (!pts.has(e.pointerId) || !start) return;
-    pts.set(e.pointerId, e.clientY);
+    pts.set(e.pointerId, [e.clientX, e.clientY]);
     const plotH = geo.H - geo.m.t - geo.m.b, span = start.view[1] - start.view[0];
     if (pts.size === 1) {
       const dy = e.clientY - start.ys[0], dx = e.clientX - start.x;
@@ -417,7 +423,7 @@ function mount(host, cfg) {
         if (Math.abs(dy) > 2) { const dp = (dy / plotH) * span; setView(clampView([start.view[0] + dp, start.view[1] + dp])); }
       }
     } else if (pts.size === 2 && start.ys.length === 2) {
-      const [a, b] = [...pts.values()], d0 = Math.abs(start.ys[0] - start.ys[1]) || 1, d1 = Math.abs(a - b) || 1;
+      const [a, b] = [...pts.values()].map((q) => q[1]), d0 = Math.abs(start.ys[0] - start.ys[1]) || 1, d1 = Math.abs(a - b) || 1;
       moved = true;
       const f = d0 / d1, mid = (start.view[0] + start.view[1]) / 2;
       setView(clampView([mid - (span / 2) * f, mid + (span / 2) * f]));
@@ -426,7 +432,7 @@ function mount(host, cfg) {
   const onEnd = (e) => {
     pts.delete(e.pointerId);
     if (!pts.size) { start = null; svg.classList.remove("drag"); }
-    else start = { view: [...view], ys: [...pts.values()], x: e.clientX, left: scroller.scrollLeft };
+    else restart();
   };
   svg.addEventListener("wheel", onWheel, { passive: false });
   svg.addEventListener("pointerdown", onDown);
