@@ -1,0 +1,74 @@
+[
+  {
+    "width": 390,
+    "errors": [],
+    "quoteText": "USDC arriving\n$9.46\nAt least $9.46 after route fees\n\nEstimated total costi\n$0.54\nApproval gas, included\n$0.01\nBridge estimate\nAbout 3 seconds\nDerive account credit\nUsually 1\u20132 minutes\n\nMinimum arrival: $5.50i",
+    "sendEnabled": true,
+    "overflow": false,
+    "walletCalls": [
+      "eth_estimateGas",
+      "eth_gasPrice",
+      "eth_estimateGas",
+      "eth_gasPrice"
+    ],
+    "publicRpcCalls": [
+      {
+        "method": "eth_call",
+        "selector": "0x82ad56cb"
+      },
+      {
+        "method": "eth_call",
+        "selector": "0xdd62ed3e"
+      },
+      {
+        "method": "eth_estimateGas",
+        "selector": "0x095ea7b3"
+      },
+      {
+        "method": "eth_gasPrice",
+        "selector": null
+      }
+    ],
+    "capturedAt": "2026-10-07T21:41:20.588303+00:00",
+    "replayClock": "2026-10-07T21:41:20.588Z",
+    "reviewedAt": "2026-10-07T22:10:44.973Z",
+    "sourceArtifact": "captured-public-route.json",
+    "note": "Replay of the captured public quote at its original capture time. Synthetic wallet holdings and allowance/approval-gas responses (zero allowance, 45,000 gas, 0.1 gwei). LiFi route and Derive minimum remain captured public responses. Not a current executable quote; no transaction submitted."
+  },
+  {
+    "width": 1440,
+    "errors": [],
+    "quoteText": "USDC arriving\n$9.46\nAt least $9.46 after route fees\n\nEstimated total costi\n$0.54\nApproval gas, included\n$0.01\nBridge estimate\nAbout 3 seconds\nDerive account credit\nUsually 1\u20132 minutes\n\nMinimum arrival: $5.50i",
+    "sendEnabled": true,
+    "overflow": false,
+    "walletCalls": [
+      "eth_estimateGas",
+      "eth_gasPrice",
+      "eth_estimateGas",
+      "eth_gasPrice"
+    ],
+    "publicRpcCalls": [
+      {
+        "method": "eth_call",
+        "selector": "0x82ad56cb"
+      },
+      {
+        "method": "eth_call",
+        "selector": "0xdd62ed3e"
+      },
+      {
+        "method": "eth_estimateGas",
+        "selector": "0x095ea7b3"
+      },
+      {
+        "method": "eth_gasPrice",
+        "selector": null
+      }
+    ],
+    "capturedAt": "2026-10-07T21:41:20.588303+00:00",
+    "replayClock": "2026-10-07T21:41:20.588Z",
+    "reviewedAt": "2026-10-07T22:10:47.242Z",
+    "sourceArtifact": "captured-public-route.json",
+    "note": "Replay of the captured public quote at its original capture time. Synthetic wallet holdings and allowance/approval-gas responses (zero allowance, 45,000 gas, 0.1 gwei). LiFi route and Derive minimum remain captured public responses. Not a current executable quote; no transaction submitted."
+  }
+]

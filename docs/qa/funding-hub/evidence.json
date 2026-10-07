@@ -1,0 +1,157 @@
+{
+  "feed_url": "https://raw.githubusercontent.com/cianfru/cowboy-feed/site-data/",
+  "baseline": "PR #121 / main 1058d88 (same tree as 4cc35a5)",
+  "capture": "Published feed snapshots; frozen clocks; live index sockets disabled for deterministic comparison; no live wallet connections or transactions. Positions use synthetic localStorage record.",
+  "phone_viewport": [
+    390,
+    844
+  ],
+  "primary_action_document_y": [
+    {
+      "screen": "outcome",
+      "action": "Review trade",
+      "before": 1056.59,
+      "after": 638.52
+    },
+    {
+      "screen": "saloon",
+      "action": "Review trade",
+      "before": 787.48,
+      "after": 609.0
+    },
+    {
+      "screen": "positions",
+      "action": "Close",
+      "before": 1569.03,
+      "after": 655.98
+    },
+    {
+      "screen": "trader",
+      "action": "First current holding coin link",
+      "before": 857.97,
+      "after": 444.23
+    },
+    {
+      "screen": "coin-options",
+      "action": "Selected expiry control",
+      "before": 3581.33,
+      "after": 2879.16
+    }
+  ],
+  "desktop": [
+    {
+      "screen": "outcome",
+      "viewport": [
+        1440,
+        900
+      ],
+      "changed_pixels": 0,
+      "before": "outcome-before-1440.png",
+      "after": "outcome-after-1440.png"
+    },
+    {
+      "screen": "saloon",
+      "viewport": [
+        1440,
+        900
+      ],
+      "changed_pixels": 0,
+      "before": "saloon-before-1440.png",
+      "after": "saloon-after-1440.png"
+    },
+    {
+      "screen": "ticket",
+      "viewport": [
+        1440,
+        900
+      ],
+      "changed_pixels": 0,
+      "before": "ticket-before-1440.png",
+      "after": "ticket-after-1440.png"
+    },
+    {
+      "screen": "saloon-review",
+      "viewport": [
+        1440,
+        900
+      ],
+      "changed_pixels": 0,
+      "before": "saloon-review-before-1440.png",
+      "after": "saloon-review-after-1440.png"
+    },
+    {
+      "screen": "positions",
+      "viewport": [
+        1440,
+        1000
+      ],
+      "changed_pixels": 0,
+      "before": "positions-before-1440.png",
+      "after": "positions-after-1440.png"
+    },
+    {
+      "screen": "trader",
+      "viewport": [
+        1440,
+        1000
+      ],
+      "changed_pixels": 0,
+      "before": "trader-before-1440.png",
+      "after": "trader-after-1440.png"
+    },
+    {
+      "screen": "coin-options",
+      "viewport": [
+        1440,
+        1000
+      ],
+      "changed_pixels": 0,
+      "before": "coin-options-before-1440.png",
+      "after": "coin-options-after-1440.png"
+    }
+  ],
+  "desktop_note": "New flags OFF. Identical viewport/data/theme and settled fonts. Positions chart uses native Closed/Open remount and 1440 -> 1600 -> 1440 resize on both immutable builds to normalize a pre-existing autoSize initialization race; full page and card scope also compare at zero pixels. No chart masking or data manipulation.",
+  "phone_accessibility": {
+    "trade_targets_min_px": 44,
+    "trade_visible_text_min_px": 12
+  },
+  "funding_quote": "See funding-quote-evidence.json: captured real public LiFi/Derive responses replayed at original time; balances and approval gas reads explicitly synthetic. Not a currently executable quote.",
+  "files": {
+    "rysk-put-1440.png": "ad3265bf42031ca1d897402b4cdfc0ce5f77cbc486f00f758141d398136b3df2",
+    "saloon-review-after-390.png": "7cae2b7aab2efb07beb1d81816437ea13e343e4bcf801d993f6300d928c2d940",
+    "positions-after-1440.png": "e31ddc51c926b09d31020e2e161dea41a62412d292e78e210dd447e0fa1a3422",
+    "saloon-before-390.png": "67feeca5b9adbd714ec4e3292dbbb93b2ba5915f980fe1561f97142158e2e6a8",
+    "outcome-after-1440.png": "454b72bd7833e20ac44a31efb69bdffe0bd03755d1a35d585f0e70d99ea25c50",
+    "ticket-after-390.png": "8da503daa5d135647112c732d5e3282ef38a09717022b828a2e7d38ecdb5aab3",
+    "coin-options-before-390.png": "3f34363d4a16a2036f4ddcf37abf20af68eac8a1feba355b2ea4e8c3b984ff41",
+    "ticket-after-1440.png": "5d700353c53d7db0ff9f59146a30d649dd6b47a9250f3637e8c80fec96743f6f",
+    "ticket-before-1440.png": "5d700353c53d7db0ff9f59146a30d649dd6b47a9250f3637e8c80fec96743f6f",
+    "positions-before-390.png": "c878c731a1677e403d4f82d954b4d1a8a0af038de6b55d9ff22e3af2a1b3b119",
+    "rysk-call-1440.png": "5374160426859d5e38665ce19d392d46e7f99f6d06944b4b402ae9740d1eb786",
+    "coin-options-before-1440.png": "45e5d8ccb6d4195afa01bcd303e1ab3b76a082e857fe138246ce81306470816f",
+    "funding-quote-390.png": "463ce64207967e21fca70671e1b14c84ec728a4023251ec1f53eca1d0e74f95a",
+    "trader-after-1440.png": "d8ed3e39da8ae6cd927167c82b589cfc87438520b934fa717f7916bd594eb0d0",
+    "rysk-call-390.png": "9bbe02d3ff4a59e3094646afac29d6a3b42fc42ff4426abc60140f04c728d844",
+    "coin-options-after-1440.png": "45e5d8ccb6d4195afa01bcd303e1ab3b76a082e857fe138246ce81306470816f",
+    "saloon-review-after-1440.png": "1d70ca42ce0df623b88afdcf74b2ba8fe229dbd9951456a822e0487e4a1721e1",
+    "positions-after-390.png": "9f15bf10bc5a6f1d1a0a8c7a1ae36a98a56ccecf26baaf08d2c91c062872b2d8",
+    "outcome-before-1440.png": "454b72bd7833e20ac44a31efb69bdffe0bd03755d1a35d585f0e70d99ea25c50",
+    "rysk-put-390.png": "e3fab0bdf8299f4041578860d43ee88fbdfedbee6addfe5b3dbfbf6d05f67e11",
+    "saloon-after-1440.png": "0f3bc0d198db5672b747abee6723b306b766d2c7e9b626b0f82f454b8d1eafc3",
+    "outcome-before-390.png": "bc1830446dfc6840527d603a81a6f418d5454ce22a705a0dcf4c84ce0d116ab7",
+    "positions-before-1440.png": "e31ddc51c926b09d31020e2e161dea41a62412d292e78e210dd447e0fa1a3422",
+    "saloon-before-1440.png": "0f3bc0d198db5672b747abee6723b306b766d2c7e9b626b0f82f454b8d1eafc3",
+    "apple-pay-1440.png": "097b24ff0c87991b70697a06b9681302eba7340f930467dadee6a70f9070e49d",
+    "apple-pay-390.png": "6ba3543264041f63eacb7ed9a9b0e58625217204c3922cf2d5a9aa4a80b62427",
+    "outcome-after-390.png": "8265725fb95d97052b387e7b053b6f71c75caf127fdc14dcf19952716539d95b",
+    "saloon-review-before-1440.png": "1d70ca42ce0df623b88afdcf74b2ba8fe229dbd9951456a822e0487e4a1721e1",
+    "trader-before-390.png": "401130a35e4cd8bae5e8a48624a8f4b646cf4ab65bd939cfb6b80959ff36172c",
+    "saloon-review-before-390.png": "620eae2c548d9fe4f492f3d4ff0132ed44d0b62cf02ac6545f82b62e10160909",
+    "saloon-after-390.png": "309959f6f65955fdd16190e96256aa2ea3db5e0e3cdedb975ba84150c907cbb7",
+    "ticket-before-390.png": "813a5d00b247c0144a0b88566b007cb19fc3040d1f2e1e44eb4b0f7bd7d98576",
+    "coin-options-after-390.png": "b909b5846829719d34e797e485323cfc4e04d93c2089ed779f6c99ded2481f61",
+    "trader-before-1440.png": "d8ed3e39da8ae6cd927167c82b589cfc87438520b934fa717f7916bd594eb0d0",
+    "trader-after-390.png": "c898ce66105410c8c6f51a1558ec85dbe0fa2fd07d2c328fde7b009cb55bade3",
+    "funding-quote-1440.png": "aba5d601b0a019b917dd1b493e330e3c6e6dfb062b8de361e9adbabf802e18ff"
+  }
+}
