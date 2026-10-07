@@ -120,4 +120,4 @@ Run: `python backend/research/settlement_record/run.py DATA_DIR` on the data bra
 - **Other coins** (7 days before, too few dates to read):
   - HYPE: 28 scored, 39% against 45%.
   - SOL, XRP, XAUT and ZEC: 5 to 9 each.
-- **What it means.** The line stays context, not a signal. If the app shows the record, it shows it as history with "no better than chance so far". The test can be rerun as dates settle; BTC reaches 60 scored dates at the 7-day lead in about three months at the current pace.
+- **What it means.** The line stays context, not a signal. If the app shows the record, it shows it as history with "no better than chance so far". The test can be rerun as dates settle; BTC reaches 60 scored dates at the 7-day lead in two to three months at the current pace (about 4 to 5 a month).
