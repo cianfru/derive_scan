@@ -29,3 +29,4 @@
 .sc-scen li span:last-child { text-align: right; white-space: nowrap; }
 .sc-scen .up { color: var(--up); } .sc-scen .down { color: var(--down); }
 @media (max-width: 680px) { .sc-frame.tall { height: 340px; } .sc-scen li { flex-direction: column; gap: 2px; } .sc-scen li span:last-child { text-align: left; } }
+.sc-tip[hidden] { display: none; }

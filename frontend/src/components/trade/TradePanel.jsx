@@ -212,36 +212,37 @@ export function DeriveSync({ onSynced, onScope }) {
   useLayoutEffect(() => {
     generation.current += 1;
     setSt({ phase: "idle" });
-    callbacks.current.onScope?.({ wallet: seat.wallet ?? null, subaccountId: seat.saloon?.id ?? null });
+    callbacks.current.onScope?.({ wallet: seat.wallet ?? null, subaccountId: seat.saloon?.id ?? null, usdc: seat.saloon?.usdc ?? null });
     if (canRead) run();
     return () => { generation.current += 1; };
-  }, [canRead, seat.client, seat.saloon?.id, seat.wallet]);
+  }, [canRead, seat.client, seat.saloon?.id, seat.wallet, seat.saloon?.usdc]);
 
   const at = st.at ? `${new Date(st.at * 1000).toISOString().slice(11, 16)} UTC` : null;
+  // One slim line (owner, 7 October 2026: the account detail "is not necessary ... maybe under an information
+  // tooltip"): the Derive account, its cash and a refresh; how the check works sits in the (i).
+  const about = <Info label="About this check">Positions reads your Saloon account on Derive over your own connection: its open positions and its trades. Derive's records are the reference; one-tap trades this browser missed are added from them, and each card says whether Derive holds its options.{st.phase === "done" ? ` Checked with Derive at ${at}${st.added ? `, ${st.added} added from Derive's records` : ""}${st.repaired ? `, ${st.repaired} corrected from Derive's records` : ""}.` : ""} {NETWORK_NOTE}</Info>;
   return (
-    <section className="tr tr-sync" aria-label="Your Saloon account on Derive">
-      <header className="tr-head">
-        <p className="tr-lead">Your Saloon account on Derive
-          <Info label="About this check">On this build Positions reads your Saloon account on Derive over your own connection: its open positions and its trades. Derive's records are the reference; one-tap trades this browser missed are added from them, and each card says whether Derive holds its options. {NETWORK_NOTE}</Info>
-        </p>
-        <TestnetTag />
-      </header>
+    <section className="tr tr-sync tr-sync-slim" aria-label="Your Saloon account on Derive">
       {!canRead ? (seat.stage === "terms" ? <TermsStep /> : seat.stage === "no_wallet" ? (
-        <p className="tr-note">Checking these against Derive needs a browser wallet such as MetaMask or Rabby.</p>
+        <p className="tr-note">Connect a browser wallet such as MetaMask or Rabby to see your Derive account here.</p>
       ) : seat.wallet && !seat.saloon && seat.stage === "fund" ? (
-        <p className="tr-note">This wallet has no Derive account yet. It starts with the first deposit from a ticket.</p>
+        <p className="tr-note">No Derive account yet: it opens with your first deposit.</p>
       ) : (
         <div className="tr-actions">
-          <span className="tr-note">Connect your wallet to check these against your Saloon account.</span>
           <button className="btn" onClick={connect} disabled={seat.busy}>{seat.busy ? "Connecting…" : "Connect wallet"}</button>
+          {about}
           {seat.message && <span className="tr-msg">{seat.message}<ErrorDetail detail={seat.detail} /></span>}
         </div>
       )) : (
         <div className="tr-actions">
+          <span className="tr-note">Derive account <span className="mono">#{seat.saloon?.id}</span></span>
+          <TestnetTag />
           {st.phase === "reading" ? <span className="tr-wait"><span className="spin" aria-hidden="true" />Reading Derive…</span>
-            : <span className="tr-note">{st.phase === "done" ? <>Checked with Derive at {at}{st.added ? ` · ${st.added} added from Derive's records` : ""}{st.repaired ? ` · ${st.repaired} corrected from Derive's records` : ""}</> : st.phase === "error" ? <>{st.message}<ErrorDetail detail={st.detail} /></> : "Not checked yet"}</span>}
-          <span className="tr-note">Derive account <span className="mono">#{seat.saloon?.id}</span> <b className="mono">{money(seat.saloon?.usdc, { cents: true })}</b> USDC</span>
-          <button className="text-control" onClick={run} disabled={st.phase === "reading"}>Check again</button>
+            : st.phase === "error" ? <span className="tr-note">{st.message}<ErrorDetail detail={st.detail} /></span>
+            : st.phase === "done" ? <span className="tr-note">Checked {at}</span> : null}
+          {st.phase === "done" && (st.added > 0 || st.repaired > 0) && <span className="tr-note">{[st.added ? `${st.added} added from Derive's records` : "", st.repaired ? `${st.repaired} corrected from Derive's records` : ""].filter(Boolean).join(" · ")}</span>}
+          <button className="text-control" onClick={run} disabled={st.phase === "reading"} aria-label="Check again">Refresh</button>
+          {about}
         </div>
       )}
       {st.phase === "done" && st.unmatched?.length > 0 && <p className="tr-note" role="status">
