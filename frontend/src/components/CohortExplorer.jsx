@@ -4,6 +4,7 @@ import { Tabs, Info, Empty } from "./ui.jsx";
 import { Asset } from "./MarketVisuals.jsx";
 import { usd, utc } from "../lib/format.js";
 import { COHORT_HELP } from "../lib/explain.js";
+import "../research-refinement.css";
 const BOUNDS = {
   "Money Printer": "At least $1M gross profit on expired options",
   "Smart Money": "$100K to $1M gross profit on expired options",
@@ -85,6 +86,12 @@ export default function CohortExplorer({ cohorts, through, valuedAt, title = "Co
         <Tabs label="Cohort grouping" value={dim} onChange={setDim} items={[["pnl", "By results"], ["size", "By size"]]} />
       </div>
       <div className="cohort-workspace">
+        <label className="cohort-mobile-select">Cohort
+          <select aria-label="Select trader cohort" value={c?.name || ""} disabled={!c} onChange={(e) => setChosen(e.target.value)}>
+            {!c && <option value="">No cohorts available</option>}
+            {rows.map((r) => <option key={r.name} value={r.name}>{r.name} · {r.wallets.toLocaleString("en-US")} wallets</option>)}
+          </select>
+        </label>
         <nav className="cohort-selector" aria-label="Select trader cohort">
           {rows.map((r) => {
             const rt = completeTotals(r.windows?.[window]);

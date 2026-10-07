@@ -57,7 +57,7 @@ createRoot(document.getElementById("root")).render(
         </Route>
       </Routes>
     </BrowserRouter>
-    {/* Vercel Web Analytics: page views only, no custom events, no cookies, no personal data. */}
+    {/* Page views. Fixed product event codes are separately opt-in via VITE_PRODUCT_EVENTS. */}
     <Analytics />
   </React.StrictMode>,
 );

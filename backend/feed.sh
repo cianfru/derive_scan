@@ -33,18 +33,31 @@ last_error() { grep -v '^    ' "$LOG.step" | grep -v '^Traceback' | tail -n 1; }
 
 case "${1:-}" in
   due)
-    python3 record_once.py --out "$STORE" --due >/dev/null
-    python3 signal_once.py --out "$STORE" --due >/dev/null
-    python3 history_once.py --out "$STORE" --due >/dev/null
-    python3 flow_once.py --out "$STORE" --due >/dev/null
-    grep -E '^(due|signals_due|history_due|flow_due)=' "$OUT" 2>/dev/null | tr '\n' ' '; echo
+    due_out=$(mktemp) || exit 1
+    trap 'rm -f "$due_out"' EXIT
+    for check in record signal history flow; do
+      step "$check due" env GITHUB_OUTPUT="$due_out" python3 "${check}_once.py" --out "$STORE" --due || :
+    done
+    for key in due signals_due history_due flow_due; do
+      if [ "$(grep -Ec "^${key}=(true|false)$" "$due_out")" != 1 ]; then
+        echo "$key: missing or invalid result"
+        failed=1
+      fi
+    done
+    [ "$failed" = 0 ] || exit 1
+    cat "$due_out" >>"$OUT"
+    tr '\n' ' ' <"$due_out"; echo
     ;;
   run)
     : "${SITE:?}"
     DUE=${DUE:-false} SIGNALS_DUE=${SIGNALS_DUE:-false} HISTORY_DUE=${HISTORY_DUE:-false} FLOW_DUE=${FLOW_DUE:-false} FORCE=${FORCE:-false}
     anything=false
     for v in "$DUE" "$SIGNALS_DUE" "$HISTORY_DUE" "$FLOW_DUE" "$FORCE"; do [ "$v" = true ] && anything=true; done
-    [ $anything = true ] || { echo "nothing due"; exit 0; }
+    if [ $anything != true ]; then
+      echo "nothing due"
+      step health python3 check_health.py "$SITE/health.json"
+      exit $failed
+    fi
 
     [ "$DUE" = true ] && step record python record_once.py --out "$STORE" --site "$SITE"
     if [ "$FLOW_DUE" = true ]; then
@@ -58,6 +71,7 @@ case "${1:-}" in
 
     built=false committed=false
     step publish python publish_site.py --data "$STORE" --site "$SITE" && built=true
+    if [ $built = true ]; then step health python3 check_health.py "$SITE/health.json"; fi
     commit() (
       cd "$STORE" || return 1
       git add -A

@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import { cssVar } from "../lib/format.js";
 import { money } from "../lib/questions.js";
-import { recentBars, useLivePrice } from "../lib/livePrice.js";
+import { recentBars, useIndexPrice } from "../lib/livePrice.js";
+import "../live-price.css";
 
 /*
  * The Saloon's chart (owner, 7 October 2026: "the chart is probably the best way to represent and show where
@@ -88,7 +89,7 @@ function palette(theme) {
 function mount(host, cfg) {
   const { svg, tip, scroller } = host;
   let { und, index, candles, now, onOpen, theme } = cfg;
-  const dates = chartLevels(cfg.dates, index);
+  let dates = chartLevels(cfg.dates, index);
   // A copy: live prices extend the last candle, or open the next one when its 4 hours roll over.
   const cs = candles.map((c) => [...c]);
   const BAR = cs.length > 1 ? cs[cs.length - 1][0] - cs[cs.length - 2][0] : 14400;
@@ -110,6 +111,7 @@ function mount(host, cfg) {
   const setView = (v) => { view = v; cfg.onView?.(v); draw(); };
 
   function draw() {
+    const focusedKey = !drag && !pts.size && svg.contains(document.activeElement) ? document.activeElement.getAttribute("data-key") : null;
     const phone = window.innerWidth < 700;
     const W = Math.max(scroller.clientWidth || 0, phone ? 820 : 900);
     const H = phone ? Math.round(Math.min(460, Math.max(380, window.innerHeight * 0.54))) : 620;
@@ -180,7 +182,7 @@ function mount(host, cfg) {
     [[0, `${days} days ago`], [cs.length - 1, "now"]].forEach(([i, label]) => {
       el("text", { x: m.l + bw * (i + 0.5), y: H - 12, fill: C.text3, "font-size": 11, "text-anchor": i ? "end" : "start", class: "sch-history-label" }, svg).textContent = label;
     });
-    // Candles and the price line repaint on each live price (`setLive`) without redrawing the bubbles.
+    // Candles and the price line repaint on each current index without redrawing unchanged bubbles.
     const live = el("g", {}, plot), liveTag = el("g", {}, svg);
     paintPrice = () => {
       live.replaceChildren(); liveTag.replaceChildren();
@@ -220,6 +222,10 @@ function mount(host, cfg) {
     if (lane) traderLane(svg, lane);
     if (current) paintSelected();
     firstPaint = false;
+    if (focusedKey) {
+      const buttons = [...svg.querySelectorAll(".sch-bubble")];
+      (buttons.find((b) => b.dataset.key === focusedKey) || buttons.find((b) => b.dataset.key.split(":")[0] === focusedKey.split(":")[0]))?.focus();
+    }
   }
 
   // Where directional traders lean on each date (net over gross delta of their open options): a line in its own
@@ -415,8 +421,8 @@ function mount(host, cfg) {
         const gx = geo.cols[dates.indexOf(t.d)], gy = geo.y(t.l.k);
         ghost.style.transition = reduced ? "none" : "transform 260ms cubic-bezier(.2,1.3,.4,1)";
         ghost.style.transform = `translate(${gx}px, ${gy}px)`;
-        setTimeout(() => { ghost.remove(); node.style.opacity = ""; drag = null; open(t.l.r); }, reduced ? 0 : 270);
-      } else { drag = null; open(l.r); }
+        setTimeout(() => { ghost.remove(); node.style.opacity = ""; drag = null; orientPrice(); open(t.l.r); }, reduced ? 0 : 270);
+      } else { drag = null; orientPrice(); open(l.r); }
     };
     node.addEventListener("pointermove", move); node.addEventListener("pointerup", up); node.addEventListener("pointercancel", up);
   }
@@ -499,13 +505,17 @@ function mount(host, cfg) {
     moved = false;
     restart();
   };
+  const capturePointers = () => {
+    // Panning redraws the bubble nodes; the stable SVG keeps receiving both fingers' releases.
+    for (const pointer of pts.keys()) { try { svg.setPointerCapture?.(pointer); } catch { /* ended */ } }
+  };
   const onMove = (e) => {
     if (!pts.has(e.pointerId) || !start) return;
     pts.set(e.pointerId, [e.clientX, e.clientY]);
     const plotH = geo.H - geo.m.t - geo.m.b, span = start.view[1] - start.view[0];
     if (pts.size === 1) {
       const dy = e.clientY - start.ys[0], dx = e.clientX - start.x;
-      if (!moved && Math.hypot(dx, dy) > 6) { moved = true; svg.classList.add("drag"); tip.hidden = true; }
+      if (!moved && Math.hypot(dx, dy) > 6) { moved = true; capturePointers(); svg.classList.add("drag"); tip.hidden = true; }
       if (moved) {
         scroller.scrollLeft = start.left - dx;
         if (Math.abs(dy) > 2) { const dp = (dy / plotH) * span; setView(clampView([start.view[0] + dp, start.view[1] + dp])); }
@@ -513,13 +523,15 @@ function mount(host, cfg) {
     } else if (pts.size === 2 && start.ys.length === 2) {
       const [a, b] = [...pts.values()].map((q) => q[1]), d0 = Math.abs(start.ys[0] - start.ys[1]) || 1, d1 = Math.abs(a - b) || 1;
       moved = true;
+      capturePointers();
       const f = d0 / d1, mid = (start.view[0] + start.view[1]) / 2;
       setView(clampView([mid - (span / 2) * f, mid + (span / 2) * f]));
     }
   };
   const onEnd = (e) => {
     pts.delete(e.pointerId);
-    if (!pts.size) { start = null; svg.classList.remove("drag"); }
+    try { if (svg.hasPointerCapture?.(e.pointerId)) svg.releasePointerCapture(e.pointerId); } catch { /* ended */ }
+    if (!pts.size) { start = null; svg.classList.remove("drag"); if (moved) orientPrice(); }
     else restart();
   };
   svg.addEventListener("wheel", onWheel, { passive: false });
@@ -532,11 +544,31 @@ function mount(host, cfg) {
   window.addEventListener("resize", onResize);
   draw();
 
+  function orientPrice() {
+    if (drag || pts.size) return;
+    const next = chartLevels(cfg.dates, price);
+    const keys = (ds) => ds.map((d) => d.levels.map((l) => l.r.key).join(",")).join("|");
+    if (keys(next) !== keys(dates)) { dates = next; draw(); }
+  }
+
   return {
     zoomIn: () => zoomBy(0.6), zoomOut: () => zoomBy(1.6), reset: () => animateTo([...HOME]),
     // Phones open on the nearest dates with the last candles and the price now still in view.
     showNearest: () => { scroller.scrollLeft = Math.max(0, geo.futX - Math.min(110, scroller.clientWidth * 0.3)); },
     select: (r) => { current = r || null; paintSelected(); },
+    setIndex: (reading) => {
+      if (!(reading?.price > 0)) return;
+      if (reading.fresh) {
+        const last = cs[cs.length - 1], p = reading.price, ts = reading.ts;
+        if (ts >= last[0] + BAR) {
+          const t = last[0] + Math.floor((ts - last[0]) / BAR) * BAR;
+          cs.push([t, last[4], Math.max(last[4], p), Math.min(last[4], p), p]); cs.shift();
+        } else if (ts >= last[0]) { last[2] = Math.max(last[2], p); last[3] = Math.min(last[3], p); last[4] = p; }
+      }
+      price = reading.price;
+      orientPrice();
+      paintPrice();
+    },
     // Bars Derive has but the published file not yet (the forming one too): replace or append, keep the length.
     setBars: (bars) => {
       for (const b of bars) {
@@ -545,19 +577,6 @@ function mount(host, cfg) {
         else if (b[0] > cs[cs.length - 1][0]) { cs.push([...b]); cs.shift(); }
       }
       if (bars.length) price = bars[bars.length - 1][4];
-      paintPrice();
-    },
-    setLive: (p, ts) => {
-      if (!(p > 0)) return;
-      const last = cs[cs.length - 1];
-      if (ts >= last[0] + BAR) {
-        const t = last[0] + Math.floor((ts - last[0]) / BAR) * BAR;
-        cs.push([t, last[4], Math.max(last[4], p), Math.min(last[4], p), p]);
-        cs.shift();
-      } else if (ts >= last[0]) {
-        last[2] = Math.max(last[2], p); last[3] = Math.min(last[3], p); last[4] = p;
-      }
-      price = p;
       paintPrice();
     },
     destroy: () => {
@@ -575,14 +594,14 @@ function mount(host, cfg) {
  * `dates`: [{expiry, settle, rows}] for one coin (rows from boardRows at `amount`); `candles`: the coin's
  * 4-hour [t, o, h, l, c] rows; `selected`: the open row, or null.
  */
-export default function SaloonChart({ und, name, index, candles, dates, amount, now, theme, selected, onOpen }) {
+export default function SaloonChart({ und, name, index, publishedTs = null, candles, dates, amount, now, theme, selected, onOpen }) {
   const svg = useRef(null), tip = useRef(null), scroller = useRef(null), stage = useRef(null);
   const api = useRef(null);
   const views = useRef({});
   const openRef = useRef(onOpen);
   openRef.current = onOpen;
   const dataKey = dates.map((d) => `${d.expiry}:${d.traders?.score ?? "-"}/${d.traders?.long ?? "-"}/${d.traders?.short ?? "-"}:${d.rows.map((r) => `${r.key}=${r.total.toFixed(2)}/${r.payout.toFixed(2)}/${smartOf(r)?.wallets || 0}/${countText(r.level?.smart_wallets)}`).join(",")}`).join("|");
-  const live = useLivePrice(und);
+  const live = useIndexPrice(und, index, publishedTs);
   const liveRef = useRef(live);
   liveRef.current = live;
   const ready = candles?.length > 1 && dates.length > 0 && Number.isFinite(index);
@@ -593,7 +612,7 @@ export default function SaloonChart({ und, name, index, candles, dates, amount, 
       und, index, candles, dates, now: now || Date.now() / 1000, amount, theme, selected,
       view: views.current[und], onView: (v) => { views.current[und] = v; }, onOpen: (r) => openRef.current?.(r),
     });
-    if (liveRef.current) api.current.setLive(liveRef.current.price, liveRef.current.ts);
+    api.current.setIndex(liveRef.current);
     if (first && scroller.current) {
       if (window.innerWidth < 700) api.current.showNearest();
       else scroller.current.scrollLeft = scroller.current.scrollWidth;
@@ -601,7 +620,7 @@ export default function SaloonChart({ und, name, index, candles, dates, amount, 
     return () => { api.current?.destroy(); api.current = null; };
   }, [ready, und, index, candles, dataKey, theme, amount]);
   useEffect(() => { api.current?.select(selected); }, [selected?.key]);
-  useEffect(() => { if (live) api.current?.setLive(live.price, live.ts); }, [live]);
+  useEffect(() => { api.current?.setIndex(live); }, [live]);
   // Catch the candles up to now once per coin and chart: the file holds closed bars only, published after each close.
   useEffect(() => {
     if (!ready) return undefined;
@@ -610,12 +629,13 @@ export default function SaloonChart({ und, name, index, candles, dates, amount, 
     recentBars(und, 14400, last).then((bars) => {
       if (gone || !api.current) return;
       api.current.setBars(bars);
-      if (liveRef.current) api.current.setLive(liveRef.current.price, liveRef.current.ts);
+      api.current.setIndex(liveRef.current);
     }).catch(() => {});
     return () => { gone = true; };
   }, [ready, und, index, candles, dataKey, theme, amount]);
   if (!ready) return <p className="status">The {und} chart is not available right now.</p>;
-  return (
+  return <>
+    {!live.fresh && <p className="index-source-notice" role="status">{live.notice}</p>}
     <div ref={stage} className="sch-stage">
       <div className="sch-zoom" role="group" aria-label="Zoom the price axis">
         <button type="button" aria-label="Zoom in" onClick={() => api.current?.zoomIn()}>+</button>
@@ -627,5 +647,5 @@ export default function SaloonChart({ und, name, index, candles, dates, amount, 
       </div>
       <div ref={tip} className="sch-tip" hidden aria-hidden="true" />
     </div>
-  );
+  </>;
 }

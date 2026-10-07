@@ -24,7 +24,7 @@ export function Tabs({ items, value, onChange, label }) {
 }
 
 // (i) popover: explanations live behind it, keeping visible text minimal.
-export function Info({ children, label = "More information" }) {
+export function Info({ children, label = "More information", trigger = "i", className = "info" }) {
   const [open, setOpen] = useState(false);
   const btn = useRef(null);
   const pop = useRef(null);
@@ -32,13 +32,13 @@ export function Info({ children, label = "More information" }) {
   useEffect(() => {
     if (!open) return;
     const close = (e) => { if (!btn.current?.contains(e.target) && !pop.current?.contains(e.target)) setOpen(false); };
-    const esc = (e) => { if (e.key === "Escape") { setOpen(false); btn.current?.focus(); } };
+    const esc = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setOpen(false); btn.current?.focus(); } };
     const reposition = () => setOpen(false);
     document.addEventListener("pointerdown", close);
-    document.addEventListener("keydown", esc);
+    document.addEventListener("keydown", esc, true);
     window.addEventListener("resize", reposition);
     window.addEventListener("scroll", reposition, true);
-    return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", esc);
+    return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", esc, true);
       window.removeEventListener("resize", reposition); window.removeEventListener("scroll", reposition, true); };
   }, [open]);
   const [pos, setPos] = useState({ left: 0, top: 0 });
@@ -52,10 +52,11 @@ export function Info({ children, label = "More information" }) {
   }, [open]);
   return (
     <>
-      <button type="button" ref={btn} className="info" aria-label={label} aria-expanded={open} aria-controls={open ? id : undefined}
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>i</button>
+      <button type="button" ref={btn} className={className} aria-label={label} aria-expanded={open} aria-controls={open ? id : undefined}
+        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o); }}>{trigger}</button>
       {open && createPortal(<div id={id} ref={pop} className="pop" role="dialog" aria-label={label} style={pos}
-        onClick={(e) => e.stopPropagation()}>{children}</div>, document.body)}
+        onClick={(e) => e.stopPropagation()}><button type="button" className="pop-close" aria-label={`Close ${label}`}
+          onClick={() => { setOpen(false); btn.current?.focus(); }}>×</button>{children}</div>, document.body)}
     </>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { usd, ago, optionLabel } from "../lib/format.js";
@@ -15,6 +15,19 @@ const CLASS_INFO = "Wallet types from every trade on Derive since December 2023.
 const CAP = 15;
 const tone = (v) => (v > 0 ? "up" : v < 0 ? "down" : "");
 
+function useSampleSize() {
+  const [small, setSmall] = useState(() => typeof matchMedia === "function" && matchMedia("(max-width: 680px)").matches);
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return;
+    const media = matchMedia("(max-width: 680px)");
+    const update = () => setSmall(media.matches);
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
+  return small ? 5 : CAP;
+}
+
 function Kind({ c }) {
   return c ? <span className={c === "top" || c === "smart" ? "tier-tag" : "dim"}>{CLASS[c] || c}</span> : <span className="faint">—</span>;
 }
@@ -29,26 +42,40 @@ export default function Flow() {
   const [selected, setSelected] = useState("all");
   const [kind, setKind] = useState("option");
   const [all, setAll] = useState(false);
+  const [allWallets, setAllWallets] = useState(false);
+  const [view, setView] = useState("trades");
+  const [focusRequest, setFocusRequest] = useState(0);
+  const resultRef = useRef(null);
+  const cap = useSampleSize();
+  useEffect(() => {
+    if (!focusRequest) return;
+    resultRef.current?.focus({ preventScroll: true });
+    resultRef.current?.scrollIntoView?.({ behavior: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }, [focusRequest]);
   if (error && !data) return <div className="wrap page"><Failed error={error} /></div>;
   if (!data) return <div className="wrap page"><Loading /></div>;
   const matching = data.large.filter((t) => (selected === "all" || t.underlying === selected) && (kind === "all" || t.kind === kind));
-  const large = all ? matching : matching.slice(0, CAP);
+  const large = all ? matching : matching.slice(0, cap);
+  const wallets = allWallets ? data.wallets : data.wallets.slice(0, cap);
+  const showTrades = () => { setView("trades"); setFocusRequest((n) => n + 1); };
   return (
-    <div className="wrap page people-page market-research-page flow-page">
+    <div className="wrap page people-page market-research-page flow-page research-refined">
       <MarketResearchHeader error={error} title="Flow" description="Recorded trades and option premium across markets."
         info="The premium overview and active wallet list cover the recorded 24-hour window across all markets. Selecting a market or instrument kind filters only the large-trade sample below."
         meta={<FlowCoverage coverage={data.coverage} as="span" />} />
       <Lead lead={flowLead(data)} />
       <Plate title="Options premium by market" className="fl-premium-panel" bodyClass="flush">
-        <FlowSummary data={data} selected={selected} onSelect={(u) => { setSelected(u); setAll(false); }} />
+        <FlowSummary data={data} selected={selected} onSelect={(u) => { setSelected(u); setAll(false); }}
+          selectionCount={matching.length} selectionKind={kind === "option" ? "option trades" : kind === "perp" ? "perp trades" : "trades"} onViewTrades={showTrades} />
       </Plate>
-      <Plate title="Large trades" className="fl-trades-panel" bodyClass="flush"
+      <div className="fl-view-switch"><Tabs label="Flow detail" value={view} onChange={setView} items={[["trades", "Large trades"], ["wallets", "Active wallets"]]} /></div>
+      {view === "trades" ? <Plate title={<span ref={resultRef} tabIndex={-1}>Large trades</span>} className="fl-trades-panel" bodyClass="flush"
         info={"Up to 80 of the largest recorded taker trades across all markets; the market filter applies to that sample. Trades that crossed the spread at $25K or more on perps, $100K notional or $2K premium on options. RFQ marks block trades negotiated off the book. " + CLASS_INFO}
         right={<>
-          {selected !== "all" && <button className="text-control" onClick={() => setSelected("all")}>{selected} · Clear</button>}
+          {selected !== "all" && <button className="text-control" onClick={() => { setSelected("all"); setAll(false); }}>{selected} · Clear</button>}
           <Tabs label="Kind" value={kind} onChange={(k) => { setKind(k); setAll(false); }} items={[["option", "Options"], ["perp", "Perps"], ["all", "All"]]} />
         </>}>
-        <div className="fl-table-context">
+        <div className="fl-table-context" role="status">
           <span>Recorded large-trade sample</span>
           <span>{selected === "all" ? "All markets" : selected} · <b>{large.length}</b> of <b>{matching.length}</b> trades</span>
         </div>
@@ -73,14 +100,14 @@ export default function Flow() {
             {!large.length && <tr><td colSpan={7} className="faint fl-empty"><span aria-label="No matching recorded large trades">—</span></td></tr>}
           </tbody>
         </table>
-        {matching.length > large.length && <button className="btn lb-more" onClick={() => setAll(true)}>Show all {matching.length}</button>}
-      </Plate>
-      <Plate title="Most active wallets" className="fl-wallets-panel" bodyClass="flush" right={<span className="fl-scope">All markets · 24h</span>}
+        {(matching.length > cap || all) && <button className="btn lb-more" onClick={() => setAll((value) => !value)}>{all ? "Show fewer trades" : `Show all ${matching.length} trades`}</button>}
+      </Plate> : <Plate title="Most active wallets" className="fl-wallets-panel" bodyClass="flush" right={<span className="fl-scope">All markets · 24h</span>}
         info={"Volume and realised profit and loss per wallet from Derive's public trades over 24 hours. Premium net is what the wallet received for options sold minus what it paid for options bought. " + CLASS_INFO}>
+        <div className="fl-table-context"><span>Most active in the recorded window</span><span><b>{wallets.length}</b> of <b>{data.wallets.length}</b> wallets</span></div>
         <table className="grid flow-table wallets-table">
           <thead><tr><th scope="col">Wallet</th><th scope="col">Type</th><th scope="col" className="num">Perp volume</th><th scope="col" className="num">Options notional</th><th scope="col" className="num">Premium net</th><th scope="col" className="num">Realised PnL</th></tr></thead>
           <tbody>
-            {data.wallets.map((w) => {
+            {wallets.map((w) => {
               const net = w.premium_sold_usd - w.premium_bought_usd;
               return (
                 <tr key={w.wallet} className="fw-row">
@@ -92,9 +119,11 @@ export default function Flow() {
                   <td className={`num hero fw-pnl ${tone(w.realized_pnl_usd)}`} data-k="Realised PnL">{usd(w.realized_pnl_usd)}</td>
                 </tr>);
             })}
+            {!wallets.length && <tr><td colSpan={6} className="faint fl-empty"><span aria-label="No recorded active wallets">—</span></td></tr>}
           </tbody>
         </table>
-      </Plate>
+        {(data.wallets.length > cap || allWallets) && <button className="btn lb-more" onClick={() => setAllWallets((value) => !value)}>{allWallets ? "Show fewer wallets" : `Show all ${data.wallets.length} wallets`}</button>}
+      </Plate>}
     </div>
   );
 }

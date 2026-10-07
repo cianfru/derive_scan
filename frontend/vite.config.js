@@ -7,5 +7,5 @@ const page = (name) => fileURLToPath(new URL(name, import.meta.url));
 export default defineConfig({
   plugins: [react()],
   build: { rollupOptions: { input: { main: page("index.html"), control: page("control.html") } } },
-  test: { environment: "jsdom" },
+  test: { environment: "jsdom", exclude: ["**/node_modules/**", "**/e2e/**"] },
 });

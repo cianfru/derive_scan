@@ -141,11 +141,13 @@ it("sends the landing into Saloon and anchors how-it-works to the non-executing 
   expect(screen.getAllByRole("link", { name: "Enter the Saloon" }).map((a) => a.getAttribute("href"))).toEqual(["/saloon", "/saloon"]);
   expect(screen.getByRole("link", { name: /See how it works/ }).getAttribute("href")).toBe("#how");
   expect(screen.queryByRole("link", { name: "Open the markets" })).toBeNull();
-  const intro = screen.getByRole("region", { name: /Pick higher or lower\.\s*Know your cost first\./ });
+  const intro = screen.getByRole("region", { name: /Find your level\.\s*Pick your side\./ });
   expect(intro.id).toBe("how");
-  const demo = within(intro).getByRole("region", { name: "See what it pays" });
+  const demo = within(intro).getByRole("region", { name: "Explore an outcome" });
   expect(within(demo).getByText("Illustration")).not.toBeNull();
-  // Higher is on from the first paint (owner, 5 October 2026), so the diagram shows something at once.
+  // A selected bubble explains its answer immediately; settlement detail stays one tap away.
+  expect(within(demo).getAllByRole("button", { name: /^BTC (Higher|Lower),/ })).toHaveLength(6);
+  fireEvent.click(within(demo).getByText("Try a settlement price"));
   expect(within(demo).getByRole("slider").disabled).toBe(false);
   expect(within(demo).getAllByRole("button", { name: /^(Higher|Lower)$/ }).map((button) => button.getAttribute("aria-pressed"))).toEqual(["true", "false"]);
   expect(within(demo).getByRole("status").textContent).toMatch(/If BTC settles at \$87,000: you get \$147\.70/);
@@ -168,7 +170,7 @@ it("keeps every reachable landing illustration free of quotes, results and forec
   }
   // Outside the worked example the landing shows no prices at all; the example's made-up dollar
   // figures live only inside its region, stamped Illustration.
-  const demo = screen.getByRole("region", { name: "See what it pays" });
+  const demo = screen.getByRole("region", { name: "Explore an outcome" });
   const outside = document.body.cloneNode(true);
   outside.querySelector(".saloon-demo").remove();
   expect(outside.textContent).not.toMatch(/\$\s?\d|\d\s?%|\bper ?cent\b/i);
@@ -184,7 +186,7 @@ it("keeps every reachable landing illustration free of quotes, results and forec
   const text = copy.join("\n");
   expect(text).not.toMatch(/\d\s?%|\bper ?cent\b/i);
   expect(text).not.toMatch(/\b(will|expect\w*|likely|predict\w*|target\w*|probabilit\w*|odds|forecast\w*|reflex|larsson|torq|edge|alpha|proven)\b/i);
-  expect(text).not.toMatch(/\b(ETH|SOL|HYPE|XRP|ADA|ZEC|XAUT|Bitcoin|Ethereum|Solana)\b/);
+  expect(outside.textContent).not.toMatch(/\b(ETH|SOL|HYPE|XRP|ADA|ZEC|XAUT|Bitcoin|Ethereum|Solana)\b/);
   expect(text).toContain("Both orders need to fill for its defined cost to apply.");
   expect(text).toContain("A payout below your cost is a loss.");
   expect(fetchSpy).not.toHaveBeenCalled();
@@ -217,7 +219,7 @@ it("describes a dry run as practice without promising fills", () => {
   vi.mocked(oneTapOffered).mockReturnValue(true);
   const { container } = render(<MemoryRouter><Landing /></MemoryRouter>);
   expect(container.querySelector(".hero-description").textContent).toContain("Nothing fills.");
-  expect(container.querySelector(".lp-execution-note").textContent).toContain("Practice mode: quotes are checked; nothing fills.");
+  expect(container.querySelector(".lp-execution-strip").textContent).toContain("This build checks quotes on Derive’s testnet. Nothing fills.");
   expect(container.querySelector(".lp-faq-list").textContent).toContain("checks a quote without placing a trade");
   expect(container.textContent).not.toMatch(/You trade in one tap|both options fill together at one price/);
 });
@@ -228,7 +230,7 @@ it("labels filled testnet trading as practice with test USDC", () => {
   const { container } = render(<MemoryRouter><Landing /></MemoryRouter>);
   expect(container.querySelector(".hero-description").textContent).toContain("Practice higher or lower in one tap with test USDC");
   expect(container.querySelector(".lp-faq-list").textContent).toContain("This build uses test USDC on Derive’s testnet.");
-  expect(container.querySelector(".lp-execution-note").textContent).toContain("both options fill together at one price");
+  expect(container.querySelector(".lp-execution-strip").textContent).toContain("Both options fill together, or nothing fills.");
 });
 
 it("promises one-tap fills only to a mainnet pilot browser", () => {

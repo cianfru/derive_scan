@@ -1,3 +1,4 @@
+import { _resetDecision } from "./lib/decision.js";
 import React from "react";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -28,6 +29,7 @@ const align = (state) => ({ version: 2, readings: { "7d": { engine: { signal: "S
 const markets = (state) => ({ coins: [{ und: "BTC", regime_1d: "MARKUP", signal_1d: "STRONG_LONG", align: align(state) }, { und: "HYPE", regime_1d: "ACCUM", signal_1d: "WAIT", align: align(state) }] });
 
 beforeEach(() => {
+  _resetDecision();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW * 1000);
   localStorage.clear();
@@ -298,9 +300,9 @@ describe("the board page", () => {
     expect(card.querySelector("a.bd-choice.yes .bd-choice-ret b").textContent).toBe(returnText(r.make, r.total));
     expect(card.querySelector("a.bd-choice.yes .bd-choice-top").textContent).toBe(`Higher${r.buyCents}¢${r.capped ? "*" : ""}`);
     cleanup();
-    docs.current = { ...docs.current, "markets.json": markets("defensive") }; show(); expect(order()).toEqual(byDate); await pick(); expect(order()).toEqual(first);
+    docs.current = { ...docs.current, "markets.json": markets("defensive") }; show(); expect(order()).toEqual(first); await pick(); expect(order()).toEqual(first);
     cleanup();
-    docs.current = { ...docs.current, "markets.json": null }; show(); expect(order()).toEqual(byDate); await pick(); expect(order()).toEqual(first);
+    docs.current = { ...docs.current, "markets.json": null }; show(); expect(order()).toEqual(first); await pick(); expect(order()).toEqual(first);
   });
   it("keeps comparisons behind details and missing-mark reasons available", async () => {
     const u = userEvent.setup({ advanceTimers: () => {} });
@@ -343,7 +345,7 @@ describe("the board page", () => {
     expect(screen.getByText("question page no side budget")).toBeTruthy();
     cleanup(); show();
     await u.click(screen.getAllByRole("link", { name: / Lower .*see what it pays/ })[0]);
-    expect(screen.getByText("question page ?side=no budget")).toBeTruthy();
+    expect(screen.getByText("question page ?side=no budget 100")).toBeTruthy();
   });
   it("collapses phone filters without clearing their values, and marks nondefault settings", async () => {
     const u = userEvent.setup({ advanceTimers: () => {} }); show();
@@ -447,7 +449,7 @@ describe("by date", () => {
     expect(container.querySelector(".bd-grid")).toBeNull();
     const head = rows[0].querySelector(".bd-row-head").textContent;
     expect(head).toMatch(/^Bitcoin·Mon 5 Oct, 08:00 UTC·in \d+d \d+h/);
-    expect(head).toMatch(/now \$84,823/);
+    expect(head).toMatch(/last index \$84,823/);
     // The card drops what the header says.
     expect(rows[0].querySelector(".bd-card-top")).toBeNull();
     expect(rows[0].querySelector(".bd-card h3")).toBeTruthy();

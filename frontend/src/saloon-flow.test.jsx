@@ -1,3 +1,4 @@
+import { _resetDecision } from "./lib/decision.js";
 import React from "react";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -14,6 +15,7 @@ import { BANNED } from "./lib/questions.js";
 
 const T14 = 1791036000;
 beforeEach(() => {
+  _resetDecision();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime((T14 + 600) * 1000);
   docs.current = { "questions/index.json": index, "questions/BTC.json": btc, "markets.json": { coins: [] } };

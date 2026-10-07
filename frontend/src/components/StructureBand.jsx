@@ -163,9 +163,9 @@ export default function StructureBand({ data, scoped, scopeLabel, signalFilter, 
   return (
     <section className="plate structure-band" aria-label="Daily market structure">
       <div className="sb-cell sb-consensus">
-        <span className="sb-eyebrow">Market · 1D<Info label="Explain market consensus">{CONSENSUS_HELP}{consensus ? consensusTerm(consensus) : ""}</Info></span>
+        <span className="sb-eyebrow">All perps · daily close<Info label="Explain market consensus">{CONSENSUS_HELP}{consensus ? consensusTerm(consensus) : ""}</Info></span>
         <strong className="sb-headline">{consensus ? CONSENSUS[consensus] || title(consensus) : <Empty />}</strong>
-        {lead[0] && <small className="sb-sub"><b>{live[lead[0]]}/{measured}</b> {REGIME[lead[0]]}</small>}
+        {lead[0] && <small className="sb-sub"><b>{live[lead[0]]}/{measured}</b> perps · {REGIME[lead[0]]}</small>}
       </div>
 
       <div className="sb-cell sb-mix">

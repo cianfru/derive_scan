@@ -18,6 +18,7 @@ const MAX_DISMISSED = 300;
 
 const empty = () => ({ version: VERSION, budget: DEFAULT_BUDGET, follows: [], research: {}, notices: [], dismissed: [] });
 let memory = empty();
+let failedWrite = false;
 const listeners = new Set();
 
 function storage() {
@@ -74,7 +75,7 @@ export function migrate(raw) {
 
 export function loadDoc() {
   const s = storage();
-  if (!s) return migrate(memory);
+  if (!s || failedWrite) return migrate(memory);
   try {
     const text = s.getItem(KEY);
     return text ? migrate(JSON.parse(text)) : migrate(memory);
@@ -95,9 +96,12 @@ export function saveDoc(doc) {
       saved = false;
     }
   }
+  failedWrite = !saved;
   listeners.forEach((fn) => fn());
   return saved;
 }
+
+export const followsPersistent = () => !failedWrite && !!storage();
 
 /** Re-renders a component whenever the saved document changes in this tab. */
 export function useFollowsDoc() {
@@ -105,7 +109,9 @@ export function useFollowsDoc() {
   useEffect(() => {
     const fn = () => setDoc(loadDoc());
     listeners.add(fn);
-    return () => listeners.delete(fn);
+    const reread = (e) => { if (e.key === KEY || e.key == null) fn(); };
+    window.addEventListener("storage", reread);
+    return () => { listeners.delete(fn); window.removeEventListener("storage", reread); };
   }, []);
   return doc;
 }
@@ -183,8 +189,18 @@ export function exportFollows() {
 }
 
 /** Adds the follows in an exported file; ones already followed keep their own settings. */
+export function prepareFollowsImport(raw) {
+  if (Array.isArray(raw)) raw = { follows: raw };
+  if (!raw || typeof raw !== "object" || !Array.isArray(raw.follows)
+    || (raw.kind && raw.kind !== "cowboy-follows")) throw new Error("Not a Following file");
+  if (Number(raw.version) > VERSION) throw new Error("Saved by a newer Cowboy");
+  const incoming = migrate(raw);
+  if (raw.follows.length && !incoming.follows.length) throw new Error("Not a Following file");
+  return incoming;
+}
+
 export function importFollows(text) {
-  const incoming = migrate(JSON.parse(text));
+  const incoming = prepareFollowsImport(JSON.parse(text));
   const doc = loadDoc();
   const have = new Set(doc.follows.map(followKey));
   for (const f of incoming.follows) if (!have.has(followKey(f))) doc.follows.push({ ...f, seen: { ...f.seen, init: false } });
@@ -291,4 +307,5 @@ export function computeNotices(input, { boards = {}, hist = {}, markets = null, 
 
 export function _resetMemory() {
   memory = empty();
+  failedWrite = false;
 }

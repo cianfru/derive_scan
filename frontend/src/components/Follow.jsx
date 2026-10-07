@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { follow, isFollowing, setLevel, unfollow, useFollowsDoc } from "../lib/follows.js";
+import { follow, followsPersistent, isFollowing, setLevel, unfollow, useFollowsDoc } from "../lib/follows.js";
 import { ANSWER, money } from "../lib/questions.js";
+import { Info } from "./ui.jsx";
+import "../my-space.css";
 
 function Mark({ on }) {
   return (
@@ -14,13 +16,15 @@ function Mark({ on }) {
 export function FollowButton({ id, side, k, board = null, compact = false }) {
   const doc = useFollowsDoc();
   const on = isFollowing(doc, id, side);
+  const [sessionNotice, setSessionNotice] = useState(false);
+  const sessionOnly = on && !followsPersistent();
   const what = `${ANSWER[side]} · ${money(k)}`;
   return (
-    <button type="button" className={`text-control fl-btn${on ? " on" : ""}${compact ? " compact" : ""}`} aria-pressed={on}
-      aria-label={on ? `Following ${what}; stop following` : `Follow ${what}`}
-      onClick={(e) => { e.stopPropagation(); if (on) unfollow(id, side); else follow(id, side, { board }); }}>
+    <><button type="button" className={`text-control fl-btn${on ? " on" : ""}${compact ? " compact" : ""}`} aria-pressed={on}
+      aria-label={on ? `Following ${what}${sessionOnly ? " for this visit" : ""}; stop following` : `Follow ${what}`}
+      onClick={(e) => { e.stopPropagation(); if (on) { unfollow(id, side); setSessionNotice(false); } else { follow(id, side, { board }); setSessionNotice(!followsPersistent()); } }}>
       <Mark on={on} /><span className="fl-text">{on ? "Following" : "Follow"}</span>
-    </button>
+    </button>{sessionOnly && sessionNotice && <span className="fl-session" role="status">This visit only<Info label="Why this follow is temporary">This browser could not save your follow. It stays available for this visit. Back up My space in Positions to keep a copy.</Info></span>}</>
   );
 }
 

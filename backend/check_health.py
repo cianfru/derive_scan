@@ -28,7 +28,27 @@ def problems(doc: dict, now: float) -> list[str]:
     for tf, age in (("4h", 14400), ("1d", 86400)):
         fresh(f"signals {tf}", (doc.get("signals") or {}).get(tf), age + MAX_AGE)
     if doc.get("questions_required") or doc.get("questions") is not None:
-        fresh("questions", doc["questions"], MAX_AGE)
+        fresh("questions", doc.get("questions"), MAX_AGE)
+    if doc.get("coverage_required") or "coverage" in doc:
+        coverage = doc.get("coverage") or {}
+        if coverage.get("ready") is not True:
+            errors.append("wallet history: incomplete coverage")
+        if coverage.get("gaps", 0):
+            errors.append("wallet history: unreconciled gaps")
+    if doc.get("flow_required") or "flow" in doc:
+        flow = doc.get("flow") or {}
+        fresh("flow collection", flow.get("checked_at"), MAX_AGE)
+        if flow.get("live_ok") is not True:
+            errors.append("flow collection: failed or unavailable")
+        windows = flow.get("coverage") or {}
+        incomplete = [window for window in ("24h", "7d") if (windows.get(window) or {}).get("ready") is not True]
+        if incomplete:
+            # A bounded collector may need several runs to fill a gap. The publisher retains the
+            # first degraded time, so recent recovery cannot mask a persistent coverage problem.
+            since = flow.get("degraded_since")
+            recovering = isinstance(since, (int, float)) and math.isfinite(since) and 0 <= now - since <= MAX_AGE
+            if not recovering:
+                errors.append(f"flow coverage: incomplete {', '.join(incomplete)}")
     return errors
 
 

@@ -293,7 +293,7 @@ describe("journal J1: Positions", () => {
     expect(loadPositions("testnet")).toHaveLength(1);
     expect(loadPositions("mainnet")).toHaveLength(1);
     const { container } = show("/saloon/mine");
-    expect(container.textContent).toContain("1 testnet record is kept apart");
+    expect(container.querySelector(".my-backup-counts").textContent).toContain("Testnet records1");
   });
 
   it("shows when the browser is not saving", () => {

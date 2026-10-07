@@ -1,0 +1,59 @@
+/* Research refinements: explicit interactions and compact, optional supporting detail.
+   Scoped to these surfaces so the trade chart and ticket keep their own layout. */
+.reading-help { appearance: none; text-align: left; font: inherit; cursor: pointer; }
+.reading-help:hover .lt-text b { text-decoration: underline dotted; text-underline-offset: 3px; }
+.reading-help[aria-expanded="true"] { outline: 2px solid var(--focus); outline-offset: 2px; }
+.mk .mk-readings .reading-help { min-height: 44px; padding-block: 4px; }
+.coin-detail .cd-overview .reading-help { min-height: 44px; }
+.coin-detail .coin-layer-nav { display: flex; align-items: center; gap: 24px; min-width: 0; border-bottom: 1px solid var(--seam); }
+.coin-layer-nav a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font: 500 13px/1.4 var(--font-body); color: var(--fg-2); }
+.coin-layer-nav a:hover, .coin-layer-nav a:focus-visible { color: var(--accent-text); }
+.coin-detail .cd-daily-reference { display: flex; align-items: baseline; justify-content: flex-end; gap: 6px 10px; flex-wrap: wrap; color: var(--muted); font: 400 12px/1.5 var(--font-body); }
+.coin-detail .cd-daily-reference .mono { color: var(--fg-2); }
+.coin-detail .cd-index-notice { color: var(--muted); font: 400 12px/1.4 var(--font-body); }
+.coin-detail .research-disclosure { min-width: 0; border-top: 1px solid var(--seam); }
+.research-disclosure > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; padding: 12px 24px; font: 500 13px/1.4 var(--font-body); color: var(--fg-2); cursor: pointer; }
+.research-disclosure > summary::after { content: "+"; font: 400 18px/1 var(--font-mono); color: var(--muted); }
+.research-disclosure[open] > summary::after { content: "−"; }
+.research-disclosure > summary::-webkit-details-marker { display: none; }
+.coin-detail .coin-context { border: 1px solid var(--seam); border-radius: var(--cd-radius); background: var(--surface-1); }
+.coin-context > .lead { padding: 0 24px 16px; border: 0; background: none; border-radius: 0; }
+.coin-context > .cd-overview { border: 0 !important; border-radius: 0 !important; }
+.coin-context .cd-overview-head { border-radius: 0; }
+.people-page .lb-controls { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px 24px; padding: 12px 20px; border-bottom: 1px solid var(--seam); }
+.lb-find { display: flex; gap: 10px; align-items: center; min-width: 180px; flex: 1; max-width: 350px; color: var(--muted); }
+.lb-find input { min-width: 0; width: 100%; border: 0; border-radius: 0; background: none; padding: 8px 0; font: 400 14px/1.4 var(--font-body); }
+.lb-sort { display: flex; align-items: center; gap: 10px; color: var(--muted); font: 400 12px/1.4 var(--font-body); }
+.lb-sort select { min-height: 40px; padding: 6px 24px 6px 8px; max-width: 220px; border: 0; background: none; font: 400 13px/1.4 var(--font-body); color: var(--fg); }
+.lb-profile { display: inline-flex; align-items: center; gap: 12px; min-height: 36px; color: var(--fg); }
+.lb-table tbody tr { position: relative; }
+.lb-profile::after { content: ""; position: absolute; inset: 0; }
+.lb-profile .arrow-icon { color: var(--muted); }
+.lb-profile:hover, .lb-profile:focus-visible { color: var(--accent-text); }
+.lb-table tr:focus-within { background: var(--plate-2); }
+.lb-result-count { padding: 10px 20px 0; color: var(--muted); font: 400 12px/1.4 var(--font-body); }
+.lb-mobile-label { display: none; }
+.cohort-mobile-select { display: none; }
+@container lb (max-width: 720px) {
+  .lb-mobile-label { display: block; color: var(--muted); font: 400 10px/1.4 var(--font-body); }
+  .lb-table td.lb-m .lb-book-label { display: inline-flex; align-items: center; gap: 6px; }
+  .lb-profile .arrow-icon { display: none; }
+}
+@media (max-width: 680px) {
+  .coin-detail.coin-page { gap: 14px; }
+  .coin-detail .coin-heading { padding-top: 0; gap: 10px; }
+  .coin-detail .cd-price-block { margin-top: 0; gap: 4px; }
+  .coin-detail .cd-daily-reference { justify-content: flex-start; font-size: 11px; gap: 4px 8px; }
+  .coin-detail .coin-layer-nav { gap: 22px; }
+  .coin-detail .coin-layer-nav a { font-size: 12px; }
+  .coin-detail .research-disclosure > summary { min-height: 48px; padding: 10px 14px; }
+  .coin-detail .coin-context > .lead { padding: 0 14px 12px; }
+  .people-page .lb-controls { padding: 8px 16px; gap: 0 16px; }
+  .people-page .lb-find { max-width: none; flex-basis: 100%; }
+  .people-page .lb-find input { min-height: 44px; font-size: 13px; }
+  .people-page .lb-sort { width: 100%; justify-content: space-between; }
+  .people-page .lb-sort select { min-height: 44px; }
+  .people-page .cohort-mobile-select { display: flex; justify-content: space-between; align-items: center; gap: 12px; border-bottom: 1px solid var(--seam); padding: 0 14px; color: var(--muted); font: 400 12px/1.4 var(--font-body); }
+  .people-page .cohort-mobile-select select { min-width: 0; flex: 1; min-height: 48px; max-width: 250px; border: 0; background: none; color: var(--fg); font: 500 13px/1.4 var(--font-body); padding: 8px; }
+  .people-page .cohort-selector { display: none; }
+}

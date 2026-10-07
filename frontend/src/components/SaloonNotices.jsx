@@ -1,10 +1,11 @@
 import { useEffect, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useFeeds } from "./Feeds.jsx";
 import { Arrow, Info } from "./ui.jsx";
 import { computeNotices, dismiss, dismissAll, loadDoc, saveDoc, useFollowsDoc } from "../lib/follows.js";
 import { priceAge } from "../lib/questions.js";
 import { useClock } from "../lib/useClock.js";
+import { updateDecision } from "../lib/decision.js";
 import "../board.css";
 import "../mobile.css";
 
@@ -69,7 +70,14 @@ export function SaloonNotices() {
 }
 
 /** The Saloon's heading, with the Chart / List switch. */
-export default function SaloonHead({ view, board = false, quoteTs, paused = false }) {
+export default function SaloonHead({ view, board = false, quoteTs, paused = false, coin }) {
+  const [params] = useSearchParams();
+  const viewTo = (mode) => {
+    const p = new URLSearchParams(params);
+    if (coin) p.set("coin", coin);
+    if (mode === "list") p.set("view", "list"); else p.delete("view");
+    return `/saloon${p.size ? `?${p}` : ""}`;
+  };
   const now = useClock();
   const age = priceAge(quoteTs, now, paused);
   const following = view === "following";
@@ -77,8 +85,8 @@ export default function SaloonHead({ view, board = false, quoteTs, paused = fals
   // Chart or List (owner, 7 October 2026): the chart is the Saloon's front door, the list the same answers in rows.
   const viewLink = guided ? <Link className="saloon-view-link" to="/saloon">Browse outcomes<span aria-hidden="true"><Arrow /></span></Link>
     : <nav className="saloon-views" aria-label="View">
-      <Link to="/saloon" aria-current={view === "chart" ? "page" : undefined}>Chart</Link>
-      <Link to="/saloon?view=list" aria-current={view === "chart" ? undefined : "page"}>List</Link>
+      <Link to={viewTo("chart")} onClick={() => updateDecision({ view: "chart" })} aria-current={view === "chart" ? "page" : undefined}>Chart</Link>
+      <Link to={viewTo("list")} onClick={() => updateDecision({ view: "list" })} aria-current={view === "chart" ? undefined : "page"}>List</Link>
     </nav>;
   return (
     <header className={`q-head sn-head-wrap${board ? " bd-heading" : ""}`}>

@@ -41,9 +41,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import time
+import uuid
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -97,8 +99,68 @@ def _num(x):
 
 
 def _write(path: Path, obj) -> None:
+    text = json.dumps(obj, separators=(",", ":"), default=float, allow_nan=False)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(obj, separators=(",", ":"), default=float))
+    path.write_text(text)
+
+
+def finalize_publication(site: Path, now: float) -> str:
+    """Validate the complete publication before attaching its shared revision and manifest.
+
+    Source observation times remain untouched, including retained quotes and historical files.
+    The workflow publishes only after this pass succeeds.
+    """
+    def invalid_constant(value):
+        raise ValueError(f"Nonfinite JSON number: {value}")
+
+    documents = []
+    for path in sorted(site.rglob("*.json")):
+        if path == site / "manifest.json":
+            continue
+        relative = path.relative_to(site).as_posix()
+        doc = json.loads(path.read_text(), parse_constant=invalid_constant)
+        if not isinstance(doc, dict):
+            raise ValueError(f"{relative}: expected a JSON object")
+        checks = []
+        if relative in ("markets.json", "questions/index.json"):
+            checks = [("coins", list)]
+        elif relative.startswith("coins/"):
+            checks = [("und", str), ("candles", dict)]
+        elif relative.startswith("questions/") and "/" not in relative[len("questions/"):] and relative != "questions/index.json":
+            checks = [("und", str), ("dates", list)]
+        elif relative == "flow.json":
+            checks = [("large", list), ("wallets", list), ("coverage", dict)]
+        for field, kind in checks:
+            if not isinstance(doc.get(field), kind):
+                raise ValueError(f"{relative}: missing or invalid {field}")
+        # Encoding the entire document catches large exponents parsed as nonfinite floats too.
+        json.dumps(doc, allow_nan=False)
+        documents.append((path, relative, doc))
+    revision = uuid.uuid4().hex
+    artifacts = {}
+    for path, relative, doc in documents:
+        _write(path, {**doc, "publication_revision": revision})
+        content = path.read_bytes()
+        artifacts[relative] = {"sha256": hashlib.sha256(content).hexdigest(), "bytes": len(content)}
+    _write(site / "manifest.json", {"schema": 1, "publication_revision": revision,
+                                    "generated_at": int(now), "artifacts": artifacts})
+    return revision
+
+
+def flow_health(data: Path, site: Path, windows: dict, now: float) -> dict:
+    path = data / "flow" / "status.json"
+    status = json.loads(path.read_text()) if path.exists() else {}
+    previous_path = site / "health.json"
+    previous = json.loads(previous_path.read_text()).get("flow", {}) if previous_path.exists() else {}
+    degraded = any((windows.get(w) or {}).get("ready") is not True for w in ("24h", "7d"))
+    since = previous.get("degraded_since")
+    if not isinstance(since, (int, float)) or not math.isfinite(since) or since > now:
+        since = int(now)
+    recovery = status.get("recovery") or {}
+    return {"checked_at": status.get("checked_at"), "live_ok": bool(status.get("live") is not None and not status["live"].get("error")),
+            "coverage": windows, "degraded_since": since if degraded else None,
+            "recovery": {"ready": recovery.get("ready"), "remaining_intervals": recovery.get("remaining_intervals"),
+                         "errors": len(recovery.get("errors") or [])}}
 
 
 def signal_history(data: Path, now: float) -> dict:
@@ -1045,7 +1107,11 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
         "questions": json.loads(questions.read_text()).get("prices_ts") if questions.exists() else None,
         "questions_required": q_coins is not None,
         "coverage": coverage,
+        "coverage_required": True,
+        "flow_required": True,
+        "flow": flow_health(data, site, flows["_coverage"], now),
     })
+    finalize_publication(site, now)
     return {"coins": len(markets)}
 
 

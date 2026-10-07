@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { LayerIcon } from "../components/Chain.jsx";
 import WalletTag from "../components/WalletTag.jsx";
-import { Info } from "../components/ui.jsx";
+import { Arrow, Info } from "../components/ui.jsx";
 import { HatMark, NeonSign } from "../components/Brand.jsx";
 import { REGIME } from "../lib/format.js";
 import { QUESTIONS_ON, TRADE_ON, ONE_TAP_FILLS, TESTNET_FILLS } from "../lib/flags.js";
@@ -11,7 +11,7 @@ import SaloonDemo from "../components/SaloonDemo.jsx";
 import "../landing.css";
 
 // The landing page shows what Cowboy does and never what it currently reads: no prices, no coins,
-// no counts, no results. Every figure is an illustration, labelled as one; the Saloon example
+// no live counts or results. Every figure is an illustration, labelled as one; the Saloon example
 // (components/SaloonDemo.jsx) is the only place with dollar figures, all made up. The sign carries the
 // character (neon, flicker, light spill); everything below it is as calm as the app.
 
@@ -194,8 +194,8 @@ function OptionsMini() {
   );
 }
 const MINIS = [
-  ["engine", "01", "Regime", RegimeMini, "The engine names the phase price is in, from building a base to cooling off."],
-  ["wallets", "02", "Wallets", WalletsMini, "How profitable wallets are positioned. Context, not a signal."],
+  ["engine", "01", "Regime", RegimeMini, "Market direction, from building a base to trending up or cooling off."],
+  ["wallets", "02", "Smart wallets", WalletsMini, "How profitable wallets are positioned. Context, not a signal."],
   ["options", "03", "Options", OptionsMini, "The range option prices imply, with its upper and lower ends. Market pricing, not a view."],
 ];
 function LayerMinis() {
@@ -221,7 +221,7 @@ const LAYERS = [
     href: "/markets", link: "Explore the markets",
   },
   {
-    kind: "wallets", name: "Wallets", Figure: WalletsFigure,
+    kind: "wallets", name: "Smart wallets", Figure: WalletsFigure,
     question: "Who is positioned, and how?", head: "Follow positions with a track record.",
     body: "Options trades rebuilt wallet by wallet. Directional traders ranked on settled results, with market makers, income sellers and hedgers set aside.",
     detail: "Positioning is context",
@@ -257,10 +257,10 @@ function ResearchExplorer() {
       <div className="lp-research-intro">
         <div>
           <p className="lp-kicker">The research behind the read</p>
-          <h2 id="lp-research-title">Three perspectives.<br />Keep the whole picture.</h2>
+          <h2 id="lp-research-title">Read the market.<br />Keep the whole picture.</h2>
         </div>
         <div>
-          <p className="lp-body">Price, wallets and options tell different stories. Read them in order, side by side. Each keeps its own meaning.</p>
+          <p className="lp-body">Market direction. Smart wallet positioning. What options price in. Three independent views, with the detail a click away.</p>
           <p className="lp-research-principle">Independent readings. Never one blended score.</p>
         </div>
       </div>
@@ -283,7 +283,7 @@ function ResearchExplorer() {
             <h3>{head}</h3>
             <p className="lp-body">{body}</p>
             <p className="lp-detail">{detail}<Info label={`More about ${LAYERS[i].name}`}>{info}</Info></p>
-            <Link className="lp-text-link" to={href}>{link}<span aria-hidden="true">↗</span></Link>
+            <Link className="lp-text-link" to={href}>{link}<Arrow className="lp-link-arrow" /></Link>
           </div>
           <Figure />
         </div>
@@ -321,21 +321,26 @@ function SaloonIntro({ canFill, practice }) {
   return (
     <section id="how" className="wrap lp-saloon-draft" aria-labelledby="lp-saloon">
       <div className="lp-saloon-copy">
-        <p className="lp-kicker"><HatMark size={23} />The Saloon</p>
-        <h2 id="lp-saloon">Pick higher or lower.<br />Know your cost first.</h2>
-        <p className="lp-body">Choose a coin, a date and a price level. See the full cost and what the position pays at settlement before you place anything.</p>
-        <ol className="lp-saloon-steps">
-          <li><span>Choose your outcome</span><small>Higher or lower at settlement.</small></li>
-          <li><span>Understand the payout</span><small>Full, partial or none. Cost always counts.</small></li>
-          <li><span>Check the context</span><small>Regime, wallets and options alongside.</small></li>
-        </ol>
-        {canFill
-          ? <p className="lp-execution-note">One tap: both options fill together at one price, or nothing fills.<Info label="How one tap works">The demo describes a position held to settlement. One tap sends the whole answer to Derive as one package from your own wallet and account, at one firm price you see first. Closing early is valued differently.</Info></p>
-          : practice
-            ? <p className="lp-execution-note">Practice mode: quotes are checked; nothing fills.<Info label="How practice works">This build checks a two-option quote on Derive’s testnet without placing a trade. The illustration shows the payout of a completed position held to settlement.</Info></p>
-            : <p className="lp-execution-note">One-tap trading is coming. Explore costs and settlement payouts.<Info label="How outcomes work">The demo describes a completed two-option position held to settlement. Both orders need to fill for its defined cost to apply. With only the first order filled, cash needed and loss can be larger. Closing early is valued differently.</Info></p>}
+        <div><p className="lp-kicker"><HatMark size={23} />The Saloon</p>
+          <h2 id="lp-saloon">Find your level.<br />Pick your side.</h2></div>
+        <p className="lp-body">Choose a coin. Tap a bubble for a date and price level. Answer Higher or Lower, with the cost and potential return in plain sight.</p>
       </div>
       <SaloonDemo />
+      <div className="lp-execution-strip">
+        <div>
+          <h3>{canFill ? (TESTNET_FILLS ? "Practice in one tap." : "Your choice. One tap.") : practice ? "Check a quote. Try the flow." : "Understand the outcome."}</h3>
+          <p>{canFill
+            ? `${TESTNET_FILLS ? "Test USDC on Derive’s testnet. " : ""}After wallet setup, review the firm price and confirm each trade. Both options fill together, or nothing fills.`
+            : practice ? "This build checks quotes on Derive’s testnet. Nothing fills."
+              : "One-tap trading is coming. Explore the cost, partial payouts and full return before you choose."}
+            <Info label={canFill ? "How one tap works" : practice ? "How practice works" : "How outcomes work"}>{canFill
+              ? "Connect your wallet, set up and fund your Derive account, then choose and confirm every trade yourself. Cowboy sends both options as one package at the firm price you approve. Funds and positions stay in your Derive account. The illustration describes holding to settlement; closing early is valued differently."
+              : practice ? "This build checks a two-option quote on Derive’s testnet without placing a trade. The illustration shows a completed position held to settlement."
+                : "The demo describes a completed two-option position held to settlement. Both orders need to fill for its defined cost to apply. With only the first order filled, cash needed and loss can be larger. Closing early is valued differently."}</Info>
+          </p>
+        </div>
+        <Link className="lp-text-link" to="/saloon">Explore the Saloon<Arrow className="lp-link-arrow" /></Link>
+      </div>
     </section>
   );
 }
@@ -348,13 +353,13 @@ export default function Landing() {
     <div className="landing cowboy-landing cowboy-draft">
       <section className="hero-stage" aria-labelledby="lp-hero">
         <div className="hero-inner">
-          <p className="hero-eyebrow">{QUESTIONS_ON ? "Market insights · Options trading" : "Independent trader intelligence on Derive."}</p>
+          <p className="hero-eyebrow">{QUESTIONS_ON ? (canFill ? "Research · Smart wallets · One-tap trading" : "Research · Smart wallets · Price outcomes") : "Independent trader intelligence on Derive."}</p>
           <div className="sign-wrap"><NeonSign /></div>
           <div className="hero-row">
             <h1 id="lp-hero">Know where<br />the herd stands.{QUESTIONS_ON && <span className="hero-then"> Then pick your side.</span>}</h1>
             <div className="hero-side">
               <p className="hero-description">{QUESTIONS_ON
-                ? "See market conditions and how traders are positioned. " + (canFill
+                ? "Read market direction and smart wallet positioning. Explore price outcomes on the bubble chart. " + (canFill
                   ? `${TESTNET_FILLS ? "Practice" : "Trade"} higher or lower in one tap${TESTNET_FILLS ? " with test USDC" : ""}, with the cost shown before you confirm.`
                   : practice ? "Explore higher-or-lower outcomes and check quotes in practice mode. Nothing fills."
                     : "Trade higher or lower on Derive, with the cost shown before you confirm.")

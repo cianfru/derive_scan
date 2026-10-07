@@ -1,3 +1,4 @@
+import { _resetDecision } from "./lib/decision.js";
 import React from "react";
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within, act } from "@testing-library/react";
@@ -21,6 +22,7 @@ const T14 = 1791036000;
 const markets = { coins: [{ und: "BTC", align: { version: 2, readings: {}, wallet_coverage: { ready: false } } }] };
 
 beforeEach(() => {
+  _resetDecision();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime((T14 + 600) * 1000);
   docs.current = {
@@ -186,7 +188,7 @@ describe("the question page", () => {
     delete docs.current["questions/BTC.json"];
     docs.errors["questions/BTC.json"] = new Error("Data unavailable (503).");
     const { container } = show("/saloon/BTC");
-    expect(container.textContent).toContain("Outcome data is unavailable right now. Try again shortly.");
+    expect(container.textContent).toContain("BTC outcome data is unavailable right now.");
     expect(container.textContent).not.toContain("No questions with a price");
   });
 
@@ -194,7 +196,7 @@ describe("the question page", () => {
     delete docs.current["questions/BTC.json"];
     docs.errors["questions/BTC.json"] = Object.assign(new Error("Data unavailable (503)."), { status: 503 });
     const { container } = show(`${Q86}?side=yes`);
-    expect(container.textContent).toContain("Outcome data is unavailable right now. Try again shortly.");
+    expect(container.textContent).toContain("BTC outcome data is unavailable right now.");
     expect(container.textContent).not.toMatch(/Off the board|no longer published|No questions with a price/);
     expect(screen.queryByRole("button", { name: "Review trade" })).toBeNull();
   });
@@ -243,7 +245,7 @@ describe("the question page", () => {
     expect(screen.getByRole("button", { name: "Review trade" })).toBeTruthy();
     // The coin's candles up to the settlement are the default chart, with the answer's zone and breakeven.
     expect(screen.queryByTestId("chart")).toBeNull();
-    expect(container.querySelector(".md-coin-now")?.textContent).toContain("BTC now");
+    expect(container.querySelector(".md-coin-now")?.textContent).toContain("BTC last index");
   });
 
   it("charts the coin up to the settlement by default, with the chosen answer's zone and breakeven", async () => {
@@ -283,7 +285,7 @@ describe("the question page", () => {
     expect(container.querySelector(".md-payoff-study h2").textContent).toBe("What $100.00 pays at settlement");
     const lines = [...container.querySelectorAll(".md-payoff-study .sc-scen li")].map((r) => r.textContent);
     expect(lines[0]).toBe("If BTC settles at or above $89,000you get $256.62 +$156.62");
-    expect(lines[1]).toMatch(/^If BTC settles at \$[\d,]+, its price nowyou get \$[\d.,]+ [+-]\$[\d.,]+$/);
+    expect(lines[1]).toMatch(/^If BTC settles at \$[\d,]+, the last available indexyou get \$[\d.,]+ [+-]\$[\d.,]+$/);
     expect(lines[2]).toBe("If BTC settles at or below $83,000you get $0.00 -$100.00");
     expect(container.querySelector(".op-range")).toBeNull();
     expect(container.textContent).toContain("Selling back before 08:00 UTC is valued at Derive's sell-back price then, not by these figures.");
@@ -641,7 +643,7 @@ describe("Positions", () => {
     expect(fig("At 08:00 UTC, today's price")).toMatch(/^-\$\d+\.\d\d$/);
     // The card is the date's group: its header names the coin, date, countdown and today's index.
     expect(card.querySelector("h2").textContent).toBe("BTC · Fri 9 Oct, 08:00 UTC");
-    expect(card.querySelector(".q-group-meta").textContent).toMatch(/^in \d+d \d+hnow \$[\d,]+1 position/);
+    expect(card.querySelector(".q-group-meta").textContent).toMatch(/^in \d+d \d+hnow \$[\d,]+(?:Published)?1 position/);
     const user = userEvent.setup({ advanceTimers: () => {} });
     await user.click(screen.getByRole("button", { name: "Close" }));
     // The close summary first: proceeds, fees and the result, then the orders inside Order details.
@@ -696,6 +698,6 @@ describe("Positions", () => {
     expect(screen.getByRole("heading", { name: "No positions yet" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Open the Saloon" }).getAttribute("href")).toBe("/saloon");
     // Export and import sit under "Saved in this browser".
-    expect(screen.getByRole("button", { name: "Export" }).closest("details.q-saved")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Download backup" }).closest("details.q-saved")).not.toBeNull();
   });
 });

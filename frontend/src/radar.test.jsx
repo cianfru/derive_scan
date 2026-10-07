@@ -47,6 +47,30 @@ describe("radar without history", () => {
 });
 
 describe("radar replay", () => {
+  it("follows one trail by default and discloses the full map history and readings", () => {
+    docs.current = { "markets.json": markets, "radar.json": radar };
+    show();
+    expect(document.querySelectorAll(".radar-trail")).toHaveLength(1);
+    expect(document.querySelector(".radar-trail").classList.contains("on")).toBe(true);
+    expect(document.querySelector(".rd-history-details").open).toBe(false);
+    expect(document.querySelector(".rd-reading-details").open).toBe(false);
+    expect(document.querySelector(".radar-list")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "All trails" }));
+    expect(document.querySelectorAll(".radar-trail")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "All trails" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(document.querySelector(".rd-history-details > summary"));
+    expect(document.querySelector(".rd-history-details").open).toBe(true);
+    expect(document.querySelector(".rd-hist")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Market readings" }));
+    expect(document.querySelector(".radar-workspace")).toBeNull();
+    expect(document.querySelectorAll(".rl-row")).toHaveLength(3);
+    expect(screen.getByRole("tablist", { name: "Wallet expiry window" })).toBeTruthy();
+    fireEvent.click(document.querySelectorAll(".rl-row")[1]);
+    expect(document.querySelector(".radar-list")).toBeNull();
+    expect(document.activeElement.getAttribute("aria-label")).toBe("ETH radar detail");
+    expect(document.querySelector(".radar-detail").getAttribute("aria-label")).toBe("ETH radar detail");
+  });
+
   it("opens at now, steps whole closes with the keys, and the rail follows the playhead", () => {
     docs.current = { "markets.json": markets, "radar.json": radar };
     show();

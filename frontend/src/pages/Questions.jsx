@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useOutletContext, useParams, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { useClock } from "../lib/useClock.js";
+import { useFeeds } from "../components/Feeds.jsx";
 import { Arrow, Info, Loading, Failed, RefreshNotice, Tabs } from "../components/ui.jsx";
 import CoinOverview from "../components/CoinOverview.jsx";
 import { Asset } from "../components/MarketVisuals.jsx";
@@ -14,7 +15,11 @@ import QuestionTicket from "../components/QuestionTicket.jsx";
 import OutcomePreview, { OutcomeFigures, WithHeld } from "../components/OutcomePreview.jsx";
 import SaloonHead from "../components/SaloonNotices.jsx";
 import { FollowButton, FollowLevel } from "../components/Follow.jsx";
-import { loadBudget } from "../lib/follows.js";
+import { useSheetFocus } from "../components/DecisionSheet.jsx";
+export { useSheetFocus } from "../components/DecisionSheet.jsx";
+import DecisionComparison, { CompareControl } from "../components/OutcomeDecision.jsx";
+import { retainOutcome, saloonReturn, useDecision } from "../lib/decision.js";
+import { useIndexPrice } from "../lib/livePrice.js";
 import { TESTNET_FILLS, TRADE_ON } from "../lib/flags.js";
 import { oneTapOffered } from "../lib/pilot.js";
 import { NOT_ON_TESTNET, NOT_ON_TESTNET_WHY, missingLegs, useTestnetListing } from "../lib/testnetLevels.js";
@@ -131,68 +136,6 @@ function SettledView({ und, level, price, paid, expiry }) {
   );
 }
 
-const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
-
-/** The phone ticket sheet is a dialog: focus moves into it on open, Tab stays inside, Escape closes
- * it, and focus returns to the button that opened it. Wide screens show the ticket as a column. */
-export function useSheetFocus(open, sheetRef, openerRef, close) {
-  const [modal, setModal] = useState(() => typeof matchMedia !== "function" || matchMedia("(max-width: 1279px)").matches);
-  useEffect(() => {
-    if (typeof matchMedia !== "function") return;
-    const media = matchMedia("(max-width: 1279px)");
-    const update = () => setModal(media.matches);
-    media.addEventListener?.("change", update);
-    return () => media.removeEventListener?.("change", update);
-  }, []);
-  useEffect(() => {
-    const el = sheetRef.current;
-    if (!open || !el) return undefined;
-    const items = () => [...el.querySelectorAll(FOCUSABLE)]
-      .filter((x) => !x.closest(".sr-only, [hidden]") && !(x.tagName !== "SUMMARY" && x.closest("details:not([open])"))
-        && (modal || !x.classList.contains("q-sheet-close"))
-        && getComputedStyle(x).display !== "none" && getComputedStyle(x).visibility !== "hidden");
-    const background = [];
-    const bodyOverflow = document.body.style.overflow;
-    const rootOverflow = document.documentElement.style.overflow;
-    if (modal) {
-      for (let node = el; node && node !== document.body; node = node.parentElement) {
-        for (const sibling of node.parentElement?.children || []) {
-          if (sibling === node) continue;
-          background.push([sibling, sibling.getAttribute("inert")]);
-          sibling.setAttribute("inert", "");
-        }
-      }
-      document.body.style.overflow = "hidden";
-      document.documentElement.style.overflow = "hidden";
-    }
-    (items()[0] || el).focus?.();
-    const key = (e) => {
-      if (e.key === "Escape" && !document.querySelector(".pop")) { e.preventDefault(); close(); return; }
-      if (!modal || e.key !== "Tab") return;
-      const list = items();
-      if (!list.length) return;
-      const first = list[0], last = list[list.length - 1];
-      if (e.shiftKey && (document.activeElement === first || !el.contains(document.activeElement))) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && (document.activeElement === last || !el.contains(document.activeElement))) { e.preventDefault(); first.focus(); }
-    };
-    document.addEventListener("keydown", key);
-    const back = openerRef.current;
-    return () => {
-      document.removeEventListener("keydown", key);
-      if (modal) {
-        for (const [node, inert] of background) {
-          if (inert == null) node.removeAttribute("inert");
-          else node.setAttribute("inert", inert);
-        }
-        document.body.style.overflow = bodyOverflow;
-        document.documentElement.style.overflow = rootOverflow;
-      }
-      back?.focus?.();
-    };
-  }, [open, modal]);
-  return modal;
-}
-
 /** No price for a side, with the reason in an (i). */
 export function NoPrice({ level, side, paused, text = "No price now" }) {
   return (
@@ -258,10 +201,10 @@ const scrollTo = (el) => el?.scrollIntoView?.({ block: "start", behavior: typeof
 
 /** What the amount pays at settlement in three plain lines (owner, 7 October 2026: in place of the 0-to-$1 payout
  * chart): where it pays in full, at today's price, and where it pays nothing. */
-function SettleLines({ und, level, side, t, index }) {
+function SettleLines({ und, level, side, t, index, current }) {
   const full = side === "yes" ? [`at or above ${money(level.hi)}`, level.hi] : [`at or below ${money(level.lo)}`, level.lo];
   const none = side === "yes" ? [`at or below ${money(level.lo)}`, level.lo] : [`at or above ${money(level.hi)}`, level.hi];
-  const rows = [full, ...(Number.isFinite(index) ? [[`at ${money(index)}, its price now`, index]] : []), none];
+  const rows = [full, ...(Number.isFinite(index) ? [[`at ${money(index)}, ${current?.fresh ? "its live index" : "the last available index"}`, index]] : []), none];
   return <ul className="sc-scen">{rows.map(([text, v]) => {
     const o = outcome(t, level, side, v);
     return <li key={text}><span>If {und} settles {text}</span><span>you get <b>{money(o.payout, { cents: true })}</b> <b className={o.pl > 0.004 ? "up" : o.pl < -0.004 ? "down" : ""}>{signed(o.pl)}</b></span></li>;
@@ -281,7 +224,7 @@ function OutcomeCharts({ und, date, level, sideKey, t, board, hist, historyError
         : `Derive's mark, buy and sell-back prices in cents per $1 of maximum payout for ${ANSWER[sideKey || "yes"]}. These are prices, not a measure of how often an outcome happens.`}</Info></div>
     {view === "coin"
       ? (coin ? <>
-          <SettleChart und={und} candles={coin.candles} index={board.index} settleTs={date.settle_ts} lo={level.lo} hi={level.hi} side={sideKey || null} breakeven={be} theme={theme}
+          <SettleChart und={und} candles={coin.candles} index={board.index} publishedTs={board.prices_ts} settleTs={date.settle_ts} lo={level.lo} hi={level.hi} side={sideKey || null} breakeven={be} theme={theme}
             payout={t && sideKey ? (S) => outcome(t, level, sideKey, S) : null} />
           <p className="sc-key"><span><i className="settle" />Settles {dayLabel(date.expiry)}, 08:00 UTC</span>
             {sideKey && <span><i className={sideKey} />{ANSWER[sideKey]} pays in full {sideKey === "yes" ? `at ${money(level.hi)} or above` : `at ${money(level.lo)} or below`}</span>}
@@ -295,12 +238,15 @@ function OutcomeCharts({ und, date, level, sideKey, t, board, hist, historyError
 
 /** The board's detail page keeps the choice, amount and payout together. Only the final order
  * review opens a ticket; prices, fees, available size and time gates use the same guided maths. */
-function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, renderLadder, ladderOpen, onLadder, initialDollars }) {
+function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, renderLadder, ladderOpen, onLadder, initialDollars, initialDraft }) {
   const { date, level } = found;
+  const current = useIndexPrice(und, board.index, board.prices_ts);
   const question = questionText(und, level, date.expiry);
   const paused = age.state === "paused" || board.paused;
   const settling = settlingNow(level);
-  const [amountDraft, setAmountDraft] = useState(() => String(Number.isFinite(initialDollars) && initialDollars > 0 ? initialDollars : loadBudget()));
+  const entry = useLocation();
+  const [decision, update] = useDecision(initialDollars, initialDraft, entry.key);
+  const amountDraft = decision.amountDraft, setAmountDraft = (value) => update({ amountDraft: value });
   const dollars = Number(amountDraft);
   const amountValid = Number.isFinite(dollars) && dollars > 0;
   const [sheet, setSheet] = useState(false);
@@ -319,24 +265,24 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
   return (
     <div className={`md-detail${sideKey && !settling ? " md-chosen" : ""}`}>
       <header className="md-heading">
-        <Link className="md-back" to="/saloon">‹ All outcomes</Link>
+        <Link className="md-back" to={saloonReturn(und, decision)}>‹ All outcomes</Link>
         <div className="md-subject"><Asset und={und} compact /><span>Price outcome</span>{board.thin && <ThinNote und={und} />}</div>
         <h1 className="q-title">{question}</h1>
         <p className="q-settles">Settles {dayLabel(date.expiry)}, 08:00 UTC{countdown(date.settle_ts) && <> · {countdown(date.settle_ts)}</>}
           <Info label="About settlement">Derive settles on the average {und} index over the 30 minutes to 08:00 UTC. The two options pay in USDC to your Derive account with no action from you.</Info>
         </p>
-        {sideKey && !settling && <div className="q-follow md-follow"><FollowButton id={level.id} side={sideKey} k={level.k} board={board} /><FollowLevel id={level.id} side={sideKey} /></div>}
+        {sideKey && !settling && <div className="q-follow md-follow"><CompareControl selection={{ id: level.id, und, side: sideKey, k: level.k }} /><FollowButton id={level.id} side={sideKey} k={level.k} board={board} /><FollowLevel id={level.id} side={sideKey} /></div>}
       </header>
 
       <div className="md-evidence">
         <section className="md-history" aria-label="Price history">
-          <div className="md-section-heading"><div><span className="label">{und} index now</span><strong className="mono"><LiveMoney und={und} value={board.index} /></strong></div><PriceTime pricesTs={board.prices_ts} age={age} /></div>
+          <div className="md-section-heading"><div><span className="label">{und} {current.fresh ? "index now" : "last index"}</span><strong className="mono"><LiveMoney und={und} value={board.index} publishedTs={board.prices_ts} /></strong></div><PriceTime pricesTs={board.prices_ts} age={age} /></div>
           <OutcomeCharts und={und} date={date} level={level} sideKey={sideKey} t={t} board={board} hist={hist} historyError={historyError} theme={theme} />
         </section>
         <Context und={und} />
         {t && <section className="md-payoff-study" aria-label="Settlement payout"><h2>What {money(t.mostLose, { cents: true })} pays at settlement</h2>
-          <SettleLines und={und} level={level} side={sideKey} t={t} index={board.index} />
-          <WithHeld und={und} level={level} side={sideKey} t={t} expiry={date.expiry} index={board.index} />
+          <SettleLines und={und} level={level} side={sideKey} t={t} index={current.price} current={current} />
+          <WithHeld und={und} level={level} side={sideKey} t={t} expiry={date.expiry} index={current.price} />
           <p className="op-note">Selling back before 08:00 UTC is valued at Derive's sell-back price then, not by these figures.<Info label="About selling back early">Until a minute before 08:00 UTC you can sell back on Derive. You then get what Derive's screen bids for the two options at that moment, which follows the coin's price and the time left, and fees apply again. Holding to 08:00 UTC pays as shown here.</Info></p>
         </section>}
         <section className="md-settlement" aria-label="How settlement works">
@@ -350,7 +296,7 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
 
       <aside className="md-selection" aria-label="Your outcome">
         <div className="md-selection-inner">
-          <p className="md-coin-now"><span>{und} now</span><b className="mono"><LiveMoney und={und} value={board.index} /></b><small>{dayLabel(date.expiry)}, 08:00 UTC{countdown(date.settle_ts) && <> · {countdown(date.settle_ts)}</>}</small></p>
+          <p className="md-coin-now"><span>{und} {current.fresh ? "now" : "last index"}</span><b className="mono"><LiveMoney und={und} value={board.index} publishedTs={board.prices_ts} /></b><small>{dayLabel(date.expiry)}, 08:00 UTC{countdown(date.settle_ts) && <> · {countdown(date.settle_ts)}</>}</small></p>
           <div className="md-selection-title"><h2>Choose your outcome</h2><span>Cost per $1 of max. payout<Info label="About the answer price">The amount shown buys up to $1 of payout at settlement, before Derive's fees. An answer can pay nothing, part of $1, or the full $1, depending on the settlement price.</Info></span></div>
           {settling ? <p className="q-big">Settling · average from 07:30 to 08:00 UTC</p> : <>
             <div className="q-pick md-pick" role="radiogroup" aria-label="Answer">
@@ -395,13 +341,15 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
 /** The guided flow from step 3: Higher or Lower (never picked for the user), then the amount, then
  * what it pays, then the trade. One primary action per step. The full ladder of levels
  * sits under "Other levels". */
-function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, renderLadder, ladderOpen, onLadder, initialStep, initialDollars }) {
+function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, renderLadder, ladderOpen, onLadder, initialStep, initialDollars, initialDraft }) {
   const { date, level } = found;
   const question = questionText(und, level, date.expiry);
   const paused = age.state === "paused" || board.paused;
   // The first amount: the board's budget when opened from it, else the budget kept in this browser.
   // An amount is the total spend, Derive's fees included (budgetTicket), as on the board.
-  const [amountDraft, setAmountDraft] = useState(() => String(Number.isFinite(initialDollars) && initialDollars > 0 ? initialDollars : loadBudget()));
+  const entry = useLocation();
+  const [decision, update] = useDecision(initialDollars, initialDraft, entry.key);
+  const amountDraft = decision.amountDraft, setAmountDraft = (value) => update({ amountDraft: value });
   const dollars = Number(amountDraft);
   const amountValid = Number.isFinite(dollars) && dollars > 0;
   const [sheet, setSheet] = useState(false);
@@ -545,14 +493,16 @@ function OldQuestion({ id, onBack }) {
 
 export default function Questions() {
   const now = useClock();
+  const [decision] = useDecision();
   const { und: undParam, id } = useParams();
   const [search, setSearch] = useSearchParams();
   const navigate = useNavigate();
   const { theme } = useOutletContext() || {};
   const parsed = id ? parseId(id) : null;
-  const { data: index, error: indexError } = useData("questions/index.json");
+  const { data: index, error: indexError, retry: retryIndex } = useData("questions/index.json");
   const und = id ? parsed?.und : undParam || index?.coins?.[0]?.und;
-  const { data: board, error } = useData(und ? `questions/${und}.json` : null);
+  const { data: board, error, retry: retryBoard } = useData(und ? `questions/${und}.json` : null);
+  const [publicationFeeds] = useFeeds(und ? [`questions/${und}.json`] : [], undefined, { revision: index?.publication_revision, retry: retryIndex });
   const [pickedDate, setPickedDate] = useState(null);
   const [pickedOutcome, setPickedOutcome] = useState(null);
   const [more, setMore] = useState(false);
@@ -565,7 +515,7 @@ export default function Questions() {
     setSearch((s) => { const n = new URLSearchParams(s); n.set("side", k); return n; }, { replace: true });
   };
   useEffect(() => { setPickedDate(null); setPickedOutcome(null); setMore(false); setLadder(false); }, [und]);
-  const back = () => { setPickedDate(null); setPickedOutcome(null); navigate(`/saloon/${und}`); };
+  const back = () => { setPickedDate(null); setPickedOutcome(null); navigate(saloonReturn(und)); };
   const age = priceAge(board?.prices_ts, now, board?.paused || index?.paused);
   const paused = age.state === "paused";
   const dates = (board?.dates || []).filter((d) => d.board);
@@ -585,12 +535,14 @@ export default function Questions() {
     }
   }, [id, und, sideKey, pickedOutcome, found?.level.id]);
 
+  useEffect(() => { if (found && sideKey && !found.settled) retainOutcome({ id: found.level.id, side: sideKey }); }, [found?.level?.id, sideKey]);
+
   if (id && !parsed) return <div className="wrap page q-page"><p className="status">Unknown question.</p><Link className="text-control" to="/saloon">Browse the Saloon</Link></div>;
   if (id && error?.status === 404 && !board) return <div className="wrap page q-page"><OldQuestion id={id} onBack={back} /></div>;
   if (indexError && !index && !id) return <div className="wrap page"><Failed error={indexError} /></div>;
   if ((!id && !index) || (und && !board && !error)) return <div className="wrap page"><Loading /></div>;
   const coins = index?.coins || [];
-  if (error && !board) return <div className="wrap page q-page"><SaloonHead view="guided" /><p className="status">Outcome data is unavailable right now. Try again shortly.</p></div>;
+  if (error && !board) return <div className="wrap page q-page"><SaloonHead view="guided" /><p className="status">{und} outcome data is unavailable right now.</p><button type="button" className="text-control" onClick={() => retryBoard?.()}>Retry</button><Link className="text-control" to={saloonReturn(und)}>Back to the Saloon</Link></div>;
   if (!und) {
     return <div className="wrap page q-page"><SaloonHead view="guided" /><p className="status">No questions with a price on Derive's screen right now.</p></div>;
   }
@@ -602,7 +554,8 @@ export default function Questions() {
   const onPick = (e, lv, k, dollars) => {
     e.preventDefault();
     setLadder(false);
-    navigate(`/q/${lv.id}?side=${k}`, { state: { step: "amount", ...(Number.isFinite(dollars) && dollars > 0 ? { dollars } : {}) } });
+    retainOutcome({ id: lv.id, side: k });
+    navigate(`/q/${lv.id}?side=${k}`, { state: { step: "amount", amountDraft: decision.amountDraft, ...(Number.isFinite(dollars) && dollars > 0 ? { dollars } : {}) } });
   };
   const lead = (
     <>
@@ -634,14 +587,15 @@ export default function Questions() {
   const ladderEl = renderLadder();
   return (
     <div className={`wrap page q-page${id ? " md-page" : ""}`}>
+      {publicationFeeds}
       {!id && <SaloonHead view="guided" />}
       <RefreshNotice error={error || (index ? indexError : null)} />
       {found && !found.settled ? (
         id ? <OutcomeDetail key={found.level.id} und={und} board={board} found={found} sideKey={sideKey} setSide={setSide} age={age} theme={theme}
-          renderLadder={renderLadder} ladderOpen={ladder} onLadder={() => setLadder((o) => !o)} initialDollars={location.state?.dollars} /> :
+          renderLadder={renderLadder} ladderOpen={ladder} onLadder={() => setLadder((o) => !o)} initialDollars={location.state?.dollars} initialDraft={location.state?.amountDraft} /> :
         <QuestionView key={found.level.id} und={und} board={board} found={found} sideKey={sideKey} setSide={setSide} age={age} theme={theme}
           lead={lead} renderLadder={renderLadder} ladderOpen={ladder} onLadder={() => setLadder((o) => !o)} initialStep={location.state?.step}
-          initialDollars={location.state?.dollars} />
+          initialDollars={location.state?.dollars} initialDraft={location.state?.amountDraft} />
       ) : (
         <div className="q-layout">
           <div className="q-flow">
@@ -658,6 +612,7 @@ export default function Questions() {
           </div>
         </div>
       )}
+      <DecisionComparison boards={{ [und]: board }} now={now} index={index} retryIndex={retryIndex} />
       <Settled board={board} />
     </div>
   );
