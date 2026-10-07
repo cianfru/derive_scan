@@ -471,8 +471,9 @@ describe("the question page", () => {
   });
 
   it("updates review isolation when the viewport crosses the sheet breakpoint", async () => {
-    let update;
-    const media = { matches: false, addEventListener: (_, listener) => { update = listener; }, removeEventListener() {} };
+    const listeners = new Set();
+    const update = () => [...listeners].forEach((listener) => listener());
+    const media = { matches: false, addEventListener: (_, listener) => listeners.add(listener), removeEventListener: (_, listener) => listeners.delete(listener) };
     vi.stubGlobal("matchMedia", () => media);
     const { container } = show(`${Q86}?side=yes`);
     await userEvent.setup({ advanceTimers: () => {} }).click(screen.getByRole("button", { name: "Review trade" }));

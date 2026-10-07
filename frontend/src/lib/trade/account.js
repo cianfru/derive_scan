@@ -135,7 +135,8 @@ export async function arriving(client, wallet, { now = Date.now() } = {}) {
   const [{ pending_deposits: list = [] }, assets] = await Promise.all([client.call("public/get_pending_deposits", { wallet }), depositAssets(client)]);
   const out = { amount: 0, count: 0, landing: 0, landingCount: 0, opening: 0, openingCount: 0, list };
   for (const d of list) {
-    const asset = assets.get(String(d.asset || "").toLowerCase());
+    const asset = assets.get(String(d.asset || d.bridge_to_l1?.token || "").toLowerCase());
+    if (["failed", "expired"].includes(d.bridge_to_l1?.bridge_status)) continue;
     if (!asset || asset.name !== "USDC" || d.status === "reverted") continue;
     const raw = num(d.amount) ?? num(d.bridge_to_l1?.expected_amount);
     const dollars = raw != null && Number.isFinite(raw) ? raw / 10 ** asset.decimals : 0;

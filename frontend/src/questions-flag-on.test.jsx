@@ -4,7 +4,7 @@ import { render, screen, cleanup, within, fireEvent } from "@testing-library/rea
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
 
-const flags = vi.hoisted(() => ({ QUESTIONS_ON: true, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false, TRADE_ON: false }));
+const flags = vi.hoisted(() => ({ FUND_ANYCHAIN: false, RYSK_MOCK: false, QUESTIONS_ON: true, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false, TRADE_ON: false }));
 vi.mock("./lib/flags.js", () => flags);
 vi.mock("./lib/pilot.js", async (importOriginal) => ({ ...await importOriginal(), oneTapOffered: vi.fn(() => false) }));
 import Shell from "./components/Shell.jsx";
@@ -14,7 +14,7 @@ import { oneTapOffered } from "./lib/pilot.js";
 
 let fetchSpy;
 beforeEach(() => {
-  Object.assign(flags, { QUESTIONS_ON: true, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false, TRADE_ON: false });
+  Object.assign(flags, { FUND_ANYCHAIN: false, RYSK_MOCK: false, QUESTIONS_ON: true, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false, TRADE_ON: false });
   vi.mocked(oneTapOffered).mockReturnValue(false);
   vi.stubGlobal("scrollTo", () => {});
   vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));

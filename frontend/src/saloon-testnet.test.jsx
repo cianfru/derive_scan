@@ -15,7 +15,7 @@ import shapes from "./fixtures/trade/private_shapes.json";
 import frames from "./fixtures/trade/public_frames.json";
 
 const docs = vi.hoisted(() => ({ current: {} }));
-vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: true, TRADE_ON: true, TESTNET_FILLS: true, MAINNET_FILLS: false, ONE_TAP_FILLS: true, tradeMode: () => "testnet" }));
+vi.mock("./lib/flags.js", () => ({ FUND_ANYCHAIN: false, RYSK_MOCK: false, QUESTIONS_ON: true, TRADE_ON: true, TESTNET_FILLS: true, MAINNET_FILLS: false, ONE_TAP_FILLS: true, tradeMode: () => "testnet" }));
 vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.current[path] ?? null : null, error: null }) }));
 vi.mock("./components/QuestionChart.jsx", () => ({ default: () => <div data-testid="chart" /> }));
 import Questions from "./pages/Questions.jsx";

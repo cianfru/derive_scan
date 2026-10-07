@@ -19,7 +19,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'sha256-Bj6ipgLkBmZCG6Rasyeyph2qAm+MARcvrq8pKIR/WjA='; style-src 'self' 'unsafe-inline'; connect-src 'self' https://raw.githubusercontent.com https://api.derive.xyz https://testnet.api.derive.xyz wss://api.derive.xyz wss://testnet.api.derive.xyz; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self' 'sha256-Bj6ipgLkBmZCG6Rasyeyph2qAm+MARcvrq8pKIR/WjA='; style-src 'self' 'unsafe-inline'; connect-src 'self' https://raw.githubusercontent.com https://li.quest https://ethereum-rpc.publicnode.com https://base-rpc.publicnode.com https://arbitrum-one-rpc.publicnode.com https://rpc.hyperliquid.xyz https://api.derive.xyz https://testnet.api.derive.xyz wss://api.derive.xyz wss://testnet.api.derive.xyz; img-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
         },
         {
           "key": "X-Content-Type-Options",

@@ -1,0 +1,90 @@
+/* Trade decisions first on phones. Every desktop rule and figure stays unchanged. */
+@media (max-width: 700px) {
+  .mt-figures { display: grid; gap: 8px; margin: 0; }
+  .mt-figures > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .mt-figures dt { display: inline-flex; align-items: center; color: var(--text-2); font-size: 13px; }
+  .mt-figures dd { margin: 0; text-align: right; font-size: 16px; }
+  .mt-figures .mt-cost dd { font-size: 22px; font-weight: 600; }
+  .mt-figures dd small { display: block; color: var(--text-3); font: 400 12px/1.4 var(--font-sans); }
+  .mt-facts, .mt-fold { min-width: 0; border-top: 1px solid var(--border); }
+  .mt-facts > summary, .mt-fold > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; color: var(--text-2); font: 500 13px/1.4 var(--font-sans); cursor: pointer; list-style: none; }
+  .mt-facts > summary::-webkit-details-marker, .mt-fold > summary::-webkit-details-marker { display: none; }
+  .mt-facts > summary::after, .mt-fold > summary::after { content: "+"; font: 400 20px/1 var(--font-sans); }
+  .mt-facts[open] > summary::after, .mt-fold[open] > summary::after { content: "−"; }
+  .mt-facts dl { display: grid; gap: 10px; margin: 4px 0 12px; }
+  .mt-facts dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 12px; }
+  .mt-facts dt { color: var(--text-3); }
+  .mt-facts dd { margin: 0; text-align: right; }
+  .mt-facts p { margin: 0 0 12px; color: var(--text-3); font-size: 12px; line-height: 1.6; }
+  .mt-fold[open] > :not(summary) { margin-block: 8px 12px; }
+  .mt-fold .q-context { min-width: 0; }
+
+  .md-page .md-detail { gap: 16px; }
+  .md-page .md-heading { gap: 6px; }
+  .md-page .md-heading .md-subject { display: none; }
+  .md-page .md-heading .q-title { font-size: 23px; max-width: none; }
+  .md-page .md-heading .q-settles { font-size: 12px; }
+  .md-page .md-selection-inner { padding: 14px 16px; gap: 8px; }
+  .md-page .md-coin-now { margin: 0; padding-bottom: 8px; }
+  .md-page .md-coin-now > small { display: none; }
+  .md-page .md-coin-now b { font-size: 20px; }
+  .md-page .md-selection-title h2 { display: none; }
+  .md-page .md-selection-title > span { min-height: 28px; }
+  .md-page .md-pick .q-pick-btn { min-height: 58px; padding: 10px; }
+  .md-page .md-pick .q-pick-zone { display: none; }
+  .md-page .md-amount { gap: 8px; }
+  .md-page .md-amount .q-amount-in { gap: 4px 8px; }
+  .md-page .md-amount .q-amount-in > label { min-height: 28px; }
+  .md-page .md-amount .q-quick { gap: 4px; }
+  .md-page .md-amount .q-quick button { min-height: 44px; min-width: 44px; }
+  .md-page .md-preview { padding-top: 8px; }
+  .md-page .md-loss-note, .md-page .md-review-action > small { display: none; }
+  .md-page .md-review-action { gap: 0; }
+  .md-page .md-review-action > button { min-height: 48px; }
+  .md-page .mt-follow .md-follow { margin: 0; gap: 8px 16px; }
+  .md-page .mt-follow .text-control, .md-page .mt-follow .fl-btn { min-height: 44px; }
+  .md-page .md-evidence.mt-fold { display: block; }
+  .md-page .md-evidence.mt-fold > .mt-research-body { display: grid; gap: 20px; }
+  .md-page .q-sheet-close { min-height: 44px; }
+
+  .sl-panel { gap: 10px; }
+  .sl-panel h2 { font-size: 20px; }
+  .sl-panel .sl-seg button { min-height: 60px; }
+  .sl-panel .sl-seg button > small:last-child { display: none; }
+  .sl-panel .sl-amount { gap: 4px 8px; }
+  .sl-panel .sl-amount .q-quick { gap: 4px; }
+  .sl-panel .sl-amount .q-quick button { min-width: 44px; }
+  .sl-panel .md-preview { padding-top: 8px; }
+  .sl-panel .sl-review { order: 1; }
+  .sl-panel .mt-facts, .sl-panel .mt-context, .sl-panel .sl-foot { order: 2; }
+  .sl-panel .sl-foot .text-control, .sl-panel .sl-foot a { display: inline-flex; align-items: center; min-height: 44px; }
+  .sl-panel .sl-foot > span { display: none; }
+  .sl-panel .mt-context { color: var(--text-2); }
+  .sl-panel .decision-consequence { font-size: 12px; }
+  .q-ticket .q-onetap-note { font-size: 12px; }
+  .q-ticket .mt-facts { margin-top: 12px; }
+}
+@media (max-width: 700px) {
+  .md-page .mt-research { grid-area: evidence; }
+  .md-page .mt-research > .md-evidence { margin-top: 8px; }
+  .sl-panel > .tabs { margin-right: 58px; flex-shrink: 0; }
+  .sl-panel > .tabs button { min-height: 44px; font-size: 13px; }
+}
+@media (max-width: 700px) {
+  .md-detail .info, .sl-panel .info, .q-sheet .info { position: relative; width: 44px; height: 44px; min-width: 44px; min-height: 44px; flex: 0 0 44px; margin: -12px -8px; border: 0; border-radius: 0; font-size: 12px; }
+  .md-detail .info::before, .sl-panel .info::before, .q-sheet .info::before { content: ""; position: absolute; inset: 12px; border: 1px solid var(--border-strong); border-radius: 50%; pointer-events: none; }
+  .md-detail .info:hover::before, .sl-panel .info:hover::before, .q-sheet .info:hover::before,
+  .md-detail .info:focus-visible::before, .sl-panel .info:focus-visible::before, .q-sheet .info:focus-visible::before { border-color: var(--accent); }
+  .sl-panel .decision-price-note { font-size: 12px; }
+  .mt-ticket-preview { border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px; margin-bottom: 12px; background: var(--surface-1); }
+  .mt-ticket-preview > p { margin: 0 0 10px; color: var(--text-3); font-size: 12px; }
+}
+@media (max-width: 700px) {
+  .md-detail .info, .sl-panel .info, .q-ticket .info { width: 44px; height: 44px; min-width: 44px; min-height: 44px; flex: 0 0 44px; margin: -12px -8px; border: 0; border-radius: 0; background: none; font-size: 12px; }
+  .md-detail .info::before, .sl-panel .info::before, .q-ticket .info::before { inset: 12px; border: 1px solid var(--border-strong); border-radius: 50%; pointer-events: none; }
+  .md-detail .info:hover::before, .sl-panel .info:hover::before, .q-ticket .info:hover::before { border-color: var(--accent); }
+  .sl-panel .decision-price-note { font-size: 12px; }
+}
+@media (max-width: 700px) {
+  .md-amount .q-dollar-field input, .sl-amount .q-dollar-field input { min-height: 44px; height: 44px; }
+}

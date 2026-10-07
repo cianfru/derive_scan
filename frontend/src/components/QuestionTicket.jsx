@@ -1,7 +1,9 @@
 import { Component, Suspense, lazy, useState } from "react";
 import { Info } from "./ui.jsx";
 import OutcomePreview from "./OutcomePreview.jsx";
+import { TradeFacts, TradeFigures, usePhoneTrade } from "./MobileTrade.jsx";
 import { TRADE_ON } from "../lib/flags.js";
+import { oneTapOffered } from "../lib/pilot.js";
 import { amountText, closeTicket, copyText, fullPay, limitText, money, orderedLegs, parseId, signed } from "../lib/questions.js";
 import { closeSummary } from "../lib/positions.js";
 import { parseUtc } from "./JournalPlaced.jsx";
@@ -53,9 +55,11 @@ const TradeBoundary = TRADE_ON ? class extends Component {
 } : null;
 
 function WithTrade(props) {
+  const phone = usePhoneTrade();
   const hand = <QuestionTicket {...props} />;
   return (
     <TradeBoundary>
+      {phone && !props.closing && props.t && oneTapOffered() && <section className="mt-ticket-preview" aria-label="Board estimate"><p>Board estimate<Info label="About the review estimate">These cost and payout figures use the published option prices. The firm total from Derive can differ; check the confirmed cost before placing a trade.</Info></p><TradeFigures und={props.und} level={props.level} side={props.sideKey} t={props.t} /><TradeFacts und={props.und} level={props.level} side={props.sideKey} t={props.t} expiry={props.expiry} /></section>}
       <Suspense fallback={<TradeLoading />}><TradePanel {...props} fallback={hand} /></Suspense>
     </TradeBoundary>
   );
@@ -128,6 +132,7 @@ function Sold({ t, paid, feesFor, onSave }) {
  * no orders to place by hand. Selling back a position placed by hand earlier keeps its orders inside
  * Order details (the short leg bought back first) and "I sold it back", which asks what sold. */
 function QuestionTicket({ und, question, answer, level, sideKey, t, board, pricesTs, settleTs, stale, closing = false, onSold, expiry, paid = null, holdPayout = null }) {
+  const phone = usePhoneTrade();
   const feesFor = (q) => closeTicket(level, sideKey, q, board)?.fees ?? null;
   const [step, setStep] = useState(null);
   const close = closing && paid != null ? closeSummary(t, paid, holdPayout) : null;
@@ -141,7 +146,7 @@ function QuestionTicket({ und, question, answer, level, sideKey, t, board, price
           <Info label="About one-tap trading">Each answer is two Derive options traded together at one price: one bought and one sold, across the zone where it pays in part. One tap places both from your own Derive account. Until it opens, the figures here show what this answer costs and pays.</Info>
         </p>
         <h3>{question} <span className="q-ticket-side">{answer} · {fullPay(level, sideKey)}</span></h3>
-        <OutcomePreview und={und} level={level} side={sideKey} t={t} expiry={expiry || parseId(level.id)?.expiry} settleTs={settleTs} summary />
+        {phone ? <><TradeFigures und={und} level={level} side={sideKey} t={t} summary /><TradeFacts und={und} level={level} side={sideKey} t={t} expiry={expiry || parseId(level.id)?.expiry} /></> : <OutcomePreview und={und} level={level} side={sideKey} t={t} expiry={expiry || parseId(level.id)?.expiry} settleTs={settleTs} summary />}
         {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
         <p className={`q-note${stale ? " warn" : ""}`}>Prices from {clock(pricesTs)}.</p>
       </section>

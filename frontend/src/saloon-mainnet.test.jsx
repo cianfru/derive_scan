@@ -14,7 +14,7 @@ vi.hoisted(() => {
   process.env.VITE_QUESTIONS = "1";
 });
 vi.mock("./lib/flags.js", () => ({
-  QUESTIONS_ON: true, TRADE_ON: true, TESTNET_FILLS: false, MAINNET_FILLS: true, ONE_TAP_FILLS: true, tradeMode: () => "mainnet",
+  FUND_ANYCHAIN: false, RYSK_MOCK: false, QUESTIONS_ON: true, TRADE_ON: true, TESTNET_FILLS: false, MAINNET_FILLS: true, ONE_TAP_FILLS: true, tradeMode: () => "mainnet",
 }));
 vi.mock("./lib/data.js", () => ({ DATA_URL: "https://example.invalid/", useData: () => ({ data: { trading: "on", trading_mainnet: "off", coins: [] }, error: null }) }));
 import TradePanel from "./components/trade/TradePanel.jsx";

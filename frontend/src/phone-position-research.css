@@ -1,0 +1,70 @@
+@media (max-width: 680px) {
+  .marketplace-positions .phone-research-fold,
+  .coin-detail .phone-research-fold { min-width: 0; border-top: 1px solid var(--border, var(--seam)); }
+  .marketplace-positions .phone-research-fold > summary,
+  .coin-detail .phone-research-fold > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; font: 500 13px/1.4 var(--font-sans, var(--font-body)); cursor: pointer; list-style: none; }
+  .marketplace-positions .phone-research-fold > summary::-webkit-details-marker,
+  .coin-detail .phone-research-fold > summary::-webkit-details-marker { display: none; }
+  .marketplace-positions .phone-research-fold > summary > span,
+  .coin-detail .phone-research-fold > summary > span { font: 400 20px var(--font-mono); }
+  .marketplace-positions .phone-research-fold[open] > summary > span,
+  .coin-detail .phone-research-fold[open] > summary > span { transform: rotate(45deg); }
+  .marketplace-positions .phone-research-fold > dl { margin-block: 8px 16px; }
+  .marketplace-positions .q-pnl { gap: 8px; padding: 12px 16px 0; margin-block: 4px 8px; }
+  .marketplace-positions .q-pnl-total b { font-size: 32px; }
+  .marketplace-positions .q-pnl .phone-research-fold { margin-top: 4px; }
+  .marketplace-positions .q-pnl-figs { gap: 12px 18px; }
+  .marketplace-positions .q-portfolio-line { padding-block: 6px; }
+  .marketplace-positions .q-phone-group.q-position { gap: 8px; padding: 12px 16px 4px; }
+  .marketplace-positions .q-phone-group .q-group-meta { gap: 2px 12px; }
+  .marketplace-positions .q-phone-group .q-group-head { padding-bottom: 4px; }
+  .marketplace-positions .q-phone-answer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 10px; align-items: center; }
+  .marketplace-positions .q-phone-answer > .q-card-title { display: flex; align-items: center; min-height: 44px; font-size: 16px; font-weight: 600; }
+  .marketplace-positions .q-phone-answer .q-position-close { position: static; min-height: 44px; min-width: 64px; font-size: 13px; }
+  .marketplace-positions .q-phone-pay-zone { grid-column: 1 / -1; display: flex; align-items: center; font-size: 12px; color: var(--text-3); }
+  .marketplace-positions .q-phone-group .q-phone-essentials,
+  .marketplace-positions .q-phone-group .q-pos-line-figs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 8px; padding: 0 0 8px; }
+  .marketplace-positions .q-phone-group .q-phone-essentials dt,
+  .marketplace-positions .q-phone-group .q-pos-line-figs dt { line-height: 1.45; }
+  .marketplace-positions .q-phone-group .q-phone-essentials dd,
+  .marketplace-positions .q-phone-group .q-phone-essentials > div:last-child dd { font-size: 16px; line-height: 1.4; }
+  .marketplace-positions .q-phone-group > .q-card-status { padding: 0; align-items: center; margin: 0; font-size: 12px; }
+  .marketplace-positions .q-phone-group > .q-position-details { border-top: 1px solid var(--border); }
+  .marketplace-positions .q-phone-group .q-position-details > summary { min-width: 44px; min-height: 44px; width: 100%; justify-content: space-between; }
+  .marketplace-positions .q-phone-group .q-group-price { margin-top: 0; border-top: 0; }
+  .marketplace-positions .q-phone-group .index-source-notice,
+  .marketplace-positions .q-phone-group .sc-settle-tag { font-size: 12px; }
+  .marketplace-positions .q-phone-group .sc-frame.tall { height: 260px; }
+  .marketplace-positions .q-phone-group .q-pos-line-what .q-card-title { display: flex; align-items: center; min-height: 44px; }
+  .marketplace-positions small,
+  .marketplace-positions .q-figs dt,
+  .marketplace-positions .q-figs dt small { font-size: 12px; }
+  .marketplace-positions .info,
+  .coin-detail .phone-research-fold .info,
+  .coin-detail .phone-options-desk .info { position: relative; width: 44px; height: 44px; min-width: 44px; min-height: 44px; flex: 0 0 44px; border: 0; border-radius: 0; background: none; font-size: 12px; }
+  .marketplace-positions .info::before,
+  .coin-detail .phone-research-fold .info::before,
+  .coin-detail .phone-options-desk .info::before { content: ""; position: absolute; inset: 12px; border: 1px solid var(--border, var(--seam)); border-radius: 50%; pointer-events: none; }
+  .marketplace-positions .q-head-top > .btn,
+  .marketplace-positions .q-line-close,
+  .marketplace-positions .q-phone-group .text-control { min-height: 44px; min-width: 44px; }
+  .marketplace-positions .phone-research-fold svg text { font-size: 12px; }
+  .coin-detail .phone-options-desk .desk-tabs { padding-top: 0; }
+  .coin-detail .phone-options-desk .expiry-desk { padding-top: 8px; padding-bottom: 0; }
+  .coin-detail .phone-options-desk .expiry-desk-heading { margin-bottom: 4px; gap: 4px; flex-wrap: nowrap; }
+  .coin-detail .phone-options-desk .expiry-desk-heading h3 { font-size: 16px; }
+  .coin-detail .phone-options-desk .expiry-desk-heading h3 > span { padding-left: 4px; font-size: 12px; }
+  .coin-detail .phone-options-index { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-block: 8px; font-size: 13px; }
+  .coin-detail .phone-options-index b { font-size: 17px; font-weight: 500; }
+  .coin-detail .phone-options-desk .selected-range { margin-top: 4px; padding: 0 0 12px; gap: 2px; }
+  .coin-detail .phone-options-desk .selected-range .label { display: flex; align-items: center; font-size: 12px; }
+  .coin-detail .phone-options-saloon { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; font-size: 13px; }
+  .coin-detail .phone-options-desk .phone-options-dashboard { padding-inline: var(--cd-pad); }
+  .coin-detail .phone-options-desk .phone-options-dashboard > .options-dashboard { margin-inline: calc(-1 * var(--cd-pad)); }
+  .coin-detail .phone-options-desk .expiry-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 8px; }
+  .coin-detail .phone-options-desk .expiry-charts { grid-template-columns: minmax(0, 1fr); }
+  .coin-detail .phone-options-desk small,
+  .coin-detail .phone-options-desk svg text { font-size: 12px; }
+  body:has(.q-phone-group) .pop-close,
+  body:has(.phone-options-desk) .pop-close { width: 44px; height: 44px; min-width: 44px; min-height: 44px; }
+}

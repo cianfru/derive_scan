@@ -31,6 +31,7 @@ import "../questions.css";
 import "../marketplace-detail.css";
 import "../settle-chart.css";
 import LiveMoney from "../components/LiveMoney.jsx";
+import { PhoneFold, TradeFacts, TradeFigures, usePhoneTrade } from "../components/MobileTrade.jsx";
 
 const clock = (t) => `${new Date(t * 1000).toISOString().slice(11, 16)} UTC`;
 const QUICK = [25, 100, 500];
@@ -240,6 +241,7 @@ function OutcomeCharts({ und, date, level, sideKey, t, board, hist, historyError
  * review opens a ticket; prices, fees, available size and time gates use the same guided maths. */
 function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, renderLadder, ladderOpen, onLadder, initialDollars, initialDraft }) {
   const { date, level } = found;
+  const phone = usePhoneTrade();
   const current = useIndexPrice(und, board.index, board.prices_ts);
   const question = questionText(und, level, date.expiry);
   const paused = age.state === "paused" || board.paused;
@@ -267,13 +269,14 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
       <header className="md-heading">
         <Link className="md-back" to={saloonReturn(und, decision)}>‹ All outcomes</Link>
         <div className="md-subject"><Asset und={und} compact /><span>Price outcome</span>{board.thin && <ThinNote und={und} />}</div>
-        <h1 className="q-title">{question}</h1>
+        <h1 className="q-title">{phone ? `${und} higher or lower than ${money(level.k)}?` : question}</h1>
         <p className="q-settles">Settles {dayLabel(date.expiry)}, 08:00 UTC{countdown(date.settle_ts) && <> · {countdown(date.settle_ts)}</>}
           <Info label="About settlement">Derive settles on the average {und} index over the 30 minutes to 08:00 UTC. The two options pay in USDC to your Derive account with no action from you.</Info>
         </p>
-        {sideKey && !settling && <div className="q-follow md-follow"><CompareControl selection={{ id: level.id, und, side: sideKey, k: level.k }} /><FollowButton id={level.id} side={sideKey} k={level.k} board={board} /><FollowLevel id={level.id} side={sideKey} /></div>}
+        {!phone && sideKey && !settling && <div className="q-follow md-follow"><CompareControl selection={{ id: level.id, und, side: sideKey, k: level.k }} /><FollowButton id={level.id} side={sideKey} k={level.k} board={board} /><FollowLevel id={level.id} side={sideKey} /></div>}
       </header>
 
+      <PhoneFold title="Chart, payout examples and research" className="mt-research">
       <div className="md-evidence">
         <section className="md-history" aria-label="Price history">
           <div className="md-section-heading"><div><span className="label">{und} {current.fresh ? "index now" : "last index"}</span><strong className="mono"><LiveMoney und={und} value={board.index} publishedTs={board.prices_ts} /></strong></div><PriceTime pricesTs={board.prices_ts} age={age} /></div>
@@ -294,6 +297,7 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
         <section className="md-other"><button className="text-control q-other" aria-expanded={ladderOpen} onClick={onLadder}>{ladderOpen ? "Hide other levels" : "Other levels"}</button>{ladderOpen && renderLadder(dollars)}</section>
       </div>
 
+      </PhoneFold>
       <aside className="md-selection" aria-label="Your outcome">
         <div className="md-selection-inner">
           <p className="md-coin-now"><span>{und} {current.fresh ? "now" : "last index"}</span><b className="mono"><LiveMoney und={und} value={board.index} publishedTs={board.prices_ts} /></b><small>{dayLabel(date.expiry)}, 08:00 UTC{countdown(date.settle_ts) && <> · {countdown(date.settle_ts)}</>}</small></p>
@@ -319,11 +323,12 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
                   {t.belowMin && <p className="q-note warn">Smallest amount for this question: {money(t.minTotal, { cents: true })} with Derive's fees.</p>}
                   {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
                   {t.mostLose > 0 && t.mostLose < 50 && <p className="q-note">Fees are a large share of small amounts.</p>}
-                  <section className="md-preview" aria-label="What it pays"><OutcomeFigures und={und} level={level} side={sideKey} t={t} expiry={date.expiry} settleTs={date.settle_ts} summary compact /><p className="md-loss-note">Your cost is the most you can lose.</p></section>
+                  <section className="md-preview" aria-label="What it pays"><TradeFigures und={und} level={level} side={sideKey} t={t} expiry={date.expiry} settleTs={date.settle_ts} summary compact /><p className="md-loss-note">Your cost is the most you can lose.</p></section>
                 </> : <p className="status">{amountValid ? <NoPrice level={level} side={sideKey} paused={paused} text={`No price now for ${ANSWER[sideKey]}`} /> : "Enter an amount greater than $0."}</p>}
                 {age.state === "stale" && <p className="q-note warn">Prices are {age.minutes} min old.</p>}
                 {offTestnet && <p className="q-note"><span className="q-noprice">{NOT_ON_TESTNET}<Info label={`Why ${ANSWER[sideKey]} at ${money(level.k)} is not on testnet`}>{NOT_ON_TESTNET_WHY}</Info></span></p>}
                 <div className="md-review-action"><button ref={opener} className="btn primary lg" disabled={!ready} onClick={place}>Review trade</button><small>{oneTapOffered() ? "One tap: both options at one price, or nothing." : "One-tap trading is coming to Cowboy."}</small></div>
+                <TradeFacts und={und} level={level} side={sideKey} t={t}>{board.thin && <ThinNote und={und} />}</TradeFacts>
               </section>
               {sheet && ready && <>{modal && <div className="q-sheet-backdrop" aria-hidden="true" />}
                 <div ref={sheetRef} className="q-sheet open md-ticket" role="dialog" aria-modal={modal ? "true" : undefined} aria-label="Ticket" tabIndex={-1}>
@@ -332,6 +337,7 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
               </div></>}
             </>}
           </>}
+          {phone && sideKey && !settling && <PhoneFold title="Follow and compare" className="mt-follow"><div className="q-follow md-follow"><CompareControl selection={{ id: level.id, und, side: sideKey, k: level.k }} /><FollowButton id={level.id} side={sideKey} k={level.k} board={board} /><FollowLevel id={level.id} side={sideKey} /></div></PhoneFold>}
         </div>
       </aside>
     </div>

@@ -30,6 +30,9 @@ import PositionsReturn from "../components/PositionsReturn.jsx";
 import { followsPersistent, useFollowsDoc } from "../lib/follows.js";
 import { pnlCoverage } from "../lib/positionsPnl.js";
 import { useClock } from "../lib/useClock.js";
+import { usePhoneLayout } from "../lib/usePhoneLayout.js";
+import PhoneDisclosure from "../components/PhoneDisclosure.jsx";
+import "../phone-position-research.css";
 
 // Saloon stage 2 with fills (testnet, or real money on mainnet): Positions reads that network's journal
 // and the Saloon account on Derive, and one-tap positions sell back through Derive. On mainnet the
@@ -339,23 +342,23 @@ function PaidFig({ v }) {
 }
 
 /** An open position's value now and result if sold back now. */
-function NowFigs({ v }) {
+function NowFigs({ v, mode }) {
   const { f, half, partWhy, pendingReceipt, entryFeesUnknown, reason } = v;
   if (pendingReceipt) {
     return (
       <>
-        <Fig label="Profit / loss now" missing={na(partWhy, "Why no result")} />
-        <Fig label="Value now" missing={na(partWhy, "Why no value")} />
+        {mode !== "value" && <Fig label="Profit / loss now" missing={na(partWhy, "Why no result")} />}
+        {mode !== "pl" && <Fig label="Value now" missing={na(partWhy, "Why no value")} />}
       </>
     );
   }
   return (
     <>
-      <Fig label="Profit / loss now" sub="if sold back now" value={plNode(f.plNow)} className="q-pl q-pl-lead"
-        missing={entryFeesUnknown ? na(DERIVE_ENTRY_FEES, "Why no result") : half ? na("With only one option filled there is no result for the answer.", "Why no result") : na("There is a result once Derive shows a sell-back price, or at settlement.", "Why no result")} />
-      <Fig label="Value now" sub="sell-back, after fees"
+      {mode !== "value" && <Fig label="Profit / loss now" sub="if sold back now" value={plNode(f.plNow)} className="q-pl q-pl-lead"
+        missing={entryFeesUnknown ? na(DERIVE_ENTRY_FEES, "Why no result") : half ? na("With only one option filled there is no result for the answer.", "Why no result") : na("There is a result once Derive shows a sell-back price, or at settlement.", "Why no result")} />}
+      {mode !== "pl" && <Fig label="Value now" sub="sell-back, after fees"
         info={f.mark != null && f.valueNow != null && <Info label="At Derive's mark">At Derive's mark: {usd(f.mark)}. Value now is Derive's sell-back price on its screen minus Derive's fees to sell back, about {usd(f.fees)}.</Info>}
-        value={usdOr(f.valueNow)} missing={half ? na(partWhy, "Why no value") : <Missing text="No price now" label="Why no price" why={reason} />} />
+        value={usdOr(f.valueNow)} missing={half ? na(partWhy, "Why no value") : <Missing text="No price now" label="Why no price" why={reason} />} />}
     </>
   );
 }
@@ -519,6 +522,7 @@ function Card({ p, onRemove, onClose, sync = null, scope = null }) {
 function PositionLine({ v, markets, sync, onRemove, onClose }) {
   const { p, q, name, op, status } = v;
   const [closing, setClosing] = useClosing(v);
+  const phone = usePhoneLayout();
   const id = `pl-${p.key}`;
   return (
     <li className={`q-pos-line q-card-${status.key}`} aria-labelledby={id}>
@@ -532,12 +536,17 @@ function PositionLine({ v, markets, sync, onRemove, onClose }) {
         {v.showClose && <button className="btn q-line-close" onClick={() => setClosing((s) => !s)} aria-expanded={closing} aria-describedby={id}>{closing ? "Keep it open" : "Close"}</button>}
       </div>
       <dl className="q-figs grid q-pos-line-figs">
-        <Fig label="Contracts" sub={op !== v.p ? "still open" : "held"} value={amountTextQ(op.contracts)} />
+        {!phone && <Fig label="Contracts" sub={op !== v.p ? "still open" : "held"} value={amountTextQ(op.contracts)} />}
         <PaidFig v={v} />
-        <NowFigs v={v} />
+        <NowFigs v={v} mode={phone ? "pl" : undefined} />
+        {phone && <MostPaysFig v={v} />}
       </dl>
       <StatusNotes v={v} sync={sync} />
       <ClosePanel v={v} closing={closing} setClosing={setClosing} onClose={onClose} />
+      {phone && <PhoneDisclosure title="Value and contracts"><dl className="q-figs grid q-position-extra">
+        <NowFigs v={v} mode="value" />
+        <Fig label="Contracts" sub={op !== v.p ? "still open" : "held"} value={amountTextQ(op.contracts)} />
+      </dl></PhoneDisclosure>}
       <Details v={v} markets={markets} onRemove={onRemove} />
     </li>
   );
@@ -554,7 +563,7 @@ const sumOr = (vals) => (vals.every((x) => Number.isFinite(x)) ? vals.reduce((a,
  */
 /** The coin's candles up to this date's settlement, with the position's pay zone and breakeven (owner,
  * 7 October 2026: to watch a position against its breakeven). Loaded only when opened. */
-function PositionPriceChart({ und, board, settleTs, solo, g }) {
+function PositionPriceChart({ und, board, settleTs, solo, g, textSize }) {
   const { data: coin, error } = useData(`coins/${und}.json`);
   const q = solo?.q;
   const bes = g?.breakevens || [];
@@ -562,7 +571,7 @@ function PositionPriceChart({ und, board, settleTs, solo, g }) {
     <div className="q-group-price">
       {(coin ? <>
         <SettleChart und={und} candles={coin.candles} index={board?.index} settleTs={settleTs} lo={q?.lo ?? null} hi={q?.hi ?? null} side={q ? solo.p.side : null} breakeven={bes}
-          payout={g && Number.isFinite(g.cost) ? (S) => { const pl = g.pl(S); return { payout: pl + g.cost, pl }; } : null} />
+          payout={g && Number.isFinite(g.cost) ? (S) => { const pl = g.pl(S); return { payout: pl + g.cost, pl }; } : null} textSize={textSize} />
         <p className="sc-key"><span><i className="settle" />Settles 08:00 UTC</span>
           {q && <span><i className={solo.p.side} />Pays in full {solo.p.side === "yes" ? `at ${money(q.hi)} or above` : `at ${money(q.lo)} or below`}</span>}
           {q && <span><i className="part" />Pays in part {money(q.lo)}–{money(q.hi)}</span>}
@@ -580,6 +589,7 @@ function GroupCard({ und, expiry, items, g, scope, syncs, onRemove, onClose }) {
   const views = items.map((p) => positionView(p, { board, now, scope }));
   const solo = views.length === 1 ? views[0] : null;
   const [closing, setClosing] = useClosing(solo || views[0]);
+  const phone = usePhoneLayout();
   const settleTs = views[0].settleTs;
   const settling = views.some((v) => v.settling);
   const n = views.length;
@@ -590,6 +600,49 @@ function GroupCard({ und, expiry, items, g, scope, syncs, onRemove, onClose }) {
   const label = `${und} on ${expiry ? dayLabel(expiry) : "an unknown date"}`;
   const noCombined = solo?.pendingReceipt ? solo.partWhy : solo?.entryFeesUnknown ? DERIVE_ENTRY_FEES
     : "Derive's trade records or entry fees are not complete yet for this date, so the combined result at settlement is not drawn.";
+  if (phone) return (
+    <article className="q-card q-position q-group q-phone-group" aria-labelledby={hid}>
+      <header className="q-group-head">
+        <h2 id={hid}><Asset und={und} compact /><span className="q-group-sep" aria-hidden="true"> · </span>
+          <span>{expiry ? `${dayLabel(expiry)}, 08:00 UTC` : "Settlement date not saved"}</span></h2>
+        <p className="q-group-meta">
+          {Number.isFinite(board?.index) && <span>now <b className="mono"><LiveMoney und={und} value={board.index} publishedTs={board.prices_ts} /></b></span>}
+          <span className="mono">{settling ? "settling now" : countdown(settleTs, now) || ""}</span>
+          <span className="q-group-n">{n} {n === 1 ? "position" : "positions"}<Info label="How these are combined">Every open position on {und} settling {expiry ? dayLabel(expiry) : "on this date"} at 08:00 UTC, against Derive's {settleRef(und)}, from the exact options and amounts you recorded, after what you paid. The line is the result for each settlement price, not a view of where it settles. {groupNotes(g)}</Info></span>
+        </p>
+      </header>
+      {solo ? <>
+        <div className="q-phone-answer">
+          <Link to={`/q/${solo.p.id}?side=${solo.p.side}`} className={`q-card-title q-position-side ${solo.p.side === "yes" ? "higher" : "lower"}`}>{solo.name} than {solo.q ? money(solo.q.k) : "this level"}</Link>
+          {solo.showClose && <button className="btn q-position-close" onClick={() => setClosing(s => !s)} aria-expanded={closing}>{closing ? "Keep it open" : "Close"}</button>}
+          {solo.q && <span className="q-phone-pay-zone">{fullPay(solo.q, solo.p.side)}<Info label="Payout levels">{solo.question}. Pays in part from {money(solo.q.lo)} to {money(solo.q.hi)}. {fullPay(solo.q, solo.p.side)}.</Info></span>}
+        </div>
+        <dl className="q-figs grid q-position-figures q-phone-essentials"><NowFigs v={solo} mode="pl" /><PaidFig v={solo} /><MostPaysFig v={solo} /></dl>
+        <StatusLine v={solo} /><StatusNotes v={solo} sync={syncs[solo.p.key] ?? null} />
+        <ClosePanel v={solo} closing={closing} setClosing={setClosing} onClose={onClose} />
+      </> : <>
+        <dl className="q-figs grid q-position-figures q-phone-essentials">
+          <Fig label="Profit / loss now" sub="if all sold back now" className="q-pl q-pl-lead" value={plNode(sumOr(views.map(v => v.pendingReceipt ? null : v.f.plNow)))} missing={many("One or more positions here have no result now; each line shows why.")} />
+          <Fig label="You paid" sub="fees included, all positions" value={usdOr(sumOr(views.map(v => v.pendingEntry ? null : v.f.paid)))} missing={many("One or more positions here have no total cost yet; each line shows why.")} />
+          <Fig label="Most it pays" sub="at settlement, combined" value={g && !left ? amount(g.mostPays) : null} missing={many(noCombined)} />
+        </dl>
+        <ul className="q-group-lines" aria-label={`Positions on ${label}`}>
+          {views.map(v => <PositionLine key={v.p.key} v={v} markets={markets} sync={syncs[v.p.key] ?? null} onRemove={onRemove} onClose={onClose} />)}
+        </ul>
+      </>}
+      <PhoneDisclosure title="Value and settlement figures"><dl className="q-figs grid q-position-extra">
+        {solo ? <><NowFigs v={solo} mode="value" /><Fig label="Contracts" value={amountTextQ(solo.op.contracts)} sub={solo.op !== solo.p ? "still open" : "held"} /></>
+          : <Fig label="Value now" sub="sell-back, after fees" value={usdOr(sumOr(views.map(v => v.pendingReceipt ? null : v.f.valueNow)))} missing={many("One or more positions here have no sell-back value.")} />}
+        <Fig label="Most you can lose" sub="combined, fees included" className="q-lose" value={g && !left ? <MostLose g={g} /> : null} missing={na(noCombined, "Why no worst case")} />
+        <Fig label="Breakeven" sub="at settlement" className="q-breakeven" value={g && !left ? breakevenText(g) : null} missing={na(noCombined, "Why no breakeven at settlement")} />
+      </dl></PhoneDisclosure>
+      {settleTs && <PhoneDisclosure title="Price chart and payout" lazy><section className="q-group-chart" aria-label={`${und} price up to the settlement, ${label}`}>
+        <PositionPriceChart und={und} board={board} settleTs={settleTs} solo={solo} g={g && !left ? g : null} textSize={12} />
+        {left > 0 && <p className="q-note">{left} of {n} positions not in this chart<Info label="Why left out">Derive's trade records or entry fees are not complete yet, so the chart covers the other {inChart}. Each position's own figures show above.</Info></p>}
+      </section></PhoneDisclosure>}
+      {solo && <Details v={solo} markets={markets} onRemove={onRemove} />}
+    </article>
+  );
   return (
     <article className="q-card q-position q-group" aria-labelledby={hid}>
       <header className="q-group-head">
@@ -651,12 +704,20 @@ function GroupCard({ und, expiry, items, g, scope, syncs, onRemove, onClose }) {
  * Open positions are valued from each coin's published board; one without a price now is left out and said.
  */
 function PnlHero({ open, summary, scope, usdc, pendingSettlementCount = 0 }) {
+  const phone = usePhoneLayout();
   const unds = [...new Set(open.map((p) => p.und).filter(Boolean))];
   const [feeds, files] = useFeeds(unds.map((u) => `questions/${u}.json`));
   const now = useClock();
   const views = open.map((p) => positionView(p, { board: files[`questions/${p.und}.json`], now, scope }));
   const c = pnlCoverage(views, summary, pendingSettlementCount);
   const fig = (label, value, cls = "") => <div className={`q-pnl-fig ${cls}`}><dt>{label}</dt><dd className="mono">{value}</dd></div>;
+  const breakdown = <dl className="q-pnl-figs">
+    {fig("Open now", c.open != null ? <span className={tone(c.open)}>{signed(c.open)}</span> : "Not available yet")}
+    <div className="q-pnl-fig q-realized-sum"><dt>Realized</dt><dd className="mono">{c.realized != null ? <span className={tone(c.realized)}>{signed(c.realized)}</span> : "Not available yet"}</dd>
+      {summary.count > 0 && <small>{summary.count} {summary.count === 1 ? "result" : "results"}: {summary.closes} sold back, {summary.settles} settled</small>}</div>
+    {fig("In positions", c.inPositions != null ? money(c.inPositions, { cents: true }) : "Not available yet")}
+    {Number.isFinite(usdc) && fig("Cash on Derive", money(usdc, { cents: true }))}
+  </dl>;
   return (
     <section className="q-pnl" aria-label="Profit and loss">
       {feeds}
@@ -666,19 +727,14 @@ function PnlHero({ open, summary, scope, usdc, pendingSettlementCount = 0 }) {
         {c.incomplete && <p className="q-pnl-coverage" role="status">Incomplete{open.length > 0 && <> · {c.knownOpen} of {open.length} open valued</>}{summary.count > 0 && <> · {c.knownResults} of {summary.count} results known</>}{pendingSettlementCount > 0 && <> · {pendingSettlementCount} awaiting settlement records</>}</p>}
         {c.estimated && <span className="q-pnl-estimate">Estimated fees included</span>}
       </div>
-      <dl className="q-pnl-figs">
-        {fig("Open now", c.open != null ? <span className={tone(c.open)}>{signed(c.open)}</span> : "Not available yet")}
-        <div className="q-pnl-fig q-realized-sum"><dt>Realized</dt><dd className="mono">{c.realized != null ? <span className={tone(c.realized)}>{signed(c.realized)}</span> : "Not available yet"}</dd>
-          {summary.count > 0 && <small>{summary.count} {summary.count === 1 ? "result" : "results"}: {summary.closes} sold back, {summary.settles} settled</small>}</div>
-        {fig("In positions", c.inPositions != null ? money(c.inPositions, { cents: true }) : "Not available yet")}
-        {Number.isFinite(usdc) && fig("Cash on Derive", money(usdc, { cents: true }))}
-      </dl>
+      {phone ? <PhoneDisclosure title="P&L breakdown">{breakdown}</PhoneDisclosure> : breakdown}
     </section>
   );
 }
 
 /** Positions: kept in this browser only, with export and import under "Saved in this browser". */
 export default function MyQuestions() {
+  const phone = usePhoneLayout();
   const [stored, setListRaw] = useState(() => prune(loadPositions(NET)));
   const setList = (l) => setListRaw(prune(l));
   const follows = useFollowsDoc();
@@ -749,9 +805,9 @@ export default function MyQuestions() {
       {NET === "mainnet" && toSettle.map((p) => <SettleWatch key={p.key} p={p} onSettle={(k, price) => setList(settlePosition(k, price))} />)}
       {ONE_TAP_FILLS && (!MAINNET_FILLS || oneTapOffered()) && <Suspense fallback={null}><DeriveSync onScope={(s) => { setScope(s); setSync(null); }}
         onSynced={(r) => { setList(r.list); setSync(r); }} /></Suspense>}
-      <PositionsReturn list={list} now={now} onTab={setTab} />
+      {!phone && <PositionsReturn list={list} now={now} onTab={setTab} />}
       {tab === "following" ? <Suspense fallback={null}><Board followingOnly embedded /></Suspense> : <>
-      {tab === "open" && <ExposureTotal groups={groups} />}
+      {tab === "open" && !phone && <ExposureTotal groups={groups} />}
       {tab === "open" && pendingReceipts.length > 0 && <p className="q-note">Derive's trade records are still being checked. These positions are left out of the combined settlement figures.</p>}
       {tab === "open" && unknownFeeEntries.length > 0 && <p className="q-note">Derive's entry fees are not available yet. These positions are left out of the combined settlement figures.</p>}
       {ONE_TAP_FILLS && (!MAINNET_FILLS || oneTapOffered()) && tab === "open" && sync?.extra && <Suspense fallback={null}><AlsoOnDerive extra={sync.extra} /></Suspense>}
@@ -775,6 +831,10 @@ export default function MyQuestions() {
           </section>
         )}
       </>}
+      {phone && <div className="phone-portfolio-context">
+        {tab === "open" && <ExposureTotal groups={groups} />}
+        <PositionsReturn list={list} now={now} onTab={setTab} />
+      </div>}
       <MySpaceBackup onRestored={() => setList(loadPositions(NET))} />
     </div>
   );

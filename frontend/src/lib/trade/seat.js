@@ -1,14 +1,17 @@
 // Saloon stage 2: the user's seat at Derive for this page visit: the wallet, one Derive connection,
 // the Saloon account and Cowboy's approval. One store per page, shared by every ticket.
 import { useSyncExternalStore } from "react";
-import { getAddress } from "ethers";
-import { MODE, NETWORK, SALOON_LABEL, SENT_HOLD_MS, TRADE_COINS } from "./config.js";
+import { formatUnits, getAddress } from "ethers";
+import { MODE, NETWORK, PRIME_STANDARD, SALOON_LABEL, SENT_HOLD_MS, TRADE_COINS } from "./config.js";
 import { forgetPilotInvite, isPilot } from "../pilot.js";
 import { NO_ACCOUNT, at, createClient, deriveKeyRejected, failure, plainError } from "./derive.js";
 import { arriving, depositAddress, findSaloon, fundedAccounts, labelAccount, listSubaccounts, otherAccounts, rememberAccount, summarise } from "./account.js";
 import { connectWallet, findProvider, gasEth, personalSign, sendTransaction, usdcTransfer } from "./wallet.js";
 import { approveCowboy, clearKey, keySigner, switchOff as retireKey, usableKey } from "./sessionKey.js";
 import { KEYS, read, remove, write } from "./store.js";
+import { FUND_ANYCHAIN } from "../flags.js";
+import { NATIVE_TOKEN, FUNDING_QUOTE_MS, bridgeRegistration, fundingError, fundingMinimum, fundingQuote, fundingRecovery, fundingStatus, validateFundingQuote } from "./anychain.js";
+import { fundingAllowance, fundingApproval, fundingPreflight, fundingReceipt, fundingWalletIdentity, switchFundingChain } from "./wallet.js";
 
 let deps = { findProvider, createClient, newKey: undefined };
 /** Set once this page has tried to resume (or connected): later resets never show "Reconnecting…". */
@@ -22,10 +25,14 @@ const initial = () => {
 let state = initial();
 const listeners = new Set();
 let generation = 0;
+let fundingLease = null;
+let bridgeAuth = null;
+let ownerAuth = null;
+let bridgeRefresh = null;
 const cancelled = () => Object.assign(new Error("Seat operation cancelled"), { name: "AbortError" });
 /** Each user operation owns its results. Ending or replacing the seat invalidates every older await. */
-function operation() {
-  const id = ++generation;
+function operation({ advance = true } = {}) {
+  const id = advance ? ++generation : generation;
   const active = () => id === generation;
   const assertActive = () => { if (!active()) throw cancelled(); };
   const run = async (step, action) => {
@@ -54,7 +61,7 @@ export function useSeat() {
   return useSyncExternalStore((l) => { listeners.add(l); return () => listeners.delete(l); }, () => state, () => state);
 }
 /** Tests and local previews swap the wallet and the socket here. */
-export function _setSeatDeps(d) { generation += 1; state.client?.close(); deps = { ...deps, ...d }; unwatch(); resumed = false; state = initial(); pub?.close(); pub = null; listeners.forEach((l) => l()); }
+export function _setSeatDeps(d) { generation += 1; state.client?.close(); deps = { ...deps, ...d }; unwatch(); resumed = false; ownerAuth = null; bridgeAuth = null; fundingLease = null; bridgeRefresh = null; state = initial(); pub?.close(); pub = null; listeners.forEach((l) => l()); }
 export function _setSeatState(s) { generation += 1; state = { ...initial(), ...s }; listeners.forEach((l) => l()); }
 
 /** A connection for public reads (the testnet's instrument list): the seat's own when it has one,
@@ -82,6 +89,7 @@ const funding = (arr, saloon) => ({
   arriving: saloon ? arr.amount : arr.amount + arr.landing,
   opening: saloon ? 0 : arr.openingCount,
 });
+const pendingBridge = (bridge) => !!bridge && (!!bridge.txHash || bridge.phase === "sending_unknown");
 
 /** A deposit this browser sent to the new-account address, kept for SENT_HOLD_MS (reloads too). */
 function sentNew(wallet, now = Date.now()) {
@@ -90,16 +98,25 @@ function sentNew(wallet, now = Date.now()) {
 }
 const sentPatch = (wallet) => {
   const s = sentNew(wallet);
-  return s ? { sentTx: s.tx, sentAmount: s.amount, sentAt: s.at } : {};
+  const saved = FUND_ANYCHAIN ? read(KEYS.bridge(wallet)) : null;
+  const bridge = saved?.quote?.request?.wallet?.toLowerCase() === wallet.toLowerCase() && (saved.txHash || saved.phase === "sending_unknown") ? saved : null;
+  return { ...(s ? { sentTx: s.tx, sentAmount: s.amount, sentAt: s.at } : {}), ...(bridge ? { bridge, sentTx: bridge.txHash, sentAmount: bridge.quote.arrivesUsd, sentAt: bridge.startedAt } : {}) };
 };
 
 /** True while another send to the new-account address would open a second account. */
 export function holdSend(seat, now = Date.now()) {
+  if (FUND_ANYCHAIN && seat.bridge?.phase === "sending_unknown") return true;
+  if (FUND_ANYCHAIN && seat.bridge?.txHash && !["credited", "refunded_verified"].includes(seat.bridge.phase)) return true;
   if (seat.saloon) return false;
   return (seat.opening || 0) > 0 || (!!seat.sentTx && now - (seat.sentAt || 0) < SENT_HOLD_MS);
 }
 
-const ownerSign = (provider, wallet) => (ts) => personalSign(provider, wallet, ts);
+const ownerSign = (provider, wallet) => async (timestamp) => {
+  const id = generation;
+  const signature = await personalSign(provider, wallet, timestamp);
+  if (id === generation && state.wallet?.toLowerCase() === wallet.toLowerCase()) ownerAuth = { wallet, timestamp, signature };
+  return signature;
+};
 const keySign = (stored) => (ts) => keySigner(stored).signMessage(ts);
 
 /**
@@ -120,7 +137,12 @@ function watch(provider, pending = null) {
     end(null);
   };
   const chainChanged = (chainId) => {
-    if ((!state.wallet && !pending?.active()) || Number(chainId) === NETWORK.chainId) return;
+    if (!state.wallet && !pending?.active()) return;
+    if (fundingLease?.flow.active() && fundingLease.provider === provider) {
+      if (Number(chainId) === fundingLease.chainId) return;
+      return end("Your wallet switched away from the funding network. Connect again to check the transfer.");
+    }
+    if (Number(chainId) === NETWORK.chainId) return;
     end(`Your wallet switched network. Connect again on ${NETWORK.chainName}.`);
   };
   provider.on("accountsChanged", accountsChanged);
@@ -142,6 +164,9 @@ function unwatch() {
 /** Back to "disconnected" (the remembered wallet stays unless the caller forgot it), with a message. */
 function end(message) {
   generation += 1;
+  fundingLease = null;
+  bridgeAuth = null;
+  ownerAuth = null;
   unwatch();
   state.client?.close();
   state = { ...initial(), message };
@@ -272,6 +297,7 @@ async function load(flow, { canPrompt = true } = {}) {
   flow.assertActive();
   const { wallet } = state;
   const client = flow.client(state.client);
+  if (FUND_ANYCHAIN) flow.set(sentPatch(wallet));
   let stored = usableKey(wallet);
   let sub = null;
   if (stored) {
@@ -296,7 +322,15 @@ async function load(flow, { canPrompt = true } = {}) {
     try { subs = await flow.run("find account", () => listSubaccounts(client, wallet)); }
     catch { flow.assertActive(); /* the key's own account is enough */ }
     if (!subs.some((x) => x.id === sub.id)) subs = [sub, ...subs];
-    if (sub.usdc > 0) return flow.set({ saloon: sub, ...accountsPatch(subs, sub), stage: "ready", busy: false });
+    if (sub.usdc > 0) {
+      if (FUND_ANYCHAIN && pendingBridge(state.bridge) && !bridgeCredited(state.bridge, sub)) return toFund(flow, sub);
+      finishCreditedBridge(flow, wallet, sub);
+      return flow.set({ saloon: sub, ...accountsPatch(subs, sub), stage: "ready", busy: false });
+    }
+    if (FUND_ANYCHAIN && pendingBridge(state.bridge)) {
+      flow.set(accountsPatch(subs, sub));
+      return toFund(flow, sub);
+    }
     const funded = fundedAccounts(subs)[0];
     if (funded) return flow.set({ saloon: funded, ...accountsPatch(subs, funded), stage: "approve", busy: false });
     flow.set(accountsPatch(subs, sub));
@@ -309,6 +343,8 @@ async function load(flow, { canPrompt = true } = {}) {
   const { saloon, subs } = await flow.run("find account", () => findSaloon(client, wallet));
   flow.set(accountsPatch(subs, saloon));
   if (!saloon || !(saloon.usdc > 0)) return toFund(flow, saloon);
+  if (FUND_ANYCHAIN && pendingBridge(state.bridge) && !bridgeCredited(state.bridge, saloon)) return toFund(flow, saloon);
+  finishCreditedBridge(flow, wallet, saloon);
   remove(KEYS.sent(wallet));
   flow.set({ saloon, key: null, stage: "approve", busy: false });
 }
@@ -331,7 +367,7 @@ async function toFund(flow, saloon) {
   const { wallet } = state;
   const client = flow.client(state.client);
   const [address, arr] = await flow.run("deposit address", () => Promise.all([depositAddress(client, wallet, saloon?.id || null), arriving(client, wallet)]));
-  flow.set({ saloon, depositAddress: address, ...funding(arr, saloon), ...(saloon ? {} : sentPatch(wallet)), stage: "fund", busy: false });
+  flow.set({ saloon, depositAddress: address, ...funding(arr, saloon), ...sentPatch(wallet), stage: "fund", busy: false });
 }
 
 /**
@@ -347,6 +383,17 @@ export async function refreshFunding() {
   const client = flow.client(state.client);
   flow.set({ busy: true, message: null });
   try {
+    if (FUND_ANYCHAIN && state.bridge) {
+      if (state.bridge.txHash) {
+        try {
+          const status = await flow.run("check bridge delivery", () => fundingStatus(state.bridge.quote, state.bridge.txHash));
+          bridgePatch(flow, { status, phase: status.phase, statusError: null });
+        } catch (e) { flow.assertActive(); bridgePatch(flow, { statusError: plainError(e) }); }
+      }
+      fundingLease = { flow, provider: state.provider, chainId: NETWORK.chainId };
+      await flow.run("return to Ethereum", () => switchFundingChain(state.provider, wallet, { id: NETWORK.chainId }, flow.assertActive));
+      fundingLease = null;
+    }
     let arr = null;
     if (state.newAccount) {
       arr = await flow.run("find account", () => arriving(client, wallet));
@@ -360,9 +407,15 @@ export async function refreshFunding() {
     const { saloon, subs } = await flow.run("find account", () => findSaloon(client, wallet, { prefer: had?.id ?? state.key?.subaccount_id ?? null }));
     const accounts = accountsPatch(subs, saloon);
     if (saloon && saloon.usdc > 0) {
+      if (FUND_ANYCHAIN && pendingBridge(state.bridge) && !bridgeCredited(state.bridge, saloon)) {
+        arr = await flow.run("find account", () => arriving(client, wallet));
+        const address = saloon.id !== had?.id ? await flow.run("deposit address", () => depositAddress(client, wallet, saloon.id)) : state.depositAddress;
+        return flow.set({ saloon, ...accounts, depositAddress: address, ...funding(arr, saloon), stage: "fund", busy: false });
+      }
       remove(KEYS.sent(wallet));
+      finishCreditedBridge(flow, wallet, saloon);
       const ready = state.key?.subaccount_id === saloon.id;
-      return flow.set({ saloon, ...accounts, opening: 0, sentTx: null, sentAmount: null, sentAt: null, stage: ready ? "ready" : "approve", busy: false });
+      return flow.set({ saloon, ...accounts, opening: 0, sentTx: null, sentAmount: null, sentAt: null, bridge: null, stage: ready ? "ready" : "approve", busy: false });
     }
     // An account that now exists takes its own deposit address (the new-account one would open another).
     const address = saloon && saloon.id !== had?.id ? await flow.run("deposit address", () => depositAddress(client, wallet, saloon.id)) : state.depositAddress;
@@ -397,6 +450,212 @@ export async function deposit(dollars) {
     }
     if (flow.active()) flow.set({ busy: false, sentTx: tx, sentAmount: dollars, sentAt });
   } catch (e) { flow.fail(e, "deposit"); }
+}
+
+function rememberBridgeHistory(wallet, bridge) {
+  const previous = read(KEYS.bridgeHistory(wallet)) || [];
+  write(KEYS.bridgeHistory(wallet), [bridge, ...previous.filter((b) => b.txHash !== bridge.txHash)].slice(0, 20));
+}
+function archiveBridge(wallet, bridge) {
+  rememberBridgeHistory(wallet, bridge);
+  remove(KEYS.bridge(wallet));
+}
+function bridgeCredited(bridge, saloon) {
+  const baseline = bridge.baseline;
+  const received = bridge.status?.receiving?.amount;
+  return !!baseline && bridge.status?.phase === "delivered" && saloon?.manager === PRIME_STANDARD
+    && (baseline.subaccountId == null || saloon.id === baseline.subaccountId)
+    && /^\d+$/.test(received || "") && saloon.usdc + 0.000001 >= baseline.usdc + Number(received) / 1e6;
+}
+function finishCreditedBridge(flow, wallet, saloon) {
+  if (!FUND_ANYCHAIN || !state.bridge?.txHash || !bridgeCredited(state.bridge, saloon)) return;
+  archiveBridge(wallet, { ...state.bridge, phase: "credited" });
+  remove(KEYS.sent(wallet));
+  flow.set({ bridge: null, sentTx: null, sentAmount: null, sentAt: null });
+}
+const bridgePatch = (flow, patch) => {
+  flow.assertActive();
+  const bridge = { ...state.bridge, ...patch };
+  if ((bridge.txHash || bridge.phase === "sending_unknown") && state.wallet) write(KEYS.bridge(state.wallet), bridge);
+  flow.set({ bridge });
+};
+const bridgeIdentity = (quote, snapshot) => {
+  if (quote?.request?.wallet?.toLowerCase() !== snapshot.wallet?.toLowerCase()
+    || quote?.request?.destination?.address?.toLowerCase() !== snapshot.depositAddress?.toLowerCase()
+    || snapshot.saloon?.id !== state.saloon?.id || snapshot.depositAddress !== state.depositAddress) throw fundingError("funding_account");
+};
+const currentRoute = async (quote, client, paidApprovalUsd = 0) => {
+  if (Date.now() > quote.expiresAt) throw fundingError("funding_changed", "This route has expired. Review a new quote.");
+  const request = quote.request;
+  const next = { ...await (deps.fundingQuote || fundingQuote)({ client, wallet: request.wallet, depositAddress: request.destination.address,
+    chain: request.chain, token: request.token, amount: formatUnits(request.fromAmount, request.token.decimals) }) };
+  if (paidApprovalUsd > 0) {
+    next.costUsd += paidApprovalUsd;
+    next.approvalGasUsd = (next.approvalGasUsd || 0) + paidApprovalUsd;
+  }
+  if (next.minArrivesUsd < quote.minArrivesUsd || next.raw.tool !== quote.raw.tool
+    || (quote.costUsd != null && (next.costUsd == null || next.costUsd > quote.costUsd + 0.000000001))
+    || next.seconds > Math.max(quote.seconds + 5, quote.seconds * 1.25)) throw fundingError("funding_changed", "The route's minimum, cost or delivery estimate changed. Review a new quote.");
+  return next;
+};
+
+/** One source transfer after any exact-amount approval; registration never credits or resends it. */
+export async function bridgeDeposit(quote) {
+  if (!FUND_ANYCHAIN) return;
+  if (!NETWORK.real || MODE !== "mainnet") { fail(fundingError("funding_network"), "funding"); return; }
+  const snapshot = { ...state };
+  if (!snapshot.provider || !snapshot.wallet || !snapshot.depositAddress || !snapshot.client || state.busy || state.stage !== "fund" || holdSend(state)
+    || (state.bridge?.txHash && !["refunded_verified", "credited"].includes(state.bridge.phase))) return;
+  const flow = operation(), client = flow.client(snapshot.client);
+  flow.set({ busy: true, message: null, bridge: { quote, txHash: null, startedAt: Date.now(), phase: "checking", registrationError: null, status: null } });
+  try {
+    bridgeIdentity(quote, snapshot);
+    if (snapshot.client.url !== NETWORK.wsUrl) throw fundingError("funding_network");
+    let next = await flow.run("check route", () => currentRoute(quote, client));
+    validateFundingQuote(next.raw, next.request, next);
+    bridgeIdentity(next, snapshot);
+    // A first wallet has no WebSocket login yet. Derive also authenticates private requests from
+    // wallet/timestamp/signature params; get this signature before any transfer leaves the wallet.
+    bridgeAuth = null;
+    fundingLease = { flow, provider: snapshot.provider, chainId: NETWORK.chainId };
+    await flow.run("return to Ethereum", () => switchFundingChain(snapshot.provider, snapshot.wallet, { id: NETWORK.chainId }, flow.assertActive));
+    if (snapshot.loggedAs !== "owner") {
+      if (ownerAuth?.wallet?.toLowerCase() === snapshot.wallet.toLowerCase() && Date.now() - Number(ownerAuth.timestamp) <= FUNDING_QUOTE_MS) bridgeAuth = { ...ownerAuth };
+      else {
+        bridgePatch(flow, { phase: "sign_in" });
+        const timestamp = String(Date.now());
+        const signature = await flow.run("sign in for deposit", () => personalSign(snapshot.provider, snapshot.wallet, timestamp));
+        bridgeAuth = { wallet: snapshot.wallet, timestamp, signature };
+      }
+    }
+    fundingLease = { flow, provider: snapshot.provider, chainId: next.request.fromChain };
+    bridgePatch(flow, { phase: "switching" });
+    await flow.run("switch source chain", () => switchFundingChain(snapshot.provider, snapshot.wallet, next.request.chain, flow.assertActive));
+    const native = getAddress(next.request.token.address) === getAddress(NATIVE_TOKEN), units = BigInt(next.request.fromAmount);
+    let paidApprovalUsd = 0;
+    if (!native && !next.raw.estimate.skipApproval) {
+      const spender = next.raw.estimate.approvalAddress;
+      if (!spender || getAddress(spender) === getAddress(NATIVE_TOKEN)) throw fundingError("funding_route", "The provider omitted its approval contract.");
+      const allowance = await flow.run("check token approval", () => fundingAllowance(snapshot.provider, snapshot.wallet, next.request.token.address, spender));
+      if (allowance < units) {
+        const approval = { ...fundingApproval(snapshot.wallet, next.request.token.address, spender, units), chainId: `0x${next.request.fromChain.toString(16)}` };
+        await flow.run("check source balance and gas", () => fundingPreflight(snapshot.provider, snapshot.wallet, next, { approval, assertActive: flow.assertActive }));
+        bridgePatch(flow, { phase: "approving" });
+        await fundingWalletIdentity(snapshot.provider, snapshot.wallet, next.request.fromChain, flow.assertActive);
+        const approvalTx = await flow.run("approve source token", () => sendTransaction(snapshot.provider, approval));
+        bridgePatch(flow, { phase: "approval_pending", approvalTx });
+        await flow.run("confirm source approval", () => fundingReceipt(snapshot.provider, approvalTx, { assertActive: flow.assertActive }));
+        paidApprovalUsd = next.approvalGasUsd || 0;
+      }
+    }
+    next = await flow.run("recheck route", () => currentRoute(quote, client, paidApprovalUsd));
+    bridgeIdentity(next, snapshot);
+    // A new route can change spender. It must already be approved; never add another unnoticed grant.
+    if (!native && !next.raw.estimate.skipApproval && await flow.run("recheck token approval", () => fundingAllowance(snapshot.provider, snapshot.wallet, next.request.token.address, next.raw.estimate.approvalAddress)) < units) throw fundingError("funding_changed", "The route's approval contract changed. Review a new quote.");
+    const minimum = await flow.run("recheck deposit minimum", () => fundingMinimum(client));
+    validateFundingQuote(next.raw, next.request, minimum);
+    await flow.run("check source balance and gas", () => fundingPreflight(snapshot.provider, snapshot.wallet, next, { assertActive: flow.assertActive }));
+    if (bridgeAuth && Date.now() - Number(bridgeAuth.timestamp) > FUNDING_QUOTE_MS) throw fundingError("funding_changed", "The deposit sign-in expired before sending. Try again.");
+    await fundingWalletIdentity(snapshot.provider, snapshot.wallet, next.request.fromChain, flow.assertActive);
+    flow.assertActive(); bridgePatch(flow, { quote: next, phase: "sending" });
+    const startedAt = Date.now();
+    const rawTx = next.raw.transactionRequest;
+    const tx = { from: snapshot.wallet, to: rawTx.to, data: rawTx.data, chainId: `0x${next.request.fromChain.toString(16)}`, value: rawTx.value == null ? "0x0" : `0x${BigInt(rawTx.value).toString(16)}` };
+    const baseline = { subaccountId: snapshot.saloon?.id ?? null, usdc: snapshot.saloon?.usdc ?? 0 };
+    bridgePatch(flow, { quote: next, phase: "sending_unknown", started_at: startedAt, baseline });
+    let txHash;
+    try { txHash = await sendTransaction(snapshot.provider, tx); }
+    catch (e) {
+      // A known rejection proves this request did not broadcast. Other failures retain the intent,
+      // since a lost provider response cannot prove that funds stayed in the wallet.
+      if (e?.source === "wallet" && [4001, 4100, 4200, 4902].includes(e.code)) {
+        const intent = read(KEYS.bridge(snapshot.wallet));
+        if (intent?.phase === "sending_unknown" && intent.started_at === startedAt) remove(KEYS.bridge(snapshot.wallet));
+        if (flow.active()) bridgePatch(flow, { phase: "error" });
+      }
+      throw e;
+    }
+    const registration = bridgeRegistration(next, txHash), sentAt = Date.now();
+    // The wallet can finish broadcasting after Disconnect. Preserve the receipt under its original
+    // owner, without reviving the old seat or asking that wallet to send again.
+    const record = { quote: next, txHash, startedAt: sentAt, started_at: startedAt, baseline, phase: "on_way", registration, registrationError: null, status: null };
+    rememberBridgeHistory(snapshot.wallet, record);
+    const previousSent = read(KEYS.sent(snapshot.wallet)), previousBridge = read(KEYS.bridge(snapshot.wallet));
+    const latestStarted = Math.max(previousSent?.started_at ?? previousSent?.at ?? 0, previousBridge?.started_at ?? previousBridge?.startedAt ?? 0);
+    if (latestStarted <= startedAt) {
+      if (!snapshot.saloon) write(KEYS.sent(snapshot.wallet), { tx: txHash, amount: next.arrivesUsd, to: snapshot.depositAddress, at: sentAt, started_at: startedAt, bridge: registration });
+      write(KEYS.bridge(snapshot.wallet), record);
+    }
+    if (!flow.active()) return;
+    bridgePatch(flow, { quote: next, txHash, startedAt: sentAt, started_at: startedAt, baseline, phase: "registering", registration });
+    flow.set({ sentTx: txHash, sentAmount: next.arrivesUsd, sentAt });
+    try {
+      await flow.run("register bridge deposit", () => client.call("private/register_bridge_deposit", { ...registration, ...(bridgeAuth || {}) }, { skipLogin: true }));
+      bridgePatch(flow, { phase: "on_way" });
+    } catch (e) {
+      if (!flow.active()) return;
+      bridgePatch(flow, { phase: "on_way", registrationError: plainError(e) });
+    }
+    flow.set({ busy: false });
+  } catch (e) {
+    if (!flow.active()) return;
+    bridgePatch(flow, { phase: state.bridge?.txHash ? "on_way" : state.bridge?.phase === "sending_unknown" ? "sending_unknown" : "error" });
+    flow.fail(e, "funding");
+  }
+  // Remain in the fund step on the source chain. The user's Check again returns the wallet to
+  // Ethereum before any approval or trading can resume; public polling never prompts the wallet.
+}
+
+export function refreshBridge() {
+  if (!FUND_ANYCHAIN || !state.bridge?.txHash || !state.client || !state.wallet || state.busy) return;
+  if (bridgeRefresh) return bridgeRefresh;
+  const flow = operation({ advance: false }), before = state.bridge;
+  const pending = (async () => {
+    try {
+      const client = flow.client(state.client);
+      const reads = { call: (method, params, options) => client.call(method, params, { ...options, publicOnly: true }) };
+      const [status, arr] = await flow.run("check bridge deposit", () => Promise.all([fundingStatus(before.quote, before.txHash), arriving(reads, state.wallet)]));
+      let recovery = { safeToRetry: false };
+      if (status.phase === "failed") {
+        try { recovery = await flow.run("verify returned funds", () => fundingRecovery(before.quote, status, before.txHash)); }
+        catch { flow.assertActive(); }
+      }
+      bridgePatch(flow, { status, phase: status.phase, statusError: null, ...recovery });
+      flow.set(funding(arr, state.saloon));
+    } catch (e) { if (flow.active()) bridgePatch(flow, { statusError: plainError(e) }); }
+  })().finally(() => { if (bridgeRefresh === pending) bridgeRefresh = null; });
+  bridgeRefresh = pending;
+  return pending;
+}
+
+/** Explicit recovery only after a fresh proof and balance read; the original receipt stays archived. */
+export async function dismissRefundedBridge() {
+  if (!FUND_ANYCHAIN || !state.bridge?.safeToRetry || !state.client || state.busy) return;
+  const flow = operation(), before = state.bridge, wallet = state.wallet;
+  flow.set({ busy: true });
+  try {
+    const status = await flow.run("recheck refund", () => fundingStatus(before.quote, before.txHash));
+    const recovery = await flow.run("verify returned funds", () => fundingRecovery(before.quote, status, before.txHash));
+    if (!recovery.safeToRetry) throw fundingError("funding_route", "The source refund or failed transaction could not be verified. Nothing new was sent.");
+    fundingLease = { flow, provider: state.provider, chainId: NETWORK.chainId };
+    await flow.run("return to Ethereum", () => switchFundingChain(state.provider, wallet, { id: NETWORK.chainId }, flow.assertActive));
+    archiveBridge(wallet, { ...before, status, ...recovery, phase: "refunded_verified" });
+    remove(KEYS.sent(wallet));
+    flow.set({ bridge: null, sentTx: null, sentAmount: null, sentAt: null, opening: 0, arriving: 0, busy: false, message: null });
+    fundingLease = null;
+  } catch (e) { flow.fail(e, "verify returned funds"); }
+}
+
+export async function retryBridgeRegistration() {
+  if (!FUND_ANYCHAIN || !state.bridge?.registration || !state.client || state.busy) return;
+  const flow = operation();
+  flow.set({ busy: true });
+  try {
+    if (bridgeAuth && Date.now() - Number(bridgeAuth.timestamp) > FUNDING_QUOTE_MS) throw fundingError("funding_route", "The transfer was sent. Its display registration could not be retried without a fresh sign-in; Check again still reads the bridge safely.");
+    await flow.run("register bridge deposit", () => flow.client(state.client).call("private/register_bridge_deposit", { ...state.bridge.registration, ...(bridgeAuth || {}) }, { skipLogin: true }));
+    bridgePatch(flow, { registrationError: null });
+  } catch (e) { if (flow.active()) bridgePatch(flow, { registrationError: plainError(e) }); }
+  if (flow.active()) flow.set({ busy: false });
 }
 
 /**

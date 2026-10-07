@@ -8,7 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import btc from "./fixtures/questions/BTC.json";
 
-vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: true, TRADE_ON: false, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false }));
+vi.mock("./lib/flags.js", () => ({ FUND_ANYCHAIN: false, RYSK_MOCK: false, QUESTIONS_ON: true, TRADE_ON: false, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false }));
 import QuestionTicket from "./components/QuestionTicket.jsx";
 import { BANNED, budgetTicket, findLevel } from "./lib/questions.js";
 

@@ -1,0 +1,30 @@
+/* A separate preview surface; no styles affect the production trade panel. */
+.rysk-mock { min-width: 0; color: var(--text-1); }
+.rm-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-block: 16px 8px; }
+.rm-head h3 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.025em; }
+.rm-head > span { font: 400 10px/1.5 var(--font-mono); color: var(--text-3); }
+.rysk-mock > .tabs { width: 100%; margin-block: 0 16px; }
+.rysk-mock > .tabs button { flex: 1; min-height: 44px; padding-inline: 6px; white-space: normal; font-size: 13px; }
+.rm-obligation { border: 1px solid var(--border-strong); border-radius: 8px; padding: 16px; background: var(--surface-2); }
+.rm-label { margin: 0 0 6px; font-size: 12px; color: var(--text-2); }
+.rm-obligation > strong { display: block; font: 500 24px/1.25 var(--font-mono); }
+.rm-obligation > p:not(.rm-label) { margin: 10px 0 0; font-size: 12px; line-height: 1.6; }
+.rm-terms { color: var(--text-1); }
+.rm-risk { color: var(--text-2); }
+.rm-premium { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-block: 18px; border-bottom: 1px solid var(--border); }
+.rm-premium > div { display: grid; gap: 5px; }
+.rm-premium span { font-size: 12px; color: var(--text-2); }
+.rm-premium strong { font: 500 30px/1.1 var(--font-mono); }
+.rm-premium > small { font-size: 11px; color: var(--text-3); }
+.rm-examples h4 { margin: 18px 0 6px; font-size: 14px; font-weight: 600; }
+.rm-example-reference { margin: 0 0 12px; font-size: 11px; line-height: 1.6; color: var(--text-2); }
+.rm-examples ol { margin: 0; padding: 0; list-style: none; }
+.rm-examples li { padding-block: 12px; border-top: 1px solid var(--border); }
+.rm-scenario-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 12px; }
+.rm-scenario-head b, .rm-scenario-head strong { font-family: var(--font-mono); font-weight: 500; }
+.rm-scenario-head strong { font-size: 16px; }
+.rm-examples li p { margin: 5px 0 0; color: var(--text-2); font-size: 11px; line-height: 1.5; }
+.rm-examples li p b { color: var(--text-1); font-weight: 500; }
+.rm-disabled { padding-block: 12px; margin: 0; border-top: 1px solid var(--border); font-size: 11px; line-height: 1.6; color: var(--text-3); }
+@media (max-width: 700px) { .rm-head > span, .rm-premium > small, .rm-example-reference, .rm-examples li p, .rm-disabled { font-size: 12px; } }
+@media (max-width: 380px) { .rm-head { align-items: start; }.rm-head > span { text-align: right; }.rm-premium { gap: 8px; }.rm-premium > small { max-width: 112px; } }

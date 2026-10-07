@@ -1,5 +1,5 @@
 import { RefreshNotice } from "../components/ui.jsx";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { usd, pct, price, ago, utc, optionLabel, strike } from "../lib/format.js";
@@ -11,6 +11,7 @@ import LeanBar from "../components/LeanBar.jsx";
 import { Asset } from "../components/MarketVisuals.jsx";
 import HistoryStatus, { coverageReady, GapNote } from "../components/HistoryStatus.jsx";
 import PnlHistory from "../components/PnlHistory.jsx";
+import "../trader-mobile.css";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const short = (t) => { const d = new Date(t * 1000); return `${MONTHS[d.getUTCMonth()]} ${String(d.getUTCDate()).padStart(2, "0")}`; };
@@ -23,10 +24,101 @@ const CAP = 20;
 const KPI_HELP = "Gross options PnL: expired options, premium received minus premium paid plus settlement value, before fees; it sets the rank. Win rate: share of expired option instruments with positive gross PnL; it counts outcomes, not their size. Expired options: distinct expired instruments with reconstructed results. Premium traded: option premium bought plus sold, before netting; it sets the size cohort. Perp PnL: reported realised perpetual PnL, separate from the ranking. " + TYPE_INFO;
 const BOOK_HELP = "Positions reconstructed through the displayed UTC close, valued on fresh options quotes. Marks use a Black-76 model on the index; quoted delta is used where available, otherwise an estimate from the strike IV, marked est. No default volatility is assumed. Later trades are not included, and expired instruments are omitted. Entry is the average cost of the remaining position where daily records determine it; when buys and sells lose their order in a daily aggregate, entry and unrealised PnL show a dash until a later close or reversal establishes a known basis. Delta is dollar exposure to the coin; positive gains when the price rises. Coins are ordered by gross delta.";
 
+function usePhone() {
+  const [phone, setPhone] = useState(() => typeof matchMedia === "function" && matchMedia("(max-width: 680px)").matches);
+  useEffect(() => {
+    if (typeof matchMedia !== "function") return;
+    const media = matchMedia("(max-width: 680px)");
+    const update = () => setPhone(media.matches);
+    media.addEventListener("change", update);
+    update();
+    return () => media.removeEventListener("change", update);
+  }, []);
+  return phone;
+}
+
+function PhoneFold({ title, children, className = "" }) {
+  return <details className={`tm-fold ${className}`}><summary>{title}</summary><div className="tm-fold-content">{children}</div></details>;
+}
+
 function leanOf(rows) {
   const q = rows.filter((p) => p.delta_usd != null);
   const net = q.reduce((s, p) => s + p.delta_usd, 0), gross = q.reduce((s, p) => s + Math.abs(p.delta_usd), 0);
   return { net_delta_usd: net, gross_delta_usd: gross, score: gross > 0 ? net / gross : null };
+}
+
+function PhoneOption({ position: p }) {
+  const o = optionLabel(p.instrument);
+  return <details className="tm-option">
+    <summary>
+      <span className="tm-option-main"><b className="mono">{o.strike != null ? `${strike(o.strike, "")} ${o.type}` : p.instrument}</b><span className={`tm-option-result ${tone(p.upnl)}`}><small>Unrealised</small><b className="mono">{p.upnl == null ? "—" : usd(p.upnl)}</b></span></span>
+      <span className="tm-option-sub"><span>{p.net > 0 ? "Long" : "Short"} <b className="mono">{qty(p.net)}</b> · {short(p.expiry)}</span><span className="tm-detail-label">Details</span></span>
+    </summary>
+    <dl className="tm-figures">
+      <div><dt>Entry</dt><dd className="mono">{p.entry == null ? "—" : price(p.entry)}</dd></div>
+      <div><dt>Mark</dt><dd className="mono">{price(p.mark)}</dd></div>
+      <div><dt>Delta</dt><dd className="mono">{p.delta_usd == null ? "—" : <>{usd(p.delta_usd)}{p.delta_source !== "quoted" && <span className="dim"> est</span>}</>}</dd></div>
+    </dl>
+  </details>;
+}
+
+function PhoneOptions({ book }) {
+  const by = {};
+  for (const p of book) (by[p.und] ||= []).push(p);
+  const groups = Object.entries(by).map(([und, rows]) => ({ und, lean: leanOf(rows), rows: [...rows].sort((a, b) => a.expiry - b.expiry || a.strike - b.strike) }))
+    .sort((a, b) => b.lean.gross_delta_usd - a.lean.gross_delta_usd);
+  return <div className="tm-book">{groups.map((g) => <section className="tm-book-group" key={g.und} aria-label={`${g.und} open options`}>
+    <div className="tm-book-head">
+      <Link to={`/coin/${g.und}#wallets`} className="asset-link"><Asset und={g.und} compact /></Link>
+      <LeanBar lean={g.lean} width={56} />
+      <Info label={`About ${g.und} exposure`}>Net delta {usd(g.lean.net_delta_usd)} of {usd(g.lean.gross_delta_usd)} gross. {BOOK_HELP}</Info>
+    </div>
+    {g.rows.slice(0, 3).map((p) => <PhoneOption position={p} key={p.instrument} />)}
+    {g.rows.length > 3 && <PhoneFold title={`Show ${g.rows.length - 3} more ${g.und} options`} className="tm-more-options">{g.rows.slice(3).map((p) => <PhoneOption position={p} key={p.instrument} />)}</PhoneFold>}
+  </section>)}</div>;
+}
+
+function PhoneLargeTrades({ trades }) {
+  return <div className="tm-large-trades">{trades.map((t, i) => <details className="tm-option" key={i}>
+    <summary>
+      <span className="tm-option-main"><b>{t.direction === "buy" ? "Buy" : "Sell"} <span className="mono">{t.amount != null ? qty(t.amount) : "—"}</span></b><b className="mono">{price(t.price)}</b></span>
+      <span className="tm-option-sub"><span className="mono">{optionLabel(t.instrument).display}</span><span className="tm-detail-label">Details</span></span>
+    </summary>
+    <dl className="tm-figures"><div><dt>Time</dt><dd>{utc(t.ts / 1000)} · {ago(t.ts / 1000)}</dd></div><div><dt>Notional</dt><dd className="mono">{usd(t.notional_usd)}</dd></div></dl>
+  </details>)}</div>;
+}
+
+function PhoneTrader({ data, error, crumb, name, book, copied, copy }) {
+  return <div className="wrap page people-page trader-page trader-phone">
+    <RefreshNotice error={error} />
+    {crumb(name)}
+    <section className="plate trader-id">
+      <div className="tid"><WalletEmblem address={data.address} size={44} /><div className="tid-t"><h1>{name}{tiered(data) && <em className="tier-tag">{data.tier}</em>}</h1><p className="tid-sub">Rank {data.rank}</p></div></div>
+      <div className="tkpis">
+        <div><span>Gross options PnL <Info label="About these figures">{KPI_HELP}</Info></span><b className={`big ${tone(data.option_pnl)}`}>{usd(data.option_pnl)}</b></div>
+        <div><span>Win rate</span><b>{pct(data.win_rate, 0)}</b></div>
+      </div>
+      <PhoneFold title="Profile details" className="tm-profile">
+        <p className="tid-sub"><span className="mono tm-address" title={data.address}>{data.address}</span><button type="button" className="tid-copy" onClick={copy}>{copied ? "Copied" : "Copy"}</button></p>
+        <dl className="tm-figures">
+          {data.pnl_cohort && <div><dt>Results cohort</dt><dd>{data.pnl_cohort}</dd></div>}
+          {data.size_cohort && <div><dt>Size cohort</dt><dd>{data.size_cohort}</dd></div>}
+          <div><dt>Since</dt><dd className="mono">{data.first}</dd></div>
+          {data.last && <div><dt>Last trade</dt><dd className="mono">{data.last}</dd></div>}
+          <div><dt>Perp PnL</dt><dd className={`mono ${tone(data.perp_pnl)}`}>{usd(data.perp_pnl)}</dd></div>
+          <div><dt>Expired options</dt><dd className="mono">{data.expired?.toLocaleString("en-US") ?? "—"}</dd></div>
+          <div><dt>Premium traded</dt><dd className="mono">{usd(data.premium_traded)}</dd></div>
+        </dl>
+      </PhoneFold>
+    </section>
+    <Plate title="Open options" info={`${BOOK_HELP}${data.lean?.score != null ? ` Total net delta ${usd(data.lean.net_delta_usd)} of ${usd(data.lean.gross_delta_usd)} gross.` : ""}`} bodyClass="flush" right={<span className="tm-book-count mono">{book.length}</span>}>
+      {book.length ? <PhoneOptions book={book} /> : <p className="status pad">—</p>}
+    </Plate>
+    {!!data.pnl_history?.length && <PhoneFold title="P&L history"><PnlHistory history={data.pnl_history} through={data.through} /></PhoneFold>}
+    {!!data.large_24h?.length && <PhoneFold title={`Large trades, 24h · ${data.large_24h.length}`}><PhoneLargeTrades trades={data.large_24h} /></PhoneFold>}
+    <PhoneFold title="Recent activity"><Plate title="Recent activity" info="Options bought and sold per day over the last 45 rebuilt days, with the average price." bodyClass="flush">{data.recent?.length ? <Recent recent={data.recent} /> : <p className="status pad">—</p>}</Plate></PhoneFold>
+    <PhoneFold title="Snapshot details"><p className="status">History to {data.through} UTC{data.valued_at ? <> · book valued {utc(data.valued_at)}{Date.now() / 1000 - data.valued_at > 1800 ? " · historical snapshot" : ""}</> : null}<GapNote data={data} /></p></PhoneFold>
+  </div>;
 }
 
 function OpenOptions({ book }) {
@@ -147,6 +239,7 @@ function Missing({ address, crumb }) {
 }
 
 export default function Trader() {
+  const phone = usePhone();
   const { address } = useParams();
   const { data, error, missing } = useData(`traders/${address.toLowerCase()}.json`, 5 * 60_000);
   const [copied, setCopied] = useState(false);
@@ -159,6 +252,7 @@ export default function Trader() {
   const name = codename(data.address);
   const copy = () => { navigator.clipboard?.writeText(data.address).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }, () => {}); };
   const large = (data.large_24h || []).slice(0, CAP);
+  if (phone) return <PhoneTrader data={data} error={error} crumb={crumb} name={name} book={book} copied={copied} copy={copy} />;
   return (
     <div className="wrap page people-page trader-page">
       <RefreshNotice error={error} />
