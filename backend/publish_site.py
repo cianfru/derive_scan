@@ -56,9 +56,10 @@ from derive.candles import CandleCache
 from derive.signals import engine_comparison, ribbon_trail
 from derive.quality import ANALYTICS_VERSION, engine_status, snapshot_status
 from derive.implied import implied_by_expiry, option_levels
-from derive.lean import DEFENSIVE_SIGNALS, HORIZONS, UP_SIGNALS, WALLET_MIN_POSITIONS, WALLET_MIN_USD, alignment, options_lean, state_of, wallets_reading
+from derive.lean import DEFENSIVE_SIGNALS, HORIZONS, UP_SIGNALS, WALLET_MIN_POSITIONS, WALLET_MIN_USD, alignment, options_lean, state_of
 from derive import traders as traders_mod
-from derive.history import DIRECTIONAL, last_complete_day, parse_option
+from derive.history import last_complete_day, parse_option
+from derive.valuation import delta_at
 from derive.metric_history import build_engine_history
 from derive.wallet_alias import canonical, translate_keys
 
@@ -790,36 +791,77 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
     return smart_legs
 
 
-# Gold rings on the Saloon (owner, 7 October 2026): an answer is marked when at least two smart (top-tier)
-# wallets hold options of the same settlement at strikes inside its pays-in-part zone whose combined delta
-# points its way, at least SMART_MIN_DELTA dollars (BTC and ETH) or SMART_MIN_DELTA_SMALL (other coins).
+# Gold rings on the Saloon (owner, 7 October 2026; "keep it clean ... x smart wallets long vs short"): each smart
+# (top-tier) wallet holding options of the level's settlement at strikes inside its pays-in-part zone counts long
+# or short by its own net delta there (at least WALLET_COUNT_MIN_USD). An answer gets the ring when at least
+# SMART_MIN_WALLETS wallets lean its way, more than lean the other way, with at least SMART_MIN_DELTA dollars
+# of delta between them (BTC and ETH; SMART_MIN_DELTA_SMALL on other coins).
 SMART_MIN_DELTA, SMART_MIN_DELTA_SMALL, SMART_MIN_WALLETS = 10_000, 2_000, 2
+# A wallet counts as long or short on a date (or at a level) from this much delta its way; dust is left out.
+WALLET_COUNT_MIN_USD = 1_000
+DATE_MIN_WALLETS = 3
+
+
+def _zone_wallets(level: dict, settle_ts: int, legs: list, und: str) -> dict:
+    per: dict = defaultdict(float)
+    for w, u, exp, strike, delta in legs:
+        if u == und and int(exp) == int(settle_ts) and level["lo"] <= strike <= level["hi"]:
+            per[w] += delta
+    return {w: v for w, v in per.items() if abs(v) >= WALLET_COUNT_MIN_USD}
+
+
+def level_smart_wallets(level: dict, settle_ts: int, legs: list, und: str) -> dict | None:
+    """{"long", "short"}: smart wallets at this level and date, each counted by its own net delta in the zone."""
+    per = _zone_wallets(level, settle_ts, legs, und)
+    long_, short = sum(v > 0 for v in per.values()), sum(v < 0 for v in per.values())
+    return {"long": long_, "short": short} if per else None
 
 
 def smart_marks(level: dict, settle_ts: int, legs: list, und: str) -> dict:
-    """{"yes"|"no": {"delta_usd", "wallets"}} for the answers of one level the smart wallets lean toward."""
-    lo, hi = level.get("lo"), level.get("hi")
-    inside = [lg for lg in legs if lg[1] == und and int(lg[2]) == int(settle_ts) and lo <= lg[3] <= hi]
-    delta, wallets = sum(lg[4] for lg in inside), len({lg[0] for lg in inside})
+    """{"yes"|"no": {"delta_usd", "wallets"}} for the answer of one level more smart wallets lean toward."""
+    per = _zone_wallets(level, settle_ts, legs, und)
+    up = [v for v in per.values() if v > 0]
+    down = [v for v in per.values() if v < 0]
     floor = SMART_MIN_DELTA if und in ("BTC", "ETH") else SMART_MIN_DELTA_SMALL
-    if wallets < SMART_MIN_WALLETS or abs(delta) < floor:
-        return {}
-    return {"yes" if delta > 0 else "no": {"delta_usd": round(delta), "wallets": wallets}}
+    for side, mine, other in (("yes", up, down), ("no", down, up)):
+        if len(mine) >= SMART_MIN_WALLETS and len(mine) > len(other) and abs(sum(mine)) >= floor:
+            return {side: {"delta_usd": round(sum(mine)), "wallets": len(mine)}}
+    return {}
 
 
-def date_traders(positions: dict | None, chain: tuple | None, settle_ts: int, now: float) -> dict | None:
-    """Where every directional wallet leans on one settlement date (owner, 7 October 2026: "maybe there is a
-    consensus"): their open options of that date, net delta over gross delta, with the Wallets layer's rules
-    (state up / defensive / neutral, at least WALLET_MIN_USD and WALLET_MIN_POSITIONS). None until the history
-    holds the directional bucket or while the coin has no chain to value it."""
-    if not positions or not chain or not any(DIRECTIONAL in cells for cells in positions.values()):
+def date_traders(book: dict | None, chain: tuple | None, settle_ts: int, now: float) -> dict | None:
+    """Where directional traders lean on one settlement date (owner, 7 October 2026: "a simple x long vs short would
+    be enough"): each directional wallet's open options of that date (history.directional_book) as its own net
+    delta; `long` and `short` count the wallets with at least WALLET_COUNT_MIN_USD their way, `score` is their
+    net over gross. The Wallets layer's rules give the state (up at +0.25, defensive at -0.25, at least
+    WALLET_MIN_USD), and it needs DATE_MIN_WALLETS wallets, so one trader never paints a date. None until the
+    history holds the book or while the coin has no chain."""
+    if book is None or not chain:
         return None
     strikes, index, _ = chain
-    r = wallets_reading(positions, strikes, index, now, 3660, tier=DIRECTIONAL, expiry=int(settle_ts))
-    return {k: r[k] for k in ("state", "score", "net_delta_usd", "gross_delta_usd", "positions", "status")}
+    per: dict = defaultdict(float)
+    missing = 0
+    for name, holders in book.items():
+        option = parse_option(name)
+        if not option or option[1] != int(settle_ts):
+            continue
+        delta, _source = delta_at(strikes, option[1], option[2], option[3], index, now)
+        if delta is None or not index:
+            missing += len(holders)
+            continue
+        for n, net in holders:
+            per[n] += net * delta * index
+    counted = [v for v in per.values() if abs(v) >= WALLET_COUNT_MIN_USD]
+    long_, short = sum(v > 0 for v in counted), sum(v < 0 for v in counted)
+    net, gross = sum(counted), sum(abs(v) for v in counted)
+    ok = not missing and long_ + short >= DATE_MIN_WALLETS and gross >= WALLET_MIN_USD
+    score = round(net / gross, 3) if ok else None
+    return {"state": state_of(score), "score": score, "long": long_, "short": short,
+            "net_delta_usd": round(net, 2), "gross_delta_usd": round(gross, 2),
+            "status": "ready" if ok else "missing_quotes" if missing else "too_few_wallets"}
 
 
-def annotate_smart(site: Path, legs: list, positions: dict | None = None, chains: dict | None = None,
+def annotate_smart(site: Path, legs: list, book: dict | None = None, chains: dict | None = None,
                    now: float | None = None) -> None:
     """Marks the published questions/{UND}.json answers the smart wallets lean toward (`smart` on the
     answer), counts the board's marked answers per coin in questions/index.json (`smart`) and adds each date's
@@ -838,12 +880,16 @@ def annotate_smart(site: Path, legs: list, positions: dict | None = None, chains
         count = 0
         for date in board.get("dates") or []:
             date.pop("traders", None)
-            reading = date_traders((positions or {}).get(und), (chains or {}).get(und), date["settle_ts"],
+            reading = date_traders(None if book is None else book.get(und, {}), (chains or {}).get(und), date["settle_ts"],
                                    time.time() if now is None else now)
             if reading:
                 date["traders"] = reading
             for level in date.get("levels") or []:
                 marks = smart_marks(level, date["settle_ts"], legs, und)
+                level.pop("smart_wallets", None)
+                counts = level_smart_wallets(level, date["settle_ts"], legs, und)
+                if counts:
+                    level["smart_wallets"] = counts
                 shown = date.get("board") and level.get("ladder") and level.get("state") not in ("retired", "tail")
                 for side in ("yes", "no"):
                     ans = level.get(side)
@@ -983,7 +1029,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     _write(site / "flow.json", {"generated_at": int(now), **flow})
     smart_legs = traders_block(data, site, chains, flow, now)
     if q_coins is not None:
-        annotate_smart(site, smart_legs, (held.get("positions") or {}) if coverage["ready"] else None, chains, now)
+        annotate_smart(site, smart_legs, held.get("directional_book") if coverage["ready"] else None, chains, now)
     from derive.config import Settings
     from record_once import load_universe
     settings = Settings(data_dir=data)

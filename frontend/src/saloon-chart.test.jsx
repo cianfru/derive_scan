@@ -10,7 +10,7 @@ const docs = vi.hoisted(() => ({ current: {} }));
 vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.current[path] ?? null : null, error: null }) }));
 vi.mock("./components/SettleChart.jsx", async (orig) => ({ ...await orig(), default: () => <div data-testid="settle-chart" /> }));
 import Saloon from "./pages/Saloon.jsx";
-import { chartLevels, levelText, returnPct, smartOf, traderText } from "./components/SaloonChart.jsx";
+import { chartLevels, countText, levelText, returnPct, smartOf, traderText } from "./components/SaloonChart.jsx";
 import { boardRows } from "./lib/board.js";
 import { BANNED } from "./lib/questions.js";
 
@@ -23,8 +23,9 @@ const smartBtc = JSON.parse(JSON.stringify(btc));
 const marked = smartBtc.dates[4].levels.find((l) => l.ladder && l.k > smartBtc.index);
 marked.yes.smart = { delta_usd: 24000, wallets: 3 };
 // Directional traders' reading on two dates, one too thin to read, as publish_site writes them.
-smartBtc.dates[4].traders = { state: "defensive", score: -0.692, net_delta_usd: -15633000, gross_delta_usd: 22592000, positions: 90, status: "ready" };
-smartBtc.dates[5].traders = { state: null, score: null, net_delta_usd: 4000, gross_delta_usd: 5000, positions: 2, status: "insufficient_exposure" };
+smartBtc.dates[4].traders = { state: "defensive", score: -0.692, long: 7, short: 8, net_delta_usd: -15633000, gross_delta_usd: 22592000, status: "ready" };
+smartBtc.dates[5].traders = { state: null, score: null, long: 1, short: 1, net_delta_usd: 4000, gross_delta_usd: 5000, status: "too_few_wallets" };
+marked.smart_wallets = { long: 3, short: 1 };
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -114,17 +115,26 @@ describe("Saloon chart page", () => {
   });
 
   it("draws where directional traders lean on each date, and says it in the panel", () => {
-    expect(traderText(smartBtc.dates[4].traders)).toBe("Short: 85% of their exposure points down, 90 positions, $22.6M");
-    expect(traderText(smartBtc.dates[5].traders)).toBe("Too few positions to read (2 open)");
-    expect(traderText({ state: "up", score: 0.3, gross_delta_usd: 42000, positions: 5 })).toBe("Long: 65% of their exposure points up, 5 positions, $42k");
+    expect(traderText(smartBtc.dates[4].traders)).toBe("7 long · 8 short, most of the money short");
+    expect(traderText(smartBtc.dates[5].traders)).toBe("1 long · 1 short, too few traders to read");
+    expect(traderText({ state: "neutral", score: 0.1, long: 4, short: 3 })).toBe("4 long · 3 short, most of the money on both sides");
+    expect(countText({ long: 3, short: 1 })).toBe("3 long · 1 short");
     show();
     const dots = [...document.querySelectorAll(".sch-lane-dot")];
-    expect(dots.map((d) => d.textContent)).toEqual(expect.arrayContaining(["Short", "Too few positions"]));
-    expect(dots.find((d) => d.textContent === "Short").getAttribute("aria-label")).toMatch(/^Directional traders on .*: Short: 85%/);
+    expect(dots.map((d) => d.textContent)).toEqual(expect.arrayContaining(["7 long · 8 short", "Too few"]));
+    expect(dots.find((d) => d.textContent === "7 long · 8 short").getAttribute("aria-label")).toMatch(/^Directional traders on .*: 7 long · 8 short, most of the money short$/);
     const bubble = [...document.querySelectorAll(".sch-bubble:not(.sch-dot)")].find((b) => b.getAttribute("aria-label").includes(dayLabelOf(smartBtc.dates[4])));
     expect(bubble).toBeTruthy();
     fireEvent.keyDown(bubble, { key: "Enter" });
-    expect(screen.getByRole("complementary", { name: "Your trade" }).textContent).toContain("Directional traders on this date: Short: 85%");
+    expect(screen.getByRole("complementary", { name: "Your trade" }).textContent).toContain("Directional traders on this date: 7 long · 8 short, most of the money short");
+  });
+
+  it("counts smart wallets at a level in the panel", () => {
+    show();
+    const b = document.querySelector(`.sch-bubble[data-key="${marked.id}:yes"]`);
+    expect(b).toBeTruthy();
+    fireEvent.keyDown(b, { key: "Enter" });
+    expect(screen.getByRole("complementary", { name: "Your trade" }).textContent).toContain("Smart wallets here: 3 long · 1 short.");
   });
 
   it("uses no forecast words", () => {

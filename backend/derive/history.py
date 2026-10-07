@@ -11,7 +11,8 @@ history/days/YYYY-MM-DD.csv.gz   one row per wallet and instrument traded that d
     volatility, premium sold out of the money, realised PnL and fees as Derive reports them
 history/settlements/{UND}.json   option settlement prices per expiry (Derive)
 history/wallets.json             each wallet's class and tier from all days so far (rules in the study doc)
-history/positions.json           open option contracts per instrument held by each tier's wallets
+history/positions.json           open option contracts per instrument held by each tier's wallets, and
+                                  every directional wallet's own (directional_book)
 history/traders.json             leaderboard, open positions, recent activity, cohorts (derive/traders.py)
 history/state.json               days done
 history/anomalies.json           days kept although their pages did not reconcile (fetch_day); each is
@@ -63,7 +64,6 @@ MIN_ACTIVE_DAYS = 90
 TOP_FRACTION = 0.20   # tier "top": the study's main set
 SMART_COUNT = 50      # tier "smart": the 50 best profitable directional wallets not already "top" (none while top has 50 or more)
 TIERS = ("top", "smart", "profitable")
-DIRECTIONAL = "directional"  # every directional wallet, a bucket of tier_positions beside the tiers
 
 
 def _f(x) -> float:
@@ -549,23 +549,30 @@ def rank_tiers(out: dict) -> dict:
     return out
 
 
+def directional_book(held: dict, wallets: dict) -> dict:
+    """{UND: {instrument: [[n, net contracts], ...]}}: every directional wallet's open options (profitable or
+    not), each wallet a number (the same number across instruments, no address), for the Saloon's per-date count
+    of directional traders long and short."""
+    ids: dict = {}
+    out: dict = defaultdict(lambda: defaultdict(list))
+    for (wallet, name), net in sorted(held.items()):
+        if (wallets.get(wallet) or {}).get("class") != "directional" or not net:
+            continue
+        n = ids.setdefault(wallet, len(ids))
+        out[name.split("-")[0]][name].append([n, round(net, 6)])
+    return {u: dict(v) for u, v in out.items()}
+
+
 def tier_positions(held: dict, wallets: dict) -> dict:
     """{UND: {instrument: {tier: [net contracts, wallets, gross contracts]}}} for open instruments, per tier and the
-    tiers above it (smart includes top; profitable includes both), and under "directional" every directional wallet,
-    in profit or not (the Saloon's per-date reading of where directional traders lean)."""
-    out: dict = defaultdict(lambda: defaultdict(dict))
+    tiers above it (smart includes top; profitable includes both)."""
+    out: dict = defaultdict(lambda: defaultdict(lambda: {t: [0.0, 0, 0.0] for t in TIERS}))
     for (wallet, name), net in held.items():
-        info = wallets.get(wallet) or {}
-        tier = info.get("tier")
-        buckets = list(TIERS[TIERS.index(tier):]) if tier in TIERS else []
-        if info.get("class") == "directional":
-            buckets.append(DIRECTIONAL)
-        cells = out[name.split("-")[0]][name] if buckets else None
-        if tier in TIERS:
-            for t in TIERS:  # every tier present once any tier holds it, as before the directional bucket
-                cells.setdefault(t, [0.0, 0, 0.0])
-        for t in buckets:
-            cell = cells.setdefault(t, [0.0, 0, 0.0])
+        tier = (wallets.get(wallet) or {}).get("tier")
+        if tier not in TIERS:
+            continue
+        for t in TIERS[TIERS.index(tier):]:
+            cell = out[name.split("-")[0]][name][t]
             cell[0] = round(cell[0] + net, 6)
             cell[1] += 1
             cell[2] = round(cell[2] + abs(net), 6)

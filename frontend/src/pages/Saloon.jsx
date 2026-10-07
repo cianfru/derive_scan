@@ -6,7 +6,7 @@ import { useFeeds } from "../components/Feeds.jsx";
 import { Info, Loading, Failed, RefreshNotice } from "../components/ui.jsx";
 import { CoinIcon } from "../components/MarketVisuals.jsx";
 import SaloonHead from "../components/SaloonNotices.jsx";
-import SaloonChart, { dayName, smartOf, traderText } from "../components/SaloonChart.jsx";
+import SaloonChart, { countText, dayName, traderText } from "../components/SaloonChart.jsx";
 import QuestionTicket from "../components/QuestionTicket.jsx";
 import { OutcomeFigures } from "../components/OutcomePreview.jsx";
 import { FollowButton } from "../components/Follow.jsx";
@@ -75,7 +75,7 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose }) {
   const valid = Number.isFinite(dollars) && dollars > 0;
   const t = valid && live(level, side, paused) ? budgetTicket(level, side, dollars, board) : null;
   const ready = t && !t.belowMin && t.payout > 0;
-  const smart = smartOf(row);
+  const smart = level.smart_wallets || null;
   const traders = board.dates?.find((d) => d.expiry === row.expiry)?.traders || null;
   const question = questionText(und, level, row.expiry);
   const pick = (s) => { const r = s === side ? row : other; if (r) onPick(r); };
@@ -108,8 +108,8 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose }) {
           {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
           {!t.belowMin && <section className="md-preview" aria-label="What it pays"><OutcomeFigures und={und} level={level} side={side} t={t} expiry={row.expiry} settleTs={row.settleTs} summary compact /></section>}
         </> : <p className="status">{valid ? `No price now for ${ANSWER[side]}.` : "Enter an amount greater than $0."}</p>}
-        {traders && <p className="sl-traders">Directional traders on this date: {traderText(traders)}.<Info label="About directional traders">Every Derive wallet that trades options for direction, profitable or not: market makers, income sellers (who sell options to collect a fee) and hedgers (who buy protection) are left out. The reading is their open options on this settlement date, as net exposure over total exposure. Long when at least 62.5% of it points up, Short when at least 62.5% points down, else Balanced; it needs $10,000 of exposure and 3 positions. A position is one wallet's holding in one option. Where traders lean is not where the price goes. Context, not a signal.</Info></p>}
-        {smart && <p className="sl-smart">Smart wallets: {smart.wallets} hold about {money(Math.abs(smart.delta_usd))} of positions {yes ? "up" : "down"} at these levels on this date.<Info label="About smart wallets">The most profitable directional options wallets on Derive. The ring marks at least $10,000 of their delta this way ($2,000 on smaller coins), across two or more wallets, at strikes inside this answer's pay zone. Context, not a signal.</Info></p>}
+        {traders && <p className="sl-traders">Directional traders on this date: {traderText(traders)}.<Info label="About directional traders">Every Derive wallet that trades options for direction, profitable or not. Market makers, income sellers (who sell options to collect a fee) and hedgers (who buy protection) are left out. Each wallet counts long or short by its own open options on this settlement date (at least $1,000 its way). "Most of the money" weighs them by size: long or short when at least 62.5% points one way. It needs 3 traders and $10,000. Where traders lean is not where the price goes. Context, not a signal.</Info></p>}
+        {smart && <p className="sl-smart">Smart wallets here: {countText(smart)}.<Info label="About smart wallets">The most profitable directional options wallets on Derive holding options of this date at strikes inside this answer's pay zone, each counted long or short by its own position there (at least $1,000). The gold ring marks the answer at least two of them lean toward, more than lean the other way. Context, not a signal.</Info></p>}
         {age.state === "stale" && <p className="q-note warn">Prices are {age.minutes} min old.</p>}
         <button type="button" className="btn primary lg" disabled={!ready} onClick={() => setTicket(true)}>Review trade</button>
         <p className="sl-foot"><span>{oneTapOffered() ? "One tap: both options at one price, or nothing." : "One-tap trading is coming to Cowboy."}</span>
@@ -171,9 +171,9 @@ function ChartView({ index, error }) {
           <p className="sl-key">
             <span><i className="up" aria-hidden="true" />Higher: pays if {und} settles above the level</span>
             <span><i className="down" aria-hidden="true" />Lower: pays if it settles below</span>
-            <span><i className="gold" aria-hidden="true" />Gold ring: smart wallets hold positions that way</span>
+            <span><i className="gold" aria-hidden="true" />Gold ring: more smart wallets lean that way</span>
             <span>Each bubble: the most you make on {money(REF)}, fees included</span>
-            {dates.some((d) => d.traders) && <span><i className="lane" aria-hidden="true" />Bottom line: where directional traders' positions lean on each date</span>}
+            {dates.some((d) => d.traders) && <span><i className="lane" aria-hidden="true" />Bottom line: directional traders long and short on each date</span>}
             <span className="sl-key-how">Drag a bubble to explore · scroll or pinch to zoom · drag the chart to move</span>
           </p>
           <div className="sl-frame">
@@ -188,7 +188,7 @@ function ChartView({ index, error }) {
             <span>{age.state === "paused" ? "Prices paused" : index?.prices_ts ? `Derive prices ${new Date(index.prices_ts * 1000).toISOString().slice(11, 16)} UTC` : "Derive prices"} · Fees included · Defined cost</span>
             <details><summary>How to read this chart</summary>
               <p>Candles on the left are {und}'s last 12 days, every 4 hours. Each column on the right is a settlement date at 08:00 UTC; the columns are spaced evenly so every date fits, with the time left under each date. Each bubble is one answer at its level: Higher above the price now, Lower below it. The figure inside is the most it makes for a {money(REF)} total, Derive's fees included. Hover a bubble to see where it pays; click it to open the trade panel. Small dots are levels without room for a bubble: click one, or zoom in, and it opens up. Drag a bubble to slide through other levels and dates.</p>
-              <p>Gold rings come from the open options of the smart wallets, the most profitable directional options wallets on Derive: at least $10,000 of delta the bubble's way ($2,000 on smaller coins), across two or more wallets, at strikes inside its pay zone. Context, not a signal.</p>
+              <p>Smart wallets are the most profitable directional options wallets on Derive. At each level, every one holding options of that date inside the answer's pay zone counts long or short by its own position there; hover a bubble to see "Smart wallets here: 3 long · 1 short". The gold ring marks the answer at least two of them lean toward, more than lean the other way (with at least $10,000 between them, $2,000 on smaller coins). The line under the dates counts every directional trader on each date the same way, "7 long · 8 short"; its dot sits higher when most of their money is long, lower when it is short, and is bigger when more money is behind it. It needs 3 traders. Context, not a signal.</p>
             </details>
           </footer>
         </>}

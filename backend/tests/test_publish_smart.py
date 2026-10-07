@@ -22,6 +22,10 @@ def test_marks_need_two_wallets_and_the_floor():
     assert P.smart_marks(lv, T, legs, "BTC") == {"yes": {"delta_usd": 12_000, "wallets": 2}}
     short = [("0xa", "ETH", T, 2_500, -1_500), ("0xb", "ETH", T, 2_550, -9_000)]
     assert P.smart_marks(_level(2_450, 2_550), T, short, "ETH") == {"no": {"delta_usd": -10_500, "wallets": 2}}
+    # Wallets count, not money: one large short does not outweigh two longs, and a tie marks nothing.
+    tie = [("0xa", "BTC", T, 85_000, 6_000), ("0xb", "BTC", T, 85_000, 6_000), ("0xc", "BTC", T, 85_000, -900_000), ("0xd", "BTC", T, 85_000, -2_000)]
+    assert P.smart_marks(lv, T, tie, "BTC") == {} and P.level_smart_wallets(lv, T, tie, "BTC") == {"long": 2, "short": 2}
+    assert P.smart_marks(lv, T, tie[:3], "BTC") == {"yes": {"delta_usd": 12_000, "wallets": 2}}
 
 
 def test_annotate_writes_answers_and_counts(tmp_path):
@@ -45,17 +49,26 @@ def test_annotate_writes_answers_and_counts(tmp_path):
     assert json.loads((q / "index.json").read_text())["coins"][0]["smart"] == 1
 
 
-def test_date_traders_reads_one_settlement_of_directional_wallets():
+def test_date_traders_counts_wallets_long_and_short_on_one_settlement():
     exp = 1_791_532_800  # 9 Oct 2026, 08:00 UTC
     now = exp - 2 * 86400
-    later = exp + 7 * 86400
-    strikes = {"ts": now, "expiries": {str(exp): [[86000, 0, 0, 0.5, 0.5, 0.4]], str(later): [[86000, 0, 0, 0.5, 0.5, 0.4]]}}
+    strikes = {"ts": now, "expiries": {str(exp): [[86000, 0, 0, 0.5, 0.5, 0.4]], str(exp + 7 * 86400): [[86000, 0, 0, 0.5, 0.5, 0.4]]}}
     name, other = "BTC-20261009-86000-C", "BTC-20261016-86000-C"
-    # Net long 2 calls (delta 0.4) over 4 positions; the next week's date is left out of this one.
-    positions = {name: {"top": [1.0, 1, 1.0], P.DIRECTIONAL: [2.0, 4, 4.0]}, other: {P.DIRECTIONAL: [-9.0, 3, 9.0]}}
-    r = P.date_traders(positions, (strikes, 84000, now), exp, now)
-    assert r["positions"] == 4 and r["state"] == "up" and r["score"] == 0.5
-    assert r["net_delta_usd"] == round(2 * 0.4 * 84000, 2) and r["gross_delta_usd"] == round(4 * 0.4 * 84000, 2)
-    # Before the history has the directional bucket, nothing is published.
-    assert P.date_traders({name: {"top": [1.0, 1, 1.0]}}, (strikes, 84000, now), exp, now) is None
-    assert P.date_traders(positions, None, exp, now) is None
+    # Delta 0.4 on an index of 84,000: one contract is $33,600 of delta.
+    book = {name: [[0, 1.0], [1, 0.5], [2, -0.2], [3, 0.01]], other: [[4, -9.0]]}  # wallet 3 is dust; 4 is another date
+    r = P.date_traders(book, (strikes, 84000, now), exp, now)
+    assert (r["long"], r["short"]) == (2, 1) and r["status"] == "ready"
+    assert r["score"] == round((1.5 - 0.2) / 1.7, 3) and r["state"] == "up"
+    # One trader alone never paints a date.
+    one = P.date_traders({name: [[0, 5.0]]}, (strikes, 84000, now), exp, now)
+    assert (one["long"], one["short"], one["state"], one["status"]) == (1, 0, None, "too_few_wallets")
+    assert P.date_traders(None, (strikes, 84000, now), exp, now) is None
+    assert P.date_traders(book, None, exp, now) is None
+
+
+def test_level_counts_smart_wallets_in_the_zone():
+    lv = _level(84_000, 86_000)
+    legs = [("0xa", "BTC", T, 85_000, 8_000), ("0xa", "BTC", T, 84_000, -2_000), ("0xb", "BTC", T, 86_000, -4_000),
+            ("0xc", "BTC", T, 85_000, 500), ("0xd", "BTC", T, 90_000, 9_000), ("0xe", "BTC", T + 86400, 85_000, 9_000)]
+    assert P.level_smart_wallets(lv, T, legs, "BTC") == {"long": 1, "short": 1}
+    assert P.level_smart_wallets(lv, T, legs[3:], "BTC") is None

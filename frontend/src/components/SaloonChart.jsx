@@ -31,21 +31,18 @@ export const returnPct = (make, total) => {
   const p = (make / total) * 100;
   return `+${p >= 100 ? Math.round(p).toLocaleString("en-US") : p.toFixed(1)}%`;
 };
-const kusd = (v) => `$${Math.abs(v) >= 1e6 ? `${(Math.abs(v) / 1e6).toFixed(1)}M` : `${Math.round(Math.abs(v) / 1000)}k`}`;
 export const dayName = (ts) => new Date(ts * 1000).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const inText = (ts, now) => {
   const s = Math.max(0, ts - now), d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600);
   return d ? `in ${d}d ${h}h` : `in ${h}h`;
 };
-export const TRADER_WORD = { up: "Long", defensive: "Short", neutral: "Balanced" };
-/** "Short: 85% of their exposure points down, 90 positions, $22.6M." */
+/** "7 long · 8 short": wallets on each side, the plain reading (owner, 7 October 2026: "keep it clean"). */
+export const countText = (c) => `${c?.long || 0} long · ${c?.short || 0} short`;
+/** The traders line's words for one date. */
 export function traderText(t) {
   if (!t) return "Not available yet";
-  if (t.score == null) return `Too few positions to read (${t.positions || 0} open)`;
-  const share = Math.round(((1 + Math.abs(t.score)) / 2) * 100);
-  const way = t.score >= 0 ? "up" : "down";
-  const size = t.gross_delta_usd >= 1e6 ? `$${(t.gross_delta_usd / 1e6).toFixed(1)}M` : `$${Math.round(t.gross_delta_usd / 1000)}k`;
-  return `${TRADER_WORD[t.state]}: ${share}% of their exposure points ${way}, ${t.positions} ${t.positions === 1 ? "position" : "positions"}, ${size}`;
+  if (t.score == null) return `${countText(t)}, too few traders to read`;
+  return `${countText(t)}, most of the money ${t.state === "up" ? "long" : t.state === "defensive" ? "short" : "on both sides"}`;
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
@@ -189,7 +186,7 @@ function mount(host, cfg) {
     for (const p of pts) {
       if (!p.t) continue;
       const col = p.t.state === "up" ? C.up : p.t.state === "defensive" ? C.down : C.text3;
-      const label = TRADER_WORD[p.t.state] || "Too few positions";
+      const label = p.y == null ? "Too few" : countText(p.t);
       const dot = el("g", { class: "sch-lane-dot", tabindex: 0, role: "img", "aria-label": `Directional traders on ${dayName(p.d.settle)}: ${traderText(p.t)}` }, g);
       // The dot's size follows the money behind the reading, so a few positions never look like a crowd.
       const r = p.y == null ? 4 : 3.5 + 5 * Math.sqrt((p.t.gross_delta_usd || 0) / most);
@@ -280,7 +277,7 @@ function mount(host, cfg) {
       + `<div>${esc(dayName(d.settle))}, 08:00 UTC · <b>${r.buyCents}c</b> per $1</div>`
       + `<div>Pays in full ${yes ? `at <b>${esc(money(r.hi))}</b> or above` : `at <b>${esc(money(r.lo))}</b> or below`}</div>`
       + `<div>Up to <b>${returnPct(r.make, r.total)}</b> on ${esc(money(cfg.amount))}</div>`
-      + (smart ? `<div class="sch-smart">Smart wallets: ${smart.wallets} hold ${kusd(smart.delta_usd)} this way</div>` : "")
+      + (r.level?.smart_wallets ? `<div class="sch-smart">Smart wallets here: ${countText(r.level.smart_wallets)}</div>` : "")
       + `<div class="sch-hint">${full ? "Click to trade, or drag to other levels and dates" : "Click to zoom in"}</div>`;
     tip.hidden = false;
     const sc = scroller.scrollLeft, sw = host.stage.clientWidth;
@@ -445,7 +442,7 @@ export default function SaloonChart({ und, name, index, candles, dates, amount, 
   const views = useRef({});
   const openRef = useRef(onOpen);
   openRef.current = onOpen;
-  const dataKey = dates.map((d) => `${d.expiry}:${d.traders?.score ?? "-"}/${d.traders?.positions ?? "-"}:${d.rows.map((r) => `${r.key}=${r.total.toFixed(2)}/${r.payout.toFixed(2)}/${smartOf(r)?.wallets || 0}`).join(",")}`).join("|");
+  const dataKey = dates.map((d) => `${d.expiry}:${d.traders?.score ?? "-"}/${d.traders?.long ?? "-"}/${d.traders?.short ?? "-"}:${d.rows.map((r) => `${r.key}=${r.total.toFixed(2)}/${r.payout.toFixed(2)}/${smartOf(r)?.wallets || 0}/${countText(r.level?.smart_wallets)}`).join(",")}`).join("|");
   const ready = candles?.length > 1 && dates.length > 0 && Number.isFinite(index);
   useEffect(() => {
     if (!ready || !svg.current) return undefined;

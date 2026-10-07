@@ -78,12 +78,9 @@ def test_tiers_and_positions():
     wallets = {f"0x{i}": {"class": "directional", "tier": "top" if i < 2 else "smart" if i < 5 else "profitable"}
                for i in range(8)}
     held = {(f"0x{i}", "BTC-20991231-100000-C"): 1.0 for i in range(8)} | {("0xM", "BTC-20991231-100000-C"): 50.0}
-    # A directional wallet in loss (no tier) and an income seller: only the first joins "directional".
-    held |= {("0xL", "BTC-20991231-100000-C"): -3.0, ("0xI", "BTC-20991231-100000-C"): -40.0}
-    wallets |= {"0xL": {"class": "directional", "tier": None}, "0xI": {"class": "income"}}
     pos = history.tier_positions(held, wallets | {"0xM": {"class": "market_maker"}})
     cell = pos["BTC"]["BTC-20991231-100000-C"]
-    assert cell == {"top": [2.0, 2, 2.0], "smart": [5.0, 5, 5.0], "profitable": [8.0, 8, 8.0], "directional": [5.0, 9, 11.0]}
+    assert cell == {"top": [2.0, 2, 2.0], "smart": [5.0, 5, 5.0], "profitable": [8.0, 8, 8.0]}
 
 
 def test_history_once_reads_days_and_checks_counts(tmp_path):
@@ -203,3 +200,13 @@ def test_trader_pnl_history_books_each_option_on_its_settlement_day(tmp_path):
     assert w["pnl_history"][-1][1] == w["option_pnl"]
     # without settlements (older callers) the field is empty rather than wrong
     assert traders.build(scan, cls, as_of=1.75e9)["traders"][0]["pnl_history"] == []
+
+
+def test_directional_book_keeps_each_directional_wallet_as_a_number():
+    held = {("0xD1", "BTC-20991231-100000-C"): 2.0, ("0xD1", "BTC-20991231-90000-P"): -1.0,
+            ("0xD2", "BTC-20991231-100000-C"): -0.5, ("0xI", "BTC-20991231-100000-C"): -40.0, ("0xD3", "ETH-20991231-5000-C"): 0.0}
+    wallets = {"0xD1": {"class": "directional", "tier": None}, "0xD2": {"class": "directional", "tier": "top"},
+               "0xD3": {"class": "directional"}, "0xI": {"class": "income"}}
+    book = history.directional_book(held, wallets)
+    assert book == {"BTC": {"BTC-20991231-100000-C": [[0, 2.0], [1, -0.5]], "BTC-20991231-90000-P": [[0, -1.0]]}}
+    assert "0xD1" not in str(book)  # numbers, never addresses
