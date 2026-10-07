@@ -134,3 +134,8 @@
 /* Context, not advice: the coin page's overview card (components/CoinOverview.jsx), with Open {coin}. */
 .q-context.md-context { display: grid; gap: 12px; }
 .md-context-title { display: inline-flex; align-items: center; margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+/* The coin's price beside the choice (owner, 7 October 2026), so the level can be read against it. */
+.md-coin-now { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin: 0 0 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.md-coin-now span { font: 500 13px/1.3 var(--font-sans); color: var(--text-2); }
+.md-coin-now b { font: 600 22px/1.1 var(--font-mono); color: var(--text-1); letter-spacing: -.02em; }
+.md-coin-now small { flex-basis: 100%; font: 400 12px/1.3 var(--font-sans); color: var(--text-2); }

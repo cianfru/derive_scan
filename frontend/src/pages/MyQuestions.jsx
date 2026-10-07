@@ -4,6 +4,8 @@ import { useData } from "../lib/data.js";
 import { Info, Tabs } from "../components/ui.jsx";
 import { Asset } from "../components/MarketVisuals.jsx";
 import PayZone from "../components/PayZone.jsx";
+import SettleChart from "../components/SettleChart.jsx";
+import "../settle-chart.css";
 import QuestionTicket from "../components/QuestionTicket.jsx";
 import { ExposureChart, ExposureTotal, MostLose, amount, breakevenText, groupNotes } from "../components/Exposure.jsx";
 import {
@@ -543,6 +545,27 @@ const sumOr = (vals) => (vals.every((x) => Number.isFinite(x)) ? vals.reduce((a,
  * the card. Several: one line each, with its own Close. Positions the combined figures leave out
  * (receipts still being checked, Derive's fees unavailable) still show, with their notes.
  */
+/** The coin's candles up to this date's settlement, with the position's pay zone and breakeven (owner,
+ * 7 October 2026: to watch a position against its breakeven). Loaded only when opened. */
+function PositionPriceChart({ und, board, settleTs, solo, g }) {
+  const [open, setOpen] = useState(false);
+  const { data: coin, error } = useData(open ? `coins/${und}.json` : null);
+  const q = solo?.q;
+  const bes = g?.breakevens || [];
+  return (
+    <details className="q-group-price" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary>{und} price up to the settlement</summary>
+      {open && (coin ? <>
+        <SettleChart und={und} candles={coin.candles} index={board?.index} settleTs={settleTs} lo={q?.lo ?? null} hi={q?.hi ?? null} side={q ? solo.p.side : null} breakeven={bes} />
+        <p className="sc-key"><span><i className="settle" />Settles 08:00 UTC</span>
+          {q && <span><i className={solo.p.side} />Pays in full {solo.p.side === "yes" ? `at ${money(q.hi)} or above` : `at ${money(q.lo)} or below`}</span>}
+          {q && <span><i className="part" />Pays in part {money(q.lo)}–{money(q.hi)}</span>}
+          {bes.length > 0 && <span><i className="be" />Breakeven {bes.map((b) => money(b)).join(" and ")}</span>}</p>
+      </> : error ? <p className="status">The {und} chart is unavailable right now.</p> : <p className="status">Loading the {und} chart…</p>)}
+    </details>
+  );
+}
+
 function GroupCard({ und, expiry, items, g, scope, syncs, onRemove, onClose }) {
   const { data: board } = useData(und ? `questions/${und}.json` : null);
   const { data: markets } = useData("markets.json");
@@ -592,6 +615,7 @@ function GroupCard({ und, expiry, items, g, scope, syncs, onRemove, onClose }) {
           <Fig label="Breakeven" sub="at settlement" className="q-breakeven" value={g && !left ? breakevenText(g) : null} missing={na(noCombined, "Why no breakeven at settlement")} />
         </dl>
       </div>
+      {settleTs && <PositionPriceChart und={und} board={board} settleTs={settleTs} solo={solo} g={g && !left ? g : null} />}
       {solo ? (
         <>
           <div className="q-group-pos">
