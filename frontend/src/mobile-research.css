@@ -1,0 +1,200 @@
+/* Compact research surfaces on phones. Keep figures, scales and desktop layouts intact. */
+@media (max-width: 680px) {
+  .page.people-page,
+  .page.market-research-page { gap: 14px; }
+
+  .page.people-page > .lead { padding: 10px 12px; gap: 4px; }
+  .page.people-page > .lead .lead-text { font-size: 14px; line-height: 1.45; }
+  .page.people-page > .lead .lead-note { font-size: 12px; line-height: 1.45; }
+  .page.people-page .page-head { gap: 6px 12px; }
+  .page.people-page .page-head h1 { font-size: 26px; }
+  .page.people-page .page-head .page-meta { font-size: 12px; line-height: 1.45; }
+  .page.people-page .lead-plate > .panel-head { min-height: 50px; padding: 8px 16px; gap: 0 12px; }
+  .page.people-page .lead-plate .panel-right { min-width: 0; }
+  .page.people-page .lead-plate .tabs { gap: 16px; }
+  .page.people-page .lead-plate .tabs button { font-size: 13px; min-height: 44px; padding-block: 10px; }
+  .page.people-page .lb-table td.lb-m { min-width: 0; white-space: normal; }
+  .page.people-page .lb-table td.lb-m > span { min-width: 0; overflow-wrap: anywhere; }
+  .page.people-page .cohorts-link { padding: 12px 16px; gap: 12px; }
+
+  /* The cohort rail needs one thumb-sized line, rather than a two-line card per choice. */
+  .page.people-page .cohort-heading { gap: 0 12px; align-items: center; }
+  .page.people-page .cohort-heading h2 { font-size: 19px; padding-bottom: 0; }
+  .page.people-page .cohort-heading .tabs button { min-height: 44px; padding-block: 10px; }
+  .page.people-page .cohort-selector button { display: flex; min-height: 48px; gap: 10px; padding: 8px 14px; }
+  .page.people-page .cohort-selector button > span:first-child { font-size: 13px; }
+  .page.people-page .cohort-meta { display: inline-flex; align-items: center; gap: 8px; }
+  .page.people-page .cohort-mini { width: 32px; }
+  .page.people-page .cohort-meta small { min-width: 0; font-size: 12px; }
+  .page.people-page .cohort-detail { padding: 12px 14px; }
+  .page.people-page .cohort-title { gap: 4px 12px; }
+  .page.people-page .cohort-title h3 { font-size: 19px; }
+  .page.people-page .cohort-title span { font-size: 12px; line-height: 1.45; }
+  .page.people-page .cohort-detail > .tabs { margin-top: 6px; gap: 14px; }
+  .page.people-page .cohort-detail > .tabs button { min-height: 44px; font-size: 12px; }
+  .page.people-page .cohort-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding-block: 12px; }
+  .page.people-page .cohort-totals > span { gap: 5px; font-size: 12px; line-height: 1.4; }
+  .page.people-page .cohort-totals b { font-size: 17px; }
+  .page.people-page table.exposure-grid { width: 100%; table-layout: fixed; }
+  .page.people-page .exposure-grid th:first-child { width: 26%; }
+  .page.people-page .exposure-grid th { font-size: 12px; white-space: normal; }
+  .page.people-page .exposure-grid td { font-size: 13px; padding-block: 10px; }
+  .page.people-page .exposure-grid td.two-line small { font-family: var(--font-body); font-size: 12px; white-space: normal; }
+  .page.people-page .exposure-grid .asset-link { min-height: 44px; }
+
+  /* Markets retains its separate coin link and research expansion areas. */
+  .markets-page.mk .mk-head { padding-top: 0; }
+  .markets-page.mk .mk-head h1 { font-size: 28px; margin-block: 6px 8px; }
+  .markets-page.mk .mk-lead p { font-size: 14px; line-height: 1.45; }
+  .markets-page.mk .mk-lead .mk-lead-note { font-size: 12px; line-height: 1.45; }
+  .markets-page.mk .markets-layout { margin-top: 0; gap: 14px; }
+  .markets-page.mk .sb-cell { padding: 10px 16px; gap: 5px; }
+  .markets-page.mk .sb-mix { padding-block: 8px; gap: 4px; }
+  .markets-page.mk .sb-headline { font-size: 20px; }
+  .markets-page.mk .sb-signals { padding-block: 4px 6px; }
+  .markets-page.mk .sb-filters { flex-wrap: nowrap; column-gap: 16px; overflow-x: auto; scrollbar-width: thin; }
+  .markets-page.mk .sb-filter { flex: none; min-height: 44px; font-size: 12px; padding-block: 8px; }
+  .markets-page.mk .mk-toolbar .tabs button { min-height: 44px; padding-block: 10px; }
+  .markets-page.mk .mk-find { min-height: 44px; }
+  .markets-page.mk .mk-context { padding-block: 6px; gap: 0 16px; }
+  .markets-page.mk .mk-count { flex-basis: auto; }
+  .markets-page.mk .mk-sort { font-size: 12px; min-height: 44px; }
+  .markets-page.mk .mk-sort select { min-height: 44px; max-width: 150px; font-size: 13px; }
+  .markets-page.mk .mk-toggle { min-height: 44px; margin-left: auto; }
+  .markets-page.mk .mk-row { padding-block: 12px; }
+  .markets-page.mk .mk-coin-link { margin-block: -12px 0; padding-block: 12px 10px; }
+  .markets-page.mk .mk-readings { position: relative; grid-template-columns: minmax(0, 1fr); margin-bottom: -12px; padding-block: 8px 12px; }
+  .markets-page.mk .mk-windows { grid-column: 1; }
+  .markets-page.mk .mk-expand { position: absolute; right: 8px; top: 0; margin: 0; }
+  .markets-page.mk .mk-win { grid-template-columns: 54px minmax(0, 1.25fr) repeat(2, minmax(0, 1fr)); padding-block: 5px; }
+  .markets-page.mk .mk-win-label small { font-size: 12px; white-space: normal; }
+  .markets-page.mk .layer-tile .lt-text b { font-size: 13px; line-height: 1.35; white-space: normal; overflow: visible; text-overflow: clip; }
+  .markets-page.mk .mk-evidence { padding-block: 14px; }
+  .markets-page.mk .mk-evidence-grid { gap: 14px; }
+  .markets-page.mk .mk-evidence-grid > section + section { padding-top: 14px; }
+  .markets-page.mk .mk-evidence h3 { margin-block: 8px 6px; }
+  .markets-page.mk .mk-evidence dl { margin-top: 10px; gap: 6px; }
+  .markets-page.mk .mk-evidence-foot { margin-top: 14px; padding-top: 8px; gap: 4px; }
+  .markets-page.mk .mk-evidence-links a { min-height: 44px; }
+  .markets-page.mk .mk-foot { padding-block: 10px; }
+  .markets-page.mk .mk-foot summary { min-height: 44px; display: flex; align-items: center; margin-top: 0; }
+
+  /* Coin research is scoped to its page, so shared Saloon context is unaffected. */
+  .coin-page.coin-detail { gap: 14px; }
+  .coin-page.coin-detail .coin-heading { padding-top: 0; }
+  .coin-page.coin-detail .cd-identity { gap: 4px; }
+  .coin-page.coin-detail .cd-title h1 { font-size: 28px; }
+  .coin-page.coin-detail .cd-price-block { margin-top: 10px; gap: 4px; }
+  .coin-page.coin-detail .coin-stamp { font-size: 12px; }
+  .coin-page.coin-detail > .lead { gap: 4px; }
+  .coin-page.coin-detail > .lead .lead-text,
+  .coin-page.coin-detail > .lead .lead-note { line-height: 1.45; }
+  .coin-page.coin-detail .cd-overview-head { min-height: 44px; padding-block: 0; }
+  .coin-page.coin-detail .journey-row.cd-overview-row { padding-block: 12px; gap: 8px 10px; }
+  .coin-page.coin-detail .cd-window small,
+  .coin-page.coin-detail .cd-overview .lt-text small,
+  .coin-page.coin-detail .cd-overview-footer { font-size: 12px; line-height: 1.4; }
+  .coin-page.coin-detail .cd-overview-footer { gap: 4px 12px; padding-block: 4px; }
+  .coin-page.coin-detail .cd-overview-footer a { min-height: 44px; }
+  .coin-page.coin-detail .step-head.cd-section-heading { min-height: 52px; padding-block: 10px; }
+  .coin-page.coin-detail .cd-section-heading .step-stamp { font-size: 12px; }
+  .coin-page.coin-detail .rh-cell,
+  .coin-page.coin-detail .rd-cell,
+  .coin-page.coin-detail .checks-list,
+  .coin-page.coin-detail .checks-against { padding-block: 12px; gap: 6px; }
+  .coin-page.coin-detail .rh-since { font-size: 12px; }
+  .coin-page.coin-detail .cd-section-body .plate-b { padding-block: 14px; }
+  .coin-page.coin-detail .price-stage .plate-b { padding-block: 8px 10px; }
+  .coin-page.coin-detail .chart-legend { font-size: 12px; gap: 4px 12px; }
+  .coin-page.coin-detail .checks-list li { min-height: 36px; }
+  .coin-page.coin-detail .wallet-read > div { padding-block: 12px; }
+  .coin-page.coin-detail .wallet-read small,
+  .coin-page.coin-detail .holder .leg,
+  .coin-page.coin-detail .cohort-row .name small { font-size: 12px; }
+  .coin-page.coin-detail .options-dashboard .move-instrument,
+  .coin-page.coin-detail .options-dashboard .skew-instrument,
+  .coin-page.coin-detail .options-dashboard .tenor-instrument { padding-block: 12px; }
+  .coin-page.coin-detail .expiry-desk,
+  .coin-page.coin-detail .desk-panels,
+  .coin-page.coin-detail .metric-history-chart { padding-block: 14px; }
+  .coin-page.coin-detail .expiry-metrics { gap: 12px 16px; }
+  .coin-page.coin-detail .expiry-charts { gap: 14px; }
+
+  .page.market-research-page .mr-head { padding-top: 0; gap: 8px; }
+  .page.market-research-page .mr-heading { gap: 4px; }
+  .page.market-research-page .mr-back { min-height: 44px; }
+  .page.market-research-page .mr-head h1 { font-size: 28px; }
+  .page.market-research-page .mr-description,
+  .page.market-research-page > .lead .lead-text,
+  .page.market-research-page > .lead .lead-note { line-height: 1.45; }
+  .page.market-research-page > .lead { margin-top: 0; gap: 4px; }
+  .page.market-research-page > .lead .lead-note { font-size: 12px; }
+
+  /* Radar controls stay adjacent to their chart instead of becoming stacked headings. */
+  .page.market-research-page.radar-page .radar-map-toolbar { flex-wrap: nowrap; min-height: 48px; gap: 12px; padding-top: 0; }
+  .page.market-research-page.radar-page .radar-window-label { flex-basis: auto; white-space: nowrap; }
+  .page.market-research-page.radar-page .radar-map-toolbar .tabs { gap: 18px; }
+  .page.market-research-page.radar-page .radar-map-toolbar .tabs button { min-height: 44px; padding-block: 10px; }
+  .page.market-research-page.radar-page .radar-stage > .panel-head,
+  .page.market-research-page.radar-page .radar-list > .panel-head { min-height: 52px; padding-block: 10px; }
+  .page.market-research-page.radar-page .radar-map-count > span,
+  .page.market-research-page.radar-page .rl-context { font-size: 12px; }
+  .page.market-research-page.radar-page .radar-map-caption { font-size: 12px; padding-bottom: 10px; }
+  .page.market-research-page.radar-page .radar-player { min-height: 52px; padding-block: 4px; }
+  .page.market-research-page.radar-page .radar-detail { padding-block: 14px; gap: 12px; }
+  .page.market-research-page.radar-page .rd-figs > div { padding-block: 10px; gap: 5px; }
+  .page.market-research-page.radar-page .rd-figs > div > span,
+  .page.market-research-page.radar-page .rd-reading-label,
+  .page.market-research-page.radar-page .rd-readings small { font-size: 12px; line-height: 1.4; }
+  .page.market-research-page.radar-page .rd-open { padding-top: 8px; }
+  .page.market-research-page.radar-page .rl-row { padding-block: 12px; gap: 10px 12px; }
+  .page.market-research-page.radar-page .rl-read::before,
+  .page.market-research-page.radar-page .rl-read small { font-size: 12px; line-height: 1.4; }
+
+  .page.market-research-page.options-page .options-board > .panel-head { min-height: 52px; padding-block: 8px 0; gap: 0 12px; }
+  .page.market-research-page.options-page .op-window .tabs { gap: 18px; }
+  .page.market-research-page.options-page .ob-row { padding-block: 14px; gap: 12px 16px; }
+  .page.market-research-page.options-page .ob-row .ob-arrow { top: 19px; }
+  .page.market-research-page.options-page .ob-cell-label,
+  .page.market-research-page.options-page .ob-tenor-values small,
+  .page.market-research-page.options-page .ob-tenor-values b,
+  .page.market-research-page.options-page .op-shared-scales { font-size: 12px; }
+  .page.market-research-page.options-page .ob-tenor-values { gap: 4px; }
+  .page.market-research-page.options-page .ob-row .ob-skew { grid-column: 1; grid-row: 3; }
+  .page.market-research-page.options-page .ob-row .ob-pc { grid-column: 2; grid-row: 3; }
+  .page.market-research-page.options-page .ob-row .ob-term { grid-column: 1 / -1; grid-row: 4; }
+  .page.market-research-page.options-page .ob-term .tenor-cell { max-width: none; }
+  .page.market-research-page.options-page .ob-tenor-values > span { display: flex; gap: 6px; align-items: baseline; }
+  .page.market-research-page.options-page .ob-row .ob-walls { display: flex; align-items: baseline; flex-wrap: wrap; grid-column: 1 / -1; grid-row: 5; gap: 4px 6px; }
+  .page.market-research-page.options-page .ob-walls > .ob-cell-label { margin-right: auto; }
+  .page.market-research-page.options-page .op-board-foot { padding-block: 10px; gap: 4px; }
+
+  .page.market-research-page.flow-page > .plate > .panel-head { min-height: 52px; padding-block: 10px; }
+  .page.market-research-page.flow-page .flow-brief-head { padding-block: 12px; gap: 10px; }
+  .page.market-research-page.flow-page .flow-market-row { min-height: 48px; padding-block: 10px; }
+  .page.market-research-page.flow-page .fl-trades-panel > .panel-head { padding-block: 0; }
+  .page.market-research-page.flow-page .fl-trades-panel .panel-title { min-height: 44px; }
+  .page.market-research-page.flow-page .fl-trades-panel .tabs button { min-height: 44px; padding-block: 10px; }
+  .page.market-research-page.flow-page .fl-table-context { padding-block: 8px; }
+  .page.market-research-page.flow-page .flow-table tr.ft-row,
+  .page.market-research-page.flow-page .flow-table tr.fw-row { padding-block: 12px; gap: 8px 16px; }
+  .page.market-research-page.flow-page .flow-table td[data-k]::before { font-size: 12px; margin-bottom: 2px; }
+}
+
+@media (max-width: 380px) {
+  /* On very narrow phones give each window a line, then compare the three layers below it. */
+  .markets-page.mk .mk-mini-head,
+  .markets-page.mk .mk-win { grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(0, 1fr)); }
+  .markets-page.mk .mk-mini-head > span:first-child { display: none; }
+  .markets-page.mk .mk-win-label { grid-column: 1 / -1; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; padding-right: 28px; }
+  .markets-page.mk .mk-win { row-gap: 4px; }
+  .coin-page.coin-detail .cd-overview-head,
+  .coin-page.coin-detail .journey-row.cd-overview-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .coin-page.coin-detail .cd-overview-head > span:first-child { display: none; }
+  .coin-page.coin-detail .cd-window { grid-column: 1 / -1; display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }
+  .page.market-research-page.radar-page .rd-readings { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .page.market-research-page.radar-page .rd-readings > div { grid-template-columns: 68px minmax(0, 1fr); gap: 2px 12px; }
+  .page.market-research-page.radar-page .rd-readings small { grid-column: 2; }
+  .page.people-page .cohort-totals { gap: 8px; }
+  .page.people-page .cohort-totals b { font-size: 16px; }
+}

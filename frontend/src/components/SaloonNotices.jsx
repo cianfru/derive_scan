@@ -3,7 +3,10 @@ import { Link } from "react-router-dom";
 import { useFeeds } from "./Feeds.jsx";
 import { Arrow, Info } from "./ui.jsx";
 import { computeNotices, dismiss, dismissAll, loadDoc, saveDoc, useFollowsDoc } from "../lib/follows.js";
+import { priceAge } from "../lib/questions.js";
+import { useClock } from "../lib/useClock.js";
 import "../board.css";
+import "../mobile.css";
 
 /**
  * Notices on return: compares the latest published files with what this browser last saw for each
@@ -67,6 +70,8 @@ export function SaloonNotices() {
 
 /** The Saloon's heading, with the Chart / List switch. */
 export default function SaloonHead({ view, board = false, quoteTs, paused = false }) {
+  const now = useClock();
+  const age = priceAge(quoteTs, now, paused);
   const following = view === "following";
   const guided = view === "guided";
   // Chart or List (owner, 7 October 2026): the chart is the Saloon's front door, the list the same answers in rows.
@@ -85,6 +90,15 @@ export default function SaloonHead({ view, board = false, quoteTs, paused = fals
         </div>
         {board ? <div className="bd-heading-meta">
           <div className="bd-observed"><span>{paused ? "Prices paused" : "Derive prices"}</span>{quoteTs ? <time className="mono" dateTime={new Date(quoteTs * 1000).toISOString()}>{new Date(quoteTs * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "UTC" })} · {new Date(quoteTs * 1000).toISOString().slice(11, 16)} UTC</time> : <span>Awaiting published prices</span>}</div>
+          <span className={`bd-mobile-prices ${age.state}`}>
+            {!quoteTs && !paused ? "Awaiting prices" : age.state === "paused" ? "Quotes paused" : age.state === "stale" ? "Stale prices" : "Prices"}
+            <Info label="About option quote prices">
+              {quoteTs ? <>Option quotes published <time className="mono" dateTime={new Date(quoteTs * 1000).toISOString()}>{new Date(quoteTs * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })} · {new Date(quoteTs * 1000).toISOString().slice(11, 16)} UTC</time>.</> : "Awaiting published option quotes."}
+              {age.state === "stale" && <> These prices are <span className="mono">{age.minutes}</span> minutes old.</>}
+              {age.state === "paused" && (quoteTs || paused) && <> Pricing is paused.</>}
+              {" A coin's live index is separate from these option quotes. Review the price and fees before trading."}
+            </Info>
+          </span>
           {viewLink}
         </div> : viewLink}
       </div>

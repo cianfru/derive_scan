@@ -174,14 +174,21 @@ function ChartView({ index, error }) {
       {!index || !ready ? <Loading /> : failed ? <div className="bd-empty" role="status"><h2>Outcome data is unavailable right now.</h2><p>Prices could not be loaded. Try again shortly.</p></div>
         : !coins.length ? <div className="bd-empty" role="status"><h2>No prices on Derive right now.</h2><p>Derive's order books are empty, so no outcome can be priced. Outcomes return here once Derive quotes again.</p></div> : <>
           <CoinTabs coins={coins} value={und} onChange={setCoin} />
-          <p className="sl-key">
-            <span><i className="up" aria-hidden="true" />Higher: pays if {und} settles above the level</span>
-            <span><i className="down" aria-hidden="true" />Lower: pays if it settles below</span>
-            <span><i className="gold" aria-hidden="true" />Gold ring: more smart wallets lean that way</span>
-            <span>Each bubble: the most you make on {money(REF)}, fees included</span>
-            {dates.some((d) => d.traders) && <span><i className="lane" aria-hidden="true" />Bottom line: directional traders long and short on each date</span>}
-            <span className="sl-key-how">Drag a bubble to explore · scroll or pinch to zoom · drag the chart to move</span>
-          </p>
+          <div className="sl-key">
+            <p className="sl-key-mobile">
+              <span><i className="up" aria-hidden="true" />Higher</span>
+              <span><i className="down" aria-hidden="true" />Lower</span>
+              <span className="sl-key-return">Max profit on {money(REF)}<Info label="About chart returns">Each bubble shows the most you make on {money(REF)}, Derive's fees included. Higher pays above the level; Lower pays below it, with partial payouts inside the pay zone. Tap a bubble for the exact payout range and dollar figures. {mine.length} {ASSET_NAMES[und] || und} ({und}) answers have a price now; {coins.find((c) => c.und === und)?.smart || 0} with smart wallets.{board.thin && " This coin has a thin order book."} A gold ring means more smart wallets lean that way. The bottom line shows directional traders' long and short positions on each date. These readings are context, not a signal.</Info></span>
+            </p>
+            <p className="sl-key-desktop">
+              <span><i className="up" aria-hidden="true" />Higher: pays if {und} settles above the level</span>
+              <span><i className="down" aria-hidden="true" />Lower: pays if it settles below</span>
+              <span><i className="gold" aria-hidden="true" />Gold ring: more smart wallets lean that way</span>
+              <span>Each bubble: the most you make on {money(REF)}, fees included</span>
+              {dates.some((d) => d.traders) && <span><i className="lane" aria-hidden="true" />Bottom line: directional traders long and short on each date</span>}
+              <span className="sl-key-how">Drag a bubble to explore · scroll or pinch to zoom · drag the chart to move</span>
+            </p>
+          </div>
           <div className="sl-frame">
             {!coinFile ? <Loading /> : !dates.length ? <div className="bd-empty" role="status"><h2>No {und} answer has a price now.</h2><p>Try another coin, or the list for the reasons.</p></div>
               : <SaloonChart und={und} name={ASSET_NAMES[und]} index={board.index} candles={candles} dates={dates} amount={REF} now={now} theme={theme}

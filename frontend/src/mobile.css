@@ -1,0 +1,35 @@
+/* Phone layouts spend space on decisions, with routine quote metadata one tap away. */
+.bd-mobile-prices { display: none; }
+@media (max-width: 600px) {
+  .wrap.page { padding-block: 16px 36px; gap: 16px; }
+
+  .bd-browser .bd-heading.sn-head-wrap .q-head-top { display: flex; flex-wrap: wrap; align-items: center; gap: 0 20px; padding: 0; }
+  .bd-browser .bd-heading .saloon-heading { flex: 1 1 auto; }
+  .bd-browser .bd-heading .bd-eyebrow,
+  .bd-browser .bd-heading .saloon-heading p,
+  .bd-browser .bd-heading .bd-observed { display: none; }
+  .bd-browser .bd-heading h1 { margin: 0; font-size: 28px; }
+  .bd-browser .bd-heading .bd-heading-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0 20px; margin: 0; padding: 0; }
+  .bd-browser .bd-heading .bd-mobile-prices { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 12px; color: var(--text-3); }
+  .bd-browser .bd-heading .bd-mobile-prices.stale,
+  .bd-browser .bd-heading .bd-mobile-prices.paused { color: var(--accent-text); }
+  .bd-browser .bd-heading .bd-mobile-prices .info { margin-left: 0; }
+  .bd-browser .bd-heading .saloon-views { gap: 16px; }
+  .bd-browser .bd-heading .saloon-views a { font-size: 14px; }
+  .bd-browser .sn { margin-top: 4px; padding-inline: 12px; }
+
+  .page.marketplace-positions { gap: 14px; }
+  .page.marketplace-positions .q-head { padding-bottom: 0; gap: 6px; }
+  .page.marketplace-positions .q-position.q-group { padding-top: 12px; gap: 10px; }
+  .page.marketplace-positions .q-group-body { gap: 12px; }
+  .page.marketplace-positions .q-group .q-position-figures,
+  .page.marketplace-positions .q-pos-line .q-pos-line-figs { gap: 10px 14px; }
+  .page.marketplace-positions .q-position-details > summary { min-height: 44px; }
+  .page.marketplace-positions .q-empty-card { min-height: 240px; padding: 24px 16px; }
+  .foot { padding-block: 18px 24px; }
+}
+@media (max-width: 360px) {
+  .bd-browser .bd-heading.sn-head-wrap .q-head-top { column-gap: 12px; }
+  .bd-browser .bd-heading .bd-heading-meta { column-gap: 12px; }
+  .bd-browser .bd-heading .saloon-views { gap: 12px; }
+}
