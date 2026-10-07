@@ -774,7 +774,7 @@ export default function MyQuestions() {
         ) : (
           <section className="q-empty-card" aria-label="No positions yet">
             <h2>No positions yet</h2>
-            <p>Your trades, costs and settlement dates, in one place. Choose an outcome in the Saloon, place its orders on Derive, then record what filled.</p>
+            <p>Your trades, costs and settlement dates, in one place.</p>
             <Link className="btn primary lg" to="/saloon">Open the Saloon</Link>
           </section>
         )}

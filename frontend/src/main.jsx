@@ -7,6 +7,8 @@ import "./research.css";
 import "./journey.css";
 import "./boards.css";
 import "./people.css";
+import "./mobile.css";
+import "./mobile-research.css";
 import Shell from "./components/Shell.jsx";
 import Landing from "./pages/Landing.jsx";
 import { QUESTIONS_ON } from "./lib/flags.js";

@@ -12,7 +12,7 @@ export function Tabs({ items, value, onChange, label }) {
   return (
     <div className="tabs" role="tablist" aria-label={label}>
       {items.map(([v, text, short]) => (
-        <button key={v} role="tab" aria-selected={value === v} tabIndex={value === v ? 0 : -1} onClick={() => onChange(v)}
+        <button key={v} role="tab" aria-label={text} aria-selected={value === v} tabIndex={value === v ? 0 : -1} onClick={() => onChange(v)}
           onKeyDown={e => {
             const index = items.findIndex(([key]) => key === v);
             const next = e.key === "Home" ? 0 : e.key === "End" ? items.length - 1 : e.key === "ArrowRight" ? (index + 1) % items.length : e.key === "ArrowLeft" ? (index + items.length - 1) % items.length : null;

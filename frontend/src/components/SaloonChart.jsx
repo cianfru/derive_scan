@@ -111,11 +111,12 @@ function mount(host, cfg) {
 
   function draw() {
     const phone = window.innerWidth < 700;
-    const W = Math.max(scroller.clientWidth || 0, phone ? 820 : 900), H = phone ? 540 : 620;
+    const W = Math.max(scroller.clientWidth || 0, phone ? 820 : 900);
+    const H = phone ? Math.round(Math.min(460, Math.max(380, window.innerHeight * 0.54))) : 620;
     svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     svg.replaceChildren();
-    const lane = dates.some((d) => d.traders) ? (phone ? 92 : 104) : 0;
-    const m = { l: 14, r: 78, t: 70, b: 34 + lane };
+    const lane = dates.some((d) => d.traders) ? (phone ? 72 : 104) : 0;
+    const m = { l: 14, r: 78, t: phone ? 58 : 70, b: 34 + lane };
     const pw = W - m.l - m.r, pastW = pw * (phone ? 0.3 : 0.34), futX = m.l + pastW, colW = (pw - pastW) / Math.max(1, dates.length);
     const R = phone ? 23 : 26;
     const [lo, hi] = view;
@@ -177,7 +178,7 @@ function mount(host, cfg) {
     const bw = pastW / cs.length;
     const days = Math.round((cs[cs.length - 1][0] - cs[0][0]) / 86400);
     [[0, `${days} days ago`], [cs.length - 1, "now"]].forEach(([i, label]) => {
-      el("text", { x: m.l + bw * (i + 0.5), y: H - 12, fill: C.text3, "font-size": 11, "text-anchor": i ? "end" : "start" }, svg).textContent = label;
+      el("text", { x: m.l + bw * (i + 0.5), y: H - 12, fill: C.text3, "font-size": 11, "text-anchor": i ? "end" : "start", class: "sch-history-label" }, svg).textContent = label;
     });
     // Candles and the price line repaint on each live price (`setLive`) without redrawing the bubbles.
     const live = el("g", {}, plot), liveTag = el("g", {}, svg);
@@ -230,8 +231,8 @@ function mount(host, cfg) {
     const g = el("g", { class: "sch-lane" }, parent);
     el("rect", { x: futX, y: top - 6, width: W - m.r - futX, height: bot - top + 12, fill: C.text1, "fill-opacity": C.light ? 0.03 : 0.035 }, g);
     el("line", { x1: futX, x2: W - m.r, y1: mid, y2: mid, stroke: C.text3, "stroke-opacity": 0.5, "stroke-dasharray": "2 4" }, g);
-    el("text", { x: futX - 10, y: mid - 3, fill: C.text2, "font-size": 11, "font-family": "Manrope, sans-serif", "font-weight": 600, "text-anchor": "end" }, g).textContent = "Directional traders";
-    el("text", { x: futX - 10, y: mid + 11, fill: C.text3, "font-size": 10.5, "font-family": "Manrope, sans-serif", "text-anchor": "end" }, g).textContent = "where their positions lean";
+    el("text", { x: futX - 10, y: mid - 3, fill: C.text2, "font-size": 11, "font-family": "Manrope, sans-serif", "font-weight": 600, "text-anchor": "end", class: "sch-history-label" }, g).textContent = "Directional traders";
+    el("text", { x: futX - 10, y: mid + 11, fill: C.text3, "font-size": 10.5, "font-family": "Manrope, sans-serif", "text-anchor": "end", class: "sch-history-label" }, g).textContent = "where their positions lean";
     el("text", { x: W - m.r + 8, y: mid - half + 10, fill: C.up, "font-size": 10.5 }, g).textContent = "Long";
     el("text", { x: W - m.r + 8, y: mid + half + 2, fill: C.down, "font-size": 10.5 }, g).textContent = "Short";
     const pts = dates.map((d, i) => ({ d, x: cols[i], t: d.traders, y: d.traders?.score != null ? mid - d.traders.score * half : null }));
@@ -533,6 +534,8 @@ function mount(host, cfg) {
 
   return {
     zoomIn: () => zoomBy(0.6), zoomOut: () => zoomBy(1.6), reset: () => animateTo([...HOME]),
+    // Phones open on the nearest dates with the last candles and the price now still in view.
+    showNearest: () => { scroller.scrollLeft = Math.max(0, geo.futX - Math.min(110, scroller.clientWidth * 0.3)); },
     select: (r) => { current = r || null; paintSelected(); },
     // Bars Derive has but the published file not yet (the forming one too): replace or append, keep the length.
     setBars: (bars) => {
@@ -591,7 +594,10 @@ export default function SaloonChart({ und, name, index, candles, dates, amount, 
       view: views.current[und], onView: (v) => { views.current[und] = v; }, onOpen: (r) => openRef.current?.(r),
     });
     if (liveRef.current) api.current.setLive(liveRef.current.price, liveRef.current.ts);
-    if (first && scroller.current) scroller.current.scrollLeft = scroller.current.scrollWidth;
+    if (first && scroller.current) {
+      if (window.innerWidth < 700) api.current.showNearest();
+      else scroller.current.scrollLeft = scroller.current.scrollWidth;
+    }
     return () => { api.current?.destroy(); api.current = null; };
   }, [ready, und, index, candles, dataKey, theme, amount]);
   useEffect(() => { api.current?.select(selected); }, [selected?.key]);
