@@ -1,13 +1,16 @@
 // Real-money one tap (builds with VITE_SALOON_TRADE=mainnet): the pilot. Only wallets on the build's
 // list (VITE_SALOON_PILOT, comma-separated addresses; empty or unset means nobody) get the one-tap
-// ticket; everyone else sees the ticket placed by hand. Small and free of trading code, so the entry
+// ticket; everyone else sees the ticket placed by hand. "all" opens it to every wallet (owner,
+// 7 October 2026: "If the flow works with one, then it works for everybody"). Small and free of trading code, so the entry
 // and the stage 1 ticket can read it.
 import { MAINNET_FILLS, TRADE_ON } from "./flags.js";
 
 const ADDRESS = /^0x[0-9a-f]{40}$/;
 
 /** The pilot list from its build variable: lower-case addresses; anything that is not one is dropped. */
+export const EVERYONE = "*";
 export function parsePilot(raw) {
+  if (String(raw ?? "").trim().toLowerCase() === "all") return new Set([EVERYONE]);
   return new Set(String(raw ?? "").split(/[\s,;]+/).map((s) => s.trim().toLowerCase()).filter((s) => ADDRESS.test(s)));
 }
 
@@ -15,7 +18,7 @@ export function parsePilot(raw) {
 export const PILOT = /* @__PURE__ */ parsePilot(import.meta.env.VITE_SALOON_PILOT);
 
 /** Is this wallet on the pilot list? */
-export const isPilot = (wallet, list = PILOT) => typeof wallet === "string" && list.has(wallet.toLowerCase());
+export const isPilot = (wallet, list = PILOT) => typeof wallet === "string" && (list.has(EVERYONE) || list.has(wallet.toLowerCase()));
 
 /** The wallet this browser last connected on mainnet (lib/trade/store.js KEYS.lastWallet), and the
  * pilot invitation (`?pilot` on any Saloon page, kept in this browser). */
@@ -40,6 +43,7 @@ export function oneTapOffered(list = PILOT) {
   if (!TRADE_ON) return false;
   if (!MAINNET_FILLS) return true;
   if (!list.size) return false;
+  if (list.has(EVERYONE)) return true;
   return isPilot(get(LAST_MAINNET_WALLET), list) || get(PILOT_INVITE) === "1";
 }
 

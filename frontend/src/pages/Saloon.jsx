@@ -10,6 +10,7 @@ import SaloonChart, { countText, dayName, traderText } from "../components/Saloo
 import QuestionTicket from "../components/QuestionTicket.jsx";
 import { OutcomeFigures } from "../components/OutcomePreview.jsx";
 import { FollowButton } from "../components/Follow.jsx";
+import { useLivePrice } from "../lib/livePrice.js";
 import { ASSET_NAMES } from "../lib/presentation.js";
 import { boardRows } from "../lib/board.js";
 import { loadBudget } from "../lib/follows.js";
@@ -27,6 +28,24 @@ const QUICK = [25, 100, 500];
 const CANDLES = 72; // 12 days of 4-hour candles
 const pctText = (v) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`;
 
+/** One coin tab, its price and 24-hour change live from Derive's index feed once it answers. */
+function CoinTab({ c: snap, on, onChange }) {
+  const lp = useLivePrice(snap.und);
+  const c = lp ? { ...snap, index: lp.price, chg: lp.prev > 0 ? (lp.price / lp.prev - 1) * 100 : snap.chg } : snap;
+  return (
+    <button type="button" role="tab" data-und={c.und} aria-selected={on} tabIndex={on ? 0 : -1} className="sl-ctab" onClick={() => onChange(c.und)}
+      aria-label={`${c.name}${Number.isFinite(c.index) ? `, ${money(c.index)}` : ""}${Number.isFinite(c.chg) ? `, ${pctText(c.chg / 100)} in 24 hours` : ""}, ${c.count} ${c.count === 1 ? "answer" : "answers"}${c.smart ? `, ${c.smart} with smart wallets` : ""}`}>
+      <CoinIcon und={c.und} />
+      <span className="ct-body">
+        <span className="ct-top"><b>{c.und}</b><small>{c.name}</small></span>
+        <span className="ct-mid"><span className="ct-price mono">{Number.isFinite(c.index) ? money(c.index) : "Not available yet"}</span>
+          {Number.isFinite(c.chg) && <span className={`ct-chg mono ${c.chg >= 0 ? "up" : "down"}`}>{pctText(c.chg / 100)}</span>}</span>
+        <span className="ct-foot">{c.count} {c.count === 1 ? "answer" : "answers"}{c.smart > 0 && <><i className="ct-gold" aria-hidden="true" />{c.smart}</>}{c.thin && " · thin book"}</span>
+      </span>
+    </button>
+  );
+}
+
 /** The coin tabs (inside the page, above the chart): logo, price, 24-hour change, answers and gold rings. */
 function CoinTabs({ coins, value, onChange }) {
   const ref = useRef(null);
@@ -41,21 +60,7 @@ function CoinTabs({ coins, value, onChange }) {
   return (
     <div className="sl-ctabs-wrap">
       <div ref={ref} className="sl-ctabs" role="tablist" aria-label="Coin" onKeyDown={keys}>
-        {coins.map((c) => {
-          const on = c.und === value;
-          return (
-            <button key={c.und} type="button" role="tab" data-und={c.und} aria-selected={on} tabIndex={on ? 0 : -1} className="sl-ctab" onClick={() => onChange(c.und)}
-              aria-label={`${c.name}${Number.isFinite(c.index) ? `, ${money(c.index)}` : ""}${Number.isFinite(c.chg) ? `, ${pctText(c.chg / 100)} in 24 hours` : ""}, ${c.count} ${c.count === 1 ? "answer" : "answers"}${c.smart ? `, ${c.smart} with smart wallets` : ""}`}>
-              <CoinIcon und={c.und} />
-              <span className="ct-body">
-                <span className="ct-top"><b>{c.und}</b><small>{c.name}</small></span>
-                <span className="ct-mid"><span className="ct-price mono">{Number.isFinite(c.index) ? money(c.index) : "Not available yet"}</span>
-                  {Number.isFinite(c.chg) && <span className={`ct-chg mono ${c.chg >= 0 ? "up" : "down"}`}>{pctText(c.chg / 100)}</span>}</span>
-                <span className="ct-foot">{c.count} {c.count === 1 ? "answer" : "answers"}{c.smart > 0 && <><i className="ct-gold" aria-hidden="true" />{c.smart}</>}{c.thin && " · thin book"}</span>
-              </span>
-            </button>
-          );
-        })}
+        {coins.map((c) => <CoinTab key={c.und} c={c} on={c.und === value} onChange={onChange} />)}
       </div>
     </div>
   );
@@ -63,6 +68,7 @@ function CoinTabs({ coins, value, onChange }) {
 
 /** The trade panel over the chart: the answer, Higher or Lower, the amount (fees included), what it pays, the ticket. */
 function TradePanel({ und, row, rows, board, age, onPick, onClose }) {
+  const livePx = useLivePrice(und);
   const [draft, setDraft] = useState(() => String(loadBudget()));
   const [ticket, setTicket] = useState(false);
   const closeRef = useRef(null);
@@ -84,7 +90,7 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose }) {
       <button ref={closeRef} type="button" className="text-control sl-close" onClick={onClose}>Close</button>
       <header>
         <h2>{und} {yes ? "higher" : "lower"} than {money(row.k)}?</h2>
-        <p className="sl-when">{dayName(row.settleTs)}, 08:00 UTC{countdown(row.settleTs) && <> · {countdown(row.settleTs)}</>} · {und} now <span className="mono">{money(board.index)}</span></p>
+        <p className="sl-when">{dayName(row.settleTs)}, 08:00 UTC{countdown(row.settleTs) && <> · {countdown(row.settleTs)}</>} · {und} now <span className="mono">{money(livePx?.price || board.index)}</span></p>
       </header>
       {ticket && ready ? <>
         <button type="button" className="text-control sl-back" onClick={() => setTicket(false)}>Back to payout</button>

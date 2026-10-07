@@ -19,6 +19,7 @@ import SettleChart from "../components/SettleChart.jsx";
 import "../settle-chart.css";
 import "../questions.css";
 import "../board.css";
+import LiveMoney from "../components/LiveMoney.jsx";
 
 const PAGE = 24;
 const usd = (v) => money(v, { cents: true });
@@ -132,7 +133,7 @@ function OutcomeCard({ outcome: r, align, budget, inRow = false, boardStyle = fa
 
 /** Where the coin's index sits within a row's ladder: a lit line across the ladder between two levels. */
 function NowMark({ und, index }) {
-  return <li className="bd-now" aria-label={`${money(index)}, the coin's index now, sits here`}><span className="bd-now-line" aria-hidden="true" /><span className="bd-now-text" aria-hidden="true">{und} now <b className="mono">{money(index)}</b></span><span className="bd-now-line end" aria-hidden="true" /></li>;
+  return <li className="bd-now" aria-label={`${money(index)}, the coin's index now, sits here`}><span className="bd-now-line" aria-hidden="true" /><span className="bd-now-text" aria-hidden="true">{und} now <b className="mono"><LiveMoney und={und} value={index} /></b></span><span className="bd-now-line end" aria-hidden="true" /></li>;
 }
 
 /** The key over a ladder: what each answer's two figures are. */
@@ -180,7 +181,7 @@ function QuickLook({ row, name, when, levels, children }) {
       {children}<span className="bd-look-icon" aria-hidden="true" /><span className="sr-only">: open the {name} chart</span>
     </button>
     {peek && !open && <div className="bd-look-peek" aria-hidden="true">
-      <div className="bd-look-peek-head"><b>{name}</b><span className="mono">now {money(row.index)}</span><span>Settles {when}</span></div>
+      <div className="bd-look-peek-head"><b>{name}</b><span className="mono">now <LiveMoney und={row.und} value={row.index} /></span><span>Settles {when}</span></div>
       {chart(true)}
       <small>Click to open</small>
     </div>}
@@ -188,7 +189,7 @@ function QuickLook({ row, name, when, levels, children }) {
       <div className="bd-look-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
       <div className="bd-look-window" role="dialog" aria-modal="true" aria-label={`${name} price up to ${when}`}>
         <div className="bd-look-window-head">
-          <div><h3>{name} <span className="mono">now {money(row.index)}</span></h3><p>Settles {when}{countdown(row.settleTs) && <> · {countdown(row.settleTs)}</>}</p></div>
+          <div><h3>{name} <span className="mono">now <LiveMoney und={row.und} value={row.index} /></span></h3><p>Settles {when}{countdown(row.settleTs) && <> · {countdown(row.settleTs)}</>}</p></div>
           <button ref={closeBtn} type="button" className="text-control" onClick={() => setOpen(false)}>Close</button>
         </div>
         {chart(false)}
@@ -212,7 +213,7 @@ function DateRow({ row: full, align, budget, boardStyle = false, all = false, no
     <section className="bd-row" aria-label={`${name}, settles ${when}`}>
       <header className="bd-row-head">
         <h2 className="bd-look-wrap"><QuickLook row={row} name={name} when={when} levels={row.items.map((g) => g.k)}><CoinIcon und={row.und} /><span className="bd-row-name">{name}</span><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-date">{when}</span>{countdown(row.settleTs) && <><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-in mono">{countdown(row.settleTs)}</span></>}</QuickLook></h2>
-        <span className="bd-row-meta">{row.index != null && <span className="bd-row-index mono">now {money(row.index)}</span>}<SmartWord und={row.und} align={align} settleTs={row.settleTs} now={now} /></span>
+        <span className="bd-row-meta">{row.index != null && <span className="bd-row-index mono">now <LiveMoney und={row.und} value={row.index} /></span>}<SmartWord und={row.und} align={align} settleTs={row.settleTs} now={now} /></span>
       </header>
       <ol className="bd-row-cards" aria-label={`${name} levels on ${dayLabel(row.expiry)}, low to high`}>{cards}</ol>
       {!all && (row.hidden > 0 || open) && <button type="button" className="bd-row-all" aria-expanded={open} onClick={() => setOpen((o) => !o)}>{open ? "Show the levels near the price" : `View all ${n} levels`}</button>}
