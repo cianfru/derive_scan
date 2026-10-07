@@ -184,7 +184,8 @@ it("keeps every reachable landing illustration free of quotes, results and forec
     }
   }
   const text = copy.join("\n");
-  expect(text).not.toMatch(/\d\s?%|\bper ?cent\b/i);
+  // Inside the example, returns read "+148%" like the Saloon (owner, 8 October 2026); no other percentage.
+  expect(text.replace(/\+\d+%/g, "")).not.toMatch(/\d\s?%|\bper ?cent\b/i);
   expect(text).not.toMatch(/\b(will|expect\w*|likely|predict\w*|target\w*|probabilit\w*|odds|forecast\w*|reflex|larsson|torq|edge|alpha|proven)\b/i);
   expect(outside.textContent).not.toMatch(/\b(ETH|SOL|HYPE|XRP|ADA|ZEC|XAUT|Bitcoin|Ethereum|Solana)\b/);
   expect(text).toContain("Both orders need to fill for its defined cost to apply.");
