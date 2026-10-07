@@ -325,7 +325,8 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
                     "aliases": scan["aliases"], "built_at": int(now)}
             positions = history.tier_positions(held, classes)
             (out / "history" / "wallets.json").write_text(json.dumps({**meta, "wallets": classes}, separators=(",", ":")))
-            (out / "history" / "positions.json").write_text(json.dumps({**meta, "positions": positions}, separators=(",", ":")))
+            (out / "history" / "positions.json").write_text(json.dumps(
+                {**meta, "positions": positions, "directional_book": history.directional_book(held, classes)}, separators=(",", ":")))
             (out / "history" / "traders.json").write_text(json.dumps(
                 {**meta, **traders.build(scan, classes, as_of, settlements)}, separators=(",", ":")))
             # The close just classed, valued as the live reading was; earlier closes are the backfill's.

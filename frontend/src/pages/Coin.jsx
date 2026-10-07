@@ -87,7 +87,7 @@ function PerpFigs({ pos }) {
 export function SaloonCta({ und, live }) {
   if (!QUESTIONS_ON || !live) return null;
   return (
-    <Link className="saloon-cta" to={`/saloon/${und}`}>
+    <Link className="saloon-cta" to={`/saloon?coin=${und}`}>
       <HatMark size={22} />
       <span><b>{und} in the Saloon</b><small>Higher or lower on {und}'s price, priced from Derive options</small></span>
       <span className="saloon-cta-go" aria-hidden="true"><Arrow /></span>

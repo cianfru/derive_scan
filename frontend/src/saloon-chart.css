@@ -1,0 +1,110 @@
+/* The Saloon's chart view (owner, 7 October 2026): coin tabs inside the page, one chart per coin with the
+ * answers as bubbles on each settlement date, and the trade panel over the chart. */
+.sl-page { --sl-up-fill: #2f5a4a; --sl-down-fill: #6a3530; --sl-gold: #e6b34a; }
+:root[data-theme="light"] .sl-page { --sl-up-fill: var(--up); --sl-down-fill: var(--down); --sl-gold: #a8740f; }
+
+.saloon-views { display: flex; gap: 20px; }
+.saloon-views a { padding: 8px 0; min-height: 44px; display: inline-flex; align-items: center; color: var(--text-3); font: 600 15px var(--font-sans); text-decoration: none; border-bottom: 2px solid transparent; }
+.saloon-views a[aria-current="page"] { color: var(--text-1); border-bottom-color: var(--accent); }
+.saloon-views a:hover { color: var(--text-1); }
+
+/* Coin tabs: each a small market strip; the active one carries the orange underline, as every tab on the site. */
+.sl-ctabs-wrap { overflow-x: auto; margin-inline: -4px; padding: 2px 4px 0; scrollbar-width: none; }
+.sl-ctabs-wrap::-webkit-scrollbar { display: none; }
+.sl-ctabs { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(176px, 1fr); border-bottom: 1px solid var(--border); }
+.sl-ctab { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 12px; padding: 10px 14px 12px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+  background: none; text-align: left; cursor: pointer; color: var(--text-2); font: inherit; scroll-snap-align: start; }
+.sl-ctab:hover { background: color-mix(in srgb, var(--text-1) 4%, transparent); }
+.sl-ctab[aria-selected="true"] { border-bottom-color: var(--accent); background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 8%, transparent)); }
+.sl-ctab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sl-ctab .ct-body { display: grid; gap: 3px; min-width: 0; }
+.sl-ctab .ct-top { display: flex; align-items: baseline; gap: 6px; }
+.sl-ctab .ct-top b { font: 700 15px var(--font-sans); color: var(--text-1); }
+.sl-ctab .ct-top small { font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sl-ctab .ct-mid { display: flex; align-items: baseline; gap: 8px; }
+.sl-ctab .ct-price { font-size: 15px; font-weight: 600; color: var(--text-1); font-variant-numeric: tabular-nums; }
+.sl-ctab .ct-chg { font-size: 12px; } .sl-ctab .ct-chg.up { color: var(--up); } .sl-ctab .ct-chg.down { color: var(--down); }
+.sl-ctab .ct-foot { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-3); white-space: nowrap; }
+.sl-ctab .ct-gold { display: inline-block; width: 9px; height: 9px; margin-left: 6px; border: 2px solid var(--sl-gold); border-radius: 50%; }
+
+.sl-key { max-width: none; display: flex; flex-wrap: wrap; gap: 6px 22px; margin: 0; padding-block: 12px; color: var(--text-3); font-size: 13px; }
+.sl-key i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.sl-key i.up { background: var(--sl-up-fill); border: 1px solid var(--up); }
+.sl-key i.down { background: var(--sl-down-fill); border: 1px solid var(--down); }
+.sl-key i.gold { border: 2px solid var(--sl-gold); }
+
+.sl-frame { position: relative; }
+.sch-stage { position: relative; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); overflow: hidden; }
+.sch-scroller { overflow-x: auto; overflow-y: hidden; }
+.sch-svg { display: block; font-family: var(--font-mono); touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none; }
+.sch-svg.drag { cursor: grabbing; }
+.sch-bubble { cursor: pointer; outline: none; }
+.sch-bubble:not(.sch-dot) { cursor: grab; }
+.sch-bubble circle { transition: transform 120ms ease; transform-box: fill-box; transform-origin: center; }
+.sch-bubble:hover circle, .sch-bubble.on circle, .sch-bubble:focus-visible circle { transform: scale(1.12); }
+.sch-bubble:focus-visible circle:last-of-type { stroke: var(--accent); stroke-width: 2.5; }
+.sch-float { animation: sch-bob var(--dur, 4s) ease-in-out var(--delay, 0s) infinite alternate; }
+@keyframes sch-bob { from { transform: translate(0, -2.5px); } to { transform: translate(0, 2.5px); } }
+.sch-pop { transform-box: fill-box; transform-origin: center; animation: sch-pop 520ms cubic-bezier(.2, 1.5, .4, 1) var(--pd, 0ms) both; }
+@keyframes sch-pop { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.sch-ghost { pointer-events: none; filter: drop-shadow(0 8px 16px rgb(0 0 0 / .45)); }
+@media (prefers-reduced-motion: reduce) { .sch-float, .sch-pop { animation: none; } .sch-bubble circle { transition: none; } }
+
+.sch-zoom { display: flex; justify-content: flex-end; align-items: center; gap: 6px; padding: 10px 12px 0; }
+.sch-zoom button { min-width: 44px; height: 44px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-2); color: var(--text-1); font: 600 16px var(--font-sans); cursor: pointer; }
+.sch-zoom .sch-reset { font-size: 13px; }
+.sch-zoom button:hover { border-color: var(--accent); }
+.sch-zoom button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.sch-tip { position: absolute; z-index: 3; pointer-events: none; padding: 9px 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-2);
+  box-shadow: 0 12px 30px rgb(0 0 0 / .35); font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.sch-tip[hidden] { display: none; }
+.sch-tip b { color: var(--text-1); font-family: var(--font-mono); font-weight: 600; }
+.sch-tip .t1 { font-weight: 700; color: var(--text-1); }
+.sch-tip .sch-smart { color: var(--sl-gold); font-weight: 600; }
+.sch-tip .sch-hint { color: var(--text-3); }
+
+/* The trade panel: a drawer over the chart's right side; a bottom sheet on phones. */
+.sl-panel { position: absolute; z-index: 4; top: 0; right: 0; bottom: 0; width: min(400px, 100%); padding: 20px 20px 18px; background: var(--surface-2);
+  border: 1px solid var(--border-strong); border-radius: 0 12px 12px 0; box-shadow: -18px 0 40px rgb(0 0 0 / .35); display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+.sl-panel h2 { margin: 0; padding-right: 64px; font: 700 21px/1.25 var(--font-sans); letter-spacing: -.015em; text-wrap: balance; }
+.sl-when { margin: 4px 0 0; color: var(--text-3); font-size: 13px; }
+.sl-close { position: absolute; top: 10px; right: 12px; min-height: 44px; }
+.sl-back { align-self: flex-start; min-height: 44px; }
+.sl-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.sl-seg button { display: grid; gap: 2px; text-align: left; padding: 10px 12px; min-height: 52px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-1); cursor: pointer; font: 600 14px var(--font-sans); }
+.sl-seg button small { font-size: 13px; font-weight: 500; color: var(--text-3); }
+.sl-seg button.yes[aria-pressed="true"] { background: var(--sl-up-fill); border-color: var(--up); color: #fff; }
+.sl-seg button.no[aria-pressed="true"] { background: var(--sl-down-fill); border-color: var(--down); color: #fff; }
+.sl-seg button[aria-pressed="true"] small { color: #fff; }
+.sl-seg button:disabled { opacity: .45; cursor: not-allowed; }
+.sl-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sl-amount { display: grid; gap: 8px; }
+.sl-amount .label { display: inline-flex; align-items: center; gap: 4px; }
+.sl-smart { margin: 0; color: var(--sl-gold); font-size: 13px; font-weight: 600; }
+.sl-panel .btn.primary { width: 100%; }
+.sl-foot { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; color: var(--text-3); font-size: 12px; }
+.sl-foot span { flex: 1 1 100%; }
+.sl-foot a { color: var(--text-2); }
+
+.sl-footer { margin-top: 14px; }
+
+@media (max-width: 700px) {
+  .sl-ctabs { grid-auto-columns: 156px; }
+  .sl-ctabs-wrap { scroll-snap-type: x proximity; }
+  .sl-key-how { display: none; }
+  .sl-panel { position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: 100%; max-height: 86svh; border-radius: 14px 14px 0 0; box-shadow: 0 -18px 40px rgb(0 0 0 / .4); }
+}
+
+/* Keep the page to the screen's width: the chart scrolls sideways inside its frame, the tabs in their strip. */
+.sl-page, .sl-page > *, .sl-frame, .sch-stage { min-width: 0; max-width: 100%; }
+.sl-ctab .ct-foot { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 700px) { .sl-ctabs { grid-auto-columns: 172px; } }
+.sl-backdrop { display: none; }
+@media (max-width: 700px) { .sl-backdrop { display: block; position: fixed; inset: 0; z-index: 3; background: rgb(0 0 0 / .45); } .sl-panel { z-index: 30; } .sl-backdrop { z-index: 29; } }
+
+/* Directional traders' lane (owner, 7 October 2026: "maybe there is a consensus"). */
+.sl-key i.lane { width: 18px; height: 2px; border-radius: 0; background: var(--text-2); vertical-align: 3px; }
+.sl-traders { margin: 0; color: var(--text-2); font-size: 13px; }
+.sch-lane-dot { cursor: default; outline: none; }
+.sch-lane-dot:focus-visible circle { stroke: var(--accent); stroke-width: 2.5; }

@@ -200,3 +200,13 @@ def test_trader_pnl_history_books_each_option_on_its_settlement_day(tmp_path):
     assert w["pnl_history"][-1][1] == w["option_pnl"]
     # without settlements (older callers) the field is empty rather than wrong
     assert traders.build(scan, cls, as_of=1.75e9)["traders"][0]["pnl_history"] == []
+
+
+def test_directional_book_keeps_each_directional_wallet_as_a_number():
+    held = {("0xD1", "BTC-20991231-100000-C"): 2.0, ("0xD1", "BTC-20991231-90000-P"): -1.0,
+            ("0xD2", "BTC-20991231-100000-C"): -0.5, ("0xI", "BTC-20991231-100000-C"): -40.0, ("0xD3", "ETH-20991231-5000-C"): 0.0}
+    wallets = {"0xD1": {"class": "directional", "tier": None}, "0xD2": {"class": "directional", "tier": "top"},
+               "0xD3": {"class": "directional"}, "0xI": {"class": "income"}}
+    book = history.directional_book(held, wallets)
+    assert book == {"BTC": {"BTC-20991231-100000-C": [[0, 2.0], [1, -0.5]], "BTC-20991231-90000-P": [[0, -1.0]]}}
+    assert "0xD1" not in str(book)  # numbers, never addresses

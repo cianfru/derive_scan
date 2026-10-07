@@ -11,7 +11,8 @@ history/days/YYYY-MM-DD.csv.gz   one row per wallet and instrument traded that d
     volatility, premium sold out of the money, realised PnL and fees as Derive reports them
 history/settlements/{UND}.json   option settlement prices per expiry (Derive)
 history/wallets.json             each wallet's class and tier from all days so far (rules in the study doc)
-history/positions.json           open option contracts per instrument held by each tier's wallets
+history/positions.json           open option contracts per instrument held by each tier's wallets, and
+                                  every directional wallet's own (directional_book)
 history/traders.json             leaderboard, open positions, recent activity, cohorts (derive/traders.py)
 history/state.json               days done
 history/anomalies.json           days kept although their pages did not reconcile (fetch_day); each is
@@ -546,6 +547,20 @@ def rank_tiers(out: dict) -> dict:
     for rank, (pnl, k) in enumerate(directional):
         out[k]["tier"] = None if pnl <= 0 else "top" if rank < n_top else "smart" if rank < SMART_COUNT else "profitable"
     return out
+
+
+def directional_book(held: dict, wallets: dict) -> dict:
+    """{UND: {instrument: [[n, net contracts], ...]}}: every directional wallet's open options (profitable or
+    not), each wallet a number (the same number across instruments, no address), for the Saloon's per-date count
+    of directional traders long and short."""
+    ids: dict = {}
+    out: dict = defaultdict(lambda: defaultdict(list))
+    for (wallet, name), net in sorted(held.items()):
+        if (wallets.get(wallet) or {}).get("class") != "directional" or not net:
+            continue
+        n = ids.setdefault(wallet, len(ids))
+        out[name.split("-")[0]][name].append([n, round(net, 6)])
+    return {u: dict(v) for u, v in out.items()}
 
 
 def tier_positions(held: dict, wallets: dict) -> dict:

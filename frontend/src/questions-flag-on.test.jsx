@@ -192,7 +192,7 @@ it("keeps every reachable landing illustration free of quotes, results and forec
 
 it("shows the coin page's Saloon link only for a coin with live questions", () => {
   render(<MemoryRouter><SaloonCta und="BTC" live /></MemoryRouter>);
-  expect(screen.getByRole("link", { name: /BTC in the Saloon/ }).getAttribute("href")).toBe("/saloon/BTC");
+  expect(screen.getByRole("link", { name: /BTC in the Saloon/ }).getAttribute("href")).toBe("/saloon?coin=BTC");
   cleanup();
   const { container } = render(<MemoryRouter><SaloonCta und="ADA" live={false} /></MemoryRouter>);
   expect(container.innerHTML).toBe("");
