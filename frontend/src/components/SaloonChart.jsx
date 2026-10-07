@@ -37,6 +37,16 @@ const inText = (ts, now) => {
   const s = Math.max(0, ts - now), d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600);
   return d ? `in ${d}d ${h}h` : `in ${h}h`;
 };
+export const TRADER_WORD = { up: "Long", defensive: "Short", neutral: "Balanced" };
+/** "Short: 85% of their exposure points down, 90 positions, $22.6M." */
+export function traderText(t) {
+  if (!t) return "Not available yet";
+  if (t.score == null) return `Too few positions to read (${t.positions || 0} open)`;
+  const share = Math.round(((1 + Math.abs(t.score)) / 2) * 100);
+  const way = t.score >= 0 ? "up" : "down";
+  const size = t.gross_delta_usd >= 1e6 ? `$${(t.gross_delta_usd / 1e6).toFixed(1)}M` : `$${Math.round(t.gross_delta_usd / 1000)}k`;
+  return `${TRADER_WORD[t.state]}: ${share}% of their exposure points ${way}, ${t.positions} ${t.positions === 1 ? "position" : "positions"}, ${size}`;
+}
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 /**
@@ -95,7 +105,8 @@ function mount(host, cfg) {
     const W = Math.max(scroller.clientWidth || 0, phone ? 820 : 900), H = phone ? 540 : 620;
     svg.setAttribute("width", W); svg.setAttribute("height", H); svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
     svg.replaceChildren();
-    const m = { l: 14, r: 78, t: 70, b: 34 };
+    const lane = dates.some((d) => d.traders) ? (phone ? 92 : 104) : 0;
+    const m = { l: 14, r: 78, t: 70, b: 34 + lane };
     const pw = W - m.l - m.r, pastW = pw * (phone ? 0.3 : 0.34), futX = m.l + pastW, colW = (pw - pastW) / Math.max(1, dates.length);
     const R = phone ? 23 : 26;
     const [lo, hi] = view;
@@ -149,8 +160,52 @@ function mount(host, cfg) {
       for (const l of visible) if (!big.includes(l)) bubble(plot, d, l, cx, false, i);
       big.forEach((l, j) => bubble(plot, d, l, cx, true, i, j));
     });
+    if (lane) traderLane(svg, lane);
     if (current) paintSelected();
     firstPaint = false;
+  }
+
+  // Where directional traders lean on each date (net over gross delta of their open options): a line in its own
+  // lane under the plot, up for Long, down for Short, a hollow dot where too few positions are open.
+  function traderLane(parent, lane) {
+    const { futX, cols, W, H, m } = geo;
+    const top = H - m.b + 16, bot = H - 34 - 10, mid = (top + bot) / 2 + 6, half = (bot - top) / 2 - 2;
+    const most = Math.max(1, ...dates.map((d) => d.traders?.gross_delta_usd || 0));
+    const g = el("g", { class: "sch-lane" }, parent);
+    el("rect", { x: futX, y: top - 6, width: W - m.r - futX, height: bot - top + 12, fill: C.text1, "fill-opacity": C.light ? 0.03 : 0.035 }, g);
+    el("line", { x1: futX, x2: W - m.r, y1: mid, y2: mid, stroke: C.text3, "stroke-opacity": 0.5, "stroke-dasharray": "2 4" }, g);
+    el("text", { x: futX - 10, y: mid - 3, fill: C.text2, "font-size": 11, "font-family": "Manrope, sans-serif", "font-weight": 600, "text-anchor": "end" }, g).textContent = "Directional traders";
+    el("text", { x: futX - 10, y: mid + 11, fill: C.text3, "font-size": 10.5, "font-family": "Manrope, sans-serif", "text-anchor": "end" }, g).textContent = "where their positions lean";
+    el("text", { x: W - m.r + 8, y: mid - half + 10, fill: C.up, "font-size": 10.5 }, g).textContent = "Long";
+    el("text", { x: W - m.r + 8, y: mid + half + 2, fill: C.down, "font-size": 10.5 }, g).textContent = "Short";
+    const pts = dates.map((d, i) => ({ d, x: cols[i], t: d.traders, y: d.traders?.score != null ? mid - d.traders.score * half : null }));
+    let run = [];
+    const flush = () => {
+      if (run.length > 1) el("polyline", { points: run.map((p) => `${p.x},${p.y}`).join(" "), fill: "none", stroke: C.text2, "stroke-width": 1.5, "stroke-opacity": 0.8 }, g);
+      run = [];
+    };
+    for (const p of pts) { if (p.y == null) flush(); else run.push(p); }
+    flush();
+    for (const p of pts) {
+      if (!p.t) continue;
+      const col = p.t.state === "up" ? C.up : p.t.state === "defensive" ? C.down : C.text3;
+      const label = TRADER_WORD[p.t.state] || "Too few positions";
+      const dot = el("g", { class: "sch-lane-dot", tabindex: 0, role: "img", "aria-label": `Directional traders on ${dayName(p.d.settle)}: ${traderText(p.t)}` }, g);
+      // The dot's size follows the money behind the reading, so a few positions never look like a crowd.
+      const r = p.y == null ? 4 : 3.5 + 5 * Math.sqrt((p.t.gross_delta_usd || 0) / most);
+      el("circle", { cx: p.x, cy: p.y ?? mid, r, fill: p.y == null ? C.surface : col, stroke: p.y == null ? C.text3 : col, "stroke-width": 1.5 }, dot);
+      el("text", { x: p.x, y: (p.y ?? mid) - r - 5, fill: p.y == null ? C.text3 : col, "font-size": 10.5, "font-family": "Manrope, sans-serif", "font-weight": 600, "text-anchor": "middle" }, dot).textContent = label;
+      const show = () => {
+        tip.innerHTML = `<div class="t1">Directional traders, ${esc(dayName(p.d.settle))}</div><div>${esc(traderText(p.t))}</div><div class="sch-hint">Context, not a signal</div>`;
+        tip.hidden = false;
+        const sc = scroller.scrollLeft;
+        tip.style.left = `${Math.max(8, Math.min(p.x - sc - 120, host.stage.clientWidth - tip.offsetWidth - 8))}px`;
+        tip.style.top = `${Math.max(52, scroller.offsetTop + (p.y ?? mid) - tip.offsetHeight - 14)}px`;
+      };
+      dot.addEventListener("pointerenter", show); dot.addEventListener("focus", show);
+      dot.addEventListener("pointerleave", () => { tip.hidden = true; }); dot.addEventListener("blur", () => { tip.hidden = true; });
+      dot.addEventListener("pointerdown", (e) => e.stopPropagation());
+    }
   }
 
   function bubble(parent, d, l, cx, full, col = 0, rank = 0) {
@@ -232,7 +287,7 @@ function mount(host, cfg) {
     let left = cx - sc + 34;
     if (left + tip.offsetWidth > sw - 8) left = cx - sc - tip.offsetWidth - 34;
     tip.style.left = `${Math.max(8, left)}px`;
-    tip.style.top = `${Math.max(52, cy - tip.offsetHeight / 2)}px`;
+    tip.style.top = `${Math.max(52, scroller.offsetTop + cy - tip.offsetHeight / 2)}px`;
   }
   function unhover() {
     tip.hidden = true;
@@ -390,7 +445,7 @@ export default function SaloonChart({ und, name, index, candles, dates, amount, 
   const views = useRef({});
   const openRef = useRef(onOpen);
   openRef.current = onOpen;
-  const dataKey = dates.map((d) => `${d.expiry}:${d.rows.map((r) => `${r.key}=${r.total.toFixed(2)}/${r.payout.toFixed(2)}/${smartOf(r)?.wallets || 0}`).join(",")}`).join("|");
+  const dataKey = dates.map((d) => `${d.expiry}:${d.traders?.score ?? "-"}/${d.traders?.positions ?? "-"}:${d.rows.map((r) => `${r.key}=${r.total.toFixed(2)}/${r.payout.toFixed(2)}/${smartOf(r)?.wallets || 0}`).join(",")}`).join("|");
   const ready = candles?.length > 1 && dates.length > 0 && Number.isFinite(index);
   useEffect(() => {
     if (!ready || !svg.current) return undefined;

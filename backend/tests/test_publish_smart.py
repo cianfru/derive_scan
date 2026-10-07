@@ -43,3 +43,19 @@ def test_annotate_writes_answers_and_counts(tmp_path):
     assert a["yes"]["smart"] == {"delta_usd": 12_000, "wallets": 2} and "smart" not in a["no"]
     assert "smart" not in b["no"]
     assert json.loads((q / "index.json").read_text())["coins"][0]["smart"] == 1
+
+
+def test_date_traders_reads_one_settlement_of_directional_wallets():
+    exp = 1_791_532_800  # 9 Oct 2026, 08:00 UTC
+    now = exp - 2 * 86400
+    later = exp + 7 * 86400
+    strikes = {"ts": now, "expiries": {str(exp): [[86000, 0, 0, 0.5, 0.5, 0.4]], str(later): [[86000, 0, 0, 0.5, 0.5, 0.4]]}}
+    name, other = "BTC-20261009-86000-C", "BTC-20261016-86000-C"
+    # Net long 2 calls (delta 0.4) over 4 positions; the next week's date is left out of this one.
+    positions = {name: {"top": [1.0, 1, 1.0], P.DIRECTIONAL: [2.0, 4, 4.0]}, other: {P.DIRECTIONAL: [-9.0, 3, 9.0]}}
+    r = P.date_traders(positions, (strikes, 84000, now), exp, now)
+    assert r["positions"] == 4 and r["state"] == "up" and r["score"] == 0.5
+    assert r["net_delta_usd"] == round(2 * 0.4 * 84000, 2) and r["gross_delta_usd"] == round(4 * 0.4 * 84000, 2)
+    # Before the history has the directional bucket, nothing is published.
+    assert P.date_traders({name: {"top": [1.0, 1, 1.0]}}, (strikes, 84000, now), exp, now) is None
+    assert P.date_traders(positions, None, exp, now) is None

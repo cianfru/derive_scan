@@ -89,8 +89,9 @@ def options_lean(features, iv_history, flow_7d, *, observed_at=None, now=None):
     return options_reading("30d", features, iv_history, {"7d": flow_7d}, observed_at=observed_at, now=now)
 
 
-def wallets_reading(positions, strikes, index, now, days, tier=WALLET_TIER):
-    """Held-book exposure. A position count is not a distinct-wallet count."""
+def wallets_reading(positions, strikes, index, now, days, tier=WALLET_TIER, expiry=None):
+    """Held-book exposure over the next `days`, or on one settlement (`expiry`, seconds) when given. A position
+    count is not a distinct-wallet count."""
     from .history import parse_option
     net = gross = estimated_gross = 0.0
     held = missing = estimated = 0
@@ -98,7 +99,7 @@ def wallets_reading(positions, strikes, index, now, days, tier=WALLET_TIER):
     for name, cells in (positions or {}).items():
         option = parse_option(name)
         cell = (cells or {}).get(tier)
-        if not option or not cell or not now < option[1] <= now + days * 86400:
+        if not option or not cell or not now < option[1] <= now + days * 86400 or expiry is not None and option[1] != expiry:
             continue
         held += cell[1]
         delta, source = delta_at(strikes, option[1], option[2], option[3], index, now)

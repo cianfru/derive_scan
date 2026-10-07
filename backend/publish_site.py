@@ -56,9 +56,9 @@ from derive.candles import CandleCache
 from derive.signals import engine_comparison, ribbon_trail
 from derive.quality import ANALYTICS_VERSION, engine_status, snapshot_status
 from derive.implied import implied_by_expiry, option_levels
-from derive.lean import DEFENSIVE_SIGNALS, HORIZONS, UP_SIGNALS, WALLET_MIN_POSITIONS, WALLET_MIN_USD, alignment, options_lean, state_of
+from derive.lean import DEFENSIVE_SIGNALS, HORIZONS, UP_SIGNALS, WALLET_MIN_POSITIONS, WALLET_MIN_USD, alignment, options_lean, state_of, wallets_reading
 from derive import traders as traders_mod
-from derive.history import last_complete_day, parse_option
+from derive.history import DIRECTIONAL, last_complete_day, parse_option
 from derive.metric_history import build_engine_history
 from derive.wallet_alias import canonical, translate_keys
 
@@ -807,10 +807,23 @@ def smart_marks(level: dict, settle_ts: int, legs: list, und: str) -> dict:
     return {"yes" if delta > 0 else "no": {"delta_usd": round(delta), "wallets": wallets}}
 
 
-def annotate_smart(site: Path, legs: list) -> None:
+def date_traders(positions: dict | None, chain: tuple | None, settle_ts: int, now: float) -> dict | None:
+    """Where every directional wallet leans on one settlement date (owner, 7 October 2026: "maybe there is a
+    consensus"): their open options of that date, net delta over gross delta, with the Wallets layer's rules
+    (state up / defensive / neutral, at least WALLET_MIN_USD and WALLET_MIN_POSITIONS). None until the history
+    holds the directional bucket or while the coin has no chain to value it."""
+    if not positions or not chain or not any(DIRECTIONAL in cells for cells in positions.values()):
+        return None
+    strikes, index, _ = chain
+    r = wallets_reading(positions, strikes, index, now, 3660, tier=DIRECTIONAL, expiry=int(settle_ts))
+    return {k: r[k] for k in ("state", "score", "net_delta_usd", "gross_delta_usd", "positions", "status")}
+
+
+def annotate_smart(site: Path, legs: list, positions: dict | None = None, chains: dict | None = None,
+                   now: float | None = None) -> None:
     """Marks the published questions/{UND}.json answers the smart wallets lean toward (`smart` on the
-    answer) and counts the board's marked answers per coin in questions/index.json (`smart`); recomputed on
-    every publish."""
+    answer), counts the board's marked answers per coin in questions/index.json (`smart`) and adds each date's
+    directional traders' reading (`traders`, date_traders); recomputed on every publish."""
     idx_path = site / "questions" / "index.json"
     try:
         idx = json.loads(idx_path.read_text())
@@ -824,6 +837,11 @@ def annotate_smart(site: Path, legs: list) -> None:
             continue
         count = 0
         for date in board.get("dates") or []:
+            date.pop("traders", None)
+            reading = date_traders((positions or {}).get(und), (chains or {}).get(und), date["settle_ts"],
+                                   time.time() if now is None else now)
+            if reading:
+                date["traders"] = reading
             for level in date.get("levels") or []:
                 marks = smart_marks(level, date["settle_ts"], legs, und)
                 shown = date.get("board") and level.get("ladder") and level.get("state") not in ("retired", "tail")
@@ -965,7 +983,7 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     _write(site / "flow.json", {"generated_at": int(now), **flow})
     smart_legs = traders_block(data, site, chains, flow, now)
     if q_coins is not None:
-        annotate_smart(site, smart_legs)
+        annotate_smart(site, smart_legs, (held.get("positions") or {}) if coverage["ready"] else None, chains, now)
     from derive.config import Settings
     from record_once import load_universe
     settings = Settings(data_dir=data)

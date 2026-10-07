@@ -6,7 +6,7 @@ import { useFeeds } from "../components/Feeds.jsx";
 import { Info, Loading, Failed, RefreshNotice } from "../components/ui.jsx";
 import { CoinIcon } from "../components/MarketVisuals.jsx";
 import SaloonHead from "../components/SaloonNotices.jsx";
-import SaloonChart, { dayName, smartOf } from "../components/SaloonChart.jsx";
+import SaloonChart, { dayName, smartOf, traderText } from "../components/SaloonChart.jsx";
 import QuestionTicket from "../components/QuestionTicket.jsx";
 import { OutcomeFigures } from "../components/OutcomePreview.jsx";
 import { FollowButton } from "../components/Follow.jsx";
@@ -76,6 +76,7 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose }) {
   const t = valid && live(level, side, paused) ? budgetTicket(level, side, dollars, board) : null;
   const ready = t && !t.belowMin && t.payout > 0;
   const smart = smartOf(row);
+  const traders = board.dates?.find((d) => d.expiry === row.expiry)?.traders || null;
   const question = questionText(und, level, row.expiry);
   const pick = (s) => { const r = s === side ? row : other; if (r) onPick(r); };
   return (
@@ -107,6 +108,7 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose }) {
           {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
           {!t.belowMin && <section className="md-preview" aria-label="What it pays"><OutcomeFigures und={und} level={level} side={side} t={t} expiry={row.expiry} settleTs={row.settleTs} summary compact /></section>}
         </> : <p className="status">{valid ? `No price now for ${ANSWER[side]}.` : "Enter an amount greater than $0."}</p>}
+        {traders && <p className="sl-traders">Directional traders on this date: {traderText(traders)}.<Info label="About directional traders">Every Derive wallet that trades options for direction, profitable or not: market makers, income sellers (who sell options to collect a fee) and hedgers (who buy protection) are left out. The reading is their open options on this settlement date, as net exposure over total exposure. Long when at least 62.5% of it points up, Short when at least 62.5% points down, else Balanced; it needs $10,000 of exposure and 3 positions. A position is one wallet's holding in one option. Where traders lean is not where the price goes. Context, not a signal.</Info></p>}
         {smart && <p className="sl-smart">Smart wallets: {smart.wallets} hold about {money(Math.abs(smart.delta_usd))} of positions {yes ? "up" : "down"} at these levels on this date.<Info label="About smart wallets">The most profitable directional options wallets on Derive. The ring marks at least $10,000 of their delta this way ($2,000 on smaller coins), across two or more wallets, at strikes inside this answer's pay zone. Context, not a signal.</Info></p>}
         {age.state === "stale" && <p className="q-note warn">Prices are {age.minutes} min old.</p>}
         <button type="button" className="btn primary lg" disabled={!ready} onClick={() => setTicket(true)}>Review trade</button>
@@ -143,8 +145,9 @@ function ChartView({ index, error }) {
   const dates = useMemo(() => {
     const by = new Map();
     for (const r of mine) { if (!by.has(r.expiry)) by.set(r.expiry, []); by.get(r.expiry).push(r); }
-    return [...by.keys()].sort().map((e) => ({ expiry: e, settle: by.get(e)[0].settleTs, rows: by.get(e) }));
-  }, [mine.map((r) => `${r.key}:${r.total}`).join(",")]);
+    return [...by.keys()].sort().map((e) => ({ expiry: e, settle: by.get(e)[0].settleTs, rows: by.get(e),
+      traders: board?.dates?.find((d) => d.expiry === e)?.traders || null }));
+  }, [mine.map((r) => `${r.key}:${r.total}`).join(","), board?.prices_ts, und]);
   const candles = useMemo(() => (coinFile?.candles?.["4h"] || []).slice(-CANDLES), [coinFile]);
   const [openKey, setOpenKey] = useState(null);
   const selected = mine.find((r) => r.key === openKey) || null;
@@ -170,6 +173,7 @@ function ChartView({ index, error }) {
             <span><i className="down" aria-hidden="true" />Lower: pays if it settles below</span>
             <span><i className="gold" aria-hidden="true" />Gold ring: smart wallets hold positions that way</span>
             <span>Each bubble: the most you make on {money(REF)}, fees included</span>
+            {dates.some((d) => d.traders) && <span><i className="lane" aria-hidden="true" />Bottom line: where directional traders' positions lean on each date</span>}
             <span className="sl-key-how">Drag a bubble to explore · scroll or pinch to zoom · drag the chart to move</span>
           </p>
           <div className="sl-frame">

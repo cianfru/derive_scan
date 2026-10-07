@@ -78,9 +78,12 @@ def test_tiers_and_positions():
     wallets = {f"0x{i}": {"class": "directional", "tier": "top" if i < 2 else "smart" if i < 5 else "profitable"}
                for i in range(8)}
     held = {(f"0x{i}", "BTC-20991231-100000-C"): 1.0 for i in range(8)} | {("0xM", "BTC-20991231-100000-C"): 50.0}
+    # A directional wallet in loss (no tier) and an income seller: only the first joins "directional".
+    held |= {("0xL", "BTC-20991231-100000-C"): -3.0, ("0xI", "BTC-20991231-100000-C"): -40.0}
+    wallets |= {"0xL": {"class": "directional", "tier": None}, "0xI": {"class": "income"}}
     pos = history.tier_positions(held, wallets | {"0xM": {"class": "market_maker"}})
     cell = pos["BTC"]["BTC-20991231-100000-C"]
-    assert cell == {"top": [2.0, 2, 2.0], "smart": [5.0, 5, 5.0], "profitable": [8.0, 8, 8.0]}
+    assert cell == {"top": [2.0, 2, 2.0], "smart": [5.0, 5, 5.0], "profitable": [8.0, 8, 8.0], "directional": [5.0, 9, 11.0]}
 
 
 def test_history_once_reads_days_and_checks_counts(tmp_path):

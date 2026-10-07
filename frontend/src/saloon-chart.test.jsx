@@ -10,7 +10,7 @@ const docs = vi.hoisted(() => ({ current: {} }));
 vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.current[path] ?? null : null, error: null }) }));
 vi.mock("./components/SettleChart.jsx", async (orig) => ({ ...await orig(), default: () => <div data-testid="settle-chart" /> }));
 import Saloon from "./pages/Saloon.jsx";
-import { chartLevels, levelText, returnPct, smartOf } from "./components/SaloonChart.jsx";
+import { chartLevels, levelText, returnPct, smartOf, traderText } from "./components/SaloonChart.jsx";
 import { boardRows } from "./lib/board.js";
 import { BANNED } from "./lib/questions.js";
 
@@ -22,6 +22,9 @@ const candles = Array.from({ length: 80 }, (_, i) => [T14 - (80 - i) * 14400, 84
 const smartBtc = JSON.parse(JSON.stringify(btc));
 const marked = smartBtc.dates[4].levels.find((l) => l.ladder && l.k > smartBtc.index);
 marked.yes.smart = { delta_usd: 24000, wallets: 3 };
+// Directional traders' reading on two dates, one too thin to read, as publish_site writes them.
+smartBtc.dates[4].traders = { state: "defensive", score: -0.692, net_delta_usd: -15633000, gross_delta_usd: 22592000, positions: 90, status: "ready" };
+smartBtc.dates[5].traders = { state: null, score: null, net_delta_usd: 4000, gross_delta_usd: 5000, positions: 2, status: "insufficient_exposure" };
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -35,6 +38,7 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
+const dayLabelOf = (d) => new Date(d.settle_ts * 1000).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
 const show = (path = "/saloon") => render(
   <MemoryRouter initialEntries={[path]}>
     <Routes><Route path="/saloon" element={<Saloon />} /><Route path="/q/:id" element={<p>outcome page</p>} /></Routes>
@@ -107,6 +111,20 @@ describe("Saloon chart page", () => {
     docs.current["questions/index.json"] = { ...idx, coins: [] };
     show();
     expect(screen.getByText("No prices on Derive right now.")).toBeTruthy();
+  });
+
+  it("draws where directional traders lean on each date, and says it in the panel", () => {
+    expect(traderText(smartBtc.dates[4].traders)).toBe("Short: 85% of their exposure points down, 90 positions, $22.6M");
+    expect(traderText(smartBtc.dates[5].traders)).toBe("Too few positions to read (2 open)");
+    expect(traderText({ state: "up", score: 0.3, gross_delta_usd: 42000, positions: 5 })).toBe("Long: 65% of their exposure points up, 5 positions, $42k");
+    show();
+    const dots = [...document.querySelectorAll(".sch-lane-dot")];
+    expect(dots.map((d) => d.textContent)).toEqual(expect.arrayContaining(["Short", "Too few positions"]));
+    expect(dots.find((d) => d.textContent === "Short").getAttribute("aria-label")).toMatch(/^Directional traders on .*: Short: 85%/);
+    const bubble = [...document.querySelectorAll(".sch-bubble:not(.sch-dot)")].find((b) => b.getAttribute("aria-label").includes(dayLabelOf(smartBtc.dates[4])));
+    expect(bubble).toBeTruthy();
+    fireEvent.keyDown(bubble, { key: "Enter" });
+    expect(screen.getByRole("complementary", { name: "Your trade" }).textContent).toContain("Directional traders on this date: Short: 85%");
   });
 
   it("uses no forecast words", () => {

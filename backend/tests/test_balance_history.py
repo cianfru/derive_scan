@@ -79,7 +79,10 @@ def test_replay_tiers_equal_classify_point_in_time(tmp_path):
         held = {}
         classes = history.classify(tmp_path, SETTLE, B.close_ts(day), held)
         assert got[day][0] == {k: v["tier"] for k, v in classes.items() if v.get("tier")}
-        assert got[day][1] == history.tier_positions(held, classes)
+        # The replay reads the tiers only; the "directional" bucket is the Saloon's and left out of it.
+        tiers_only = {u: {n: {t: c for t, c in cells.items() if t != history.DIRECTIONAL} for n, cells in names.items()}
+                      for u, names in history.tier_positions(held, classes).items()}
+        assert got[day][1] == {u: {n: c for n, c in names.items() if c} for u, names in tiers_only.items()}
     early_tiers, late_tiers = got[early][0], got[late][0]
     assert "0xA" in early_tiers and "0xB" not in early_tiers and "0xLate" not in early_tiers
     assert late_tiers.get("0xLate") in ("top", "smart")  # qualified after the early cutoff, never before
