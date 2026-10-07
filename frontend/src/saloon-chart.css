@@ -42,8 +42,11 @@
 .sch-bubble:not(.sch-dot) { cursor: grab; }
 .sch-body { transition: transform 140ms ease; transform-box: fill-box; transform-origin: center; }
 .sch-bubble:hover .sch-body, .sch-bubble.on .sch-body, .sch-bubble:focus-visible .sch-body { transform: scale(1.1); }
-.sch-shadow { transition: opacity 140ms ease; }
-.sch-bubble:hover .sch-shadow, .sch-bubble.on .sch-shadow { opacity: .75; }
+.sch-halo { opacity: .75; transition: opacity 140ms ease; }
+.sch-bubble:hover .sch-halo, .sch-bubble.on .sch-halo { opacity: 1; }
+.sch-more { cursor: pointer; outline: none; }
+.sch-more:hover text, .sch-more:focus-visible text { fill: var(--accent); }
+.sch-more:hover path, .sch-more:focus-visible path { stroke: var(--accent); }
 .sch-bubble:focus-visible .sch-body > circle:not(.sch-gold) { stroke: var(--accent); stroke-width: 2.5; stroke-opacity: 1; }
 .sch-float { animation: sch-bob var(--dur, 4s) ease-in-out var(--delay, 0s) infinite alternate; }
 @keyframes sch-bob { from { transform: translate(0, -2.5px); } to { transform: translate(0, 2.5px); } }
