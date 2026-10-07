@@ -72,3 +72,29 @@ Otherwise the result is "context, not a signal", and positioning is shown withou
 - Options lean (built 2 October 2026): skew against its own range, taker premium (market makers left out), put/call change, short-dated stress; beside the engine's signal, never part of it.
 - Market makers left out of Flow and of taker sides as soon as the rebuilt history classes them; every other wallet shows its type.
 - Alignment (built 2 October 2026): for the next 7 and 30 days, the engine (4H, 1D), option prices and the Smart tier's open positions on expiries inside the window (net delta as a share of gross, from `history/positions.json`), each read as up, neutral or defensive. Side by side, never combined into a signal.
+
+## Addendum A: did their side settle in the money? (DRAFT, awaiting the owner's approval; nothing computed)
+
+Owner, 7 October 2026: "see if directional traders ... actually predict price movements into the future by looking at their bets and then the price that followed". A track record for the Saloon's directional traders' line, with its own rules, fixed before any result.
+
+### Reading and outcome
+
+- Unit: one reading per coin and settlement date, never one per day (daily readings of the same date are not independent).
+- Reading: the line's own measure, net over gross delta of every directional wallet's open options of that settlement date. Wallets are classed with information up to the reading time only. Delta comes from the implied volatility of the trades at the time (Black-76 on the index). Long at +0.25 or more, Short at -0.25 or less, else Balanced. It needs $10,000 and 3 positions.
+- Lead: the reading is taken 7 days before settlement for dates listed at least 7 days ahead (main test), and 1 day before for every date (reported, not deciding).
+- Outcome: Derive's settlement price against the index at the reading time. "Their way" when Long settled above it or Short settled below it. Balanced and unreadable dates are counted but not scored.
+- Window: every settlement from the start of the rebuilt history (December 2023) to the newest settled date. BTC and ETH decide; other coins are reported.
+
+### Comparison (chance is not 50%)
+
+- Base rate: a coin that rose over the window makes "Long" right more often by drift alone. The expected hit rate by chance is p_up x share Long + (1 - p_up) x share Short, where p_up is the share of the same dates that settled above their reading-time index.
+- Permutation: the Long/Short labels are shuffled across the same dates 10,000 times, and the observed hit rate is placed among the shuffles.
+
+### Bar
+
+"Their side has settled their way more often than chance" may be shown only if all of these hold at the 7-day lead:
+1. BTC has at least 60 scored dates, and its hit rate is above the 99th percentile of the permutations.
+2. The same direction holds in both halves of the window.
+3. ETH's hit rate is above its own chance rate.
+
+Otherwise the app shows the record as history only: "Of N dates, their side settled their way M times (X%); by chance about Y%." The headline is "no better than chance so far" unless the bar is met. No probability, odds, likely or predict wording appears in the app in either case.
