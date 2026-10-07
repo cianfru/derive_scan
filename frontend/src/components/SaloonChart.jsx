@@ -534,7 +534,8 @@ function mount(host, cfg) {
 
   return {
     zoomIn: () => zoomBy(0.6), zoomOut: () => zoomBy(1.6), reset: () => animateTo([...HOME]),
-    showNearest: () => { scroller.scrollLeft = Math.max(0, geo.futX - 16); },
+    // Phones open on the nearest dates with the last candles and the price now still in view.
+    showNearest: () => { scroller.scrollLeft = Math.max(0, geo.futX - Math.min(110, scroller.clientWidth * 0.3)); },
     select: (r) => { current = r || null; paintSelected(); },
     // Bars Derive has but the published file not yet (the forming one too): replace or append, keep the length.
     setBars: (bars) => {
