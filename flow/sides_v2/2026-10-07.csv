@@ -887,3 +887,5 @@ bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sel
 1791413100,ETH,put,33388.69,33388.69,699.4,192.4,2
 1791413100,HYPE,perp,1759.92,0.0,0.0,0.0,1
 1791413100,PUMP,perp,0.0,1420.14,0.0,0.0,1
+1791413100,XAUT,call,6160.15,0.0,38.85,0.0,1
+1791413100,ZEC,put,2657.37,2657.37,33.79,80.42,2
