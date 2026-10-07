@@ -11,6 +11,7 @@ import hist from "./fixtures/questions/history-BTC-20261009.json";
 const docs = vi.hoisted(() => ({ current: {}, errors: {} }));
 vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.current[path] ?? null : null, error: docs.errors[path] ?? null }) }));
 vi.mock("./components/QuestionChart.jsx", () => ({ default: () => <div data-testid="chart" /> }));
+vi.mock("./components/SettleChart.jsx", async (orig) => ({ ...await orig(), default: (p) => <div data-testid="settle-chart" data-side={p.side || ""} data-lo={p.lo} data-hi={p.hi} data-be={p.breakeven ?? ""} /> }));
 import Questions from "./pages/Questions.jsx";
 import MyQuestions from "./pages/MyQuestions.jsx";
 import { BANNED } from "./lib/questions.js";
@@ -239,7 +240,24 @@ describe("the question page", () => {
     expect(container.querySelector(".q-ticket")).toBeNull();
     expect(screen.getByRole("region", { name: "What it pays" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Review trade" })).toBeTruthy();
+    // The coin's candles up to the settlement are the default chart, with the answer's zone and breakeven.
+    expect(screen.queryByTestId("chart")).toBeNull();
+    expect(container.querySelector(".md-coin-now")?.textContent).toContain("BTC now");
+  });
+
+  it("charts the coin up to the settlement by default, with the chosen answer's zone and breakeven", async () => {
+    docs.current["coins/BTC.json"] = { candles: { "4h": [[1791000000, 1, 2, 0.5, 1.5, 1]], "1d": [[1790956800, 1, 2, 0.5, 1.5, 1]] } };
+    show(Q86);
+    const user = userEvent.setup({ advanceTimers: () => {} });
+    await user.click(screen.getAllByRole("radio")[1]);
+    const chart = screen.getByTestId("settle-chart");
+    expect(chart.dataset.side).toBe("no");
+    expect(Number(chart.dataset.be)).toBeGreaterThan(Number(chart.dataset.lo));
+    expect(Number(chart.dataset.be)).toBeLessThan(Number(chart.dataset.hi));
+    expect(screen.getByText(/Breakeven \$/)).toBeTruthy();
+    await user.click(screen.getByRole("tab", { name: "Answer price" }));
     expect(screen.getByTestId("chart")).toBeTruthy();
+    delete docs.current["coins/BTC.json"];
   });
 
   it("shows pay, fees, total, most it pays, most you can make, breakeven and settlement, the worst case before any action", async () => {

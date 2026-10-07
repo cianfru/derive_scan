@@ -140,3 +140,7 @@
 @media (pointer: coarse) {
   .q-line-close, .q-group .q-position-close { min-height: 44px; }
 }
+/* The coin's price up to the settlement, with the position's zone and breakeven (owner, 7 October 2026). */
+.q-group-price { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); }
+.q-group-price > summary { min-height: 44px; display: flex; align-items: center; cursor: pointer; font: 600 14px var(--font-sans); color: var(--text-1); }
+.q-group-price .sc-frame { margin-top: 6px; }

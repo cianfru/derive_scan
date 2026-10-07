@@ -9,7 +9,9 @@ import index from "./fixtures/questions/index.json";
 
 const docs = vi.hoisted(() => ({ current: {}, errors: {} }));
 vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.current[path] ?? null : null, error: docs.errors[path] ?? null }) }));
+vi.mock("./components/SettleChart.jsx", async (orig) => ({ ...await orig(), default: (p) => <div data-testid="settle-chart" data-levels={p.levels.join(",")} data-compact={p.compact ? "1" : ""} /> }));
 import Board, { returnText } from "./pages/Board.jsx";
+import { payZones, settleBars, settleFrame } from "./components/SettleChart.jsx";
 import { SaloonNotices } from "./components/SaloonNotices.jsx";
 import { BANNED, dayLabel, ticket } from "./lib/questions.js";
 import { DEFAULT_SORT, SORTS, boardRows, budgetTicket, cleanBudget, coinRank, costOverMark, dateRows, exitCost, filterRows, markFor, nearRow, sortRows } from "./lib/board.js";
@@ -608,5 +610,44 @@ describe("storage", () => {
     dismiss("a");
     expect(loadDoc().notices.map((n) => n.key)).toEqual(["b"]);
     expect(loadDoc().dismissed).toEqual(["a"]);
+  });
+});
+
+describe("quick look from a date row", () => {
+  it("shows a small chart on hover and opens a window over the board on click, closing back to the same place", async () => {
+    docs.current["coins/BTC.json"] = { candles: { "4h": [[NOW - 14400, 1, 2, 0.5, 1.5, 1]], "1d": [[NOW - 86400, 1, 2, 0.5, 1.5, 1]] } };
+    const user = userEvent.setup({ advanceTimers: () => {} });
+    show();
+    const look = screen.getAllByRole("button", { name: /: open the Bitcoin chart/ })[0];
+    vi.useRealTimers();
+    fireEvent.mouseEnter(look);
+    await screen.findByTestId("settle-chart");
+    expect(screen.getByTestId("settle-chart").dataset.compact).toBe("1");
+    await user.click(look);
+    const dialog = screen.getByRole("dialog");
+    expect(dialog.getAttribute("aria-label")).toMatch(/^Bitcoin price up to /);
+    expect(within(dialog).getByTestId("settle-chart").dataset.compact).toBe("");
+    expect(within(dialog).getByTestId("settle-chart").dataset.levels.split(",").length).toBeGreaterThan(0);
+    expect(within(dialog).getByRole("link", { name: "Open Bitcoin" }).getAttribute("href")).toBe("/coin/BTC");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(look);
+  });
+});
+
+describe("the settlement chart's geometry", () => {
+  it("takes 4-hour candles up to 10 days out and daily ones beyond", () => {
+    expect(settleFrame(1000 + 9 * 86400, 1000)).toBe("4h");
+    expect(settleFrame(1000 + 11 * 86400, 1000)).toBe("1d");
+  });
+  it("adds the empty future up to the settlement, which always has its own point", () => {
+    const bars = settleBars([[0, 1, 2, 0.5, 1.5, 9], [14400, 1, 2, 0.5, 1.5, 9]], 14400 * 3 + 600, "4h");
+    expect(bars.slice(0, 2).every((b) => b.close != null)).toBe(true);
+    expect(bars.map((b) => b.time)).toEqual([0, 14400, 28800, 43200, 43800, 58200]);
+  });
+  it("names where each answer pays in full and in part", () => {
+    expect(payZones(80000, 88000, "no")).toEqual({ full: { from: -Infinity, to: 80000 }, part: { from: 80000, to: 88000 } });
+    expect(payZones(80000, 88000, "yes").full).toEqual({ from: 88000, to: Infinity });
+    expect(payZones(80000, 88000, null).full).toBeNull();
   });
 });

@@ -9,6 +9,7 @@ import { ASSET_NAMES } from "../lib/presentation.js";
 import QuestionLadder from "../components/QuestionLadder.jsx";
 import PayZone from "../components/PayZone.jsx";
 import QuestionChart from "../components/QuestionChart.jsx";
+import SettleChart from "../components/SettleChart.jsx";
 import QuestionTicket from "../components/QuestionTicket.jsx";
 import OutcomePreview, { OutcomeFigures, OutcomePayoffStudy } from "../components/OutcomePreview.jsx";
 import SaloonHead from "../components/SaloonNotices.jsx";
@@ -19,10 +20,11 @@ import { oneTapOffered } from "../lib/pilot.js";
 import { NOT_ON_TESTNET, NOT_ON_TESTNET_WHY, missingLegs, useTestnetListing } from "../lib/testnetLevels.js";
 import {
   ANSWER, buyCents, cents, centsDown, countdown, dayLabel, findLevel, fullPay, gap, live, money, noPriceReason, parseId, priceAge,
-  budgetTicket, questionText, settlingNow, payAt,
+  budgetTicket, questionText, settlingNow, payAt, breakeven,
 } from "../lib/questions.js";
 import "../questions.css";
 import "../marketplace-detail.css";
+import "../settle-chart.css";
 
 const clock = (t) => `${new Date(t * 1000).toISOString().slice(11, 16)} UTC`;
 const QUICK = [25, 100, 500];
@@ -253,6 +255,29 @@ function History({ und, date, level, sideKey, theme }) {
 
 const scrollTo = (el) => el?.scrollIntoView?.({ block: "start", behavior: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 
+/** The outcome page's chart (owner, 7 October 2026): the coin's candles up to the settlement with the answer's
+ * pay zones and breakeven drawn into the future (the default), or the answer's own price history. */
+function OutcomeCharts({ und, date, level, sideKey, t, board, hist, historyError, theme }) {
+  const [view, setView] = useState("coin");
+  const { data: coin, error } = useData(view === "coin" ? `coins/${und}.json` : null);
+  const be = t && sideKey ? breakeven(t, level, sideKey) : null;
+  return <>
+    <div className="md-history-key"><Tabs label="Chart" value={view} onChange={setView} items={[["coin", `${und} price`], ["q", "Answer price"]]} />
+      <Info label="About the chart">{view === "coin"
+        ? `${und}'s candles, then the time left to the settlement at 08:00 UTC on ${dayLabel(date.expiry)}. The shaded areas show where ${sideKey ? ANSWER[sideKey] : "each answer"} pays at settlement: in full, or in part between ${money(level.lo)} and ${money(level.hi)}. They show what it pays, not where the price goes.`
+        : `Derive's mark, buy and sell-back prices in cents per $1 of maximum payout for ${ANSWER[sideKey || "yes"]}. These are prices, not a measure of how often an outcome happens.`}</Info></div>
+    {view === "coin"
+      ? (coin ? <>
+          <SettleChart und={und} candles={coin.candles} index={board.index} settleTs={date.settle_ts} lo={level.lo} hi={level.hi} side={sideKey || null} breakeven={be} theme={theme} />
+          <p className="sc-key"><span><i className="settle" />Settles {dayLabel(date.expiry)}, 08:00 UTC</span>
+            {sideKey && <span><i className={sideKey} />{ANSWER[sideKey]} pays in full {sideKey === "yes" ? `at ${money(level.hi)} or above` : `at ${money(level.lo)} or below`}</span>}
+            <span><i className="part" />Pays in part {money(level.lo)}–{money(level.hi)}</span>
+            {be != null && <span><i className="be" />Breakeven {money(be)}</span>}</p>
+        </> : error ? <p className="status">The {und} chart is unavailable right now.</p> : <Loading />)
+      : historyError && !hist ? <p className="status">Price history is unavailable right now.</p> : <QuestionChart hist={hist} id={level.id} side={sideKey || "yes"} level={level} und={und} theme={theme} />}
+  </>;
+}
+
 /** The board's detail page keeps the choice, amount and payout together. Only the final order
  * review opens a ticket; prices, fees, available size and time gates use the same guided maths. */
 function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, renderLadder, ladderOpen, onLadder, initialDollars }) {
@@ -291,8 +316,7 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
       <div className="md-evidence">
         <section className="md-history" aria-label="Price history">
           <div className="md-section-heading"><div><span className="label">{und} index now</span><strong className="mono">{money(board.index)}</strong></div><PriceTime pricesTs={board.prices_ts} age={age} /></div>
-          <div className="md-history-key"><span>Price history</span><Info label="About the price chart">Question shows Derive's mark, buy and sell-back prices in cents per $1 of maximum payout for {ANSWER[sideKey || "yes"]}. Select {und} to see the coin's index instead. These are prices, not a measure of how often an outcome happens.</Info></div>
-          {historyError && !hist ? <p className="status">Price history is unavailable right now.</p> : <QuestionChart hist={hist} id={level.id} side={sideKey || "yes"} level={level} und={und} theme={theme} />}
+          <OutcomeCharts und={und} date={date} level={level} sideKey={sideKey} t={t} board={board} hist={hist} historyError={historyError} theme={theme} />
         </section>
         <Context und={und} />
         {t && <section className="md-payoff-study" aria-label="Settlement payout"><h2>What it pays at settlement</h2><OutcomePayoffStudy und={und} level={level} side={sideKey} t={t} index={board.index} expiry={date.expiry} /></section>}
@@ -307,6 +331,7 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
 
       <aside className="md-selection" aria-label="Your outcome">
         <div className="md-selection-inner">
+          <p className="md-coin-now"><span>{und} now</span><b className="mono">{money(board.index)}</b><small>{dayLabel(date.expiry)}, 08:00 UTC{countdown(date.settle_ts) && <> · {countdown(date.settle_ts)}</>}</small></p>
           <div className="md-selection-title"><h2>Choose your outcome</h2><span>Cost per $1 of max. payout<Info label="About the answer price">The amount shown buys up to $1 of payout at settlement, before Derive's fees. An answer can pay nothing, part of $1, or the full $1, depending on the settlement price.</Info></span></div>
           {settling ? <p className="q-big">Settling · average from 07:30 to 08:00 UTC</p> : <>
             <div className="q-pick md-pick" role="radiogroup" aria-label="Answer">

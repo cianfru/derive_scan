@@ -1,0 +1,18 @@
+/* SettleChart: candles, then the time to the settlement with the pay zones drawn into it. */
+.sc-frame { position: relative; height: 280px; }
+.sc-frame.compact { height: 176px; }
+.sc-box { position: absolute; inset: 0; }
+.sc-over { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.sc-settle { position: absolute; top: 0; bottom: 26px; width: 0; border-left: 1px dashed var(--text-2); }
+.sc-settle-tag { position: absolute; top: 4px; transform: translateX(-100%); padding-right: 6px; font: 500 11px/1.2 var(--font-sans); color: var(--text-2); white-space: nowrap; }
+.sc-part { position: absolute; background: color-mix(in srgb, var(--text-2) 12%, transparent); }
+.sc-full { position: absolute; }
+.sc-full.yes { background: color-mix(in srgb, var(--up) 16%, transparent); }
+.sc-full.no { background: color-mix(in srgb, var(--down) 16%, transparent); }
+.sc-key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 0; font: 400 12px/1.4 var(--font-sans); color: var(--text-2); }
+.sc-key i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; border-radius: 2px; vertical-align: -1px; }
+.sc-key i.part { background: color-mix(in srgb, var(--text-2) 28%, transparent); }
+.sc-key i.yes { background: color-mix(in srgb, var(--up) 40%, transparent); }
+.sc-key i.no { background: color-mix(in srgb, var(--down) 40%, transparent); }
+.sc-key i.be { height: 0; border-top: 1px dashed var(--fg); border-radius: 0; vertical-align: 3px; }
+.sc-key i.settle { width: 0; height: 12px; border-left: 1px dashed var(--text-2); border-radius: 0; vertical-align: -2px; }

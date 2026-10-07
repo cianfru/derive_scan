@@ -15,6 +15,8 @@ import { exportFollows, importFollows, unfollow, useFollowsDoc } from "../lib/fo
 import { TESTNET_FILLS } from "../lib/flags.js";
 import { NOT_ON_TESTNET, NOT_ON_TESTNET_WHY, missingLegs, useTestnetListing } from "../lib/testnetLevels.js";
 import { ANSWER, countdown, dayLabel, fullPay, money, noPriceReason, priceAge, signed } from "../lib/questions.js";
+import SettleChart from "../components/SettleChart.jsx";
+import "../settle-chart.css";
 import "../questions.css";
 import "../board.css";
 
@@ -147,6 +149,56 @@ function SmartWord({ und, align, settleTs, now }) {
   return <span className="bd-row-smart">Smart wallets <b className={state}>{SMART_WORD[state]}</b><Info label={`About smart wallets on ${und}`}>How the most profitable fifth of Derive traders who bet on direction hold {und} options settling in the next {horizon === "7d" ? "7" : "30"} days. Context, not a signal: it never changes the order of this board.</Info></span>;
 }
 
+/** A quick look at the coin from a date row (owner, 7 October 2026: "something quick", no new page): hovering the
+ * coin and its settlement time shows a small chart; a click opens it as a window over the board, with the date's
+ * levels drawn into the time left to the settlement. Closing returns to the same place. */
+function QuickLook({ row, name, when, levels, children }) {
+  const [peek, setPeek] = useState(false);
+  const [open, setOpen] = useState(false);
+  const { data: coin, error } = useData(peek || open ? `coins/${row.und}.json` : null);
+  const btn = useRef(null);
+  const closeBtn = useRef(null);
+  const timer = useRef(0);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => {
+    if (!open) return undefined;
+    closeBtn.current?.focus();
+    const key = (e) => { if (e.key === "Escape") { e.preventDefault(); setOpen(false); } };
+    document.addEventListener("keydown", key);
+    return () => { document.removeEventListener("keydown", key); btn.current?.focus(); };
+  }, [open]);
+  const hover = (on) => {
+    clearTimeout(timer.current);
+    if (typeof window !== "undefined" && window.matchMedia && !window.matchMedia("(hover: hover)").matches) return;
+    timer.current = setTimeout(() => setPeek(on), on ? 180 : 120);
+  };
+  const chart = (compact) => coin ? <SettleChart und={row.und} candles={coin.candles} index={row.index} settleTs={row.settleTs} levels={levels} compact={compact} />
+    : error ? <p className="status">The {name} chart is unavailable right now.</p> : <p className="status">Loading the {name} chart…</p>;
+  return <>
+    <button ref={btn} type="button" className="bd-look" aria-haspopup="dialog" aria-expanded={open} onClick={() => { setPeek(false); setOpen(true); }}
+      onMouseEnter={() => hover(true)} onMouseLeave={() => hover(false)} onFocus={() => hover(true)} onBlur={() => hover(false)}>
+      {children}<span className="bd-look-icon" aria-hidden="true" /><span className="sr-only">: open the {name} chart</span>
+    </button>
+    {peek && !open && <div className="bd-look-peek" aria-hidden="true">
+      <div className="bd-look-peek-head"><b>{name}</b><span className="mono">now {money(row.index)}</span><span>Settles {when}</span></div>
+      {chart(true)}
+      <small>Click to open</small>
+    </div>}
+    {open && <>
+      <div className="bd-look-backdrop" onClick={() => setOpen(false)} aria-hidden="true" />
+      <div className="bd-look-window" role="dialog" aria-modal="true" aria-label={`${name} price up to ${when}`}>
+        <div className="bd-look-window-head">
+          <div><h3>{name} <span className="mono">now {money(row.index)}</span></h3><p>Settles {when}{countdown(row.settleTs) && <> · {countdown(row.settleTs)}</>}</p></div>
+          <button ref={closeBtn} type="button" className="text-control" onClick={() => setOpen(false)}>Close</button>
+        </div>
+        {chart(false)}
+        <p className="sc-key"><span><i className="settle" />Settles {when}</span><span>Dotted lines: the levels on this date</span></p>
+        <Link className="bd-look-open" to={`/coin/${row.und}`}>Open {name}</Link>
+      </div>
+    </>}
+  </>;
+}
+
 /** One coin and settlement date: a header, then its levels from low to high with the index marked. */
 function DateRow({ row: full, align, budget, boardStyle = false, all = false, now }) {
   const [open, setOpen] = useState(false);
@@ -159,7 +211,7 @@ function DateRow({ row: full, align, budget, boardStyle = false, all = false, no
   return (
     <section className="bd-row" aria-label={`${name}, settles ${when}`}>
       <header className="bd-row-head">
-        <h2><CoinIcon und={row.und} /><span className="bd-row-name">{name}</span><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-date">{when}</span>{countdown(row.settleTs) && <><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-in mono">{countdown(row.settleTs)}</span></>}</h2>
+        <h2 className="bd-look-wrap"><QuickLook row={row} name={name} when={when} levels={row.items.map((g) => g.k)}><CoinIcon und={row.und} /><span className="bd-row-name">{name}</span><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-date">{when}</span>{countdown(row.settleTs) && <><span className="bd-row-sep" aria-hidden="true">·</span><span className="bd-row-in mono">{countdown(row.settleTs)}</span></>}</QuickLook></h2>
         <span className="bd-row-meta">{row.index != null && <span className="bd-row-index mono">now {money(row.index)}</span>}<SmartWord und={row.und} align={align} settleTs={row.settleTs} now={now} /></span>
       </header>
       <ol className="bd-row-cards" aria-label={`${name} levels on ${dayLabel(row.expiry)}, low to high`}>{cards}</ol>
