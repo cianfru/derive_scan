@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { createChart, CandlestickSeries, ColorType, CrosshairMode, LineStyle } from "lightweight-charts";
 import { cssVar, price } from "../lib/format.js";
 import { money } from "../lib/questions.js";
+import { recentBars, useLivePrice } from "../lib/livePrice.js";
 
 const STEP = { "4h": 14400, "1d": 86400 };
 // Up to 10 days to settlement the 4-hour candles, beyond that the daily ones (the Saloon's 7- and 30-day windows).
@@ -38,6 +39,10 @@ export default function SettleChart({ und, candles, index, settleTs, lo = null, 
   const box = useRef(null);
   const over = useRef(null);
   const tip = useRef(null);
+  const applyLive = useRef(null);
+  const lp = useLivePrice(und);
+  const lpRef = useRef(lp);
+  lpRef.current = lp;
   const payRef = useRef(payout);
   payRef.current = payout;
   const tf = settleFrame(settleTs);
@@ -73,14 +78,31 @@ export default function SettleChart({ und, candles, index, settleTs, lo = null, 
     const bars = settleBars(rows, settleTs, tf, keep);
     candle.setData(bars);
     const line = (p, color, title, style = LineStyle.Dotted, width = 1) => candle.createPriceLine({ price: p, color, lineWidth: width, lineStyle: style, axisLabelVisible: !compact || title === "Now", title: compact ? "" : title });
-    if (Number.isFinite(index)) line(index, c("--fg"), "Now", LineStyle.Solid);
+    const nowLine = Number.isFinite(index) ? line(index, c("--fg"), "Now", LineStyle.Solid) : null;
     if (Number.isFinite(lo) && Number.isFinite(hi)) {
       line(hi, side === "yes" ? up : c("--muted"), side === "yes" ? "Full payout" : "");
       line(lo, side === "no" ? down : c("--muted"), side === "no" ? "Full payout" : "");
     }
     for (const k of levels) line(k, c("--muted"), "");
     for (const b of bes) line(b, c("--fg"), "Breakeven", LineStyle.Dashed, 1);
-    const lastT = rows[rows.length - 1][0];
+    let lastT = rows[rows.length - 1][0];
+    let last = { ...bars.find((b) => b.time === lastT) };
+    // Live prices from Derive's index feed: the last candle moves with each one, the next opens when its period
+    // starts, and the Now line follows.
+    applyLive.current = (p, at) => {
+      const step = STEP[tf];
+      if (at >= lastT + step) {
+        const t = lastT + Math.floor((at - lastT) / step) * step;
+        if (!bars.some((b) => b.time === t)) return;
+        last = { time: t, open: last.close, high: Math.max(last.close, p), low: Math.min(last.close, p), close: p };
+        lastT = t;
+      } else if (at >= lastT) {
+        last = { ...last, high: Math.max(last.high, p), low: Math.min(last.low, p), close: p };
+      } else return;
+      try { candle.update(last, true); } catch { return; }
+      nowLine?.applyOptions({ price: p });
+      schedule();
+    };
     // The settlement line and the pay zones are drawn over the chart, from the last candle to the settlement.
     const draw = () => {
       const host = over.current;
@@ -135,8 +157,25 @@ export default function SettleChart({ und, candles, index, settleTs, lo = null, 
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
     ro?.observe(box.current);
     schedule();
-    return () => { cancelAnimationFrame(frame); ro?.disconnect(); chart.unsubscribeCrosshairMove(onMove); chart.timeScale().unsubscribeVisibleLogicalRangeChange(schedule); chart.remove(); };
+    if (lpRef.current) applyLive.current(lpRef.current.price, lpRef.current.ts);
+    // The file holds closed bars only: catch up to now (the forming bar too) from Derive's own candles.
+    let gone = false;
+    recentBars(und, STEP[tf], lastT).then((fresh) => {
+      if (gone) return;
+      for (const [t, o, h, l, cl] of fresh) {
+        if (t < lastT || !bars.some((b) => b.time === t)) continue;
+        last = { time: t, open: o, high: h, low: l, close: cl };
+        lastT = t;
+        try { candle.update(last, true); } catch { return; }
+      }
+      if (!fresh.length) return;
+      nowLine?.applyOptions({ price: last.close });
+      if (lpRef.current) applyLive.current?.(lpRef.current.price, lpRef.current.ts);
+      schedule();
+    }).catch(() => {});
+    return () => { gone = true; applyLive.current = null; cancelAnimationFrame(frame); ro?.disconnect(); chart.unsubscribeCrosshairMove(onMove); chart.timeScale().unsubscribeVisibleLogicalRangeChange(schedule); chart.remove(); };
   }, [rows, settleTs, tf, lo, hi, side, [].concat(breakeven ?? []).join(","), index, levels.join(","), theme, compact]);
+  useEffect(() => { if (lp) applyLive.current?.(lp.price, lp.ts); }, [lp]);
   if (!rows?.length) return <p className="status">The {und} chart is not available right now.</p>;
   const what = side ? `${side === "yes" ? "Higher" : "Lower"} pays in full ${side === "yes" ? `at ${money(hi)} or above` : `at ${money(lo)} or below`}` : "the date's levels";
   return (

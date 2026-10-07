@@ -25,6 +25,7 @@ import {
 import "../questions.css";
 import "../marketplace-detail.css";
 import "../settle-chart.css";
+import LiveMoney from "../components/LiveMoney.jsx";
 
 const clock = (t) => `${new Date(t * 1000).toISOString().slice(11, 16)} UTC`;
 const QUICK = [25, 100, 500];
@@ -329,7 +330,7 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
 
       <div className="md-evidence">
         <section className="md-history" aria-label="Price history">
-          <div className="md-section-heading"><div><span className="label">{und} index now</span><strong className="mono">{money(board.index)}</strong></div><PriceTime pricesTs={board.prices_ts} age={age} /></div>
+          <div className="md-section-heading"><div><span className="label">{und} index now</span><strong className="mono"><LiveMoney und={und} value={board.index} /></strong></div><PriceTime pricesTs={board.prices_ts} age={age} /></div>
           <OutcomeCharts und={und} date={date} level={level} sideKey={sideKey} t={t} board={board} hist={hist} historyError={historyError} theme={theme} />
         </section>
         <Context und={und} />
@@ -349,7 +350,7 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
 
       <aside className="md-selection" aria-label="Your outcome">
         <div className="md-selection-inner">
-          <p className="md-coin-now"><span>{und} now</span><b className="mono">{money(board.index)}</b><small>{dayLabel(date.expiry)}, 08:00 UTC{countdown(date.settle_ts) && <> · {countdown(date.settle_ts)}</>}</small></p>
+          <p className="md-coin-now"><span>{und} now</span><b className="mono"><LiveMoney und={und} value={board.index} /></b><small>{dayLabel(date.expiry)}, 08:00 UTC{countdown(date.settle_ts) && <> · {countdown(date.settle_ts)}</>}</small></p>
           <div className="md-selection-title"><h2>Choose your outcome</h2><span>Cost per $1 of max. payout<Info label="About the answer price">The amount shown buys up to $1 of payout at settlement, before Derive's fees. An answer can pay nothing, part of $1, or the full $1, depending on the settlement price.</Info></span></div>
           {settling ? <p className="q-big">Settling · average from 07:30 to 08:00 UTC</p> : <>
             <div className="q-pick md-pick" role="radiogroup" aria-label="Answer">

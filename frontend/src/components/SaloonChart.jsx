@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { cssVar } from "../lib/format.js";
 import { money } from "../lib/questions.js";
+import { recentBars, useLivePrice } from "../lib/livePrice.js";
 
 /*
  * The Saloon's chart (owner, 7 October 2026: "the chart is probably the best way to represent and show where
@@ -88,7 +89,10 @@ function mount(host, cfg) {
   const { svg, tip, scroller } = host;
   let { und, index, candles, now, onOpen, theme } = cfg;
   const dates = chartLevels(cfg.dates, index);
-  const cs = candles;
+  // A copy: live prices extend the last candle, or open the next one when its 4 hours roll over.
+  const cs = candles.map((c) => [...c]);
+  const BAR = cs.length > 1 ? cs[cs.length - 1][0] - cs[cs.length - 2][0] : 14400;
+  let price = index, paintPrice = () => {};
   const C = palette(theme);
   const lowC = Math.min(...cs.map((c) => c[3])), highC = Math.max(...cs.map((c) => c[2]));
   const HOME = [Math.min(lowC, index * 0.93), Math.max(highC, index * 1.07)];
@@ -171,21 +175,27 @@ function mount(host, cfg) {
       el("text", { x: W - m.r + 8, y: y(p) + 4, fill: C.text3, "font-size": 11 }, svg).textContent = fmtP(p);
     }
     const bw = pastW / cs.length;
-    cs.forEach(([, o, h, l, c], i) => {
-      const x = m.l + bw * (i + 0.5), col = c >= o ? C.up : C.down;
-      el("line", { x1: x, x2: x, y1: y(h), y2: y(l), stroke: col, "stroke-width": 1 }, plot);
-      el("rect", { x: x - bw * 0.32, y: y(Math.max(o, c)), width: bw * 0.64, height: Math.max(1, Math.abs(y(o) - y(c))), fill: col }, plot);
-    });
     const days = Math.round((cs[cs.length - 1][0] - cs[0][0]) / 86400);
     [[0, `${days} days ago`], [cs.length - 1, "now"]].forEach(([i, label]) => {
       el("text", { x: m.l + bw * (i + 0.5), y: H - 12, fill: C.text3, "font-size": 11, "text-anchor": i ? "end" : "start" }, svg).textContent = label;
     });
-    const yi = y(index);
-    if (yi > m.t - 8 && yi < H - m.b) {
-      el("line", { x1: m.l, x2: W - m.r, y1: yi, y2: yi, stroke: C.text1, "stroke-width": 1, "stroke-dasharray": "5 4", "stroke-opacity": 0.7 }, plot);
-      el("rect", { x: W - m.r + 2, y: yi - 10, width: m.r - 4, height: 20, rx: 3, fill: C.text1 }, svg);
-      el("text", { x: W - m.r + 8, y: yi + 4, fill: C.ground, "font-size": 11, "font-weight": 600 }, svg).textContent = fmtP(index);
-    }
+    // Candles and the price line repaint on each live price (`setLive`) without redrawing the bubbles.
+    const live = el("g", {}, plot), liveTag = el("g", {}, svg);
+    paintPrice = () => {
+      live.replaceChildren(); liveTag.replaceChildren();
+      cs.forEach(([, o, h, l, c], i) => {
+        const x = m.l + bw * (i + 0.5), col = c >= o ? C.up : C.down;
+        el("line", { x1: x, x2: x, y1: y(h), y2: y(l), stroke: col, "stroke-width": 1 }, live);
+        el("rect", { x: x - bw * 0.32, y: y(Math.max(o, c)), width: bw * 0.64, height: Math.max(1, Math.abs(y(o) - y(c))), fill: col }, live);
+      });
+      const yi = y(price);
+      if (yi > m.t - 8 && yi < H - m.b) {
+        el("line", { x1: m.l, x2: W - m.r, y1: yi, y2: yi, stroke: C.text1, "stroke-width": 1, "stroke-dasharray": "5 4", "stroke-opacity": 0.7 }, live);
+        el("rect", { x: W - m.r + 2, y: yi - 10, width: m.r - 4, height: 20, rx: 3, fill: C.text1 }, liveTag);
+        el("text", { x: W - m.r + 8, y: yi + 4, fill: C.ground, "font-size": 11, "font-weight": 600 }, liveTag).textContent = fmtP(price);
+      }
+    };
+    paintPrice();
     el("line", { x1: futX, x2: futX, y1: 0, y2: H - m.b, stroke: C.strong, "stroke-width": 1 }, svg);
     const zone = el("g", {}, plot);
     const threads = el("g", {}, plot);
@@ -524,6 +534,29 @@ function mount(host, cfg) {
   return {
     zoomIn: () => zoomBy(0.6), zoomOut: () => zoomBy(1.6), reset: () => animateTo([...HOME]),
     select: (r) => { current = r || null; paintSelected(); },
+    // Bars Derive has but the published file not yet (the forming one too): replace or append, keep the length.
+    setBars: (bars) => {
+      for (const b of bars) {
+        const i = cs.findIndex((c) => c[0] === b[0]);
+        if (i >= 0) cs[i] = [...b];
+        else if (b[0] > cs[cs.length - 1][0]) { cs.push([...b]); cs.shift(); }
+      }
+      if (bars.length) price = bars[bars.length - 1][4];
+      paintPrice();
+    },
+    setLive: (p, ts) => {
+      if (!(p > 0)) return;
+      const last = cs[cs.length - 1];
+      if (ts >= last[0] + BAR) {
+        const t = last[0] + Math.floor((ts - last[0]) / BAR) * BAR;
+        cs.push([t, last[4], Math.max(last[4], p), Math.min(last[4], p), p]);
+        cs.shift();
+      } else if (ts >= last[0]) {
+        last[2] = Math.max(last[2], p); last[3] = Math.min(last[3], p); last[4] = p;
+      }
+      price = p;
+      paintPrice();
+    },
     destroy: () => {
       cancelAnimationFrame(anim); cancelAnimationFrame(countAnim); clearTimeout(rt);
       svg.removeEventListener("wheel", onWheel);
@@ -546,6 +579,9 @@ export default function SaloonChart({ und, name, index, candles, dates, amount, 
   const openRef = useRef(onOpen);
   openRef.current = onOpen;
   const dataKey = dates.map((d) => `${d.expiry}:${d.traders?.score ?? "-"}/${d.traders?.long ?? "-"}/${d.traders?.short ?? "-"}:${d.rows.map((r) => `${r.key}=${r.total.toFixed(2)}/${r.payout.toFixed(2)}/${smartOf(r)?.wallets || 0}/${countText(r.level?.smart_wallets)}`).join(",")}`).join("|");
+  const live = useLivePrice(und);
+  const liveRef = useRef(live);
+  liveRef.current = live;
   const ready = candles?.length > 1 && dates.length > 0 && Number.isFinite(index);
   useEffect(() => {
     if (!ready || !svg.current) return undefined;
@@ -554,10 +590,24 @@ export default function SaloonChart({ und, name, index, candles, dates, amount, 
       und, index, candles, dates, now: now || Date.now() / 1000, amount, theme, selected,
       view: views.current[und], onView: (v) => { views.current[und] = v; }, onOpen: (r) => openRef.current?.(r),
     });
+    if (liveRef.current) api.current.setLive(liveRef.current.price, liveRef.current.ts);
     if (first && scroller.current) scroller.current.scrollLeft = scroller.current.scrollWidth;
     return () => { api.current?.destroy(); api.current = null; };
   }, [ready, und, index, candles, dataKey, theme, amount]);
   useEffect(() => { api.current?.select(selected); }, [selected?.key]);
+  useEffect(() => { if (live) api.current?.setLive(live.price, live.ts); }, [live]);
+  // Catch the candles up to now once per coin and chart: the file holds closed bars only, published after each close.
+  useEffect(() => {
+    if (!ready) return undefined;
+    let gone = false;
+    const last = candles[candles.length - 1][0];
+    recentBars(und, 14400, last).then((bars) => {
+      if (gone || !api.current) return;
+      api.current.setBars(bars);
+      if (liveRef.current) api.current.setLive(liveRef.current.price, liveRef.current.ts);
+    }).catch(() => {});
+    return () => { gone = true; };
+  }, [ready, und, index, candles, dataKey, theme, amount]);
   if (!ready) return <p className="status">The {und} chart is not available right now.</p>;
   return (
     <div ref={stage} className="sch-stage">

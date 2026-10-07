@@ -16,6 +16,11 @@ const ROOT = resolve(__dirname, "../../..");
 const WALLET = /Connect wallet|Switch off Cowboy|Derive testnet · test USDC|hw-btn|hdr-wallet|hdr-testnet/;
 const MARKERS = [/0x9371352CCef6f5b36EfDFE90942fFE622Ab77F1D/i, /testnet\.api\.derive\.xyz/, /EIP712Domain/, /set_session_key/, /private\/execute_quote/, /get_trade_history/];
 
+/** The live price module (lib/livePrice.js): Derive's public index feed and nothing that trades. Its endpoint is the
+ * only one a file outside the trade chunk may name (owner, 7 October 2026: live prices on every page). */
+const liveOnly = (src) => /spot_feed\./.test(src) && !MARKERS.some((m) => m !== MARKERS[1] && m.test(src)) && !/private\//.test(src);
+const endpointOk = (m, src) => m === MARKERS[1] && liveOnly(src);
+
 async function bundle(env, exts = [".js"]) {
   const saved = { ...process.env };
   Object.assign(process.env, env);
@@ -43,7 +48,7 @@ it("leaves trading code out of a build with the flag off, even with the Saloon o
 it("leaves trading code and the testnet badge out of a build with the Saloon off", async () => {
   const files = await bundle({ VITE_QUESTIONS: "", VITE_SALOON_TRADE: "testnet" }, [".js", ".css"]);
   for (const { f, src } of files) {
-    for (const m of MARKERS) expect(m.test(src), `${f} ${m}`).toBe(false);
+    for (const m of MARKERS) if (!endpointOk(m, src)) expect(m.test(src), `${f} ${m}`).toBe(false);
     expect(src, f).not.toMatch(/testnet build/);
     expect(src, f).not.toMatch(WALLET);
   }
@@ -63,7 +68,7 @@ it("builds a testnet app: fills on the testnet only, in the trade chunk, with th
   const entry = files.find(({ f }) => f.startsWith("index-"));
   expect(entry.src).toMatch(/Connect wallet/);
   expect(entry.src).toMatch(/\.hw-btn/);
-  for (const m of MARKERS) expect(m.test(entry.src), `entry ${m}`).toBe(false);
+  for (const m of MARKERS) if (!endpointOk(m, entry.src)) expect(m.test(entry.src), `entry ${m}`).toBe(false);
   expect(entry.src).not.toMatch(/Switch off Cowboy/);
   // Error details for testing: in the trade chunk of this build only.
   expect(files.filter(({ src }) => /Details for testing/.test(src)).map(({ f }) => f)).toEqual(withTrade);
@@ -86,7 +91,9 @@ it("builds a real-money app: mainnet only, in the trade chunk, with none of the 
   expect(trade).toMatch(/private\/execute_quote/);
   expect(trade).toContain("wss://api.derive.xyz/v3/ws");
   expect(trade).toMatch(/Real money/);
-  expect(js.filter(({ src }) => /wss:\/\/api\.derive\.xyz/.test(src)).map(({ f }) => f)).toEqual(withTrade);
+  // Outside the trade chunk, mainnet's socket appears only in the live price module.
+  for (const { f, src } of js) if (/wss:\/\/api\.derive\.xyz/.test(src) && !withTrade.includes(f)) expect(liveOnly(src), f).toBe(true);
+  expect(js.some(({ src }) => liveOnly(src) && src.includes("wss://api.derive.xyz/v3/ws"))).toBe(true);
   const entry = js.find(({ f }) => f.startsWith("index-"));
   for (const m of MARKERS) expect(m.test(entry.src), `entry ${m}`).toBe(false);
   for (const { f, src } of files) {

@@ -24,6 +24,7 @@ import { oneTapOffered } from "../lib/pilot.js";
 import "../questions.css";
 import "../journal.css";
 import "../marketplace-positions.css";
+import LiveMoney from "../components/LiveMoney.jsx";
 
 // Saloon stage 2 with fills (testnet, or real money on mainnet): Positions reads that network's journal
 // and the Saloon account on Derive, and one-tap positions sell back through Derive. On mainnet the
@@ -591,7 +592,7 @@ function GroupCard({ und, expiry, items, g, scope, syncs, onRemove, onClose }) {
           <span>{expiry ? `${dayLabel(expiry)}, 08:00 UTC` : "Settlement date not saved"}</span></h2>
         <p className="q-group-meta">
           <span className="mono">{settling ? "settling now" : countdown(settleTs, now) || ""}</span>
-          {Number.isFinite(board?.index) && <span>now <b className="mono">{money(board.index)}</b></span>}
+          {Number.isFinite(board?.index) && <span>now <b className="mono"><LiveMoney und={und} value={board.index} /></b></span>}
           <span className="q-group-n">{n} {n === 1 ? "position" : "positions"}<Info label="How these are combined">
             Every open position on {und} settling {expiry ? dayLabel(expiry) : "on this date"} at 08:00 UTC, against Derive's {settleRef(und)}, from the exact options and amounts you recorded, after what you paid. The line is the result for each settlement price, not a view of where it settles. {groupNotes(g)}</Info></span>
         </p>
