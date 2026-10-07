@@ -709,14 +709,15 @@ def _publish_wallet_files(site: Path, files: dict[str, dict], index: dict | None
         _write(site / "traders" / "aliases.json", aliases)
 
 
-def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) -> None:
+def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) -> list:
     """traders.json (leaderboard and cohorts), traders/{address}.json (one per ranked trader, no
-    publish time: freshness lives in traders.json) and traders/index.json (wallet_index)."""
+    publish time: freshness lives in traders.json) and traders/index.json (wallet_index). Returns the
+    smart (top-tier) wallets' open legs, (wallet, und, expiry, strike, delta_usd), for the Saloon's rings."""
     p = data / "history" / "traders.json"
     if not p.exists():
         _write(site / "traders.json", {"generated_at": int(now), **history_coverage({}, now)})
         _publish_wallet_files(site, {}, None)
-        return
+        return []
     doc = json.loads(p.read_text())
     coverage = history_coverage(doc, now)
     ranked = {t["address"].lower() for t in doc["traders"]}
@@ -728,12 +729,16 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
             _write(site / "wallets" / f"{und}.json", {"generated_at": int(now), **coverage, "und": und})
         # Direct links must not keep serving a stale, apparently current book.
         _publish_wallet_files(site, {a: dict(coverage) for a in ranked}, index, aliases)
-        return
+        return []
     files: dict[str, dict] = {}
+    smart_legs: list = []
     rows = []
     holders: dict = defaultdict(list)  # und -> ranked traders holding options on it
     for t in doc["traders"]:
         book = _book(t["open"], chains, now)
+        if t.get("tier") == "top":
+            smart_legs += [(t["address"].lower(), b["und"], b["expiry"], b["strike"], b["delta_usd"])
+                           for b in book if b.get("delta_usd") is not None]
         by_und: dict = defaultdict(list)
         for b in book:
             by_und[b["und"]].append(b)
@@ -782,6 +787,55 @@ def traders_block(data: Path, site: Path, chains: dict, flow: dict, now: float) 
         _write(site / "wallets" / f"{und}.json", {"generated_at": int(now), **coverage, "und": und,
                                                   "holders": top, "holders_total": len(holders.get(und, [])),
                                                   "cohorts": coin_cohorts})
+    return smart_legs
+
+
+# Gold rings on the Saloon (owner, 7 October 2026): an answer is marked when at least two smart (top-tier)
+# wallets hold options of the same settlement at strikes inside its pays-in-part zone whose combined delta
+# points its way, at least SMART_MIN_DELTA dollars (BTC and ETH) or SMART_MIN_DELTA_SMALL (other coins).
+SMART_MIN_DELTA, SMART_MIN_DELTA_SMALL, SMART_MIN_WALLETS = 10_000, 2_000, 2
+
+
+def smart_marks(level: dict, settle_ts: int, legs: list, und: str) -> dict:
+    """{"yes"|"no": {"delta_usd", "wallets"}} for the answers of one level the smart wallets lean toward."""
+    lo, hi = level.get("lo"), level.get("hi")
+    inside = [lg for lg in legs if lg[1] == und and int(lg[2]) == int(settle_ts) and lo <= lg[3] <= hi]
+    delta, wallets = sum(lg[4] for lg in inside), len({lg[0] for lg in inside})
+    floor = SMART_MIN_DELTA if und in ("BTC", "ETH") else SMART_MIN_DELTA_SMALL
+    if wallets < SMART_MIN_WALLETS or abs(delta) < floor:
+        return {}
+    return {"yes" if delta > 0 else "no": {"delta_usd": round(delta), "wallets": wallets}}
+
+
+def annotate_smart(site: Path, legs: list) -> None:
+    """Marks the published questions/{UND}.json answers the smart wallets lean toward (`smart` on the
+    answer) and counts them per coin in questions/index.json (`smart`); recomputed on every publish."""
+    idx_path = site / "questions" / "index.json"
+    try:
+        idx = json.loads(idx_path.read_text())
+    except (OSError, ValueError):
+        return
+    for coin in idx.get("coins") or []:
+        und, path = coin["und"], site / "questions" / f"{coin['und']}.json"
+        try:
+            board = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        count = 0
+        for date in board.get("dates") or []:
+            for level in date.get("levels") or []:
+                marks = smart_marks(level, date["settle_ts"], legs, und)
+                for side in ("yes", "no"):
+                    ans = level.get(side)
+                    if not isinstance(ans, dict):
+                        continue
+                    ans.pop("smart", None)
+                    if side in marks:
+                        ans["smart"] = marks[side]
+                        count += 1
+        _write(path, board)
+        coin["smart"] = count
+    _write(idx_path, idx)
 
 
 def build(data: Path, site: Path, now: float | None = None) -> dict:
@@ -907,7 +961,9 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
     for r in flow["large"] + flow["wallets"]:
         r["ranked"] = (r.get("wallet") or "").lower() in ranked
     _write(site / "flow.json", {"generated_at": int(now), **flow})
-    traders_block(data, site, chains, flow, now)
+    smart_legs = traders_block(data, site, chains, flow, now)
+    if q_coins is not None:
+        annotate_smart(site, smart_legs)
     from derive.config import Settings
     from record_once import load_universe
     settings = Settings(data_dir=data)
