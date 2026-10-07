@@ -201,7 +201,7 @@ function mount(host, cfg) {
       };
       dot.addEventListener("pointerenter", show); dot.addEventListener("focus", show);
       dot.addEventListener("pointerleave", () => { tip.hidden = true; }); dot.addEventListener("blur", () => { tip.hidden = true; });
-      dot.addEventListener("pointerdown", (e) => e.stopPropagation());
+      dot.addEventListener("pointerdown", (e) => { if (e.pointerType !== "touch") e.stopPropagation(); });
     }
   }
 
@@ -229,11 +229,21 @@ function mount(host, cfg) {
     b.addEventListener("focus", show);
     b.addEventListener("pointerleave", () => { if (!drag) unhover(); });
     b.addEventListener("blur", unhover);
-    if (full) b.addEventListener("pointerdown", (e) => startDrag(e, b, d, l, cx, by));
-    else {
-      b.addEventListener("pointerdown", (e) => e.stopPropagation());
-      b.addEventListener("click", (e) => { e.stopPropagation(); zoomTo(d, l); });
-    }
+    // On a touch screen a thumb on a bubble pans the chart like anywhere else, and a tap opens it (owner,
+    // 7 October 2026); with a mouse a full bubble drags through the levels and dates, a dot zooms in.
+    let touch = false;
+    b.addEventListener("pointerdown", (e) => {
+      touch = e.pointerType === "touch";
+      if (touch) return;
+      if (full) startDrag(e, b, d, l, cx, by);
+      else e.stopPropagation();
+    });
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (moved) return;
+      if (!full) zoomTo(d, l);
+      else if (touch) open(r);
+    });
     b.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (full) open(r); else zoomTo(d, l); }
     });
@@ -388,15 +398,24 @@ function mount(host, cfg) {
   };
   const pts = new Map();
   let moved = false, start = null;
-  const onDown = (e) => { pts.set(e.pointerId, e.clientY); moved = false; start = { view: [...view], ys: [...pts.values()] }; };
+  // One finger or the mouse moves the chart both ways: up and down along the price axis, left and right
+  // through the dates (the frame scrolls sideways when the chart is wider than the screen).
+  const onDown = (e) => {
+    pts.set(e.pointerId, e.clientY);
+    moved = false;
+    start = { view: [...view], ys: [...pts.values()], x: e.clientX, left: scroller.scrollLeft };
+  };
   const onMove = (e) => {
     if (!pts.has(e.pointerId) || !start) return;
     pts.set(e.pointerId, e.clientY);
     const plotH = geo.H - geo.m.t - geo.m.b, span = start.view[1] - start.view[0];
     if (pts.size === 1) {
-      const dy = e.clientY - start.ys[0];
-      if (Math.abs(dy) > 4) { moved = true; svg.classList.add("drag"); tip.hidden = true; }
-      if (moved) { const dp = (dy / plotH) * span; setView(clampView([start.view[0] + dp, start.view[1] + dp])); }
+      const dy = e.clientY - start.ys[0], dx = e.clientX - start.x;
+      if (!moved && Math.hypot(dx, dy) > 6) { moved = true; svg.classList.add("drag"); tip.hidden = true; }
+      if (moved) {
+        scroller.scrollLeft = start.left - dx;
+        if (Math.abs(dy) > 2) { const dp = (dy / plotH) * span; setView(clampView([start.view[0] + dp, start.view[1] + dp])); }
+      }
     } else if (pts.size === 2 && start.ys.length === 2) {
       const [a, b] = [...pts.values()], d0 = Math.abs(start.ys[0] - start.ys[1]) || 1, d1 = Math.abs(a - b) || 1;
       moved = true;
@@ -406,7 +425,8 @@ function mount(host, cfg) {
   };
   const onEnd = (e) => {
     pts.delete(e.pointerId);
-    if (!pts.size) { start = null; svg.classList.remove("drag"); } else start = { view: [...view], ys: [...pts.values()] };
+    if (!pts.size) { start = null; svg.classList.remove("drag"); }
+    else start = { view: [...view], ys: [...pts.values()], x: e.clientX, left: scroller.scrollLeft };
   };
   svg.addEventListener("wheel", onWheel, { passive: false });
   svg.addEventListener("pointerdown", onDown);
