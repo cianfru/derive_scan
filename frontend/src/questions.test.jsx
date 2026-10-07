@@ -11,7 +11,8 @@ import hist from "./fixtures/questions/history-BTC-20261009.json";
 const docs = vi.hoisted(() => ({ current: {}, errors: {} }));
 vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: path ? docs.current[path] ?? null : null, error: docs.errors[path] ?? null }) }));
 vi.mock("./components/QuestionChart.jsx", () => ({ default: () => <div data-testid="chart" /> }));
-vi.mock("./components/SettleChart.jsx", async (orig) => ({ ...await orig(), default: (p) => <div data-testid="settle-chart" data-side={p.side || ""} data-lo={p.lo} data-hi={p.hi} data-be={p.breakeven ?? ""} /> }));
+vi.mock("./components/SettleChart.jsx", async (orig) => ({ ...await orig(), default: (p) => <div data-testid="settle-chart" data-side={p.side || ""} data-lo={p.lo} data-hi={p.hi} data-be={p.breakeven ?? ""}
+  data-pay={p.payout ? [83000, 86000, 89000].map((v) => { const o = p.payout(v); return `${o.payout.toFixed(2)}/${o.pl.toFixed(2)}`; }).join(",") : ""} /> }));
 import Questions from "./pages/Questions.jsx";
 import MyQuestions from "./pages/MyQuestions.jsx";
 import { BANNED } from "./lib/questions.js";
@@ -278,33 +279,34 @@ describe("the question page", () => {
     const lose = screen.getByText("Your cost is the most you can lose.");
     const get = screen.getByRole("button", { name: "Review trade" });
     expect(lose.compareDocumentPosition(get) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    const ex = [...container.querySelectorAll(".md-payoff-study .op-ex tbody tr")].map((r) => r.textContent);
-    expect(ex).toEqual(["$83,000 or lower$0.00-$100.00", "$86,000$128.31+$28.31", "$89,000 or higher$256.62+$156.62"]);
-    expect(container.textContent).toContain("Selling back before 08:00 UTC is valued at Derive's sell-back price then, not by this chart.");
+    // In place of the 0-to-$1 chart: three plain lines for the amount (owner, 7 October 2026).
+    expect(container.querySelector(".md-payoff-study h2").textContent).toBe("What $100.00 pays at settlement");
+    const lines = [...container.querySelectorAll(".md-payoff-study .sc-scen li")].map((r) => r.textContent);
+    expect(lines[0]).toBe("If BTC settles at or above $89,000you get $256.62 +$156.62");
+    expect(lines[1]).toMatch(/^If BTC settles at \$[\d,]+, its price nowyou get \$[\d.,]+ [+-]\$[\d.,]+$/);
+    expect(lines[2]).toBe("If BTC settles at or below $83,000you get $0.00 -$100.00");
+    expect(container.querySelector(".op-range")).toBeNull();
+    expect(container.textContent).toContain("Selling back before 08:00 UTC is valued at Derive's sell-back price then, not by these figures.");
     expect(container.textContent).not.toMatch(/\b(agrees?|matches)\b/i);
     const texts = await allText(container);
-    texts.push(container.querySelector(".op-range").getAttribute("aria-valuetext"));
     expect(texts.length).toBeGreaterThanOrEqual(8);
     wordcheck(texts);
   });
 
-  it("moves the settlement slider by keyboard value and shows the same payout as the ramp", () => {
-    const { container } = show(`${Q86}?side=yes`);
-    const range = screen.getByRole("slider", { name: "BTC price at settlement" });
-    expect(range.getAttribute("aria-valuetext")).toBe("BTC at $84,800: pays 30c per $1, you get $76.99, loss $23.01");
-    const at = (v) => { fireEvent.change(range, { target: { value: String(v) } }); return range.getAttribute("aria-valuetext"); };
-    expect(at(83000)).toBe("BTC at $83,000: pays 0c per $1, you get $0.00, loss $100.00");
-    expect(at(86000)).toBe("BTC at $86,000: pays 50c per $1, you get $128.31, profit $28.31");
-    expect(at(89000)).toBe("BTC at $89,000: pays 100c per $1, you get $256.62, profit $156.62");
-    expect(container.querySelector(".op-read").textContent).toBe("If BTC settles at$89,000Pays per $1100cYou get$256.62Profit+$156.62");
-    wordcheck([container.textContent]);
+  it("tells what the amount gets at any price the pointer reaches in the chart's future", async () => {
+    docs.current["coins/BTC.json"] = { candles: { "4h": [[1791000000, 1, 2, 0.5, 1.5, 1]], "1d": [[1790956800, 1, 2, 0.5, 1.5, 1]] } };
+    show(`${Q86}?side=yes`);
+    // The same payout as the three lines and the figures: nothing at $83,000, half at $86,000, in full at $89,000.
+    expect(screen.getByTestId("settle-chart").dataset.pay).toBe("0.00/-100.00,128.31/28.31,256.62/156.62");
+    expect(screen.getByText("Point at the future to see what $100.00 pays at that price")).toBeTruthy();
+    delete docs.current["coins/BTC.json"];
   });
 
   it("mirrors Lower: full below the zone, nothing above it", () => {
     const { container } = show(`${Q86}?side=no`);
-    const ex = [...container.querySelectorAll(".md-payoff-study .op-ex tbody tr")].map((r) => r.textContent);
-    expect(ex[0]).toMatch(/^\$83,000 or lower\$[\d.,]+\+\$/);
-    expect(ex[2]).toMatch(/^\$89,000 or higher\$0\.00-\$/);
+    const lines = [...container.querySelectorAll(".md-payoff-study .sc-scen li")].map((r) => r.textContent);
+    expect(lines[0]).toMatch(/^If BTC settles at or below \$83,000you get \$[\d.,]+ \+\$/);
+    expect(lines[2]).toMatch(/^If BTC settles at or above \$89,000you get \$0\.00 -\$/);
     expect(container.querySelector(".op-figs").textContent).toContain("total back, full $1 at or below $83,000");
   });
 

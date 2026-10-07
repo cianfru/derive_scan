@@ -16,3 +16,16 @@
 .sc-key i.no { background: color-mix(in srgb, var(--down) 40%, transparent); }
 .sc-key i.be { height: 0; border-top: 1px dashed var(--fg); border-radius: 0; vertical-align: 3px; }
 .sc-key i.settle { width: 0; height: 12px; border-left: 1px dashed var(--text-2); border-radius: 0; vertical-align: -2px; }
+/* With a payout to read (owner, 7 October 2026): taller, and a label beside the pointer in the future. */
+.sc-frame.tall { height: 440px; }
+.sc-tip { position: absolute; z-index: 3; pointer-events: none; display: grid; gap: 2px; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 8px;
+  background: var(--surface-1); box-shadow: var(--shadow-pop); font: 400 13px/1.35 var(--font-sans); color: var(--text-2); white-space: nowrap; }
+.sc-tip b { font: 600 14px var(--font-mono); color: var(--text-1); }
+.sc-tip em { margin-left: 4px; font: 600 14px var(--font-mono); font-style: normal; color: var(--text-1); }
+.sc-tip em.up { color: var(--up); } .sc-tip em.down { color: var(--down); }
+.sc-scen { display: grid; gap: 0; margin: 12px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--border); }
+.sc-scen li { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font: 400 14px/1.4 var(--font-sans); color: var(--text-2); }
+.sc-scen li b { font: 600 15px var(--font-mono); color: var(--text-1); }
+.sc-scen li span:last-child { text-align: right; white-space: nowrap; }
+.sc-scen .up { color: var(--up); } .sc-scen .down { color: var(--down); }
+@media (max-width: 680px) { .sc-frame.tall { height: 340px; } .sc-scen li { flex-direction: column; gap: 2px; } .sc-scen li span:last-child { text-align: left; } }

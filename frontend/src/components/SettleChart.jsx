@@ -34,9 +34,12 @@ export function payZones(lo, hi, side) {
  * (the board's quick look) it draws the date's levels as dotted lines.
  */
 export default function SettleChart({ und, candles, index, settleTs, lo = null, hi = null, side = null, breakeven = null,
-  levels = [], theme, compact = false, label }) {
+  levels = [], theme, compact = false, label, payout = null }) {
   const box = useRef(null);
   const over = useRef(null);
+  const tip = useRef(null);
+  const payRef = useRef(payout);
+  payRef.current = payout;
   const tf = settleFrame(settleTs);
   const rows = candles?.[tf];
   useEffect(() => {
@@ -105,6 +108,25 @@ export default function SettleChart({ und, candles, index, settleTs, lo = null, 
       }
       host.innerHTML = parts.join("");
     };
+    // Pointing at the future (owner, 7 October 2026): what the amount pays if the coin settles at that price.
+    const onMove = (param) => {
+      const el = tip.current;
+      if (!el) return;
+      const fn = payRef.current;
+      const t = param?.time;
+      if (!fn || !param?.point || t == null || t <= lastT) { el.hidden = true; return; }
+      const p = candle.coordinateToPrice(param.point.y);
+      if (!Number.isFinite(p) || p <= 0) { el.hidden = true; return; }
+      const o = fn(p);
+      if (!o) { el.hidden = true; return; }
+      const sign = o.pl > 0.004 ? "+" : o.pl < -0.004 ? "-" : "";
+      el.innerHTML = `<span>If ${und} settles at <b>${money(p)}</b></span><span>you get <b>${money(o.payout, { cents: true })}</b> <em class="${o.pl > 0.004 ? "up" : o.pl < -0.004 ? "down" : ""}">${sign}${money(Math.abs(o.pl), { cents: true })}</em></span>`;
+      el.hidden = false;
+      const w = box.current.clientWidth, x = param.point.x, y = param.point.y;
+      el.style.left = `${Math.min(Math.max(8, x + 14), w - el.offsetWidth - 70)}px`;
+      el.style.top = `${Math.max(4, y - el.offsetHeight - 10)}px`;
+    };
+    chart.subscribeCrosshairMove(onMove);
     let frame = 0;
     const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(draw); };
     // Everything from the first candle to just past the settlement: the future is the point of this chart.
@@ -113,14 +135,15 @@ export default function SettleChart({ und, candles, index, settleTs, lo = null, 
     const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
     ro?.observe(box.current);
     schedule();
-    return () => { cancelAnimationFrame(frame); ro?.disconnect(); chart.timeScale().unsubscribeVisibleLogicalRangeChange(schedule); chart.remove(); };
+    return () => { cancelAnimationFrame(frame); ro?.disconnect(); chart.unsubscribeCrosshairMove(onMove); chart.timeScale().unsubscribeVisibleLogicalRangeChange(schedule); chart.remove(); };
   }, [rows, settleTs, tf, lo, hi, side, [].concat(breakeven ?? []).join(","), index, levels.join(","), theme, compact]);
   if (!rows?.length) return <p className="status">The {und} chart is not available right now.</p>;
   const what = side ? `${side === "yes" ? "Higher" : "Lower"} pays in full ${side === "yes" ? `at ${money(hi)} or above` : `at ${money(lo)} or below`}` : "the date's levels";
   return (
-    <div className={`sc-frame${compact ? " compact" : ""}`} role="img" aria-label={label || `${und} ${tf === "4h" ? "4-hour" : "daily"} candles up to the settlement, with ${what}`}>
+    <div className={`sc-frame${compact ? " compact" : ""}${payout ? " tall" : ""}`} role="img" aria-label={label || `${und} ${tf === "4h" ? "4-hour" : "daily"} candles up to the settlement, with ${what}`}>
       <div ref={box} className="sc-box" />
       <div ref={over} className="sc-over" aria-hidden="true" />
+      {payout && <div ref={tip} className="sc-tip" hidden aria-hidden="true" />}
     </div>
   );
 }

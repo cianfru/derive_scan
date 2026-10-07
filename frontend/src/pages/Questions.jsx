@@ -11,7 +11,7 @@ import PayZone from "../components/PayZone.jsx";
 import QuestionChart from "../components/QuestionChart.jsx";
 import SettleChart from "../components/SettleChart.jsx";
 import QuestionTicket from "../components/QuestionTicket.jsx";
-import OutcomePreview, { OutcomeFigures, OutcomePayoffStudy } from "../components/OutcomePreview.jsx";
+import OutcomePreview, { OutcomeFigures, WithHeld } from "../components/OutcomePreview.jsx";
 import SaloonHead from "../components/SaloonNotices.jsx";
 import { FollowButton, FollowLevel } from "../components/Follow.jsx";
 import { loadBudget } from "../lib/follows.js";
@@ -20,7 +20,7 @@ import { oneTapOffered } from "../lib/pilot.js";
 import { NOT_ON_TESTNET, NOT_ON_TESTNET_WHY, missingLegs, useTestnetListing } from "../lib/testnetLevels.js";
 import {
   ANSWER, buyCents, cents, centsDown, countdown, dayLabel, findLevel, fullPay, gap, live, money, noPriceReason, parseId, priceAge,
-  budgetTicket, questionText, settlingNow, payAt, breakeven,
+  budgetTicket, questionText, settlingNow, payAt, breakeven, outcome, signed,
 } from "../lib/questions.js";
 import "../questions.css";
 import "../marketplace-detail.css";
@@ -255,6 +255,18 @@ function History({ und, date, level, sideKey, theme }) {
 
 const scrollTo = (el) => el?.scrollIntoView?.({ block: "start", behavior: typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
 
+/** What the amount pays at settlement in three plain lines (owner, 7 October 2026: in place of the 0-to-$1 payout
+ * chart): where it pays in full, at today's price, and where it pays nothing. */
+function SettleLines({ und, level, side, t, index }) {
+  const full = side === "yes" ? [`at or above ${money(level.hi)}`, level.hi] : [`at or below ${money(level.lo)}`, level.lo];
+  const none = side === "yes" ? [`at or below ${money(level.lo)}`, level.lo] : [`at or above ${money(level.hi)}`, level.hi];
+  const rows = [full, ...(Number.isFinite(index) ? [[`at ${money(index)}, its price now`, index]] : []), none];
+  return <ul className="sc-scen">{rows.map(([text, v]) => {
+    const o = outcome(t, level, side, v);
+    return <li key={text}><span>If {und} settles {text}</span><span>you get <b>{money(o.payout, { cents: true })}</b> <b className={o.pl > 0.004 ? "up" : o.pl < -0.004 ? "down" : ""}>{signed(o.pl)}</b></span></li>;
+  })}</ul>;
+}
+
 /** The outcome page's chart (owner, 7 October 2026): the coin's candles up to the settlement with the answer's
  * pay zones and breakeven drawn into the future (the default), or the answer's own price history. */
 function OutcomeCharts({ und, date, level, sideKey, t, board, hist, historyError, theme }) {
@@ -268,11 +280,13 @@ function OutcomeCharts({ und, date, level, sideKey, t, board, hist, historyError
         : `Derive's mark, buy and sell-back prices in cents per $1 of maximum payout for ${ANSWER[sideKey || "yes"]}. These are prices, not a measure of how often an outcome happens.`}</Info></div>
     {view === "coin"
       ? (coin ? <>
-          <SettleChart und={und} candles={coin.candles} index={board.index} settleTs={date.settle_ts} lo={level.lo} hi={level.hi} side={sideKey || null} breakeven={be} theme={theme} />
+          <SettleChart und={und} candles={coin.candles} index={board.index} settleTs={date.settle_ts} lo={level.lo} hi={level.hi} side={sideKey || null} breakeven={be} theme={theme}
+            payout={t && sideKey ? (S) => outcome(t, level, sideKey, S) : null} />
           <p className="sc-key"><span><i className="settle" />Settles {dayLabel(date.expiry)}, 08:00 UTC</span>
             {sideKey && <span><i className={sideKey} />{ANSWER[sideKey]} pays in full {sideKey === "yes" ? `at ${money(level.hi)} or above` : `at ${money(level.lo)} or below`}</span>}
             <span><i className="part" />Pays in part {money(level.lo)}–{money(level.hi)}</span>
-            {be != null && <span><i className="be" />Breakeven {money(be)}</span>}</p>
+            {be != null && <span><i className="be" />Breakeven {money(be)}</span>}
+            {t && sideKey && <span>Point at the future to see what {money(t.mostLose, { cents: true })} pays at that price</span>}</p>
         </> : error ? <p className="status">The {und} chart is unavailable right now.</p> : <Loading />)
       : historyError && !hist ? <p className="status">Price history is unavailable right now.</p> : <QuestionChart hist={hist} id={level.id} side={sideKey || "yes"} level={level} und={und} theme={theme} />}
   </>;
@@ -319,7 +333,11 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
           <OutcomeCharts und={und} date={date} level={level} sideKey={sideKey} t={t} board={board} hist={hist} historyError={historyError} theme={theme} />
         </section>
         <Context und={und} />
-        {t && <section className="md-payoff-study" aria-label="Settlement payout"><h2>What it pays at settlement</h2><OutcomePayoffStudy und={und} level={level} side={sideKey} t={t} index={board.index} expiry={date.expiry} /></section>}
+        {t && <section className="md-payoff-study" aria-label="Settlement payout"><h2>What {money(t.mostLose, { cents: true })} pays at settlement</h2>
+          <SettleLines und={und} level={level} side={sideKey} t={t} index={board.index} />
+          <WithHeld und={und} level={level} side={sideKey} t={t} expiry={date.expiry} index={board.index} />
+          <p className="op-note">Selling back before 08:00 UTC is valued at Derive's sell-back price then, not by these figures.<Info label="About selling back early">Until a minute before 08:00 UTC you can sell back on Derive. You then get what Derive's screen bids for the two options at that moment, which follows the coin's price and the time left, and fees apply again. Holding to 08:00 UTC pays as shown here.</Info></p>
+        </section>}
         <section className="md-settlement" aria-label="How settlement works">
           <div className="md-section-heading"><h2>It can pay in part.</h2><Rules und={und} /></div>
           <p>Between <b className="mono">{money(level.lo)}</b> and <b className="mono">{money(level.hi)}</b>, each answer pays a share of $1. The settlement price determines how much.</p>

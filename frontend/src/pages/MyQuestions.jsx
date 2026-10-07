@@ -556,11 +556,13 @@ function PositionPriceChart({ und, board, settleTs, solo, g }) {
     <details className="q-group-price" onToggle={(e) => setOpen(e.currentTarget.open)}>
       <summary>{und} price up to the settlement</summary>
       {open && (coin ? <>
-        <SettleChart und={und} candles={coin.candles} index={board?.index} settleTs={settleTs} lo={q?.lo ?? null} hi={q?.hi ?? null} side={q ? solo.p.side : null} breakeven={bes} />
+        <SettleChart und={und} candles={coin.candles} index={board?.index} settleTs={settleTs} lo={q?.lo ?? null} hi={q?.hi ?? null} side={q ? solo.p.side : null} breakeven={bes}
+          payout={g && Number.isFinite(g.cost) ? (S) => { const pl = g.pl(S); return { payout: pl + g.cost, pl }; } : null} />
         <p className="sc-key"><span><i className="settle" />Settles 08:00 UTC</span>
           {q && <span><i className={solo.p.side} />Pays in full {solo.p.side === "yes" ? `at ${money(q.hi)} or above` : `at ${money(q.lo)} or below`}</span>}
           {q && <span><i className="part" />Pays in part {money(q.lo)}–{money(q.hi)}</span>}
-          {bes.length > 0 && <span><i className="be" />Breakeven {bes.map((b) => money(b)).join(" and ")}</span>}</p>
+          {bes.length > 0 && <span><i className="be" />Breakeven {bes.map((b) => money(b)).join(" and ")}</span>}
+          {g && <span>Point at the future to see what you get at that price</span>}</p>
       </> : error ? <p className="status">The {und} chart is unavailable right now.</p> : <p className="status">Loading the {und} chart…</p>)}
     </details>
   );
