@@ -37,3 +37,30 @@ Recorded 8 October 2026 from a conversation with the owner. Nothing here is buil
   2. After a few weeks of clean drafts, formats the owner has approved several times post through the API on their own; new formats and unusual calls still go to the owner.
   3. Only with a track record: posts on its own within limits (a few a day, approved formats, every post logged), with a Telegram off switch.
 - This extends the plan in CLAUDE.md's X cards entry: "the watcher drafting posts on changes, then the bot."
+
+## Market makers (owner, 8 October 2026)
+
+- Level 1, a full trading front end on Derive (weeks, browser only): Derive's referral and API Broker programme, later a small Cowboy fee through the builder code; the order-book fallback when an RFQ quote is worse than Derive's book (design and owner approval first; the largest friction in one tap today); single options, other spreads, "between" on mainnet, limit orders; an account view (margin, every leg, Greeks behind an (i)).
+- Level 2, market makers who quote Cowboy's flow on Derive's rails (months): retail flow is what makers want, and tighter quotes close the gap measured against Polymarket (about 14% over fair on Derive, about 4% on Polymarket). Work: check Derive's RFQ docs for directed or tagged requests (unknown; otherwise part of the broker conversation), a maker package (flow spec, testnet, response times), weekly volume, sizes and how often fills turn against the maker, agreements per maker. Payment-for-flow arrangements are regulated in many places: the owner's lawyer before anything is signed.
+- Level 3, Cowboy's own venue (matching, risk and margin, liquidations, settlement contracts, price feeds, custody, audits, licence): advised against; Derive is that, and the multi-venue idea was dropped on 5 October 2026.
+- Makers follow volume: finish level 1, measure flow from the start, then approach Derive and 2-3 makers together.
+- Talking to makers: first ask Derive (in the referral and broker thread) to introduce the 2-3 makers most active on its RFQ; Derive knows who quotes, our data only shows wallets. Then direct outreach (websites, LinkedIn or X heads of options or business development, Derive's Discord, conferences). Bring a one-page summary: what Cowboy is, the flow, honest numbers, the ask. Start relationships now, return with numbers after a few weeks of trading.
+
+## Unified account across venues (owner, 8 October 2026)
+
+- The idea: one Cowboy account and one portfolio across Derive (its own chain) and Rysk (HyperEVM), money moved between them in one click, low cost. Not cheapest-venue routing (dropped 5 October 2026): the two sell different products (Derive: buying Higher/Lower spreads; Rysk: selling covered calls and cash-secured puts), so the value is doing both, seeing both and moving money easily.
+- Limits: crossing chains takes about 1 to 5 minutes, not seconds (Derive's exact withdrawal timing to be read in its docs); Rysk locks collateral until expiry with no early exit, so money moves into Rysk in a click but not back out before settlement; Rysk has no public trading API, so nothing is possible there until Rysk offers an API, partnership or SDK (first question for the owner's call).
+- Not custodial: Cowboy holding users' money (one balance, internal ledger) would be instant but needs a licence, identity checks and insurance, is a hacking target, and breaks the rule that no Cowboy server holds keys or funds. Money stays in the user's own accounts; Cowboy reads and orchestrates.
+- Steps:
+  1. One portfolio: Derive and Rysk positions, P&L and cash on one Positions page (needs Rysk to allow reading positions).
+  2. Move with a few signatures: withdraw from Derive, bridge, deposit on Rysk, with a live tracker; 2-4 wallet signatures, 1-5 minutes; reuses the bridge flow behind `VITE_FUND_ANYCHAIN`, the Derive connection and the deposit tracker.
+  3. One click: one signature approves the whole move, run in the background only to the user's own addresses, through a smart account per user with limited permissions; needs a security audit and the owner's explicit approval (a Cowboy service would hold a limited key).
+  4. Feels instant: the user's money kept split across both venues and rebalanced in the background, or bridges where a third party fronts funds on arrival; Cowboy never fronts money itself.
+- Build steps 1 and 2 after the Rysk call if Rysk gives access; hold step 3 until users move money between venues often; no Cowboy-held accounts. The owner's lawyer on a service that moves users' money between venues, even non-custodially.
+- Questions for Rysk: can a third-party app place orders and read positions for users (API, partner programme, SDK); referral or integrator fee; coins, dates and minimum sizes; early close; how fills and settlement are reported; terms on showing their prices.
+
+## Bridge choice (owner, 8 October 2026: Li.Fi is not the cheapest)
+
+- `lib/trade/anychain.js` calls Li.Fi only (`FUNDING_API`); its checks (Derive's minimum deposit after fees, the 120-second limit, no Cowboy fee) apply to any provider.
+- Candidates to compare on real quotes (support for Derive's deposit chains and HyperEVM to be confirmed from each provider's docs, never assumed): Circle's CCTP (native USDC burned and minted, no slippage, gas plus a small fee for its fast mode; usually the cheapest for USDC to USDC), intent bridges such as Relay and Across (a filler pays out on arrival within seconds, cheap for USDC on major chains), Bungee (Socket's aggregator; Derive's own bridging runs on Socket), deBridge, and Li.Fi.
+- Plan: a small measurement first (same routes, $100 and $1,000, USDC and ETH from Ethereum, Base, Arbitrum and HyperEVM to the Derive deposit address; what arrives, time, total cost), then quote two or three providers side by side in the browser and pick the one that delivers the most within the time limit, each behind the same checks. Also check in Derive's docs whether it accepts USDC directly from Base or Arbitrum, which would need no third-party bridge for USDC.
