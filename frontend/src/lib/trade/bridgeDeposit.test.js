@@ -10,7 +10,7 @@ import { createClient } from "./derive.js";
 import { fakeDerive, deriveError } from "./fakeSocket.js";
 import { fakeWallet } from "./fakeWallet.js";
 import { _resetAssets } from "./account.js";
-import { _setSeatDeps, _setSeatState, bridgeDeposit, connect, disconnect, dismissRefundedBridge, holdSend, refreshBridge, refreshFunding, seatState } from "./seat.js";
+import { _setSeatDeps, _setSeatState, bridgeDeposit, connect, deposit as depositUsdc, retryBridgeRegistration, disconnect, dismissRefundedBridge, holdSend, refreshBridge, refreshFunding, seatState } from "./seat.js";
 import { KEYS, read, write } from "./store.js";
 import { validateFundingQuote } from "./anychain.js";
 
@@ -26,7 +26,7 @@ function quoteFor(wallet) {
     transactionRequest: { from: wallet, to: token, chainId: 8453, data: "0xabcd", value: "0" } };
   return validateFundingQuote(raw, request, { minDepositUsd: 5, safetyUsd: 0.5 });
 }
-function setup({ allowance = 10000000, newAccount = true, registerFails = false, changeRoute = false, costWorse = false, approvalCost = 0 } = {}) {
+function setup({ allowance = 10000000, newAccount = true, registerFails = false, register = null, changeRoute = false, costWorse = false, approvalCost = 0 } = {}) {
   const wallet = fakeWallet({ chainId: 1, allowance, emitSwitch: true });
   const account = { usdc: 0 };
   const fake = fakeDerive({ handlers: {
@@ -36,7 +36,7 @@ function setup({ allowance = 10000000, newAccount = true, registerFails = false,
     "public/register_deposit_address": { deposit_address: deposit },
     "public/get_pending_deposits": { pending_deposits: [] },
     "public/get_risk_universes": risk,
-    "private/register_bridge_deposit": registerFails ? deriveError(9002) : { bridge_status: "registered" },
+    "private/register_bridge_deposit": register || (registerFails ? deriveError(9002) : { bridge_status: "registered" }),
   } });
   const quote = quoteFor(wallet.address);
   quote.costUsd += approvalCost; quote.approvalGasUsd = approvalCost;
@@ -274,4 +274,45 @@ it("releases a verified reverted source transaction only after rechecking, retai
   expect(seatState().bridge).toBeNull();
   expect(holdSend(seatState())).toBe(false);
   expect(read(KEYS.bridgeHistory(wallet.address))[0].phase).toBe("refunded_verified");
+});
+
+// Review findings on #123 (8 October 2026).
+it("returns the wallet to Ethereum before a direct deposit after a bridge attempt failed on the source chain", async () => {
+  const { wallet, quote } = setup(); await connect();
+  const request = wallet.request.bind(wallet);
+  wallet.request = (args) => args.method === "eth_sendTransaction" ? Promise.reject(Object.assign(new Error("Declined"), { code: 4001 })) : request(args);
+  await bridgeDeposit(quote);
+  expect(Number(await wallet.request({ method: "eth_chainId" }))).toBe(8453);
+  wallet.request = request;
+  await depositUsdc(10);
+  const sends = wallet.calls.map((c, i) => [c, i]).filter(([c]) => c.method === "eth_sendTransaction");
+  const [, sendAt] = sends[sends.length - 1];
+  const back = wallet.calls.map((c, i) => [c, i]).filter(([c, i]) => i < sendAt && c.method === "wallet_switchEthereumChain");
+  expect(back[back.length - 1][0].params[0].chainId).toBe("0x1");
+  expect(Number(await wallet.request({ method: "eth_chainId" }))).toBe(1);
+});
+
+it("recognises a delivered bridge as credited when Derive keeps a small deposit fee", async () => {
+  const { wallet, quote, account } = setup({ newAccount: false }); await connect();
+  account.usdc = 3;
+  _setSeatState({ ...seatState(), saloon: { ...seatState().saloon, usdc: 3 }, depositAddress: deposit, stage: "fund" });
+  await bridgeDeposit(quote);
+  vi.stubGlobal("fetch", async () => ({ ok: true, json: async () => ({ status: "DONE", substatus: "COMPLETED", toAddress: deposit, receiving: { chainId: 1, amount: "9800000", token: { address: NETWORK.usdc, decimals: 6 } } }) }));
+  account.usdc = 12.75; await refreshFunding();
+  expect(seatState()).toMatchObject({ stage: "approve", bridge: null });
+  expect(read(KEYS.bridgeHistory(wallet.address))[0].phase).toBe("credited");
+});
+
+it("signs in again when tracking is retried after the first sign-in expired", async () => {
+  let fail = true;
+  const { wallet, fake, quote } = setup({ register: () => fail ? deriveError(9002) : { bridge_status: "registered" } });
+  await connect(); await bridgeDeposit(quote);
+  expect(seatState().bridge.registrationError).toBeTruthy();
+  const signs = wallet.calls.filter((c) => c.method === "personal_sign").length;
+  const later = Date.now() + 5 * 60_000; vi.spyOn(Date, "now").mockReturnValue(later);
+  fail = false;
+  await retryBridgeRegistration();
+  expect(wallet.calls.filter((c) => c.method === "personal_sign").length).toBe(signs + 1);
+  expect(fake.calls("private/register_bridge_deposit").at(-1).params.timestamp).toBe(String(later));
+  expect(seatState().bridge.registrationError).toBeNull();
 });

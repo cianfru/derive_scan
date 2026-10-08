@@ -440,6 +440,12 @@ export async function deposit(dollars) {
   const startedAt = Date.now();
   try {
     flow.assertActive();
+    // A bridge attempt can leave the wallet on its source chain; the deposit goes out on Ethereum only.
+    if (FUND_ANYCHAIN) {
+      fundingLease = { flow, provider, chainId: NETWORK.chainId };
+      await flow.run("return to Ethereum", () => switchFundingChain(provider, wallet, { id: NETWORK.chainId }, flow.assertActive));
+      fundingLease = null;
+    }
     const tx = await sendTransaction(provider, usdcTransfer(wallet, to, dollars));
     const sentAt = Date.now();
     // The wallet may have broadcast even after Disconnect. Keep its receipt under the original
@@ -460,12 +466,14 @@ function archiveBridge(wallet, bridge) {
   rememberBridgeHistory(wallet, bridge);
   remove(KEYS.bridge(wallet));
 }
+// Derive may keep a deposit fee from what the bridge delivered; a credit within it counts as this deposit.
+const creditAllowance = (received) => 0.000001 + Math.max(0.5, received * 0.02);
 function bridgeCredited(bridge, saloon) {
   const baseline = bridge.baseline;
   const received = bridge.status?.receiving?.amount;
   return !!baseline && bridge.status?.phase === "delivered" && saloon?.manager === PRIME_STANDARD
     && (baseline.subaccountId == null || saloon.id === baseline.subaccountId)
-    && /^\d+$/.test(received || "") && saloon.usdc + 0.000001 >= baseline.usdc + Number(received) / 1e6;
+    && /^\d+$/.test(received || "") && saloon.usdc + creditAllowance(Number(received) / 1e6) >= baseline.usdc + Number(received) / 1e6;
 }
 function finishCreditedBridge(flow, wallet, saloon) {
   if (!FUND_ANYCHAIN || !state.bridge?.txHash || !bridgeCredited(state.bridge, saloon)) return;
@@ -651,7 +659,13 @@ export async function retryBridgeRegistration() {
   const flow = operation();
   flow.set({ busy: true });
   try {
-    if (bridgeAuth && Date.now() - Number(bridgeAuth.timestamp) > FUNDING_QUOTE_MS) throw fundingError("funding_route", "The transfer was sent. Its display registration could not be retried without a fresh sign-in; Check again still reads the bridge safely.");
+    // The retry comes from the user's click, so an expired sign-in is renewed with one wallet prompt.
+    if (bridgeAuth && Date.now() - Number(bridgeAuth.timestamp) > FUNDING_QUOTE_MS) {
+      if (!state.provider || !state.wallet) throw fundingError("funding_account", "Connect again to retry tracking. The transfer was sent; Check again still reads it.");
+      const timestamp = String(Date.now()), wallet = state.wallet;
+      const signature = await flow.run("sign in for deposit", () => personalSign(state.provider, wallet, timestamp));
+      bridgeAuth = { wallet, timestamp, signature };
+    }
     await flow.run("register bridge deposit", () => flow.client(state.client).call("private/register_bridge_deposit", { ...state.bridge.registration, ...(bridgeAuth || {}) }, { skipLogin: true }));
     bridgePatch(flow, { registrationError: null });
   } catch (e) { if (flow.active()) bridgePatch(flow, { registrationError: plainError(e) }); }
