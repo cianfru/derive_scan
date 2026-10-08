@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import SaloonDemo from "./components/SaloonDemo.jsx";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
-const FORBIDDEN = /\b(will|expect\w*|likely|predict\w*|target\w*|probab\w*|odds|chance\w*|forecast\w*|bet(s|ting)?|edges?|guarantee\w*)\b|%/i;
+const FORBIDDEN = /\b(will|expect\w*|likely|predict\w*|target\w*|probab\w*|odds|chance\w*|forecast\w*|bet(s|ting)?|edges?|guarantee\w*)\b|(?<!\+\d+)%/i; // a return such as "+148%" is allowed (owner, 8 October 2026); no other percentage
 const openSettlement = () => fireEvent.click(screen.getByText("Try a settlement price"));
 
 describe("illustrative Saloon bubble discovery", () => {
