@@ -23,7 +23,7 @@ import "../questions.css";
 import "../board.css";
 import LiveMoney from "../components/LiveMoney.jsx";
 import { recordProductEvent } from "../lib/diagnostics.js";
-import DecisionComparison, { CompareControl, ViewComparison } from "../components/OutcomeDecision.jsx";
+import DecisionComparison, { ViewComparison } from "../components/OutcomeDecision.jsx";
 import { retainOutcome, updateDecision, useDecision } from "../lib/decision.js";
 
 const PAGE = 24;
@@ -65,7 +65,6 @@ function AnswerChoice({ r, budget }) {
         </Link>
         : <div className="bd-choice off">{side}<span className="q-noprice">No price now<Info label={`Why ${name} has no price`}>{r.reason}</Info></span></div>}
       <FollowButton id={r.id} side={r.side} k={r.k} board={r.board} compact />
-      {available && <CompareControl selection={r} compact />}
     </div>
   );
 }
