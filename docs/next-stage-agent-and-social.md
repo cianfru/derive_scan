@@ -64,3 +64,18 @@ Recorded 8 October 2026 from a conversation with the owner. Nothing here is buil
 - `lib/trade/anychain.js` calls Li.Fi only (`FUNDING_API`); its checks (Derive's minimum deposit after fees, the 120-second limit, no Cowboy fee) apply to any provider.
 - Candidates to compare on real quotes (support for Derive's deposit chains and HyperEVM to be confirmed from each provider's docs, never assumed): Circle's CCTP (native USDC burned and minted, no slippage, gas plus a small fee for its fast mode; usually the cheapest for USDC to USDC), intent bridges such as Relay and Across (a filler pays out on arrival within seconds, cheap for USDC on major chains), Bungee (Socket's aggregator; Derive's own bridging runs on Socket), deBridge, and Li.Fi.
 - Plan: a small measurement first (same routes, $100 and $1,000, USDC and ETH from Ethereum, Base, Arbitrum and HyperEVM to the Derive deposit address; what arrives, time, total cost), then quote two or three providers side by side in the browser and pick the one that delivers the most within the time limit, each behind the same checks. Also check in Derive's docs whether it accepts USDC directly from Base or Arbitrum, which would need no third-party bridge for USDC.
+
+## "Built on" logos and contract verification (owner, 8 October 2026)
+
+- A small "Built on" strip near the landing's footer, for trust. Only what users actually go through in production, never what is built but switched off or only planned:
+
+  | When | The strip reads |
+  |---|---|
+  | Today | Built on Derive · Ethereum · USDC |
+  | After the owner's funding test and switch-on of `VITE_FUND_ANYCHAIN` | + Li.Fi (and Base, Arbitrum if shown as source chains) |
+  | After the bridge comparison, only bridges Cowboy calls directly | + those bridges (a route Li.Fi picks inside a transfer is not Cowboy's integration) |
+  | After Rysk goes live | + Rysk · HyperEVM |
+
+- Each brand's own one-colour logo as its brand kit allows (white in dark, ink in light; never recoloured orange, which is Cowboy's brand and interaction colour only), small and quiet; "Built on" or "Powered by", never "Partner"; the footer's "Not affiliated with Derive" stays. Check each brand kit; ask Derive directly. Inside the deposit step, the same name in small type ("Routed by Li.Fi").
+- Contract verification: Cowboy has no contract of its own today (trades go through Derive's contracts). Any contract Cowboy deploys later (for example the per-user smart account of the unified account) gets its source verified on the block explorer and an audit before launch, as with Rainbow's verified contract.
+- On-chain fingerprints of the agent's daily pick (a hash written to Base before the outcome, so anyone can check the published pick was not edited): comes with the agent stage.
