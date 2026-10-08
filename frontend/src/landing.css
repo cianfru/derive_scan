@@ -113,11 +113,14 @@
 .hdr-landing .nav-research, .hdr-landing .nav-divider { display: none; }
 .hdr-landing .nav-more { display: flex; }
 .hdr-landing .tools { margin-left: 0; }
-/* The sign retains its character while the interactive example comes into reach sooner. */
+/* Tablets and desktops (owner, 5 October 2026; restated 8 October 2026 after the next section showed on the
+   first screen): the first screen shows the header and the hero alone. The stage fills the viewport below the
+   header and centres its content; the sign shrinks with the viewport's height, and the stage grows rather
+   than clips. */
 @media (min-width: 761px) {
-  .cowboy-draft .hero-stage { display: flex; }
-  .cowboy-draft .hero-inner { flex: 1; width: 100%; justify-content: center; padding-block: clamp(24px, 4svh, 40px) clamp(32px, 5svh, 56px); gap: clamp(18px, 2.8svh, 28px); }
-  .cowboy-draft .sign-wrap { width: min(820px, 100%, 100svh); padding-block: 4px 12px; }
+  .cowboy-draft .hero-stage { display: flex; min-height: calc(100vh - var(--header-h, 60px)); min-height: calc(100svh - var(--header-h, 60px)); }
+  .cowboy-draft .hero-inner { flex: 1; width: 100%; justify-content: center; padding-block: clamp(24px, 5svh, 56px) clamp(32px, 7svh, 80px); gap: clamp(18px, 3.4svh, 34px); }
+  .cowboy-draft .sign-wrap { width: min(1060px, 100%, 124svh); padding-block: clamp(4px, 1.2svh, 12px) clamp(8px, 2.4svh, 24px); }
   .cowboy-draft .hero-row h1 { font-size: clamp(40px, min(4.6vw, 7.4svh), 62px); }
 }
 @media (max-width: 950px) {
@@ -133,9 +136,12 @@
   .cowboy-draft .lp-faq { gap: 32px; }
 }
 @media (max-width: 760px) {
-  .cowboy-draft .hero-stage { display: flex; min-height: 0; }
+  /* The first screen shows the hero alone (svh: Safari with its bars showing), one tight group a little
+     above the middle; the next section starts below the fold (owner, 5 and 8 October 2026). */
+  .cowboy-draft .hero-stage { display: flex; min-height: calc(100vh - var(--header-h)); min-height: calc(100svh - var(--header-h)); }
   .cowboy-draft .hero-inner { flex: 1; width: 100%; justify-content: flex-start; padding-block: clamp(16px, 3svh, 32px); gap: clamp(10px, 2.2svh, 20px); }
-  .cowboy-draft .hero-inner::before, .cowboy-draft .hero-inner::after { content: none; }
+  .cowboy-draft .hero-inner::before { content: ""; flex: 2 1 0; margin-bottom: calc(-1 * clamp(10px, 2.2svh, 20px)); }
+  .cowboy-draft .hero-inner::after { content: ""; flex: 3 1 0; margin-top: calc(-1 * clamp(10px, 2.2svh, 20px)); }
   .cowboy-draft .sign-wrap { width: min(94%, 420px); padding: 0; }
   .cowboy-draft .hero-row { display: flex; flex-direction: column; align-items: stretch; gap: clamp(12px, 2.4svh, 20px); margin-top: 0; }
   .cowboy-draft .hero-side { display: flex; flex-direction: column; }
