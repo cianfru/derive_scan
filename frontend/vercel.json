@@ -9,7 +9,7 @@
       "destination": "/control.html"
     },
     {
-      "source": "/((?!brand/|assets/|fonts/|coins/|favicon|site\\.webmanifest|control).*)",
+      "source": "/((?!brand/|assets/|fonts/|coins/|favicon|site\\.webmanifest|robots\\.txt|control).*)",
       "destination": "/index.html"
     }
   ],
