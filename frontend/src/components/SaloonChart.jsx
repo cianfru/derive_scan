@@ -49,18 +49,19 @@ export function traderText(t) {
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 /**
- * The bubbles per date: every level once, with the side that bets toward it (above the price Higher, below it
- * Lower), or the other side when that one has no price. `dates` are [{expiry, settle, rows}], rows from boardRows.
+ * The bubbles per date: every level once, with the side that bets toward it (above the price Higher, green;
+ * below it Lower, red). A level whose answer toward it has no price is a blank, a small grey dot reading
+ * "No price now" (owner, 8 October 2026: the other side's red bubble above the price was a near-certain,
+ * near-worthless bet in the wrong colour). `dates` are [{expiry, settle, rows}], rows from boardRows.
  */
 export function chartLevels(dates, index) {
   return dates.map((d) => {
     const ks = [...new Set(d.rows.map((r) => r.k))].sort((a, b) => a - b);
     const find = (k, side) => d.rows.find((r) => r.k === k && r.side === side);
-    const levels = ks.map((k) => {
-      const side = k >= index ? "yes" : "no";
-      return { k, r: find(k, side) || find(k, side === "yes" ? "no" : "yes") };
-    }).filter((l) => l.r);
-    return { ...d, levels, find };
+    const toward = (k) => (k >= index ? "yes" : "no");
+    const levels = ks.map((k) => ({ k, r: find(k, toward(k)) })).filter((l) => l.r);
+    const blanks = ks.filter((k) => !find(k, toward(k)));
+    return { ...d, levels, blanks, find };
   }).filter((d) => d.levels.length);
 }
 export const smartOf = (r) => r?.level?.[r.side]?.smart || null;
@@ -213,6 +214,12 @@ function mount(host, cfg) {
         .sort((a, b) => Math.abs(a.k - index) - Math.abs(b.k - index));
       const big = [];
       for (const l of visible) if (!big.some((b) => Math.abs(y(b.k) - y(l.k)) < R * 2 + 4)) big.push(l);
+      for (const k of d.blanks || []) {
+        if (y(k) <= m.t || y(k) >= H - m.b) continue;
+        const g = el("g", { class: "sch-blank" }, plot);
+        el("circle", { cx, cy: y(k), r: 4, fill: "none", stroke: C.text3, "stroke-width": 1.5, "stroke-opacity": 0.7 }, g);
+        el("title", {}, g).textContent = `${fmtP(k)}: no price now`;
+      }
       for (const l of visible) if (!big.includes(l)) bubble(plot, d, l, cx, false, i);
       big.forEach((l, j) => bubble(plot, d, l, cx, true, i, j));
       const above = d.levels.filter((l) => y(l.k) <= m.t + R * 0.7), below = d.levels.filter((l) => y(l.k) >= H - m.b - R * 0.7);

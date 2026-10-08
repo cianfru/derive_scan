@@ -59,10 +59,16 @@ describe("chart helpers", () => {
       expect(new Set(ks).size).toBe(ks.length);
       for (const l of d.levels) {
         const toward = l.k >= btc.index ? "yes" : "no";
-        // The side toward the level when it has a price, else the other one.
-        if (d.rows.some((r) => r.k === l.k && r.side === toward)) expect(l.r.side).toBe(toward);
+        // Always the side toward the level: Higher above the price, Lower below it.
+        expect(l.r.side).toBe(toward);
       }
     }
+  });
+  it("shows a level without a price toward it as a blank, never the other side's bubble", () => {
+    const row = (k, side) => ({ k, side, key: `${k}:${side}` });
+    const [d] = chartLevels([{ expiry: "20261009", settle: 1, rows: [row(90000, "no"), row(88000, "yes"), row(80000, "no"), row(78000, "yes")] }], 84000);
+    expect(d.levels.map((l) => [l.k, l.r.side])).toEqual([[80000, "no"], [88000, "yes"]]);
+    expect(d.blanks).toEqual([78000, 90000]);
   });
   it("formats returns and levels", () => {
     expect(returnPct(78.4, 100)).toBe("+78.4%");
