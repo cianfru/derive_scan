@@ -10,7 +10,7 @@ import btc from "./fixtures/questions/BTC.json";
 import { budgetTicket, findLevel } from "./lib/questions.js";
 
 const ctl = vi.hoisted(() => ({ gate: null, fail: false }));
-vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: true, TRADE_ON: true, TESTNET_FILLS: true }));
+vi.mock("./lib/flags.js", () => ({ FUND_ANYCHAIN: false, RYSK_MOCK: false, QUESTIONS_ON: true, TRADE_ON: true, TESTNET_FILLS: true }));
 
 const ID = "BTC-20261009-A-82000-88000";
 const { level, date } = findLevel(btc, ID);

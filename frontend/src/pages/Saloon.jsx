@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useOutletContext, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { useClock } from "../lib/useClock.js";
 import { useFeeds } from "../components/Feeds.jsx";
-import { Info, Loading, RefreshNotice } from "../components/ui.jsx";
+import { Info, Loading, RefreshNotice, Tabs } from "../components/ui.jsx";
 import { CoinIcon } from "../components/MarketVisuals.jsx";
 import SaloonHead from "../components/SaloonNotices.jsx";
 import SaloonChart, { countText, dayName, traderText } from "../components/SaloonChart.jsx";
 import QuestionTicket from "../components/QuestionTicket.jsx";
-import { OutcomeFigures } from "../components/OutcomePreview.jsx";
+import { PhoneFold, TradeFacts, TradeFigures } from "../components/MobileTrade.jsx";
+import { RYSK_MOCK } from "../lib/flags.js";
 import { FollowButton } from "../components/Follow.jsx";
 import { useIndexPrice } from "../lib/livePrice.js";
 import { useSheetFocus } from "../components/DecisionSheet.jsx";
@@ -26,6 +27,7 @@ import "../marketplace-detail.css";
 import "../saloon-chart.css";
 
 // Bubbles show the most each answer makes for one amount, as on the list, so they compare like for like.
+const RyskMock = RYSK_MOCK ? lazy(() => import("../components/RyskMock.jsx")) : null;
 const REF = 100;
 const QUICK = [25, 100, 500];
 const CANDLES = 72; // 12 days of 4-hour candles
@@ -75,6 +77,7 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose, opener, refre
   const [decision, update] = useDecision();
   const draft = decision.amountDraft, setDraft = (amountDraft) => update({ amountDraft });
   const [ticket, setTicket] = useState(false);
+  const [tradeView, setTradeView] = useState("buy");
   const panelRef = useRef(null);
   const stageAction = useRef(null), previousStage = useRef(ticket);
   const modal = useSheetFocus(true, panelRef, opener, () => ticket ? setTicket(false) : onClose(), "(max-width: 700px)");
@@ -104,6 +107,8 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose, opener, refre
   return (
     <aside ref={panelRef} className="sl-panel" role={modal ? "dialog" : undefined} aria-modal={modal ? "true" : undefined} aria-label="Your trade" tabIndex={-1}>
       <button type="button" className="text-control sl-close" onClick={onClose}>Close</button>
+      {RYSK_MOCK && <Tabs label="Trade type" value={tradeView} onChange={(v) => { setTicket(false); setTradeView(v); }} items={[["buy", "Buy outcome"], ["premium", "Receive premium"]]} />}
+      {RYSK_MOCK && tradeView === "premium" ? <Suspense fallback={<p className="status">Loading illustrations…</p>}><RyskMock und={und} /></Suspense> : <>
       <header>
         <h2>{und} {yes ? "higher" : "lower"} than {money(row.k)}?</h2>
         <p className="sl-when">{dayName(row.settleTs)}, 08:00 UTC{countdown(row.settleTs) && <> · {countdown(row.settleTs)}</>} · {und} index <span className="mono">{money(current.price)}</span><small className="decision-price-note">{current.notice}</small></p>
@@ -130,15 +135,19 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose, opener, refre
         {t ? <>
           {t.belowMin && <p className="q-note warn">Smallest amount here: {money(t.minTotal, { cents: true })} with Derive's fees.</p>}
           {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
-          {!t.belowMin && <section className="md-preview" aria-label="What it pays"><OutcomeFigures und={und} level={level} side={side} t={t} expiry={row.expiry} settleTs={row.settleTs} summary compact /></section>}
+          {!t.belowMin && <section className="md-preview" aria-label="What it pays"><TradeFigures und={und} level={level} side={side} t={t} expiry={row.expiry} settleTs={row.settleTs} summary compact /></section>}
         </> : <p className="status">{settling ? "Settling · average from 07:30 to 08:00 UTC" : valid ? `No price now for ${ANSWER[side]}.` : "Enter an amount greater than $0."}</p>}
         {atNow && <p className="decision-consequence">If {und} settles at {money(current.price)}, you get <b>{money(atNow.payout, { cents: true })}</b> · <b className={atNow.pl >= 0 ? "up" : "down"}>{signed(atNow.pl)}</b><Info label="About this settlement example">This example uses {current.source === "live" && current.fresh ? "the live index" : "the last available index"} and describes settlement at that price. Selling back early has a different value.</Info></p>}
+        {(traders || smart) && <PhoneFold title="Traders and smart wallets" className="mt-context">
         {traders && <p className="sl-traders">Directional traders on this date: {traderText(traders)}.<Info label="About directional traders">Every Derive wallet that trades options for direction, profitable or not. Market makers, income sellers (who sell options to collect a fee) and hedgers (who buy protection) are left out. Each wallet counts long or short by its own open options on this settlement date (at least $1,000 its way). "Most of the money" weighs them by size: long or short when at least 62.5% points one way. It needs 3 traders and $10,000. Where traders lean is not where the price goes. Context, not a signal.</Info></p>}
         {smart && <p className="sl-smart">Smart wallets here: {countText(smart)}.<Info label="About smart wallets">The most profitable directional options wallets on Derive holding options of this date at strikes inside this answer's pay zone, each counted long or short by its own position there (at least $1,000). The gold ring marks the answer at least two of them lean toward, more than lean the other way. Context, not a signal.</Info></p>}
+        </PhoneFold>}
         {age.state === "stale" && <p className="q-note warn">Prices are {age.minutes} min old.</p>}
-        <button ref={stageAction} type="button" className="btn primary lg" disabled={!ready} onClick={() => setTicket(true)}>Review trade</button>
+        <button ref={stageAction} type="button" className="btn primary lg sl-review" disabled={!ready} onClick={() => setTicket(true)}>Review trade</button>
+        <TradeFacts und={und} level={level} side={side} t={t} />
         <p className="sl-foot"><span>{oneTapOffered() ? "One tap: both options at one price, or nothing." : "One-tap trading is coming to Cowboy."}</span>
           <Link to={`/q/${row.id}?side=${side}`} onClick={() => recordProductEvent("payout_reviewed")} state={{ amountDraft: draft, ...(valid ? { dollars } : {}), returnTo: saloonReturn(und) }}>Full details</Link><FollowButton id={row.id} side={side} k={row.k} board={board} /><CompareControl selection={row} onView={onClose} /></p>
+      </>}
       </>}
     </aside>
   );

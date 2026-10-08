@@ -1,0 +1,64 @@
+@media (max-width: 680px) {
+  .trader-page.trader-phone { gap: 14px; }
+  .trader-phone .crumbs { margin-bottom: -8px; min-height: 44px; }
+  .trader-phone .crumbs a { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; }
+  .trader-phone .trader-id { padding: 12px 16px 0; gap: 10px; }
+  .trader-phone .tid { align-items: center; }
+  .trader-phone .tid h1 { font-size: 21px; }
+  .trader-phone .tkpis { padding-top: 6px; gap: 10px 16px; }
+  .trader-phone .tkpis > div > span { min-height: 44px; font-size: 12px; }
+  .trader-phone .tkpis > div { gap: 0; }
+  .trader-phone .tkpis b { font-size: 20px; }
+  .trader-phone .tkpis b.big { font-size: 24px; }
+  .trader-phone .info { width: 44px; height: 44px; border: 0; background: none; position: relative; }
+  .trader-phone .info::before { inset: 12px; border: 1px solid var(--border-strong); border-radius: 50%; }
+  body:has(.trader-phone) .pop-close { width: 44px; height: 44px; }
+  .trader-phone .panel-head { min-height: 52px; padding: 4px 16px; gap: 0 8px; }
+  .trader-phone .panel-title { font-size: 18px; display: flex; align-items: center; }
+  .trader-phone .tm-book-count { font-size: 13px; color: var(--text-3); }
+  .trader-phone .tm-fold { min-width: 0; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); }
+  .trader-phone .tm-fold > summary { min-height: 48px; padding: 12px 16px; font-size: 14px; font-weight: 600; cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .trader-phone .tm-fold > summary::-webkit-details-marker,
+  .trader-phone .tm-option > summary::-webkit-details-marker { display: none; }
+  .trader-phone .tm-fold > summary::after { content: "+"; font: 500 18px/1 var(--font-mono); color: var(--text-3); }
+  .trader-phone .tm-fold[open] > summary::after { content: "−"; }
+  .trader-phone .tm-fold[open] > summary { border-bottom: 1px solid var(--border); }
+  .trader-phone .tm-fold-content { min-width: 0; }
+  .trader-phone .tm-fold-content > .plate { border: 0; border-radius: 0; }
+  .trader-phone .tm-profile { border: 0; border-radius: 0; margin-inline: -16px; border-top: 1px solid var(--border); background: none; }
+  .trader-phone .tm-profile > .tm-fold-content { padding: 0 16px 12px; }
+  .trader-phone .tm-address { overflow-wrap: anywhere; white-space: normal; }
+  .trader-phone .tid-copy { display: inline-flex; align-items: center; min-width: 44px; min-height: 44px; font-size: 13px; }
+  .trader-phone .tm-figures { display: grid; gap: 8px; margin: 0; padding: 12px 16px; font-size: 12px; }
+  .trader-phone .tm-figures > div { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; min-width: 0; }
+  .trader-phone .tm-figures dt { color: var(--text-3); }
+  .trader-phone .tm-figures dd { margin: 0; text-align: right; overflow-wrap: anywhere; font-size: 13px; }
+  .trader-phone .tm-profile .tm-figures { padding: 12px 0 0; }
+  .trader-phone .tm-book-head { display: flex; align-items: center; gap: 8px; padding-inline: 16px; min-height: 52px; border-bottom: 1px solid var(--border); }
+  .trader-phone .tm-book-head .asset-link { display: inline-flex; min-height: 44px; min-width: 44px; align-items: center; margin-right: auto; }
+  .trader-phone .tm-book-head .asset b { font-size: 15px; }
+  .trader-phone .tm-book-head .info { margin: 0; }
+  .trader-phone .tm-option { border-bottom: 1px solid var(--border); }
+  .trader-phone .tm-option > summary { display: grid; gap: 6px; list-style: none; padding: 10px 16px; min-height: 64px; cursor: pointer; }
+  .trader-phone .tm-option-main,
+  .trader-phone .tm-option-sub { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; font-size: 13px; }
+  .trader-phone .tm-option-main > b { font-weight: 500; overflow-wrap: anywhere; }
+  .trader-phone .tm-option-result { display: flex; align-items: baseline; gap: 6px; }
+  .trader-phone .tm-option-result small { font-size: 12px; color: var(--text-3); }
+  .trader-phone .tm-option-result b { font-size: 13px; font-weight: 500; white-space: nowrap; }
+  .trader-phone .tm-option-sub { color: var(--text-3); font-size: 12px; }
+  .trader-phone .tm-option-sub > span:first-child { overflow-wrap: anywhere; min-width: 0; }
+  .trader-phone .tm-detail-label { color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; flex: none; }
+  .trader-phone .tm-option[open] > summary { background: var(--surface-2); }
+  .trader-phone .tm-option .tm-figures { border-top: 1px solid var(--border); }
+  .trader-phone .tm-more-options { border: 0; border-radius: 0; border-bottom: 1px solid var(--border); }
+  .trader-phone .tm-more-options > summary { font-size: 12px; color: var(--accent-text); }
+  .trader-phone .tm-book-group:last-child .tm-option:last-child,
+  .trader-phone .tm-book-group:last-child .tm-more-options { border-bottom: 0; }
+  .trader-phone .tm-fold .tabs button { min-width: 44px; min-height: 44px; font-size: 12px; }
+  .trader-phone .tm-fold .ph-grid text,
+  .trader-phone .tm-fold .ph-axis { font-size: 12px; }
+  .trader-phone .tm-fold .trade-table td.t-opt { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+  .trader-phone .tm-fold .lb-more { min-height: 44px; font-size: 13px; }
+  .trader-phone .tm-fold-content > .status { margin: 0; padding: 12px 16px; font-size: 12px; line-height: 1.5; }
+}

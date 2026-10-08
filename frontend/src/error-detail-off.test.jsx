@@ -4,7 +4,7 @@ import { afterEach, it, expect, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: true, TRADE_ON: true, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false, tradeMode: () => "dryrun" }));
+vi.mock("./lib/flags.js", () => ({ FUND_ANYCHAIN: false, RYSK_MOCK: false, QUESTIONS_ON: true, TRADE_ON: true, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false, tradeMode: () => "dryrun" }));
 import { ConnectStep } from "./components/trade/SeatSetup.jsx";
 import { _setSeatDeps } from "./lib/trade/seat.js";
 import { createClient } from "./lib/trade/derive.js";

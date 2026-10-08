@@ -11,7 +11,7 @@ import { FollowButton } from "./components/Follow.jsx";
 import MyQuestions from "./pages/MyQuestions.jsx";
 import { returnFacts } from "./components/PositionsReturn.jsx";
 
-vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: true, MAINNET_FILLS: true, ONE_TAP_FILLS: true, TESTNET_FILLS: false, TRADE_ON: true }));
+vi.mock("./lib/flags.js", () => ({ FUND_ANYCHAIN: false, RYSK_MOCK: false, QUESTIONS_ON: true, MAINNET_FILLS: true, ONE_TAP_FILLS: true, TESTNET_FILLS: false, TRADE_ON: true }));
 vi.mock("./lib/pilot.js", () => ({ oneTapOffered: () => true }));
 vi.mock("./lib/data.js", () => ({ useData: () => ({ data: null, error: null }) }));
 vi.mock("./components/trade/TradePanel.jsx", () => ({ default: () => null, AlsoOnDerive: () => null,

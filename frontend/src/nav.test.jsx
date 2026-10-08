@@ -6,7 +6,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
-vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: true, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false, TRADE_ON: false }));
+vi.mock("./lib/flags.js", () => ({ FUND_ANYCHAIN: false, RYSK_MOCK: false, QUESTIONS_ON: true, TESTNET_FILLS: false, MAINNET_FILLS: false, ONE_TAP_FILLS: false, TRADE_ON: false }));
 const docs = vi.hoisted(() => ({ current: {} }));
 vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: docs.current[path] ?? null }), useFeeds: () => [null, {}, true] }));
 import Shell from "./components/Shell.jsx";

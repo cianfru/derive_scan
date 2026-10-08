@@ -2,10 +2,11 @@
 // throwaway key made from a public test phrase; it is never funded and never registered anywhere.
 import { Wallet, getBytes, keccak256, toUtf8Bytes } from "ethers";
 
-export function fakeWallet({ phrase = "cowboy test owner", chainId = 11155111, code = "0x", reject = new Set(), gas = 52000, gasPrice = 2e9, usdc = 250e6, exposed = true } = {}) {
+export function fakeWallet({ phrase = "cowboy test owner", chainId = 11155111, code = "0x", reject = new Set(), gas = 52000, gasPrice = 2e9, usdc = 250e6, allowance = 0, nativeBalance = 1e18, exposed = true, emitSwitch = false } = {}) {
   const w = new Wallet(keccak256(toUtf8Bytes(phrase)));
   const calls = [];
   let chain = chainId;
+  let approved = BigInt(allowance);
   const handlers = { accountsChanged: new Set(), chainChanged: new Set() };
   const provider = {
     address: w.address,
@@ -22,7 +23,8 @@ export function fakeWallet({ phrase = "cowboy test owner", chainId = 11155111, c
         case "eth_requestAccounts": return [w.address.toLowerCase()];
         case "eth_accounts": return exposed ? [w.address.toLowerCase()] : [];
         case "eth_chainId": return `0x${chain.toString(16)}`;
-        case "wallet_switchEthereumChain": chain = parseInt(params[0].chainId, 16); return null;
+        case "wallet_switchEthereumChain": chain = parseInt(params[0].chainId, 16); if (emitSwitch) provider.emit("chainChanged", params[0].chainId); return null;
+        case "wallet_addEthereumChain": return null;
         case "eth_getCode": return code;
         case "personal_sign": return w.signMessage(getBytes(params[0]));
         case "eth_signTypedData_v4": {
@@ -32,8 +34,13 @@ export function fakeWallet({ phrase = "cowboy test owner", chainId = 11155111, c
         }
         case "eth_estimateGas": return `0x${gas.toString(16)}`;
         case "eth_gasPrice": return `0x${Math.round(gasPrice).toString(16)}`;
-        case "eth_call": return `0x${BigInt(usdc).toString(16).padStart(64, "0")}`;
-        case "eth_sendTransaction": return `0x${"ab".repeat(32)}`;
+        case "eth_call": return `0x${BigInt(params[0].data?.startsWith("0xdd62ed3e") ? approved : usdc).toString(16).padStart(64, "0")}`;
+        case "eth_getBalance": return `0x${BigInt(nativeBalance).toString(16)}`;
+        case "eth_getTransactionReceipt": return { status: "0x1" };
+        case "eth_sendTransaction": {
+          if (params[0].data?.startsWith("0x095ea7b3")) approved = BigInt(`0x${params[0].data.slice(-64)}`);
+          return `0x${"ab".repeat(32)}`;
+        }
         default: throw Object.assign(new Error(`unsupported ${method}`), { code: 4200 });
       }
     },

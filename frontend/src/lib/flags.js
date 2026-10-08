@@ -26,6 +26,12 @@ export const MAINNET_FILLS = QUESTIONS_ON && import.meta.env.VITE_SALOON_TRADE =
 export const ONE_TAP_FILLS = QUESTIONS_ON && (import.meta.env.VITE_SALOON_TRADE === "testnet"
   || import.meta.env.VITE_SALOON_TRADE === "mainnet");
 
+/** Optional EVM funding routes. Off builds discard their provider and execution code. */
+export const FUND_ANYCHAIN = TRADE_ON && import.meta.env.VITE_FUND_ANYCHAIN === "1";
+
+/** Fixed Rysk illustrations only; never prices, wallet calls or execution. */
+export const RYSK_MOCK = QUESTIONS_ON && import.meta.env.VITE_RYSK_MOCK === "1";
+
 /** The same rule as a function, for tests and labels: "testnet", "mainnet", "dryrun" or "off". */
 export function tradeMode(raw, questionsOn = QUESTIONS_ON) {
   const v = String(raw ?? "");

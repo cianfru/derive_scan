@@ -21,7 +21,8 @@ const MARKERS = [/0x9371352CCef6f5b36EfDFE90942fFE622Ab77F1D/i, /testnet\.api\.d
 const liveOnly = (src) => /spot_feed\./.test(src) && !MARKERS.some((m) => m !== MARKERS[1] && m.test(src)) && !/private\//.test(src);
 const endpointOk = (m, src) => m === MARKERS[1] && liveOnly(src);
 
-async function bundle(env, exts = [".js"]) {
+async function bundle(overrides, exts = [".js"]) {
+  const env = { VITE_FUND_ANYCHAIN: "", VITE_RYSK_MOCK: "", ...overrides };
   const saved = { ...process.env };
   Object.assign(process.env, env);
   const out = mkdtempSync(join(tmpdir(), "cowboy-bundle-"));
@@ -35,9 +36,14 @@ async function bundle(env, exts = [".js"]) {
   }
 }
 
+const FUNDING_MARKER = /li\.quest\/v1|private\/register_bridge_deposit|function aggregate3\(|function getEthBalance\(/;
+const RYSK_MARKER = /rysk-mock|Made-up figures · not a Rysk quote/;
+
 it("leaves trading code out of a build with the flag off, even with the Saloon on", async () => {
   const files = await bundle({ VITE_QUESTIONS: "1", VITE_SALOON_TRADE: "" }, [".js", ".css"]);
   for (const { f, src } of files) {
+    expect(FUNDING_MARKER.test(src), f).toBe(false);
+    expect(RYSK_MARKER.test(src), f).toBe(false);
     for (const m of MARKERS) expect(m.test(src), `${f} ${m}`).toBe(false);
     expect(src, f).not.toMatch(/testnet build|One tap works|Bought in one tap|Testnet<|Loading one-tap|Reload to trade in one tap/);
     expect(src, f).not.toMatch(WALLET);
@@ -102,6 +108,29 @@ it("builds a real-money app: mainnet only, in the trade chunk, with none of the 
     expect(src, f).not.toMatch(/Sepolia|sepolia/);
     expect(src, f).not.toMatch(/Details for testing/);
     expect(src, f).not.toMatch(/test USDC|Testnet · dry run|Not on testnet|testnet build|One tap works on Derive's testnet|Show test networks|Derive testnet/);
+    expect(FUNDING_MARKER.test(src), f).toBe(false);
+    expect(RYSK_MARKER.test(src), f).toBe(false);
+  }
+}, 120_000);
+
+it("keeps optional funding only in the trade chunk and the Rysk illustration in its own lazy chunk", async () => {
+  const files = await bundle({ VITE_QUESTIONS: "1", VITE_SALOON_TRADE: "mainnet", VITE_SALOON_PILOT: "all", VITE_FUND_ANYCHAIN: "1", VITE_RYSK_MOCK: "1" });
+  const funding = files.filter(({ src }) => /li\.quest\/v1/.test(src));
+  expect(funding).toHaveLength(1);
+  expect(funding[0].f).toMatch(/^TradePanel-/);
+  expect(funding[0].src).toContain("private/register_bridge_deposit");
+  for (const { f, src } of files) if (f !== funding[0].f) expect(FUNDING_MARKER.test(src), f).toBe(false);
+  const mock = files.filter(({ src }) => /rysk-mock/.test(src));
+  expect(mock).toHaveLength(1);
+  expect(mock[0].f).toMatch(/^RyskMock-/);
+  expect(mock[0].src).not.toMatch(/li\.quest|eth_sendTransaction|private\/execute_quote|api\.rysk|fetch\(/);
+}, 120_000);
+
+it("discards optional provider code when trading and the Saloon are disabled", async () => {
+  const files = await bundle({ VITE_QUESTIONS: "", VITE_SALOON_TRADE: "", VITE_FUND_ANYCHAIN: "1", VITE_RYSK_MOCK: "1" }, [".js", ".css"]);
+  for (const { f, src } of files) {
+    expect(FUNDING_MARKER.test(src), f).toBe(false);
+    expect(RYSK_MARKER.test(src), f).toBe(false);
   }
 }, 120_000);
 

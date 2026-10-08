@@ -3,7 +3,7 @@
 // repeat (9002 backend unavailable, -32000 rate limit) are retried with a growing pause; a dropped
 // socket reconnects on the next call and logs in again. Nothing here holds or sends a wallet key.
 import { NETWORK, executeAllowed } from "./config.js";
-import { MAINNET_FILLS } from "../flags.js";
+import { FUND_ANYCHAIN, MAINNET_FILLS } from "../flags.js";
 
 export class DeriveError extends Error {
   constructor(code, message, data) {
@@ -25,6 +25,18 @@ export const EXECUTE = "private/execute_quote";
 
 /** Plain messages for what can go wrong (design 2.4). No codes on screen. */
 const PLAIN = {
+  ...(FUND_ANYCHAIN ? {
+  funding_route: "No route right now. Try another token or amount.",
+  funding_slow: "No fast route right now. Try another token or chain.",
+  funding_balances: "Wallet balances could not be read on this chain. Try again.",
+  funding_minimum: "Derive's deposit minimum is unavailable. Try again before sending.",
+  funding_below_minimum: "Too little would arrive after fees. Increase the amount.",
+  funding_amount: "Check the amount and your token balance.",
+  funding_changed: "This deposit price changed. Review a new route before sending.",
+  funding_network: "Funding is available on mainnet only. Nothing was sent.",
+  funding_account: "Your wallet or deposit account changed. Get a new route.",
+  funding_gas: "Not enough source-chain gas for this deposit. Add native tokens before sending.",
+  } : {}),
   11104: "That price is no longer open. Asking again.",
   11110: "Derive's screen has a better price. Get a new price.",
   11112: "Derive takes fewer legs in one package.",
@@ -196,6 +208,7 @@ export function createClient({
   let nextId = 1;
   let login = null; // { wallet, sign } to repeat after a reconnect
   let authVersion = 0;
+  let sessionReady = false;
   const pending = new Map();
   let status = "idle";
   const setStatus = (s) => { status = s; onStatus(s); };
@@ -224,6 +237,7 @@ export function createClient({
       sock.onclose = () => {
         if (ws !== sock) return;
         ws = null;
+        sessionReady = false;
         const wasOpening = !!opening;
         opening = null;
         rejectOpening = null;
@@ -264,11 +278,10 @@ export function createClient({
   }
 
   let relogin = null;
-  async function ensure() {
-    const fresh = !(ws && ws.readyState === 1);
+  async function ensure(skipLogin = false) {
     await open();
     assertOpen();
-    if (fresh && login) {
+    if (!sessionReady && login && !skipLogin) {
       relogin = relogin || doLogin(login).finally(() => { relogin = null; });
       await relogin;
     }
@@ -280,11 +293,22 @@ export function createClient({
     const signature = await sign(timestamp);
     assertOpen(); assertActive();
     if (version !== authVersion) throw closedError();
-    return sendOnce("public/login", { wallet, timestamp, signature });
+    const result = await sendOnce("public/login", { wallet, timestamp, signature });
+    assertOpen(); assertActive();
+    if (version === authVersion) sessionReady = true;
+    return result;
   }
 
   /** One call. `safe` (default true) allows Derive's retryable errors to be retried. */
-  async function call(method, params, { safe = true, assertActive = () => {}, beforeSend = () => {} } = {}) {
+  async function call(method, params, { safe = true, assertActive = () => {}, beforeSend = () => {}, skipLogin = false, publicOnly = false } = {}) {
+    if (publicOnly && (!method.startsWith("public/") || method === "public/login")) throw new DeriveError(-32602, "Not a public read");
+    // This display-only bridge registration carries its own fresh request authentication. A dropped
+    // socket must not trigger another wallet prompt after the source transfer has already left.
+    if (skipLogin) {
+      if (!FUND_ANYCHAIN) throw new DeriveError(-32602, "Request authentication unavailable");
+      if (method !== "private/register_bridge_deposit" || !params?.wallet
+        || (!(params.timestamp && params.signature) && login?.wallet?.toLowerCase() !== params.wallet.toLowerCase())) throw new DeriveError(-32602, "Invalid bridge registration authentication");
+    }
     // The fill guard, before anything and again at the last step before the wire: a fill goes only to
     // this build's own network, and on mainnet only while the published switch allows it for the
     // signed-in pilot wallet.
@@ -298,7 +322,7 @@ export function createClient({
     for (;;) {
       try {
         assertOpen(); assertActive();
-        await ensure();
+        await ensure(skipLogin || publicOnly);
         assertOpen(); assertActive();
         guard();
         beforeSend(); // no await between this boundary and the wire; sent calls still return their result
@@ -324,13 +348,14 @@ export function createClient({
       assertOpen(); assertActive();
       const auth = { wallet, sign };
       login = auth;
+      sessionReady = false;
       const version = ++authVersion;
       await open();
       assertOpen(); assertActive();
       if (version !== authVersion) throw closedError();
       return doLogin(auth, assertActive, version);
     },
-    logout() { authVersion += 1; login = null; },
+    logout() { authVersion += 1; login = null; sessionReady = false; },
     close() {
       if (closed) return;
       closed = true;

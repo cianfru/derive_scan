@@ -10,7 +10,7 @@ import btc from "./fixtures/questions/BTC.json";
 import rec from "./fixtures/trade/testnet_rfq_trades.json";
 
 const mock = vi.hoisted(() => ({ docs: {}, reads: [], settlements: [], rfqs: [] }));
-vi.mock("./lib/flags.js", () => ({ QUESTIONS_ON: true, TRADE_ON: true, TESTNET_FILLS: true, MAINNET_FILLS: false, ONE_TAP_FILLS: true, tradeMode: () => "testnet" }));
+vi.mock("./lib/flags.js", () => ({ FUND_ANYCHAIN: false, RYSK_MOCK: false, QUESTIONS_ON: true, TRADE_ON: true, TESTNET_FILLS: true, MAINNET_FILLS: false, ONE_TAP_FILLS: true, tradeMode: () => "testnet" }));
 vi.mock("./lib/data.js", () => ({ useData: (path) => ({ data: mock.docs[path] || null }) }));
 vi.mock("./lib/testnetLevels.js", async () => ({ ...await vi.importActual("./lib/testnetLevels.js"), useTestnetListing: () => null }));
 vi.mock("./lib/trade/sync.js", async () => ({ ...await vi.importActual("./lib/trade/sync.js"),

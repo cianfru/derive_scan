@@ -5,7 +5,9 @@ import { DEPOSIT_SUGGESTED, NETWORK } from "../../lib/trade/config.js";
 import { depositCheck } from "../../lib/trade/account.js";
 import { acceptTerms, connect, deposit, depositGasUsd, holdSend, pickAccount, refreshFunding, useSeat } from "../../lib/trade/seat.js";
 import ErrorDetail from "./ErrorDetail.jsx";
-import { MAINNET_FILLS } from "../../lib/flags.js";
+import { FUND_ANYCHAIN, MAINNET_FILLS } from "../../lib/flags.js";
+import AnyChainFunding, { BridgeProgress } from "./AnyChainFunding.jsx";
+import BuyInWallet from "./BuyInWallet.jsx";
 
 export const DERIVE_TERMS_URL = "https://www.derive.xyz/terms-of-use";
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "");
@@ -99,26 +101,33 @@ export function FundStep({ ethUsd }) {
   const seat = useSeat();
   const [dollars, setDollars] = useState(100);
   const [gasUsd, setGasUsd] = useState(null);
+  const [method, setMethod] = useState("direct");
+  const [fundingChain, setFundingChain] = useState(null);
   useEffect(() => {
+    if (FUND_ANYCHAIN && method === "bridge") { setGasUsd(null); return; }
     let live = true;
     depositGasUsd(dollars, ethUsd).then((g) => { if (live) setGasUsd(g); });
     return () => { live = false; };
-  }, [dollars, ethUsd, seat.depositAddress]);
+  }, [dollars, ethUsd, seat.depositAddress, method]);
   const chk = depositCheck(dollars, gasUsd);
   const isNew = !seat.saloon;
   const onWay = seat.arriving || seat.sentAmount || 0;
-  if (holdSend(seat)) {
+  const bridgeUnknown = FUND_ANYCHAIN && seat.bridge?.phase === "sending_unknown";
+  const bridgeAttention = FUND_ANYCHAIN && ["failed", "attention"].includes(seat.bridge?.phase);
+  if (holdSend(seat) || (FUND_ANYCHAIN && seat.bridge?.txHash)) {
     // One deposit to the new-account address opens the account; a second would open another.
     return (
       <div className="tr-step">
-        <p className="tr-lead">Your deposit is on its way
-          <Info label="Why you can't send again yet">Your first deposit opens your Derive account. Sending again before it lands would open a second account, so add more once this one is ready.</Info>
+        <p className="tr-lead">{bridgeUnknown ? "Check your wallet transfer" : bridgeAttention ? "Your transfer needs attention" : "Your deposit is on its way"}
+          {bridgeUnknown ? <Info label="Why funding is on hold">Cowboy has not received a confirmed source transaction. Your wallet may still be processing the request, so another deposit is blocked to avoid sending twice.</Info> : FUND_ANYCHAIN && seat.bridge?.txHash
+            ? <Info label="About deposit tracking">The transfer has left your wallet. Check its delivery and Derive balance before starting another deposit. A partial delivery or refund needs to be resolved first.</Info>
+            : <Info label="Why you can't send again yet">Your first deposit opens your Derive account. Sending again before it lands would open a second account, so add more once this one is ready.</Info>}
         </p>
-        <dl className="tr-figs">
+        {!bridgeAttention && !bridgeUnknown && <dl className="tr-figs">
           <div><dt>Arriving</dt><dd className="mono">{onWay > 0 ? money(onWay, { cents: true }) : "Not available yet"}</dd></div>
-        </dl>
-        <p className="tr-note">Derive credits a deposit after about 2 minutes of confirmations.</p>
-        <button className="btn primary lg" disabled>Send USDC</button>
+        </dl>}
+        {bridgeUnknown ? <p className="tr-note">The transfer's outcome is not confirmed. Check your wallet's activity. Cowboy keeps funding on hold while it checks for the deposit.</p> : FUND_ANYCHAIN && seat.bridge?.txHash ? <BridgeProgress /> : <p className="tr-note">Derive credits a deposit after about 2 minutes of confirmations.</p>}
+        {!bridgeUnknown && !(FUND_ANYCHAIN && seat.bridge?.txHash) && <button className="btn primary lg" disabled>Send USDC</button>}
         <div className="tr-actions">
           <button className="text-control" onClick={refreshFunding} disabled={seat.busy}>{seat.busy ? "Checking…" : "Check again"}</button>
         </div>
@@ -132,6 +141,11 @@ export function FundStep({ ethUsd }) {
         <Info label="About your Derive account">Cowboy trades from one Derive account owned by your wallet. Money already on Derive works too: once a Derive account holds USDC, Cowboy offers it, and nothing moves. Withdraw any time on Derive.</Info>
       </p>
       {seat.newAccount && <p className="tr-note">Your first deposit opens your Derive account.</p>}
+      {FUND_ANYCHAIN && <div className="fund-methods" role="group" aria-label="Funding method">
+        <button type="button" aria-pressed={method === "direct"} disabled={seat.busy} onClick={() => setMethod("direct")}>USDC on {NETWORK.chainName}</button>
+        <button type="button" aria-pressed={method === "bridge"} disabled={seat.busy} onClick={() => setMethod("bridge")}>Pay from another chain</button>
+      </div>}
+      {FUND_ANYCHAIN && method === "bridge" ? <AnyChainFunding onChainChange={setFundingChain} /> : <>
       <div className="tr-amount">
         <span className="q-dollar-field"><span>$</span>
           <input aria-label="Deposit amount" inputMode="decimal" value={dollars} onChange={(e) => setDollars(Math.max(0, Number(e.target.value.replace(/[^\d.]/g, "")) || 0))} />
@@ -156,6 +170,8 @@ export function FundStep({ ethUsd }) {
       <p className="tr-note">{MAINNET_FILLS
         ? `Send only USDC on ${NETWORK.chainName} to this address. Funded on Derive instead, it shows here after Check again.`
         : "Test USDC comes from Derive's testnet app. Funded there, it shows here after Check again."}</p>
+      </>}
+      {MAINNET_FILLS && <BuyInWallet provider={seat.provider} networkName={method === "bridge" && fundingChain ? fundingChain : "Ethereum"} disabled={seat.busy} />}
       {seat.message && <p className="tr-msg">{seat.message}<ErrorDetail detail={seat.detail} /></p>}
     </div>
   );

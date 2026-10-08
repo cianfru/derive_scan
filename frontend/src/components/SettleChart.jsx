@@ -36,7 +36,7 @@ export function payZones(lo, hi, side) {
  * (the board's quick look) it draws the date's levels as dotted lines.
  */
 export default function SettleChart({ und, candles, index, settleTs, lo = null, hi = null, side = null, breakeven = null,
-  levels = [], theme, compact = false, label, payout = null, publishedTs = null }) {
+  levels = [], theme, compact = false, label, payout = null, publishedTs = null, textSize = null }) {
   const box = useRef(null);
   const over = useRef(null);
   const tip = useRef(null);
@@ -54,7 +54,7 @@ export default function SettleChart({ und, candles, index, settleTs, lo = null, 
     const chart = createChart(box.current, {
       autoSize: true,
       localization: { priceFormatter: price, locale: "en-US" },
-      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: c("--muted"), fontFamily: "Chivo Mono, monospace", fontSize: compact ? 10 : 11, attributionLogo: false },
+      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: c("--muted"), fontFamily: "Chivo Mono, monospace", fontSize: textSize ?? (compact ? 10 : 11), attributionLogo: false },
       grid: { vertLines: { visible: false }, horzLines: { color: c("--seam") + "99" } },
       rightPriceScale: { borderColor: c("--seam") },
       timeScale: { borderColor: c("--seam"), timeVisible: tf === "4h", rightOffset: 0, fixLeftEdge: true },
@@ -179,7 +179,7 @@ export default function SettleChart({ und, candles, index, settleTs, lo = null, 
       schedule();
     }).catch(() => {});
     return () => { gone = true; applyLive.current = null; cancelAnimationFrame(frame); ro?.disconnect(); chart.unsubscribeCrosshairMove(onMove); chart.timeScale().unsubscribeVisibleLogicalRangeChange(schedule); chart.remove(); };
-  }, [rows, settleTs, tf, lo, hi, side, [].concat(breakeven ?? []).join(","), index, levels.join(","), theme, compact]);
+  }, [rows, settleTs, tf, lo, hi, side, [].concat(breakeven ?? []).join(","), index, levels.join(","), theme, compact, textSize]);
   useEffect(() => { if (lp) applyLive.current?.(lp.price, lp.ts, lp.fresh); }, [lp]);
   if (!rows?.length) return <p className="status">The {und} chart is not available right now.</p>;
   const what = side ? `${side === "yes" ? "Higher" : "Lower"} pays in full ${side === "yes" ? `at ${money(hi)} or above` : `at ${money(lo)} or below`}` : "the date's levels";

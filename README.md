@@ -120,7 +120,7 @@ Built 5 October 2026 (design P8); **on since 7 October 2026 for the pilot** (the
 - **Two locks, both needed.** (a) The published switch `trading_mainnet` in `questions/index.json`, from the repository variable `QUESTIONS_TRADING_MAINNET` (`on`, `sell_only`, `off`; unset or unknown means `off`), apart from the testnet's `trading`. The ticket reads it again, uncached, right before each fill; a read that fails counts as off. (b) The pilot list `VITE_SALOON_PILOT`: comma-separated wallet addresses (empty or unset means nobody). Eligible visitors get the one-tap ticket; everyone else gets a figures-only review with "One-tap trading is coming to Cowboy…" (`TradePanel` passes `oneTapComing` to `QuestionTicket`; `oneTapComing()` in `lib/pilot.js` says the same for other callers).
 - **The fill guard.** `fillsAllowed(network, mode, live)` and the client's last check before the wire (`executeAllowed` in `lib/trade/config.js`) allow `private/execute_quote` only in a mainnet build, on the mainnet endpoint and chain, while the switch allows that direction for the signed-in pilot wallet (or, as before, in a testnet build on the testnet). Every combination is tested (`lib/trade/mainnet.test.js`).
 - **Pilot browsers.** One tap shows in a browser that connected a listed wallet before, or that opened any page with `?pilot` once. Connecting a wallet that is not listed ends that and returns to the figures-only review. The header's wallet shows in pilot browsers only.
-- **Funding** uses Derive's standard deposit flow (Derive docs, Programmatic Onboarding): `public/register_deposit_address` for the PRIME Standard manager, then USDC on Ethereum (`0xA0b8…eB48`, the address Derive's `public/get_all_currencies` lists) sent from the wallet to that address; "Fund it on Derive instead" opens Derive's app.
+- **Funding** uses Derive's standard deposit flow: `public/register_deposit_address` for PRIME Standard, then official USDC on Ethereum (`0xA0b8…eB48`) sent to that address; "Fund it on Derive instead" opens Derive's app. Optional four-chain EVM funding and wallet purchase guidance are described below and in [the funding hub notes](docs/cross-chain-funding.md).
 - **Kept apart.** Browser keys use `cowboy-saloon-*:mainnet`; one-tap records join the mainnet journal (`cowboy-questions`) beside the trades placed by hand.
 
 ### Switching it on (owner)
@@ -136,6 +136,27 @@ Built 5 October 2026 (design P8); **on since 7 October 2026 for the pilot** (the
 - **Fast, no redeploy:** set `QUESTIONS_TRADING_MAINNET` to `off` (or `sell_only` to allow only sell backs). Each tap re-reads the published file, so it holds from the first publish after the change (minutes).
 - **Hard stop:** in Vercel, remove `VITE_SALOON_TRADE` (or empty `VITE_SALOON_PILOT`) and redeploy: the build then carries no trading code, or offers one tap to nobody.
 - Either way, positions already on Derive are untouched and settle as usual; users can sell them on Derive.
+
+## Funding hub (optional)
+
+Implemented 7 October 2026, with **cross-chain funding and the Rysk preview off by default**. This PR does not enable them in production. Direct Ethereum funding stays available; no real cross-chain transfer has been signed or sent during development, and the first owner mainnet deposit is pending.
+
+| Flag | Requirements and scope |
+| --- | --- |
+| `VITE_FUND_ANYCHAIN=1` | Requires `VITE_QUESTIONS=1` and a supported `VITE_SALOON_TRADE` mode. Adds **Pay from another chain**. Real transfers require `VITE_SALOON_TRADE=mainnet` and existing wallet/pilot eligibility; testnet and dry-run builds cannot send real bridge transfers. |
+| `VITE_RYSK_MOCK=1` | Requires `VITE_QUESTIONS=1`. Adds a lazily loaded **Receive premium** illustration beside **Buy outcome**. Made-up figures and a made-up seven-day term; no Rysk prices, wallet actions or orders. |
+
+The EVM funding picker supports **Ethereum, Base, Arbitrum and HyperEVM**. LI.FI's public chain/token catalogues supply metadata; approved public RPCs and Multicall3 read balances, without a LI.FI balances endpoint. The initial scan covers native currency and up to 40 common tokens per chain; **Find other tokens** expands the catalogue. Failed reads remain unavailable, not zero. Solana funding is not implemented.
+
+Routes request **FASTEST**, with no Cowboy integrator fee; provider and network fees still apply. Quotes expire after **60 seconds**, and estimated bridge duration must be at most **120 seconds**. Guaranteed Ethereum USDC arrival after fees and slippage must cover Derive's runtime deposit minimum plus `max($0.50, 10% of the minimum)`. Source balance/gas, recipient, token, amount and chain checks run before sending. Changed quotes require review if arrival or cost worsens. ERC-20 routes may need a separate exact-amount wallet approval; the allowance-aware quote includes its estimated gas in **Estimated total cost**, and refuses to guess an unavailable estimate. The wallet shows final network fees.
+
+Funding shows **bridge delivery → Derive account credit** as separate steps. Wallet/network-scoped receipts survive disconnects; a persisted pre-send intent also holds funding after a reload or ambiguous wallet response without a hash. If the wallet request was cancelled after reload, manual wallet-activity verification and reconciliation are needed; there is no automatic resend. Partial or unverified delivery remains held, while a proved revert/refund can reopen funding after a fresh balance check. Optional-code removal and these boundaries are covered by bundle and fake-wallet/provider tests.
+
+The 7 October read-only public quote returned an expected and guaranteed arrival of **9.46525 USDC for 10 USDC on Base**, via Mayan (Swift), with a three-second bridge estimate and a $5.50 minimum including margin. Wallet balances were mocked; no signature, approval, transfer or actual Derive credit was tested. The first owner deposit must measure total gas, arrived amount, Derive's fee and final credit time. Historical 6 October quotes are preserved separately in [the implementation and validation notes](docs/cross-chain-funding.md).
+
+Mainnet account setup also offers **Buy with Apple Pay in your wallet** guidance: buy USDC on the selected network if the wallet/provider offers it, then return to fund Derive. It is not an embedded onramp; payment fees, availability and identity checks are set by the wallet's provider. No owner business-onramp account or API key is required.
+
+The [Rysk discussion brief](docs/rysk-design.md) covers the owner's partner call and the obligation-first mock: collateral lock and possible purchase/sale, physical settlement and no early exit, followed by premium dollars and settlement examples. A future HyperEVM/Rysk funding adapter is not implemented; Derive cash and Rysk locked collateral remain distinct.
 
 ## X cards (`/control`)
 
@@ -251,6 +272,10 @@ phone journeys. These browser checks use deterministic published-data fixtures a
 mock public sockets; they do not connect a wallet or submit orders. Set
 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use an existing Chromium installation. CI also
 builds the default, testnet and mainnet configurations.
+
+Funding tests use fake wallet confirmations, public-provider responses and chain
+receipts; they never send real funds. Optional-flag bundle checks also verify that
+funding-provider and Rysk mock code are excluded when their flags are off.
 
 The decision draft (coin, outcome, side, decimal budget and comparison choices) is
 kept in the current browser session; live prices are read afresh. My space offers

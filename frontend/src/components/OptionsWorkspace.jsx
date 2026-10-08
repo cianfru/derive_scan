@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { Tabs, Info, Plate, PanelHead } from "./ui.jsx";
 import HistoryStrip from "./HistoryStrip.jsx";
 import SurfaceHistory from "./SurfaceHistory.jsx";
@@ -8,10 +9,15 @@ import { OIWall, Smile, TermStructure, MiniSeries, PricedByDate, TakerFlow } fro
 import { MoveBand, SkewInstrument, VolatilityTenors } from "./OptionsInstruments.jsx";
 import { expiryDate, expiryEvidence } from "../lib/research.js";
 import { pct, price, strike, utc, DASH } from "../lib/format.js";
+import { usePhoneLayout } from "../lib/usePhoneLayout.js";
+import PhoneDisclosure from "./PhoneDisclosure.jsx";
+import LiveMoney from "./LiveMoney.jsx";
+import { QUESTIONS_ON } from "../lib/flags.js";
+import "../phone-position-research.css";
 
 const contracts = (v) => `${v.toLocaleString("en-US", { maximumFractionDigits: 2 })} contracts`;
 
-function ExpiryDesk({ opts }) {
+function ExpiryDesk({ opts, compact = false, und }) {
   const exps = (opts.expiries || [])
     .filter((e) => opts.strikes?.expiries?.[String(e.expiry)])
     .sort((a, b) => a.expiry - b.expiry);
@@ -35,6 +41,38 @@ function ExpiryDesk({ opts }) {
   }, [key]);
   const index = opts.features?.index_price;
   if (!exps.length) return <p className="status desk-empty">No strikes for this market yet.</p>;
+  if (compact) return (
+    <div className="expiry-workspace phone-expiry-workspace">
+      <aside ref={rail} className="expiry-rail" aria-label="Expiries">
+        {exps.map(e => <button key={e.expiry} aria-pressed={e.expiry === key} onClick={() => setSelected(e.expiry)}>
+          <strong>{expiryDate(e.expiry).slice(5)}</strong><span>{Math.round(e.tenor_days) || "<1"}d</span>
+        </button>)}
+      </aside>
+      <div className="expiry-desk">
+        <div className="expiry-desk-heading"><h3>{expiryDate(key)} <span>{expiry?.tenor_days.toFixed(1)} days</span></h3>
+          <Info label="About this expiry">Every reading here uses the selected expiry's published option quotes. Priced range is the middle half of settlement outcomes implied by those quotes, not a view of where the coin settles.</Info>
+        </div>
+        <div className="phone-options-index"><span>Index now</span><b className="mono"><LiveMoney und={und} value={index} publishedTs={opts.ts} /></b></div>
+        <div className="selected-range">
+          <span className="label">Priced range<Info label="About the priced range">The middle half of outcomes option prices imply for this expiry, between the 25th and 75th percentiles of the pricing model. {implied?.method === "atm" ? "This expiry uses a single at-the-money volatility, so strike skew is left out." : "The model uses the checked volatility smile."} Market pricing, not our view. Strike snapshot {Number.isFinite(opts.chain_at) ? utc(opts.chain_at) : "time unavailable"}. The index above can update independently.</Info></span>
+          <strong>{implied?.q ? `$${price(implied.q[1])} — $${price(implied.q[3])}` : DASH}</strong>
+        </div>
+        {QUESTIONS_ON && <Link className="text-link phone-options-saloon" to={`/saloon/${und}`}>Open {und} in the Saloon<span aria-hidden="true">↗</span></Link>}
+        <PhoneDisclosure title="Expiry figures and strikes" lazy>
+          <div className="expiry-metrics">
+            <div><span>ATM volatility</span><b>{pct(expiry?.atm_iv)}</b></div>
+            <div><span>Forward</span><b>{Number.isFinite(expiry?.forward) ? `$${price(expiry.forward)}` : DASH}</b></div>
+            <div><span>Largest put</span><b>{put ? strike(put[0]) : DASH}</b>{put && <small>{contracts(put[2])}</small>}</div>
+            <div><span>Largest call</span><b>{call ? strike(call[0]) : DASH}</b>{call && <small>{contracts(call[1])}</small>}</div>
+          </div>
+          <div className="expiry-charts">
+            <section><PanelHead as="h4" title="Open interest by strike" info="Open contracts by strike, puts left and calls right on one contract scale. The dashed line is the published index. Concentrations do not reveal trade intent, support or resistance." /><OIWall rows={rows} index={index} allStrikes /></section>
+            <section><PanelHead as="h4" title="Volatility by strike" info="Implied volatility across strikes for this expiry: puts below the index, calls above. A higher left wing means downside protection is priced richer. Only quoted strikes are drawn." /><Smile rows={rows} index={index} /></section>
+          </div>
+        </PhoneDisclosure>
+      </div>
+    </div>
+  );
   return (
     <div className="expiry-workspace">
       <aside ref={rail} className="expiry-rail" aria-label="Expiries">
@@ -145,6 +183,8 @@ function DashCell({ kind, title, strip, className = "", children, ...stripProps 
 }
 
 export default function OptionsWorkspace({ opts, und, flow, embedded = false, hasSurface = false }) {
+  const phoneLayout = usePhoneLayout();
+  const phone = embedded && phoneLayout;
   const [view, setView] = useState("expiry");
   const [window, setWindow] = useState("24h");
   const f = opts.features || {},
@@ -154,25 +194,20 @@ export default function OptionsWorkspace({ opts, und, flow, embedded = false, ha
   const { data: doc } = useData(hasSurface ? `surface/${und}.json` : null, 30 * 60_000);
   const surface = useMemo(() => decodeSurface(doc), [doc]);
   const strips = useMemo(() => dashboardStrips(surface, opts), [surface, opts]);
+  const dashboard = <div className="options-dashboard plate">
+    <DashCell kind="move" title="30-day move" strip={strips.move}><MoveBand index={f.index_price} iv={f.atm_iv_30d} bare /></DashCell>
+    <DashCell kind="skew" title="30-day skew" strip={strips.skew} area><SkewInstrument rr={f.rr25_30d} bare /></DashCell>
+    <DashCell kind="term" title="Term structure" strip={strips.term} className="term-cell" zero><VolatilityTenors features={f} bare /></DashCell>
+  </div>;
   return (
-    <section id="options-detail" className={`options-workspace${embedded ? " embedded" : ""}`}>
+    <section id="options-detail" className={`options-workspace${embedded ? " embedded" : ""}${phone ? " phone-options-desk" : ""}`}>
       {!embedded && (
         <div className="section-heading">
           <h2>{und} options</h2>
           <span className="status mono">{historical ? "Historical · " : ""}{utc(opts.ts)}</span>
         </div>
       )}
-      <div className="options-dashboard plate">
-        <DashCell kind="move" title="30-day move" strip={strips.move}>
-          <MoveBand index={f.index_price} iv={f.atm_iv_30d} bare />
-        </DashCell>
-        <DashCell kind="skew" title="30-day skew" strip={strips.skew} area>
-          <SkewInstrument rr={f.rr25_30d} bare />
-        </DashCell>
-        <DashCell kind="term" title="Term structure" strip={strips.term} className="term-cell" zero>
-          <VolatilityTenors features={f} bare />
-        </DashCell>
-      </div>
+      {!phone && dashboard}
       <div className="options-desk plate">
         <div className="desk-tabs">
           <Tabs
@@ -187,7 +222,7 @@ export default function OptionsWorkspace({ opts, und, flow, embedded = false, ha
             ]}
           />
         </div>
-        {view === "expiry" && <ExpiryDesk opts={opts} />}
+        {view === "expiry" && <ExpiryDesk opts={opts} compact={phone} und={und} />}
         {view === "ranges" && (
           <div className="desk-panels">
             <Plate
@@ -232,6 +267,7 @@ export default function OptionsWorkspace({ opts, und, flow, embedded = false, ha
           </div>
         ))}
       </div>
+      {phone && <PhoneDisclosure title="Market pricing and history" className="phone-options-dashboard">{dashboard}</PhoneDisclosure>}
     </section>
   );
 }
