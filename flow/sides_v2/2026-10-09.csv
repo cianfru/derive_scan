@@ -62,3 +62,5 @@ bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sel
 1791509400,XAUT,perp,0.0,1098.2,0.0,0.0,2
 1791509400,XRP,perp,0.0,1538.37,0.0,0.0,2
 1791510300,HYPE,perp,0.0,152.54,0.0,0.0,1
+1791510300,CC,perp,0.0,549.54,0.0,0.0,1
+1791510300,ETH,perp,15000.16,1239.74,0.0,0.0,6
