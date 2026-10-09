@@ -52,14 +52,15 @@ describe("the amount panel", () => {
     expect(t.minPayout).toBe(60);
     expect(t.capped).toBe(false);
   });
-  it("reproduces ETH above $2,700: 1.08 contracts, and caps $100 at the size shown", () => {
+  it("reproduces ETH above $2,700: 1.08 contracts, and sizes $100 in full past the size shown", () => {
     const uncapped = ticket({ ...ethLevel, yes: { ...ethLevel.yes, size: 1e6 } }, "yes", 100, eth);
     expect(uncapped.contracts).toBe(1.08);
     expect(uncapped.premium.toFixed(2)).toBe("99.47");
     expect(uncapped.payout).toBeCloseTo(216);
     const capped = ticket(ethLevel, "yes", 100, eth);
-    expect(capped.capped).toBe(true);
-    expect(capped.payout).toBeCloseTo(40);
+    expect(capped.capped).toBe(true); // larger than the book shows; the firm quote prices it
+    expect(capped.contracts).toBe(1.08);
+    expect(capped.capPayout).toBeCloseTo(40);
     expect(capped.minPayout).toBeCloseTo(20); // 0.1 ETH contracts on a $200 zone
   });
   it("flags amounts under Derive's minimum (0.01 BTC)", () => {

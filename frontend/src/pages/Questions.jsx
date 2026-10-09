@@ -321,7 +321,7 @@ function OutcomeDetail({ und, board, found, sideKey, setSide, age, theme, render
                 </div>
                 {t ? <>
                   {t.belowMin && <p className="q-note warn">Smallest amount for this question: {money(t.minTotal, { cents: true })} with Derive's fees.</p>}
-                  {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
+                  {t.capped && <p className="q-note">Larger than Derive’s order book shows at this price ({money(t.capPayout)} of payout); the firm quote prices the full amount.</p>}
                   {t.mostLose > 0 && t.mostLose < 50 && <p className="q-note">Fees are a large share of small amounts.</p>}
                   <section className="md-preview" aria-label="What it pays"><TradeFigures und={und} level={level} side={sideKey} t={t} expiry={date.expiry} settleTs={date.settle_ts} summary compact /><p className="md-loss-note">Your cost is the most you can lose.</p></section>
                 </> : <p className="status">{amountValid ? <NoPrice level={level} side={sideKey} paused={paused} text={`No price now for ${ANSWER[sideKey]}`} /> : "Enter an amount greater than $0."}</p>}
@@ -434,7 +434,7 @@ function QuestionView({ und, board, found, sideKey, setSide, age, theme, lead, r
               {t ? (
                 <>
                   {t.belowMin && <p className="q-note warn">Smallest amount for this question: {money(t.minTotal, { cents: true })} with Derive's fees.</p>}
-                  {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
+                  {t.capped && <p className="q-note">Larger than Derive’s order book shows at this price ({money(t.capPayout)} of payout); the firm quote prices the full amount.</p>}
                   {t.mostLose > 0 && t.mostLose < 50 && <p className="q-note">Fees are a large share of small amounts.</p>}
                 </>
               ) : (

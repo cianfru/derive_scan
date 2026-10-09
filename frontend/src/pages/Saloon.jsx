@@ -174,7 +174,7 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose, opener, refre
         </div>
         {t ? <>
           {t.belowMin && <p className="q-note warn">Smallest amount here: {money(t.minTotal, { cents: true })} with Derive's fees.</p>}
-          {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
+          {t.capped && <p className="q-note">Larger than Derive’s order book shows at this price ({money(t.capPayout)} of payout); the firm quote prices the full amount.</p>}
           {!t.belowMin && <section className="md-preview" aria-label="What it pays"><TradeFigures und={und} level={level} side={side} t={t} expiry={row.expiry} settleTs={row.settleTs} summary compact /></section>}
         </> : <p className="status">{settling ? "Settling · average from 07:30 to 08:00 UTC" : valid ? `No price now for ${ANSWER[side]}.` : "Enter an amount greater than $0."}</p>}
         {atNow && <p className="decision-consequence">If {und} settles at {money(current.price)}, you get <b>{money(atNow.payout, { cents: true })}</b> · <b className={atNow.pl >= 0 ? "up" : "down"}>{signed(atNow.pl)}</b><Info label="About this settlement example">This example uses {current.source === "live" && current.fresh ? "the live index" : "the last available index"} and describes settlement at that price. Selling back early has a different value.</Info></p>}

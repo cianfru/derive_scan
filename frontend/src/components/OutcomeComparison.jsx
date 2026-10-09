@@ -86,7 +86,7 @@ function ComparisonItem({ selection, budget, now, onRemove, onSelect }) {
         <div><dt>Pays in full</dt><dd className="mono">{money(side === "yes" ? level.hi : level.lo)} or {side === "yes" ? "above" : "below"}</dd></div>
         <div><dt>Pays in part</dt><dd className="mono">{money(level.lo)}–{money(level.hi)}</dd></div>
       </dl> : <p className="oc-no-figures">Cost and payout unavailable.</p>}
-      {t?.capped && <p className="oc-size">Limited size at this price · {usd(t.mostLose)} of {usd(budget)} used.</p>}
+      {t?.capped && <p className="oc-size">Larger than the order book at this price; the firm quote prices it.</p>}
       {onSelect && <button type="button" className="text-control oc-open" onClick={() => onSelect(selection)}>Open details</button>}
     </article>
   );
