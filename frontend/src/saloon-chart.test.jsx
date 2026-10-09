@@ -122,6 +122,22 @@ describe("Saloon chart page", () => {
     expect(screen.getByText("No prices on Derive right now.")).toBeTruthy();
   });
 
+  it("keeps a tab for every coin with options, saying why one has no answer now", () => {
+    docs.current["questions/index.json"] = { ...idx, quiet: [
+      { und: "ETH", thin: false, index: 2500, reason: "wide" }, { und: "CC", thin: true, index: null, reason: "thin" }] };
+    show("/saloon?coin=ETH");
+    const tabs = within(screen.getByRole("tablist", { name: "Coin" }));
+    expect(tabs.getByRole("tab", { name: /Ethereum.*prices too wide/i }).getAttribute("aria-selected")).toBe("true");
+    expect(tabs.getByText("Market too thin")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "No ETH answers right now" })).toBeTruthy();
+    expect(screen.getByText(/checks every 15 minutes/)).toBeTruthy();
+    fireEvent.click(tabs.getByRole("tab", { name: /market too thin/i }));
+    expect(screen.getByRole("heading", { name: "CC: market too thin" })).toBeTruthy();
+    cleanup();
+    show();  // the default coin is one with answers
+    expect(within(screen.getByRole("tablist", { name: "Coin" })).getByRole("tab", { selected: true }).textContent).toMatch(/BTC/);
+  });
+
   it("draws where directional traders lean on each date, and says it in the panel", () => {
     expect(traderText(smartBtc.dates[4].traders)).toBe("7 long · 8 short, most of the money short");
     expect(traderText(smartBtc.dates[5].traders)).toBe("1 long · 1 short, too few traders to read");

@@ -37,11 +37,11 @@ def sweep(und: str, snaps: list[tuple[int, Path]]) -> dict:
         except (OSError, ValueError):
             continue
         for d in coin["dates"].values():
-            d["check_hour"] = None  # one gate check per snapshot
+            d["check_slot"] = None  # one gate check per snapshot
         board = Q.step(und, chain, ts, Q.DEFAULT_SPEC, coin)
         passing = 0
         for e, d in coin["dates"].items():
-            if not Q.offered(e, ts) or d["zone"] is None or d["check_hour"] != ts // 3600:
+            if not Q.offered(e, ts) or d["zone"] is None or d.get("check_slot") != ts // Q.QUESTION_GATES["check_sec"]:
                 continue
             ok = bool(d["checks"] and d["checks"][-1])
             passing += ok

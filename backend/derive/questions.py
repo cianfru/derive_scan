@@ -36,8 +36,9 @@ QUESTION_GATES = {
     "ladder": 7, "ladder_more": 15,               # levels shown, and after "More levels"
     "yes_min": 0.03, "yes_max": 0.97,             # Yes buy window for the ladder
     "min_days": 1.0, "max_days": 35.0,            # dates offered (time to the 08:00 UTC expiry)
-    "date_window": (3, 4),                        # date shown: headline passes in 3 of the last 4 hourly checks
+    "date_window": (3, 4),                        # date shown: headline passes in 3 of the last 4 checks (one per 15 min)
     "lapse_checks": 4,                            # a shown date goes after this many failed checks in a row
+    "check_sec": 900,                             # one gate check per date per 15-minute slot (owner, 9 October 2026; it was hourly)
     "headline_hold": 2,                           # slots the forward must sit nearer a new level
     "zone_change_min_days": 7.0,                  # the one allowed zone change, only this far out
     "settling_sec": 1800,                         # "Settling" from 07:30 UTC
@@ -343,20 +344,20 @@ def nearest(levels: list[float], x: float) -> float | None:
 # -- one snapshot ------------------------------------------------------------------------------
 def new_date_state() -> dict:
     return {"zone": None, "zone_set": None, "zone_changes": 0, "headline": None, "cand": None, "cand_n": 0,
-            "checks": [], "check_hour": None, "shown": False, "ids": {}, "retired": []}
+            "checks": [], "check_slot": None, "shown": False, "ids": {}, "retired": []}
 
 
 def step(und: str, chain: dict, ts: int, spec: dict, state: dict) -> dict:
     """Advance one coin's state by one snapshot and return its board.
 
     state (mutated): {"dates": {YYYYMMDD: date state}}. The board lists every date on the board or
-    still holding published ids, with priced levels. One hourly gate check per date per hour."""
+    still holding published ids, with priced levels. One gate check per date per 15-minute slot."""
     options = chain.get("options") or {}
     perp = chain.get("perp") or {}
     exs = expiries(options)
     index = _f(perp.get("I")) or next((_f(t.get("I")) for t in options.values() if _f(t.get("I"))), None)
     dates = state.setdefault("dates", {})
-    hour = ts // 3600
+    slot = ts // QUESTION_GATES["check_sec"]
     board = {"und": und, "ts": ts, "index": index, "thin": tier(und) == "thin", "dates": []}
     if not index:
         return board
@@ -399,9 +400,9 @@ def step(und: str, chain: dict, ts: int, spec: dict, state: dict) -> dict:
         else:
             ds["cand"], ds["cand_n"] = None, 0
         priced = {k: price_level(ex, k - w / 2, k + w / 2, index, spec) for k in levels}
-        # Hourly gate check on the headline; the date shows on 3 of the last 4 (or all, while fewer).
-        if ds["check_hour"] != hour and ds["headline"] is not None:
-            ds["check_hour"] = hour
+        # Gate check on the headline once per slot; the date shows on 3 of the last 4 (or all, while fewer).
+        if ds.get("check_slot") != slot and ds["headline"] is not None:
+            ds["check_slot"] = slot
             ds["checks"] = (ds["checks"] + [passes(priced.get(ds["headline"]), und)])[-max(QUESTION_GATES["date_window"][1], QUESTION_GATES["lapse_checks"]):]
             need, window = QUESTION_GATES["date_window"]
             last = ds["checks"][-window:]

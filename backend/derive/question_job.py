@@ -7,7 +7,7 @@ Data branch (always, small):
                                         ts,id,fair,yes_buy,yes_sell,no_buy,no_sell,index
 
 App files (site-data), only when publishing is switched on (QUESTIONS_PUBLISH=on):
-  questions/index.json                  coins with at least one live question, prices_ts, and `trading`:
+  questions/index.json                  coins with at least one live question (`quiet`: the others, with why), prices_ts, and `trading`:
                                         the Saloon stage 2 kill switch (on / sell_only / off, from
                                         QUESTIONS_TRADING; default on, any other value off), and
                                         `trading_mainnet`: the same switch for real-money one tap
@@ -288,7 +288,25 @@ def write_site(site: Path, root: Path, boards: dict, state: dict, now: float, pr
     (out / "index.json").write_text(_dump({"schema": SCHEMA, "prices_ts": prices_ts, "generated_at": int(now), "trading": trading_state(),
                                            "trading_mainnet": trading_mainnet_state(),
                                            **trading_lease(now),
-                                           "coins": sorted(coins, key=lambda c: (c["thin"], Q.QUESTION_GATES["majors"].index(c["und"]) if not c["thin"] else 0, -c["questions"]))}))
+                                           "coins": sorted(coins, key=lambda c: (c["thin"], Q.QUESTION_GATES["majors"].index(c["und"]) if not c["thin"] else 0, -c["questions"])),
+                                           "quiet": quiet_coins(state, boards, {c["und"] for c in coins}, now)}))
+
+
+def quiet_coins(state: dict, boards: dict, shown: set, now: float) -> list[dict]:
+    """Coins with options on Derive but no answer to offer now, each with the reason the app shows
+    on its tab (owner, 9 October 2026: a missing tab made Cowboy look empty): "wide" when a date has
+    levels but its prices fail the cost or size check, "thin" when no level can be built, "none"
+    when Derive lists no date in the Saloon's range."""
+    out = []
+    for und, coin in state["coins"].items():
+        if und in shown:
+            continue
+        dates = coin.get("dates") or {}
+        offered = [e for e in dates if Q.offered(e, now)]
+        reason = "wide" if any(dates[e].get("zone") for e in offered) else "thin" if offered else "none"
+        out.append({"und": und, "thin": Q.tier(und) == "thin", "index": (boards.get(und) or {}).get("index"), "reason": reason})
+    majors = Q.QUESTION_GATES["majors"]
+    return sorted(out, key=lambda c: (c["und"] not in majors, majors.index(c["und"]) if c["und"] in majors else 0, c["und"]))
 
 
 def kept_chains(root: Path, source: str, und: str, since: float, until: float = float("inf")) -> list[tuple[int, Path]]:
