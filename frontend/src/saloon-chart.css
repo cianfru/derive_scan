@@ -89,15 +89,21 @@
 .sl-amount { display: grid; gap: 8px; }
 .sl-amount .label { display: inline-flex; align-items: center; gap: 4px; }
 .sl-smart { margin: 0; font-size: 13px; }
-.sl-smart > p { margin: 0; color: var(--sl-gold); font-weight: 600; }
-.sl-wallets { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; }
-.sl-wallets li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; min-height: 32px; border-top: 1px solid var(--border); padding: 4px 2px 0 0; }
+.sl-smart > p { margin: 0; }
+.sl-smart > p:first-child { color: var(--sl-gold); font-weight: 600; }
+.sl-best { margin: 4px 0 0; color: var(--text-2); }
+.sl-wallets { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 0; }
+.sl-wallets li { display: grid; gap: 2px; border-top: 1px solid var(--border); padding: 6px 2px 6px 0; }
 .sl-wallets li:first-child { border-top: 0; }
+.sl-wallet-top { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.sl-wallet-top > :last-child { margin-left: auto; white-space: nowrap; }
+.sl-rank { color: var(--accent-text); font-weight: 600; min-width: 3ch; }
 .sl-wallet { color: var(--text-1); text-decoration: underline; text-decoration-color: var(--border-2, var(--border)); text-underline-offset: 3px; min-width: 0; overflow: hidden; }
 .sl-wallet:hover, .sl-wallet:focus-visible { color: var(--accent); }
 .sl-wallets .up { color: var(--up); } .sl-wallets .down { color: var(--down); }
-.sl-wallet-pnl { color: var(--text-2); text-align: right; }
-@media (hover: none) { .sl-wallets li { min-height: 44px; } }
+.sl-record { margin: 0; display: flex; flex-wrap: wrap; gap: 2px 10px; color: var(--text-2); font-size: 12px; }
+.sl-short { color: var(--text-1); border-bottom: 1px dashed var(--border-2, var(--border)); }
+@media (hover: none) { .sl-wallet-top { min-height: 44px; } }
 .sl-panel .btn.primary { width: 100%; }
 .sl-foot { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; color: var(--text-3); font-size: 12px; }
 .sl-foot span { flex: 1 1 100%; }

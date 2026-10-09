@@ -873,20 +873,26 @@ def _zone_wallets(level: dict, settle_ts: int, legs: list, und: str) -> dict:
 
 
 LEVEL_WALLETS_LISTED = 8
+RECORD_FIELDS = ("rank", "option_pnl", "win_rate", "expired", "premium_traded", "first")
 
 
-def level_smart_wallets(level: dict, settle_ts: int, legs: list, und: str, who: dict | None = None) -> dict | None:
-    """{"long", "short", "wallets"}: smart wallets at this level and date, each counted by its own net delta in the
-    zone. `wallets` names them (owner, 9 October 2026: "I click on them ... and I can see their P&L"), the largest
-    first, with their side, delta in the zone and options PnL and rank from traders.json (`who`)."""
+def level_smart_wallets(level: dict, settle_ts: int, legs: list, und: str, who: dict | None = None,
+                        ranked_total: int | None = None) -> dict | None:
+    """{"long", "short", "ranked_total", "wallets"}: smart wallets at this level and date, each counted by its own
+    net delta in the zone (every wallet counts once; rank never weighs the count). `wallets` names them (owner,
+    9 October 2026: "I click on them ... and I can see their P&L"), best rank first (owner, same day: "shall we rank
+    them?"), each with its side, delta in the zone and track record from traders.json (`who`): rank, options PnL,
+    win rate and count of settled options, premium traded and first trade."""
     per = _zone_wallets(level, settle_ts, legs, und)
     if not per:
         return None
     long_, short = sum(v > 0 for v in per.values()), sum(v < 0 for v in per.values())
+    who = who or {}
+    order = sorted(per.items(), key=lambda kv: (who.get(kv[0], {}).get("rank") or float("inf"), -abs(kv[1])))
     wallets = [{"address": w, "side": "long" if v > 0 else "short", "delta_usd": round(v),
-                "option_pnl": (who or {}).get(w, {}).get("option_pnl"), "rank": (who or {}).get(w, {}).get("rank")}
-               for w, v in sorted(per.items(), key=lambda kv: -abs(kv[1]))[:LEVEL_WALLETS_LISTED]]
-    return {"long": long_, "short": short, "wallets": wallets}
+                **{k: who.get(w, {}).get(k) for k in RECORD_FIELDS}}
+               for w, v in order[:LEVEL_WALLETS_LISTED]]
+    return {"long": long_, "short": short, "ranked_total": ranked_total, "wallets": wallets}
 
 
 def smart_marks(level: dict, settle_ts: int, legs: list, und: str) -> dict:
@@ -944,9 +950,11 @@ def annotate_smart(site: Path, legs: list, book: dict | None = None, chains: dic
     except (OSError, ValueError):
         return
     try:
-        who = {r["address"].lower(): r for r in json.loads((site / "traders.json").read_text()).get("traders") or []}
+        tdoc = json.loads((site / "traders.json").read_text())
+        who = {r["address"].lower(): r for r in tdoc.get("traders") or []}
+        ranked_total = tdoc.get("ranked_total")
     except (OSError, ValueError, AttributeError, KeyError):
-        who = {}
+        who, ranked_total = {}, None
     for coin in idx.get("coins") or []:
         und, path = coin["und"], site / "questions" / f"{coin['und']}.json"
         try:
@@ -963,7 +971,7 @@ def annotate_smart(site: Path, legs: list, book: dict | None = None, chains: dic
             for level in date.get("levels") or []:
                 marks = smart_marks(level, date["settle_ts"], legs, und)
                 level.pop("smart_wallets", None)
-                counts = level_smart_wallets(level, date["settle_ts"], legs, und, who)
+                counts = level_smart_wallets(level, date["settle_ts"], legs, und, who, ranked_total)
                 if counts:
                     level["smart_wallets"] = counts
                 shown = date.get("board") and level.get("ladder") and level.get("state") not in ("retired", "tail")
