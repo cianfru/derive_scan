@@ -1,0 +1,2 @@
+ts,instrument,kind,underlying,direction,amount,price,index_price,notional_usd,premium_usd,wallet,subaccount_id,rfq,realized_pnl
+1791504463845,ETH-20261127-3200-C,option,ETH,sell,100.0,23.316650636517,2474.60095309765,247460.1,2331.67,0x4D25819e9De2A2EEEdDca953D1eF0182680a7054,90,1,0.0
