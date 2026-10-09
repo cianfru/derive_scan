@@ -170,7 +170,8 @@ While Derive's connection is down or its prices are older than 60 s, the publish
 unchanged. `/health` reports the connection, the age of the last price and the files served.
 
 Deploy (owner): a Railway service from this repository with root directory `backend` (it reads
-`backend/railway.toml`: the Dockerfile, start command `python -m live.server`, health check `/health`),
+`backend/railway.toml`: the Dockerfile, start command `python -m live.server`, health check `/health`;
+the Dockerfile's own command is the live service too, so a start command left in Railway's settings is the only override),
 a custom domain `live.cowboy.trading` (a CNAME at the DNS provider; the app's CSP allows it), then
 `VITE_LIVE_URL=https://live.cowboy.trading/` on the Vercel project `torq` and a redeploy. Without
 `VITE_LIVE_URL` the app reads the published files exactly as before. Optional variables:
