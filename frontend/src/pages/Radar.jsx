@@ -18,8 +18,8 @@ const EPS = 1e-6;
 const MS_PER_CLOSE = 450, REDUCED_MS = 700;
 const signedPct = (v) => (Number.isFinite(v) ? `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v * 100).toFixed(0)}%` : DASH);
 
-const RADAR_HELP = "Across: the 1D engine's price stretch, in standard deviations from its trend. Up: the Smart cohort's net option delta divided by its gross absolute option delta, from −100% to +100%, on expiries inside the selected window (7 or 30 days). Circle area: gross dollar delta exposure, relative to the largest shown; fill: the daily engine's reading. Markets without a current wallet reading sit on the strip above the axis at their price stretch. Exposure, not a count of traders; context side by side, not an entry score.";
-const RADAR_HISTORY_HELP = "History: the selected market trails its last 7 daily closes, oldest faintest; All trails shows every plotted market's trail. Replay steps through the last 30, with circle sizes and the stretch axis on one scale across them. Past wallet readings are rebuilt from Derive's trade history with the Smart cohort as it stood on each day, so later results never choose the wallets. Hollow dot: delta modelled from trade prices; filled dot: delta from recorded option quotes. Dotted step: expiries left or entered the window at that close, so the move comes from the window, not from trading. Where no option quotes were recorded and a position had no recent traded implied volatility, the close is shown as unavailable rather than modelled. In Replay every figure beside the map is the selected close's; options readings are not kept per close. Grey circle: no recorded engine reading for that close. Context, not a signal.";
+const RADAR_HELP = "Across: the 1D engine's price stretch, in standard deviations from its trend. Up: the Smart wallets' net option delta divided by its gross absolute option delta, from −100% to +100%, on expiries inside the selected window (7 or 30 days). Circle area: gross dollar delta exposure, relative to the largest shown; fill: the daily engine's reading. Markets without a current wallet reading sit on the strip above the axis at their price stretch. Exposure, not a count of traders; context side by side, not an entry score.";
+const RADAR_HISTORY_HELP = "History: the selected market trails its last 7 daily closes, oldest faintest; All trails shows every plotted market's trail. Replay steps through the last 30, with circle sizes and the stretch axis on one scale across them. Past wallet readings are rebuilt from Derive's trade history with the Smart wallets as they stood on each day, so later results never choose the wallets. Hollow dot: delta modelled from trade prices; filled dot: delta from recorded option quotes. Dotted step: expiries left or entered the window at that close, so the move comes from the window, not from trading. Where no option quotes were recorded and a position had no recent traded implied volatility, the close is shown as unavailable rather than modelled. In Replay every figure beside the map is the selected close's; options readings are not kept per close. Grey circle: no recorded engine reading for that close. Context, not a signal.";
 
 /** Places strip labels in up to three rows so neighbours never overlap. */
 function stripRows(items, x) {
@@ -128,7 +128,7 @@ export function RadarMap({ points, strip = [], focus, onSelect, trails = null, s
   const xTicks = narrow ? [-bound, 0, bound] : [-bound, -bound / 2, 0, bound / 2, bound];
   return (
     <div ref={box} className="radar-map-box">
-      <svg className="radar-map" viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="group" aria-label="Radar: 1D price stretch versus Smart cohort option delta balance">
+      <svg className="radar-map" viewBox={`0 0 ${W} ${H}`} width={W} height={H} role="group" aria-label="Radar: 1D price stretch versus Smart wallets' option delta balance">
         {[-1, -0.5, 0, 0.5, 1].map((v) => (
           <g key={v}>
             <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} className={v === 0 ? "radar-zero" : "trace-grid"} />
@@ -474,9 +474,9 @@ export default function Radar() {
             </div>
             <div className="rd-figs">
               <div><span>1D stretch<Info label="About stretch">How far the price sits from its daily trend, in standard deviations, from the 1D engine. Context, not a signal.</Info></span><b>{Number.isFinite(zShown) ? z(zShown) : <Empty />}</b></div>
-              <div><span>Delta balance<Info label="About delta balance">The Smart cohort's net option delta divided by its gross option delta on expiries in the window: +100% all long delta, −100% all short. Exposure, not a count of traders.</Info>{wUnavailable && <> <Info label="Why the wallet reading is unavailable">{NO_IV_HELP}</Info></>}</span>
+              <div><span>Delta balance<Info label="About delta balance">The Smart wallets' net option delta divided by its gross option delta on expiries in the window: +100% all long delta, −100% all short. Exposure, not a count of traders.</Info>{wUnavailable && <> <Info label="Why the wallet reading is unavailable">{NO_IV_HELP}</Info></>}</span>
                 <b>{wValue ? `${(wValue.y * 100).toFixed(0)}%` : wUnavailable ? "Unavailable" : <Empty />}</b></div>
-              <div><span>Gross delta<Info label="About gross delta">The dollar size of the Smart cohort's option delta on this coin, long and short added together.</Info></span><b>{wValue ? usd(wValue.gross) : wUnavailable ? "Unavailable" : <Empty />}</b></div>
+              <div><span>Gross delta<Info label="About gross delta">The dollar size of the Smart wallets' option delta on this coin, long and short added together.</Info></span><b>{wValue ? usd(wValue.gross) : wUnavailable ? "Unavailable" : <Empty />}</b></div>
             </div>
             <details className="rd-history-details">
               <summary>History</summary>

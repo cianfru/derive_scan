@@ -79,8 +79,8 @@ it("opens Markets and Traders as disclosure menus: arrows move, Escape closes an
   expect(screen.queryByRole("group", { name: "Markets pages" })).toBeNull();
   const tm = screen.getByRole("group", { name: "Traders pages" });
   expect(within(tm).getAllByRole("link").map((a) => [a.textContent, a.getAttribute("href")])).toEqual(
-    [["Leaderboard", "/traders"], ["Cohorts", "/traders/cohorts"]]);
-  await user.click(within(tm).getByRole("link", { name: "Cohorts" }));
+    [["Leaderboard", "/traders"], ["Posses", "/traders/posses"]]);
+  await user.click(within(tm).getByRole("link", { name: "Posses" }));
   expect(screen.queryByRole("group", { name: "Traders pages" })).toBeNull();
   expect(document.activeElement).toBe(traders);
 });
@@ -102,7 +102,7 @@ it("marks the active section: Saloon, Markets, Traders or My space, underlined, 
     shellAt(path);
     expect(active(), path).toEqual(["Markets"]);
   }
-  for (const path of ["/traders", "/traders/cohorts", "/trader/0xabc"]) {
+  for (const path of ["/traders", "/traders/posses", "/trader/0xabc"]) {
     cleanup();
     shellAt(path);
     expect(active(), path).toEqual(["Traders"]);

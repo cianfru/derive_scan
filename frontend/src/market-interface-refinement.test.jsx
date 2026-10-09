@@ -137,8 +137,9 @@ it("exposes mobile trader values and offers all mobile cohort choices", () => {
   cleanup();
   const names = ["Money Printer", "Smart Money", "Grinder", "Humble Earner", "Exit Liquidity", "Semi-Rekt", "Full Rekt", "Giga-Rekt"];
   render(<MemoryRouter><CohortExplorer cohorts={{ pnl: names.map((name) => ({ name, wallets: 3, windows: { all: { coins: {} } } })) }} through="2026-10-06" /></MemoryRouter>);
-  const select = screen.getByRole("combobox", { name: "Select trader cohort" });
+  const select = screen.getByRole("combobox", { name: "Select trader posse" });
   expect(within(select).getAllByRole("option")).toHaveLength(8);
   fireEvent.change(select, { target: { value: "Giga-Rekt" } });
-  expect(screen.getByRole("heading", { name: "Giga-Rekt" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Boot Hill" })).toBeTruthy(); // the code stays, people see the Western name
+  expect(screen.queryByText(/Giga-Rekt/)).toBeNull();
 });

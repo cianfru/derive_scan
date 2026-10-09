@@ -3,7 +3,7 @@ import { useLocation, useNavigationType } from "react-router-dom";
 
 const positions = new Map();
 const names = { "/": "Cowboy", "/markets": "Markets", "/radar": "Radar", "/options": "Options",
-  "/flow": "Flow", "/traders": "Traders", "/traders/cohorts": "Cohorts", "/saloon/mine": "Positions",
+  "/flow": "Flow", "/traders": "Traders", "/traders/posses": "Posses", "/saloon/mine": "Positions",
   "/saloon/following": "Following", "/saloon": "Saloon" };
 
 export function pageTitle(pathname, search = "") {

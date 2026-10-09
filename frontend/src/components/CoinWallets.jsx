@@ -5,6 +5,7 @@ import { usd, strike } from "../lib/format.js";
 import { viewReading } from "../lib/presentation.js";
 import { TYPE } from "../lib/traders.js";
 import { Plate, Tabs, Loading, Empty } from "./ui.jsx";
+import { posseName } from "../lib/posses.js";
 import WalletTag from "./WalletTag.jsx";
 
 const day = (t) => new Date(t * 1000).toISOString().slice(5, 10);
@@ -41,14 +42,14 @@ function Cohorts({ cohorts }) {
   const rows = (cohorts?.[dim] || []).filter((c) => c[win]?.positions);
   const max = Math.max(0, ...rows.map((c) => Math.abs(c[win].net_delta_usd || 0)));
   return (
-    <Plate className="cohorts-plate" title="Cohorts" info="Every options trader on Derive except market makers, grouped by results on expired options (Money Printer to Giga-Rekt) or by premium traded (Leviathan to Shrimp). Each bar is the group's net dollar delta on this coin's open options, scaled to the largest group in the list: right gains from a rise, left from a fall. Colour shows the net as a share of the group's gross delta: green or red past a quarter, grey in between."
+    <Plate className="cohorts-plate" title="Posses" info="Every options trader on Derive except market makers, grouped by results on expired options (Legend to Boot Hill) or by premium traded (Railroad Baron to Tenderfoot). Each bar is the group's net dollar delta on this coin's open options, scaled to the largest group in the list: right gains from a rise, left from a fall. Colour shows the net as a share of the group's gross delta: green or red past a quarter, grey in between."
       right={<Tabs label="Expiries" value={win} onChange={setWin} items={[["7d", "7D"], ["30d", "30D"], ["all", "All"]]} />}>
       <Tabs label="Group by" value={dim} onChange={setDim} items={[["pnl", "Results"], ["size", "Size"]]} />
       {rows.length ? (
         <div className="cohort-rows">
           {rows.map((c) => (
             <div key={c.name} className="cohort-row">
-              <span className="name"><b>{c.name}</b><small className="mono">{c[win].positions} pos.</small></span>
+              <span className="name"><b>{posseName(c.name)}</b><small className="mono">{c[win].positions} pos.</small></span>
               <DeltaBar value={c[win].net_delta_usd} max={max} score={c[win].score} />
               <span className={`delta-num ${tone(c[win].score)}`}>{c[win].net_delta_usd == null ? <Empty /> : usd(c[win].net_delta_usd)}</span>
             </div>))}
@@ -70,7 +71,7 @@ function Holders({ holders, total }) {
               return (
                 <Link key={h.address} className="holder" to={`/trader/${h.address.toLowerCase()}`}>
                   <span className="who"><WalletTag address={h.address} size={22} />
-                    <small>{h.tier ? <b>{TYPE[h.tier]}</b> : TYPE[h.class] || "Trader"} · #{h.rank}{h.pnl_cohort ? ` · ${h.pnl_cohort}` : ""}</small></span>
+                    <small>{h.tier ? <b>{TYPE[h.tier]}</b> : TYPE[h.class] || "Trader"} · #{h.rank}{h.pnl_cohort ? ` · ${posseName(h.pnl_cohort)}` : ""}</small></span>
                   <span className="leg">{leg ? <>{leg.net > 0 ? "Long" : "Short"} {strike(leg.strike, "")} {leg.type === "C" ? "call" : "put"} · {day(leg.expiry)}</> : <Empty />}
                     {h.positions > 1 ? <em> +{h.positions - 1}</em> : null}</span>
                   <span className={`delta-num ${h.net_delta_usd > 0 ? "up" : h.net_delta_usd < 0 ? "down" : ""}`}>{usd(h.net_delta_usd)}</span>

@@ -129,7 +129,7 @@ test("narrow phone navigation keeps Traders and My space separate", async ({ pag
   const a = await traders.boundingBox(), b = await space.boundingBox();
   expect(a.x + a.width).toBeLessThanOrEqual(b.x - 4);
   await traders.click();
-  await expect(page.getByRole("link", { name: "Cohorts", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Posses", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   await space.click();
   await expect(page.getByRole("link", { name: "Following", exact: true })).toBeVisible();
