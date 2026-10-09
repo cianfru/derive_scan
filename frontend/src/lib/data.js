@@ -5,17 +5,31 @@ export { publicationState } from "./publication.js";
 
 export const DATA_URL = import.meta.env.VITE_DATA_URL || "https://raw.githubusercontent.com/cianfru/cowboy-feed/site-data/";
 const TTL = 60_000;
+// The live service (Railway) re-prices the Saloon's files from Derive every few seconds; they are
+// read from there when VITE_LIVE_URL is set, and from the published data if it does not answer.
+export const LIVE_URL = import.meta.env.VITE_LIVE_URL || "";
+const LIVE_PATH = /^questions\/(index|[A-Z0-9]+)\.json$/;
+export const isLivePath = (path) => !!LIVE_URL && LIVE_PATH.test(path || "");
+const LIVE_TTL = 3000;
+export const LIVE_REFRESH_MS = 5000;
 const cache = new Map();
 const inflight = new Map();
 export const DATA_TIMEOUT_MS = 8000;
 
 async function read(path) {
+  if (isLivePath(path)) {
+    try { return await readFrom(LIVE_URL, path); } catch { /* the published copy below */ }
+  }
+  return readFrom(DATA_URL, path);
+}
+
+async function readFrom(base, path) {
   const controller = new AbortController();
   let timer;
   try {
     return await Promise.race([
       (async () => {
-        const r = await fetch(DATA_URL + path, { cache: "no-cache", signal: controller.signal });
+        const r = await fetch(base + path, { cache: "no-cache", signal: controller.signal });
         if (!r.ok) throw Object.assign(new Error(`Data unavailable (${r.status}). It refreshes every 15 minutes.`), { status: r.status, code: "http" });
         let data;
         try { data = await r.json(); } catch { throw Object.assign(new Error("Published data could not be read. Try again shortly."), { code: "invalid_data" }); }
@@ -36,7 +50,7 @@ async function read(path) {
 export async function load(path, { force = false } = {}) {
   if (inflight.has(path)) return inflight.get(path);
   const hit = cache.get(path);
-  if (!force && hit && Date.now() - hit.at < TTL) return hit.data;
+  if (!force && hit && Date.now() - hit.at < (isLivePath(path) ? LIVE_TTL : TTL)) return hit.data;
   const request = (async () => {
     let data;
     try { data = await read(path); } catch (error) {
@@ -58,6 +72,7 @@ export async function load(path, { force = false } = {}) {
 /** A published file, refreshed every refreshMs. A null path reads nothing (no request).
  *  missing is true when the file does not exist (HTTP 404), e.g. a wallet with no profile. */
 export function useData(path, refreshMs = 5 * 60_000) {
+  if (isLivePath(path)) refreshMs = Math.min(refreshMs, LIVE_REFRESH_MS);
   const [state, setState] = useState({ path, data: cache.get(path)?.data ?? null, error: null, missing: false });
   const refresh = useRef(null);
   const retry = useCallback(() => refresh.current?.(true), [path]);
@@ -86,7 +101,8 @@ export function useData(path, refreshMs = 5 * 60_000) {
     };
     refresh.current = get;
     get();
-    const t = setInterval(() => get(), refreshMs);
+    // A hidden tab stops refreshing; it catches up as soon as it is shown again.
+    const t = setInterval(() => { if (typeof document === "undefined" || !document.hidden) get(); }, refreshMs);
     return () => { live = false; refresh.current = null; clearInterval(t); };
   }, [path, refreshMs]);
   if (!path) return { data: null, error: null, missing: false, loading: false, refreshing: false, retry };

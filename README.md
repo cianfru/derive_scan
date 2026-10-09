@@ -158,6 +158,29 @@ Mainnet account setup also offers **Buy with Apple Pay in your wallet** guidance
 
 The [Rysk discussion brief](docs/rysk-design.md) covers the owner's partner call and the obligation-first mock: collateral lock and possible purchase/sale, physical settlement and no early exit, followed by premium dollars and settlement examples. A future HyperEVM/Rysk funding adapter is not implemented; Derive cash and Rysk locked collateral remain distinct.
 
+## Live service (Railway)
+
+`backend/live/` keeps one connection to Derive's WebSocket (`ticker_slim.{instrument}.1000`) for every
+option the published Saloon boards use (about 800 on 9 October 2026), re-prices each published level
+every 2 s with the feed's own pricing (`derive.questions.price_level`) and serves the same paths the
+app reads: `questions/index.json` and `questions/{UND}.json` (ETag, `Cache-Control: max-age=2`, gzip).
+The 15-minute feed still decides which dates and levels exist and publishes the trading switches and
+their lease; the live copy keeps them as published and only updates prices, `prices_ts` and the index.
+While Derive's connection is down or its prices are older than 60 s, the published files are served
+unchanged. `/health` reports the connection, the age of the last price and the files served.
+
+Deploy (owner): a Railway service from this repository with root directory `backend` (it reads
+`backend/railway.toml`: the Dockerfile, start command `python -m live.server`, health check `/health`),
+a custom domain `live.cowboy.trading` (a CNAME at the DNS provider; the app's CSP allows it), then
+`VITE_LIVE_URL=https://live.cowboy.trading/` on the Vercel project `torq` and a redeploy. Without
+`VITE_LIVE_URL` the app reads the published files exactly as before. Optional variables:
+`DERIVE_WS_URL`, `SITE_DATA_URL`.
+
+In the app (`lib/data.js`): with `VITE_LIVE_URL` set, the Saloon's files are read from the live service
+and refreshed every 5 s (3 s cache), falling back to the published copy when it does not answer; the
+one-tap lease check before a fill still reads the published `questions/index.json`. A hidden tab stops
+refreshing until it is shown again.
+
 ## X cards (`/control`)
 
 `cowboy.trading/control` is the owner's page for posting on X by hand. It shows the card catalogue built from the latest `site-data` files (`frontend/src/control/`: `kit.jsx` for the frame, layout, charts and formatting; `cards.jsx` for the first three; `cards/market.jsx`, `options.jsx`, `saloon.jsx`, `traders.jsx`; `index.js` lists them). There are 22 cards and 45 card-and-coin entries:
