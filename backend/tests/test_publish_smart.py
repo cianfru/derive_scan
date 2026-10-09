@@ -24,7 +24,7 @@ def test_marks_need_two_wallets_and_the_floor():
     assert P.smart_marks(_level(2_450, 2_550), T, short, "ETH") == {"no": {"delta_usd": -10_500, "wallets": 2}}
     # Wallets count, not money: one large short does not outweigh two longs, and a tie marks nothing.
     tie = [("0xa", "BTC", T, 85_000, 6_000), ("0xb", "BTC", T, 85_000, 6_000), ("0xc", "BTC", T, 85_000, -900_000), ("0xd", "BTC", T, 85_000, -2_000)]
-    assert P.smart_marks(lv, T, tie, "BTC") == {} and {k: v for k, v in P.level_smart_wallets(lv, T, tie, "BTC").items() if k != "wallets"} == {"long": 2, "short": 2}
+    assert P.smart_marks(lv, T, tie, "BTC") == {} and {k: v for k, v in P.level_smart_wallets(lv, T, tie, "BTC").items() if k in ("long", "short")} == {"long": 2, "short": 2}
     assert P.smart_marks(lv, T, tie[:3], "BTC") == {"yes": {"delta_usd": 12_000, "wallets": 2}}
 
 
@@ -70,8 +70,17 @@ def test_level_counts_smart_wallets_in_the_zone():
     lv = _level(84_000, 86_000)
     legs = [("0xa", "BTC", T, 85_000, 8_000), ("0xa", "BTC", T, 84_000, -2_000), ("0xb", "BTC", T, 86_000, -4_000),
             ("0xc", "BTC", T, 85_000, 500), ("0xd", "BTC", T, 90_000, 9_000), ("0xe", "BTC", T + 86400, 85_000, 9_000)]
-    who = {"0xa": {"option_pnl": 84_210.5, "rank": 12}}
-    assert P.level_smart_wallets(lv, T, legs, "BTC", who) == {"long": 1, "short": 1, "wallets": [
-        {"address": "0xa", "side": "long", "delta_usd": 6_000, "option_pnl": 84_210.5, "rank": 12},
-        {"address": "0xb", "side": "short", "delta_usd": -4_000, "option_pnl": None, "rank": None}]}
+    who = {"0xa": {"option_pnl": 84_210.5, "rank": 12, "win_rate": 0.6, "expired": 40, "premium_traded": 500_000.0,
+                   "first": "2025-01-02", "class": "directional"},
+           "0xb": {"option_pnl": 1_000_000.0, "rank": 3, "win_rate": 0.5, "expired": 10}}
+    out = P.level_smart_wallets(lv, T, legs, "BTC", who, 5_177)
+    assert (out["long"], out["short"], out["ranked_total"]) == (1, 1, 5_177)
+    # Best rank first, whatever the size; the record comes along, nothing else from traders.json.
+    assert out["wallets"] == [
+        {"address": "0xb", "side": "short", "delta_usd": -4_000, "rank": 3, "option_pnl": 1_000_000.0, "win_rate": 0.5,
+         "expired": 10, "premium_traded": None, "first": None},
+        {"address": "0xa", "side": "long", "delta_usd": 6_000, "rank": 12, "option_pnl": 84_210.5, "win_rate": 0.6,
+         "expired": 40, "premium_traded": 500_000.0, "first": "2025-01-02"}]
+    unranked = P.level_smart_wallets(lv, T, legs, "BTC")
+    assert [w["address"] for w in unranked["wallets"]] == ["0xa", "0xb"]  # no ranks: largest first
     assert P.level_smart_wallets(lv, T, legs[3:], "BTC") is None

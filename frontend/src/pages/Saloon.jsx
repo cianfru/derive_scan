@@ -6,6 +6,7 @@ import { useFeeds } from "../components/Feeds.jsx";
 import { Info, Loading, RefreshNotice, Tabs } from "../components/ui.jsx";
 import WalletTag from "../components/WalletTag.jsx";
 import { usd } from "../lib/format.js";
+import { bestRanked, pct, SHORT_RECORD, signedUsd, walletRecord } from "../lib/smartWallets.js";
 import { CoinIcon } from "../components/MarketVisuals.jsx";
 import SaloonHead from "../components/SaloonNotices.jsx";
 import SaloonChart, { countText, dayName, traderText } from "../components/SaloonChart.jsx";
@@ -193,17 +194,33 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose, opener, refre
 }
 
 // Who the smart wallets at a level are (owner, 9 October 2026: "I click on them ... I see who they are and I can see
-// their P&L"): each one's codename linking to its trader page, its side in this zone, its size there and options P&L.
+// their P&L"), best rank first with each one's track record ("shall we rank them?", same day): codename linking to
+// the trader page, rank, side and size in this zone, options P&L, settled options won and lost, return on premium.
 function SmartWallets({ smart }) {
   const list = smart.wallets || [];
+  const best = bestRanked(list);
+  const of = Number.isFinite(smart.ranked_total) ? ` of ${smart.ranked_total.toLocaleString("en-US")}` : "";
   return <div className="sl-smart">
-    <p>Smart wallets here: {countText(smart)}.<Info label="About smart wallets">The most profitable directional options wallets on Derive holding options of this date at strikes inside this answer's pay zone, each counted long or short by its own position there (at least $1,000). The size is that position's delta in dollars; P&L is the wallet's options P&L on Derive so far. Open a wallet for its positions and history. The gold ring marks the answer at least two of them lean toward, more than lean the other way. Context, not a signal.</Info></p>
+    <p>Smart wallets here: {countText(smart)}.<Info label="About smart wallets">The most profitable directional options wallets on Derive holding options of this date at strikes inside this answer's pay zone, each counted long or short by its own position there (at least $1,000). The list puts the best-ranked first; rank is by options P&L across every ranked wallet. The size is the position's delta in dollars. The record counts the options each wallet held to settlement, won and lost, and the return is its options P&L over all the premium it bought and sold. Fewer than {SHORT_RECORD} settled options reads "Short record". Every wallet counts once in the long and short count and the gold ring, whatever its rank. A track record shows the past; context, not a signal.</Info></p>
+    {best && <p className="sl-best">Best ranked here: {best}</p>}
     {list.length > 0 && <ul className="sl-wallets" aria-label="Smart wallets at this level">
-      {list.map((w) => <li key={w.address}>
-        <Link to={`/trader/${w.address}`} className="sl-wallet"><WalletTag address={w.address} size={18} /></Link>
-        <span className={w.side === "long" ? "up" : "down"}>{w.side === "long" ? "Long" : "Short"} <span className="mono">{usd(Math.abs(w.delta_usd))}</span></span>
-        <span className="sl-wallet-pnl">P&L <b className={w.option_pnl == null ? "" : `mono ${w.option_pnl >= 0 ? "up" : "down"}`}>{w.option_pnl == null ? "Not available yet" : `${w.option_pnl >= 0 ? "+" : ""}${usd(w.option_pnl)}`}</b></span>
-      </li>)}
+      {list.map((w) => {
+        const r = walletRecord(w);
+        return <li key={w.address}>
+          <div className="sl-wallet-top">
+            {Number.isFinite(w.rank) && <span className="sl-rank mono" title={`Rank ${w.rank}${of}`}>#{w.rank}</span>}
+            <Link to={`/trader/${w.address}`} className="sl-wallet"><WalletTag address={w.address} size={18} /></Link>
+            <span className={w.side === "long" ? "up" : "down"}>{w.side === "long" ? "Long" : "Short"} <span className="mono">{usd(Math.abs(w.delta_usd))}</span></span>
+          </div>
+          <p className="sl-record">
+            <span>P&L <b className={w.option_pnl == null ? "" : `mono ${w.option_pnl >= 0 ? "up" : "down"}`}>{signedUsd(w.option_pnl) ?? "Not available yet"}</b></span>
+            {r.won != null && <span><span className="mono">{r.won}</span> won · <span className="mono">{r.lost}</span> lost</span>}
+            {r.ret != null && <span><span className="mono">{pct(r.ret)}</span> on premium</span>}
+            {r.since && <span>since {r.since}</span>}
+            {r.short && <span className="sl-short">Short record</span>}
+          </p>
+        </li>;
+      })}
     </ul>}
   </div>;
 }

@@ -26,10 +26,10 @@ marked.yes.smart = { delta_usd: 24000, wallets: 3 };
 // Directional traders' reading on two dates, one too thin to read, as publish_site writes them.
 smartBtc.dates[4].traders = { state: "defensive", score: -0.692, long: 7, short: 8, net_delta_usd: -15633000, gross_delta_usd: 22592000, status: "ready" };
 smartBtc.dates[5].traders = { state: null, score: null, long: 1, short: 1, net_delta_usd: 4000, gross_delta_usd: 5000, status: "too_few_wallets" };
-marked.smart_wallets = { long: 3, short: 1, wallets: [
-  { address: "0x28fb00000000000000000000000000000000aa01", side: "short", delta_usd: -42000, option_pnl: 84210.5, rank: 12 },
-  { address: "0x28fb00000000000000000000000000000000aa02", side: "long", delta_usd: 9000, option_pnl: -1500, rank: 40 },
-  { address: "0x28fb00000000000000000000000000000000aa03", side: "long", delta_usd: 3000, option_pnl: null, rank: null },
+marked.smart_wallets = { long: 3, short: 1, ranked_total: 5177, wallets: [
+  { address: "0x28fb00000000000000000000000000000000aa02", side: "long", delta_usd: 9000, rank: 1, option_pnl: 10858147, win_rate: 0.565, expired: 382, premium_traded: 162177068, first: "2024-06-28" },
+  { address: "0x28fb00000000000000000000000000000000aa01", side: "short", delta_usd: -42000, rank: 12, option_pnl: -1500, win_rate: 0.5, expired: 10, premium_traded: 30000, first: "2026-08-01" },
+  { address: "0x28fb00000000000000000000000000000000aa03", side: "long", delta_usd: 3000, rank: null, option_pnl: null, win_rate: null, expired: null, premium_traded: null, first: null },
 ] };
 
 beforeEach(() => {
@@ -166,11 +166,11 @@ describe("Saloon chart page", () => {
     const list = screen.getByRole("list", { name: "Smart wallets at this level" });
     const items = within(list).getAllByRole("listitem");
     expect(items).toHaveLength(3);
-    expect(within(items[0]).getByRole("link").getAttribute("href")).toBe("/trader/0x28fb00000000000000000000000000000000aa01");
-    expect(items[0].textContent).toContain("Short $42K");
-    expect(items[0].textContent).toContain("P&L +$84.2K");
-    expect(items[1].textContent).toContain("Long $9K");
-    expect(items[1].textContent).toContain("P&L -$1.5K");
+    expect(within(items[0]).getByRole("link").getAttribute("href")).toBe("/trader/0x28fb00000000000000000000000000000000aa02");
+    expect(screen.getByText("Best ranked here: #1 long · #12 short")).toBeTruthy();
+    for (const bit of ["#1", "Long $9K", "P&L +$10.86M", "216 won · 166 lost", "+6.7% on premium", "since Jun 2024"]) expect(items[0].textContent).toContain(bit);
+    expect(items[0].textContent).not.toContain("Short record");
+    for (const bit of ["#12", "Short $42K", "P&L -$1.5K", "5 won · 5 lost", "-5.0% on premium", "Short record"]) expect(items[1].textContent).toContain(bit);
     expect(items[2].textContent).toContain("Not available yet");
   });
 
