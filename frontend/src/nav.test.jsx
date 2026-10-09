@@ -1,5 +1,5 @@
 // The Saloon build's header: My space counts, the Following tab in Positions, the old Following route,
-// and the Cohorts page split out of Traders.
+// and the Posses page split out of Traders.
 import React from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -92,15 +92,15 @@ const traders = {
   traders: [{ address: "0x1111111111111111111111111111111111111111", rank: 1, class: "directional", option_pnl: 1000, win_rate: 0.5, premium_traded: 5000, last: "2026-10-02", lean: null }],
 };
 
-it("moves cohorts to their own page; the leaderboard links to it", () => {
+it("moves posses to their own page; the leaderboard links to it", () => {
   docs.current = { "traders.json": traders };
   render(<MemoryRouter><Traders /></MemoryRouter>);
-  expect(screen.queryByRole("region", { name: "Trader cohort positioning" })).toBeNull();
-  expect(screen.getByRole("link", { name: /Cohorts/ }).getAttribute("href")).toBe("/traders/cohorts");
+  expect(screen.queryByRole("region", { name: "Trader posse positioning" })).toBeNull();
+  expect(screen.getByRole("link", { name: /Posses/ }).getAttribute("href")).toBe("/traders/posses");
   cleanup();
   render(<MemoryRouter><Cohorts /></MemoryRouter>);
-  expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/^Cohorts/);
-  expect(screen.getByRole("region", { name: "Trader cohort positioning" })).toBeTruthy();
-  expect(screen.getByRole("note", { name: "Takeaway" }).textContent).toContain("4 Money Printer wallets hold $20K of net long option delta across 1 coin.");
+  expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/^Posses/);
+  expect(screen.getByRole("region", { name: "Trader posse positioning" })).toBeTruthy();
+  expect(screen.getByRole("note", { name: "Takeaway" }).textContent).toContain("4 Legend wallets hold $20K of net long option delta across 1 coin.");
   expect(screen.getByRole("link", { name: "Leaderboard" }).getAttribute("href")).toBe("/traders");
 });

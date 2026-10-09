@@ -55,6 +55,9 @@ FIELDS = ("wallet", "instrument", "buy_contracts", "sell_contracts", "buy_value_
 # Wallet classes (docs/options-traders-study.md, approved 2 October 2026)
 MM_MAKER_SHARE = 0.60
 MM_BOTH_SIDES_SHARE = 0.50
+# Amendment B (owner, 9 October 2026): a wallet averaging more option legs per active day than this is a market
+# maker too, whatever its maker share (one top-tier wallet ran about 118 a day at 56% maker; the next, 14).
+MM_LEGS_PER_DAY = 50
 INCOME_SOLD_SHARE = 0.80
 INCOME_OTM_SHARE = 0.50
 HEDGE_COVER = 0.50
@@ -473,7 +476,8 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float,
     """Each wallet's class from every day file, using information up to as_of only.
 
     Market maker: > 60% of option legs as maker, or both sides of the same instrument on the same
-    day for more than half of the instruments it traded. Income seller: > 80% of option premium
+    day for more than half of the instruments it traded, or (Amendment B) more than 50 option legs per
+    day over its active span. Income seller: > 80% of option premium
     sold, and at least half of it out of the money. Hedger: on more than half of the days it
     traded options, its perp trades that day offset at least half of the option delta added.
     Directional: the rest with at least 20 option legs over at least 90 days. Skilled: directional
@@ -528,7 +532,8 @@ def classify(root: Path, settlements: dict[str, dict[str, float]], as_of: float,
 def classify_stats(stats: dict) -> str:
     """A wallet's class from its stats (legs, maker_share, both_sides_share, sold_share,
     otm_sold_share, hedged_days_share, active_days); the rules of classify()."""
-    if stats["maker_share"] > MM_MAKER_SHARE or stats["both_sides_share"] > MM_BOTH_SIDES_SHARE:
+    if stats["maker_share"] > MM_MAKER_SHARE or stats["both_sides_share"] > MM_BOTH_SIDES_SHARE \
+            or stats["legs"] / max(stats.get("active_days") or 1, 1) > MM_LEGS_PER_DAY:
         return "market_maker"
     if stats["sold_share"] > INCOME_SOLD_SHARE and stats["otm_sold_share"] >= INCOME_OTM_SHARE:
         return "income"

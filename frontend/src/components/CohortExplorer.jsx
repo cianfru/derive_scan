@@ -4,6 +4,7 @@ import { Tabs, Info, Empty } from "./ui.jsx";
 import { Asset } from "./MarketVisuals.jsx";
 import { usd, utc } from "../lib/format.js";
 import { COHORT_HELP } from "../lib/explain.js";
+import { posseName } from "../lib/posses.js";
 import "../research-refinement.css";
 const BOUNDS = {
   "Money Printer": "At least $1M gross profit on expired options",
@@ -57,7 +58,7 @@ function MiniBar({ score }) {
   );
 }
 const Dagger = ({ on }) => (on ? <sup className="dagger" aria-label="complete quotes only">†</sup> : null);
-export default function CohortExplorer({ cohorts, through, valuedAt, title = "Cohorts" }) {
+export default function CohortExplorer({ cohorts, through, valuedAt, title = "Posses" }) {
   const [dim, setDim] = useState("pnl"),
     [chosen, setChosen] = useState("Money Printer"),
     [window, setWindow] = useState("all");
@@ -70,34 +71,34 @@ export default function CohortExplorer({ cohorts, through, valuedAt, title = "Co
   const t = completeTotals(book);
   const stale = valuedAt && Date.now() / 1000 - valuedAt > 1800;
   return (
-    <section className="cohort-explorer" aria-label="Trader cohort positioning">
+    <section className="cohort-explorer" aria-label="Trader posse positioning">
       <div className="cohort-heading">
         <h2>
           {title}
-          <Info label="Explain trader cohorts">
-            {BOUNDS[c?.name] ? `${c.name}: ${BOUNDS[c.name]}, before fees. ` : ""}
-            Results cohorts use the full collected history of expired options; size cohorts use total premium traded.
+          <Info label="Explain trader posses">
+            {BOUNDS[c?.name] ? `${posseName(c.name)}: ${BOUNDS[c.name]}, before fees. ` : ""}
+            Posses by results use the full collected history of expired options; posses by size use total premium traded.
             Market makers are excluded. {COHORT_HELP} Open positions count wallet-instrument positions, not distinct
             wallets; Within 30d includes Within 7d. † Totals and selector bars cover only coins whose quotes are
             complete; coins shown with a dash are left out. Positions reconstructed through {through} UTC, valued{" "}
             {valuedAt ? utc(valuedAt) : "at publication"}{stale ? " (historical snapshot)" : ""}.
           </Info>
         </h2>
-        <Tabs label="Cohort grouping" value={dim} onChange={setDim} items={[["pnl", "By results"], ["size", "By size"]]} />
+        <Tabs label="Posse grouping" value={dim} onChange={setDim} items={[["pnl", "By results"], ["size", "By size"]]} />
       </div>
       <div className="cohort-workspace">
-        <label className="cohort-mobile-select">Cohort
-          <select aria-label="Select trader cohort" value={c?.name || ""} disabled={!c} onChange={(e) => setChosen(e.target.value)}>
-            {!c && <option value="">No cohorts available</option>}
-            {rows.map((r) => <option key={r.name} value={r.name}>{r.name} · {r.wallets.toLocaleString("en-US")} wallets</option>)}
+        <label className="cohort-mobile-select">Posse
+          <select aria-label="Select trader posse" value={c?.name || ""} disabled={!c} onChange={(e) => setChosen(e.target.value)}>
+            {!c && <option value="">No posses available</option>}
+            {rows.map((r) => <option key={r.name} value={r.name}>{posseName(r.name)} · {r.wallets.toLocaleString("en-US")} wallets</option>)}
           </select>
         </label>
-        <nav className="cohort-selector" aria-label="Select trader cohort">
+        <nav className="cohort-selector" aria-label="Select trader posse">
           {rows.map((r) => {
             const rt = completeTotals(r.windows?.[window]);
             return (
               <button key={r.name} aria-pressed={r.name === c?.name} onClick={() => setChosen(r.name)}>
-                <span>{r.name}</span>
+                <span>{posseName(r.name)}</span>
                 <span className="cohort-meta"><MiniBar score={rt.score} /><small>{r.wallets.toLocaleString("en-US")}</small></span>
               </button>
             );
@@ -107,10 +108,10 @@ export default function CohortExplorer({ cohorts, through, valuedAt, title = "Co
           {c ? (
             <>
               <div className="cohort-title">
-                <h3>{c.name}</h3>
-                <span>{BOUNDS[c.name] || "Defined results cohort"}</span>
+                <h3>{posseName(c.name)}</h3>
+                <span>{BOUNDS[c.name] || "Defined results posse"}</span>
               </div>
-              <Tabs label="Cohort option expiry" value={window} onChange={setWindow}
+              <Tabs label="Posse option expiry" value={window} onChange={setWindow}
                 items={[["all", "All unexpired"], ["7d", "Within 7d", "7d"], ["30d", "Within 30d", "30d"], ["beyond30d", "Beyond 30d", "> 30d"]]} />
               <div className="cohort-totals">
                 <span>Net option delta<b className={t.net > 0 ? "up" : t.net < 0 ? "down" : ""}>{usd(t.net)}<Dagger on={t.partial && t.net != null} /></b></span>

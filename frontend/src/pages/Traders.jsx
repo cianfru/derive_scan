@@ -9,10 +9,11 @@ import WalletTag from "../components/WalletTag.jsx";
 import LeanBar from "../components/LeanBar.jsx";
 import HistoryStatus, { coverageReady, GapNote } from "../components/HistoryStatus.jsx";
 import { codename } from "../lib/walletName.js";
+import { posseName } from "../lib/posses.js";
 import "../research-refinement.css";
 
 const PAGE_HELP = `Options traders on Derive, ranked by gross results on expired options, before fees. Market makers are left out. ${TYPE_INFO}`;
-const BOARD_HELP = "Gross options PnL counts expired options: premium received minus premium paid plus settlement value, before fees, across the collected history. Ranks remain the published gross-options-PnL rank when the list is sorted by another metric. Win rate: share of expired instruments with positive gross PnL; it ignores win and loss size. Premium traded: option premium bought and sold, before netting; it sets the size cohort. Book: net dollar delta of reconstructed unexpired options, valued on the newest chain; long delta gains from a small price rise, short delta from a fall; perp hedges excluded. Up to 200 wallets are published.";
+const BOARD_HELP = "Gross options PnL counts expired options: premium received minus premium paid plus settlement value, before fees, across the collected history. Ranks remain the published gross-options-PnL rank when the list is sorted by another metric. Win rate: share of expired instruments with positive gross PnL; it ignores win and loss size. Premium traded: option premium bought and sold, before netting; it sets the size posse. Book: net dollar delta of reconstructed unexpired options, valued on the newest chain; long delta gains from a small price rise, short delta from a fall; perp hedges excluded. Up to 200 wallets are published.";
 const tiered = (t) => t.tier === "top" || t.tier === "smart";
 const tone = (v) => (v > 0 ? "up" : v < 0 ? "down" : "");
 
@@ -86,7 +87,7 @@ export default function Traders() {
                       <WalletTag address={t.address} name={t.name} size={28} /><Arrow />
                     </Link>
                     <span className="lb-sub">
-                      {[t.pnl_cohort, t.size_cohort].filter(Boolean).join(" · ") || "—"}
+                      {[t.pnl_cohort, t.size_cohort].filter(Boolean).map(posseName).join(" · ") || "—"}
                       {tiered(t) && <em className="tier-tag">{t.tier}</em>}
                     </span>
                   </td>
@@ -107,8 +108,8 @@ export default function Traders() {
         {!list.length && <p className="empty-state">No traders match these filters.</p>}
         {list.length > shown.length && <button className="btn lb-more" onClick={() => setAll(true)}>Show all {list.length}</button>}
       </Plate>
-      <Link className="cohorts-link" to="/traders/cohorts">
-        <span><b>Cohorts</b><small>Traders grouped by results and by size, and how each group is positioned per coin</small></span>
+      <Link className="cohorts-link" to="/traders/posses">
+        <span><b>Posses</b><small>Traders grouped by results and by size, and how each group is positioned per coin</small></span>
         <span aria-hidden="true">→</span>
       </Link>
       <p className="status">History to {data.through} UTC · positions valued on the newest options chain<GapNote data={data} /></p>

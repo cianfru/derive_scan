@@ -30,7 +30,7 @@ Built 2 October 2026: `backend/derive/history.py`, run by `history_once.py` in t
 
 ### Wallet classes (applied with information available at the time only)
 
-- Market makers: more than 60% of option legs as maker, or both sides of the same instrument within 24 hours on more than half the instruments traded. Excluded.
+- Market makers: more than 60% of option legs as maker, or both sides of the same instrument within 24 hours on more than half the instruments traded, or (Amendment B, 9 October 2026) more than 50 option legs a day. Excluded.
 - Income sellers (vaults, covered calls, cash-secured puts): more than 80% of option premium sold, mostly out-of-the-money. Excluded from the directional set; shown separately as structure.
 - Hedgers: a perp position opposite to their option delta covering at least half of it. Excluded.
 - Directional: the rest, with at least 20 option legs and at least 90 days active.
@@ -121,3 +121,13 @@ Run: `python backend/research/settlement_record/run.py DATA_DIR` on the data bra
   - HYPE: 28 scored, 39% against 45%.
   - SOL, XRP, XAUT and ZEC: 5 to 9 each.
 - **What it means.** The line stays context, not a signal. If the app shows the record, it shows it as history with "no better than chance so far". The test can be rerun as dates settle; BTC reaches 60 scored dates at the 7-day lead in two to three months at the current pace (about 4 to 5 a month).
+
+## Amendment B: a volume rule for market makers (APPROVED by the owner on 9 October 2026, before Part 2's test was run)
+
+Owner, 9 October 2026, on a top-tier wallet with 9,551 settled options won and 9,324 lost and 2.4% on premium: "this is not a trader. This is a market maker ... someone hedging positions or running delta-neutral strategies ... so people don't get any information that is wrong". Approved the same day: "you have my approval, move on, and amend the study rules".
+
+- **Rule added to Wallet classes.** A wallet averaging more than 50 option legs per day over its active span (first to last trade day) is a market maker as well, whatever its maker share or both-sides share. The two existing tests stay as written.
+- **Why this measure.** It reads only how the wallet trades, never its results, so it cannot be tuned on PnL. On 9 October 2026 the top tier (477 wallets) had one wallet above it: 107,139 option legs since April 2024, about 118 a day, 56% as maker and both sides of the same option on 28% of options, just under the 60% and 50% lines. The next-busiest top-tier wallet ran about 14 a day; 90% ran one or fewer.
+- **Left as it is.** A grey zone of 31 top-tier wallets above 50% maker or 40% both sides (about 10% of the tier's PnL) stays directional: patient limit-order traders also post prices. Each trader page shows its passive share so a reader can judge.
+- **Scope.** It applies everywhere the classes apply: the tiers, the Saloon's gold rings and traders' line, the Radar's Smart balance (its backfill is rebuilt with the new classes), Flow and the leaderboard. Addendum A's result above was computed with the earlier classes; it is rerun with these classes before it is quoted again.
+

@@ -4,6 +4,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { usd, pct, price, ago, utc, optionLabel, strike } from "../lib/format.js";
 import { TYPE_INFO } from "../lib/traders.js";
+import { posseName } from "../lib/posses.js";
 import { codename, shortAddr } from "../lib/walletName.js";
 import { Plate, Loading, Failed, Info } from "../components/ui.jsx";
 import { WalletEmblem } from "../components/WalletTag.jsx";
@@ -21,7 +22,7 @@ const tone = (v) => (v > 0 ? "up" : v < 0 ? "down" : "");
 const tiered = (t) => t.tier === "top" || t.tier === "smart";
 const CAP = 20;
 
-const KPI_HELP = "Gross options PnL: expired options, premium received minus premium paid plus settlement value, before fees; it sets the rank. Win rate: share of expired option instruments with positive gross PnL; it counts outcomes, not their size. Expired options: distinct expired instruments with reconstructed results. Premium traded: option premium bought plus sold, before netting; it sets the size cohort. Perp PnL: reported realised perpetual PnL, separate from the ranking. " + TYPE_INFO;
+const KPI_HELP = "Gross options PnL: expired options, premium received minus premium paid plus settlement value, before fees; it sets the rank. Win rate: share of expired option instruments with positive gross PnL; it counts outcomes, not their size. Expired options: distinct expired instruments with reconstructed results. Premium traded: option premium bought plus sold, before netting; it sets the size posse. Perp PnL: reported realised perpetual PnL, separate from the ranking. " + TYPE_INFO;
 const BOOK_HELP = "Positions reconstructed through the displayed UTC close, valued on fresh options quotes. Marks use a Black-76 model on the index; quoted delta is used where available, otherwise an estimate from the strike IV, marked est. No default volatility is assumed. Later trades are not included, and expired instruments are omitted. Entry is the average cost of the remaining position where daily records determine it; when buys and sells lose their order in a daily aggregate, entry and unrealised PnL show a dash until a later close or reversal establishes a known basis. Delta is dollar exposure to the coin; positive gains when the price rises. Coins are ordered by gross delta.";
 
 function usePhone() {
@@ -88,6 +89,8 @@ function PhoneLargeTrades({ trades }) {
   </details>)}</div>;
 }
 
+const PASSIVE_HELP = "The share of this wallet's option trades where it posted the price and another trader took it. Market makers trade mostly this way: a wallet above 60%, one trading both sides of the same option on most options it touches, or one averaging more than 50 option trades a day is treated as a market maker and left out of the rankings.";
+
 function PhoneTrader({ data, error, crumb, name, book, copied, copy }) {
   return <div className="wrap page people-page trader-page trader-phone">
     <RefreshNotice error={error} />
@@ -101,8 +104,9 @@ function PhoneTrader({ data, error, crumb, name, book, copied, copy }) {
       <PhoneFold title="Profile details" className="tm-profile">
         <p className="tid-sub"><span className="mono tm-address" title={data.address}>{data.address}</span><button type="button" className="tid-copy" onClick={copy}>{copied ? "Copied" : "Copy"}</button></p>
         <dl className="tm-figures">
-          {data.pnl_cohort && <div><dt>Results cohort</dt><dd>{data.pnl_cohort}</dd></div>}
-          {data.size_cohort && <div><dt>Size cohort</dt><dd>{data.size_cohort}</dd></div>}
+          {data.pnl_cohort && <div><dt>Results posse</dt><dd>{posseName(data.pnl_cohort)}</dd></div>}
+          {data.size_cohort && <div><dt>Size posse</dt><dd>{posseName(data.size_cohort)}</dd></div>}
+          {Number.isFinite(data.maker_share) && <div><dt>Passive share <Info label="About the passive share">{PASSIVE_HELP}</Info></dt><dd>{pct(data.maker_share, 0)}</dd></div>}
           <div><dt>Since</dt><dd className="mono">{data.first}</dd></div>
           {data.last && <div><dt>Last trade</dt><dd className="mono">{data.last}</dd></div>}
           <div><dt>Perp PnL</dt><dd className={`mono ${tone(data.perp_pnl)}`}>{usd(data.perp_pnl)}</dd></div>
@@ -268,8 +272,8 @@ export default function Trader() {
             </p>
             <p className="tid-sub tid-meta">
               <span>Rank {data.rank}</span>
-              {data.pnl_cohort && <span>{data.pnl_cohort}</span>}
-              {data.size_cohort && <span>{data.size_cohort}</span>}
+              {data.pnl_cohort && <span>{posseName(data.pnl_cohort)}</span>}
+              {data.size_cohort && <span>{posseName(data.size_cohort)}</span>}
               <span>since {data.first}</span>
               {data.last && <span>last trade {data.last}</span>}
               <span>perp PnL <b className={`mono ${tone(data.perp_pnl)}`}>{usd(data.perp_pnl)}</b></span>
@@ -281,6 +285,7 @@ export default function Trader() {
           <div><span>Win rate</span><b>{pct(data.win_rate, 0)}</b></div>
           <div><span>Expired options</span><b>{data.expired?.toLocaleString("en-US") ?? "—"}</b></div>
           <div><span>Premium traded</span><b>{usd(data.premium_traded)}</b></div>
+          {Number.isFinite(data.maker_share) && <div><span>Passive share <Info label="About the passive share">{PASSIVE_HELP}</Info></span><b>{pct(data.maker_share, 0)}</b></div>}
         </div>
       </section>
       <PnlHistory history={data.pnl_history} through={data.through} />

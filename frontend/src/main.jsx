@@ -43,7 +43,8 @@ createRoot(document.getElementById("root")).render(
           <Route path="coin/:und" element={<Coin />} />
           <Route path="options" element={<Options />} />
           <Route path="traders" element={<Traders />} />
-          <Route path="traders/cohorts" element={<Cohorts />} />
+          <Route path="traders/posses" element={<Cohorts />} />
+          <Route path="traders/cohorts" element={<Navigate to="/traders/posses" replace />} />
           <Route path="trader/:address" element={<Trader />} />
           <Route path="flow" element={<Flow />} />
           {QUESTIONS_ON && <Route path="saloon" element={<Saloon />} />}

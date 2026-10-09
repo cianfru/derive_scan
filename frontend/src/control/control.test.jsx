@@ -118,7 +118,7 @@ describe("cards", () => {
     const m = cohortModel(w, "BTC");
     expect(m.win).toBeGreaterThan(0);
     expect(m.lose).toBeLessThan(0);
-    expect(m.biggest.name).toBe("Full Rekt");
+    expect(m.biggest.name).toBe("Busted"); // shown under its Western name
   });
 
   it("reads the last settlement around its price", () => {

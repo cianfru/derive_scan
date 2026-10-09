@@ -37,7 +37,7 @@ export const isResearch = (path) => RESEARCH.some(([to]) => path === to || path.
 export const MENUS = [
   { id: "markets", label: "Markets", items: [["/markets", "Board"], ["/radar", "Radar"], ["/options", "Options"], ["/flow", "Flow"]],
     owns: (p) => ["/markets", "/radar", "/options", "/flow"].some((to) => p === to || p.startsWith(`${to}/`)) || p.startsWith("/coin/") },
-  { id: "traders", label: "Traders", items: [["/traders", "Leaderboard"], ["/traders/cohorts", "Cohorts"]],
+  { id: "traders", label: "Traders", items: [["/traders", "Leaderboard"], ["/traders/posses", "Posses"]],
     owns: (p) => p === "/traders" || p.startsWith("/traders/") || p.startsWith("/trader/") },
 ];
 

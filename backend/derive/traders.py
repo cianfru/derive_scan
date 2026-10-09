@@ -99,7 +99,7 @@ def build(scan: dict, wallets: dict, as_of: float, settlements: dict | None = No
         coins = scan["coins"].get(a) or {}
         traders.append({"address": a, "rank": rank, **{k: v.get(k) for k in (
             "class", "tier", "option_pnl", "perp_pnl", "win_rate", "expired", "premium_traded", "legs", "first", "last",
-            "sold_share")},
+            "sold_share", "maker_share")},
             "pnl_cohort": pnl_cohort(v), "size_cohort": size_cohort(v),
             "coins": {u: round(x, 2) for u, x in sorted(coins.items(), key=lambda kv: -kv[1])[:4]},
             "open": held.get(a, []), "recent": sorted(scan["recent"].get(a, []), reverse=True)[:120],

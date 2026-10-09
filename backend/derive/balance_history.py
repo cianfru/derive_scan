@@ -59,7 +59,7 @@ from .lean import HORIZONS, WALLET_MIN_POSITIONS, WALLET_MIN_USD, WALLET_TIER, w
 from .valuation import delta_at
 from .wallet_alias import canonical
 
-SCHEMA = 2              # 2: no intrinsic-delta fallback; unavailable closes carry bit 2
+SCHEMA = 3              # 2: no intrinsic-delta fallback; unavailable closes carry bit 2; 3: classes with Amendment B
 CLOSES = 90             # closes rebuilt by a backfill
 SOURCE = "v2_mainnet"
 DAY = 86400

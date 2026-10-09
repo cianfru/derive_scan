@@ -1,4 +1,5 @@
 // Trader cards: the leaderboard, the day's biggest trades, how smart wallets lean, and who holds what by results.
+import { posseName } from "../../lib/posses.js";
 import { Avatar, Bars, Card, DOWN, GREY, NAME, TAG, UP, big, codename, dm, fin, icon, join, stamp, usd } from "../kit.jsx";
 
 const STYLE = { income: "sells options for income", directional: "bets on direction", hedger: "hedges a bigger position", occasional: "trades now and then" };
@@ -125,10 +126,10 @@ const smartAngles = (m) => [
 
 // How each results group holds one coin
 export function cohortModel(w, und) {
-  const rows = (w?.cohorts?.pnl || []).map((c) => ({ name: c.name, wallets: c.wallets, r: c["7d"] })).filter((c) => c.r && fin(c.r.net_delta_usd) && c.r.positions > 0);
+  const rows = (w?.cohorts?.pnl || []).map((c) => ({ code: c.name, name: posseName(c.name), wallets: c.wallets, r: c["7d"] })).filter((c) => c.r && fin(c.r.net_delta_usd) && c.r.positions > 0);
   if (rows.length < 3) return null;
-  const winners = rows.filter((c) => ["Money Printer", "Smart Money", "Grinder", "Humble Earner"].includes(c.name));
-  const losers = rows.filter((c) => ["Semi-Rekt", "Full Rekt", "Giga-Rekt"].includes(c.name));
+  const winners = rows.filter((c) => ["Money Printer", "Smart Money", "Grinder", "Humble Earner"].includes(c.code));
+  const losers = rows.filter((c) => ["Semi-Rekt", "Full Rekt", "Giga-Rekt"].includes(c.code));
   const sum = (xs) => xs.reduce((t, c) => t + c.r.net_delta_usd, 0);
   return { und, ts: w.generated_at, rows, win: sum(winners), lose: sum(losers), biggest: [...rows].sort((a, b) => Math.abs(b.r.net_delta_usd) - Math.abs(a.r.net_delta_usd))[0] };
 }
@@ -142,7 +143,7 @@ function CohortView({ m }) {
       title={split
         ? <>Derive's winners are <span className={m.win >= 0 ? "g" : "r"}>{side(m.win)}</span> {m.und}. Its biggest losers are <span className={m.lose >= 0 ? "g" : "r"}>{side(m.lose)}</span></>
         : <>Winners and losers on Derive are both {side(m.win)} {m.und}</>} size="m"
-      sub={<>Every wallet is grouped by its all-time options results, from Money Printer to Giga-Rekt. The biggest bet comes from <b>{m.biggest.name}</b>: {big(Math.abs(m.biggest.r.net_delta_usd))} {side(m.biggest.r.net_delta_usd)} across {m.biggest.r.positions} positions.</>}>
+      sub={<>Every wallet is grouped by its all-time options results, from Legend to Boot Hill. The biggest bet comes from <b>{m.biggest.name}</b>: {big(Math.abs(m.biggest.r.net_delta_usd))} {side(m.biggest.r.net_delta_usd)} across {m.biggest.r.positions} positions.</>}>
       <Bars signed rows={m.rows.map((c) => ({ label: c.name, sub: `${c.wallets.toLocaleString("en-US")} wallets`, value: Math.sign(c.r.net_delta_usd) * Math.log10(1 + Math.abs(c.r.net_delta_usd)), text: big(c.r.net_delta_usd) }))} />
     </Card>
   );
@@ -152,7 +153,7 @@ const cohortAngles = (m) => {
   const split = Math.sign(m.win) !== Math.sign(m.lose);
   return [
     split ? `On ${TAG}, the most profitable options traders are ${side(m.win)} ${m.und} (${big(Math.abs(m.win))}). The ones who've lost the most are ${side(m.lose)} (${big(Math.abs(m.lose))}). We know which group we'd rather sit next to.` : `Winners and losers on ${TAG} agree for once: both ${side(m.win)} ${m.und}. Winners ${big(Math.abs(m.win))}, losers ${big(Math.abs(m.lose))}.`,
-    `Biggest ${m.und} bet on ${TAG} this week, by trader group: ${m.biggest.name}, ${big(Math.abs(m.biggest.r.net_delta_usd))} ${side(m.biggest.r.net_delta_usd)}. Every wallet is named for its results, from Money Printer to Giga-Rekt.`,
+    `Biggest ${m.und} bet on ${TAG} this week, by trader group: ${m.biggest.name}, ${big(Math.abs(m.biggest.r.net_delta_usd))} ${side(m.biggest.r.net_delta_usd)}. Every wallet is named for its results, from Legend to Boot Hill.`,
   ];
 };
 
