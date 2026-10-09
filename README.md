@@ -63,7 +63,7 @@ The `data` branch always keeps (a few KB, plus about 300 KB a day of hourly CSV 
 
 | Path | Content |
 |---|---|
-| `questions/state.json` | schema 1: per coin, each date's frozen `zone` (set once, at most one change toward the minimum while over 7 days out), `headline` with its two-slot hold, the last hourly gate checks, `shown`, the published ids `{id: [lo, hi]}` and `retired` ids; each coin's instrument `spec` (tick, minimum, amount step, taker rate, base fee, cap); `settle_try` per coin |
+| `questions/state.json` | schema 1: per coin, each date's frozen `zone` (set once, at most one change toward the minimum while over 7 days out), `headline` with its two-slot hold, the last gate checks (one per 15-minute slot since 9 October 2026; `check_slot`), `shown`, the published ids `{id: [lo, hi]}` and `retired` ids; each coin's instrument `spec` (tick, minimum, amount step, taker rate, base fee, cap); `settle_try` per coin |
 | `questions/history/{UND}/{YYYYMMDD}.csv` | hourly, one row per published question of that date: `ts,id,fair,yes_buy,yes_sell,no_buy,no_sell,index` (per $1) |
 
 The app files exist only when the Action runs with `QUESTIONS_PUBLISH=on` (`record.yml` currently sets it to `"on"`); while it is off `publish_site.py` removes any `questions/` folder. The app shows the Saloon only in a build with `VITE_QUESTIONS=1` (routes, navigation, the landing's "Enter the Saloon" button and the coin page's Saloon card). Public visitors explore costs and settlement payouts; the review says "One-tap trading is coming to Cowboy" and does not offer manual order placement. One-tap execution, when enabled for the visitor, happens on Cowboy; `VITE_DERIVE_REFERRAL` supplies its referral code.
@@ -170,7 +170,8 @@ While Derive's connection is down or its prices are older than 60 s, the publish
 unchanged. `/health` reports the connection, the age of the last price and the files served.
 
 Deploy (owner): a Railway service from this repository with root directory `backend` (it reads
-`backend/railway.toml`: the Dockerfile, start command `python -m live.server`, health check `/health`),
+`backend/railway.toml`: the Dockerfile, start command `python -m live.server`, health check `/health`;
+the Dockerfile's own command is the live service too, so a start command left in Railway's settings is the only override),
 a custom domain `live.cowboy.trading` (a CNAME at the DNS provider; the app's CSP allows it), then
 `VITE_LIVE_URL=https://live.cowboy.trading/` on the Vercel project `torq` and a redeploy. Without
 `VITE_LIVE_URL` the app reads the published files exactly as before. Optional variables:

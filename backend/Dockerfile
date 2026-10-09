@@ -8,5 +8,6 @@ RUN pip install --no-cache-dir -r requirements.lock
 COPY . .
 RUN mkdir -p /app/data
 
+# The image runs the live service (Railway); the FastAPI app in main.py is run locally with python main.py.
 EXPOSE 8000
-CMD ["python", "main.py"]
+CMD ["python", "-m", "live.server"]

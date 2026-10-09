@@ -33,19 +33,32 @@ const QUICK = [25, 100, 500];
 const CANDLES = 72; // 12 days of 4-hour candles
 const pctText = (v) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`;
 
+/** Why a coin with options on Derive has no answer now (questions/index.json `quiet`): its tab
+ *  stays and says so, so the Saloon never looks empty (owner, 9 October 2026). */
+const QUIET_TAB = { wide: "Prices too wide", thin: "Market too thin", none: "No dates now" };
+function QuietPanel({ und, name, reason }) {
+  const title = reason === "thin" ? `${und}: market too thin` : reason === "none" ? `No ${und} dates right now` : `No ${und} answers right now`;
+  const body = reason === "thin"
+    ? `Derive has too few ${name} option prices to build an answer at a fair cost. ${und} shows here once market makers quote it.`
+    : reason === "none"
+      ? `Derive lists no ${name} options settling within the Saloon's range (1 to 35 days).`
+      : `Derive's ${name} option prices are too wide right now: an answer would cost too much over its fair value. Cowboy checks every 15 minutes and shows ${und} again once they tighten.`;
+  return <div className="bd-empty" role="status"><h2>{title}</h2><p>{body}</p></div>;
+}
+
 /** One coin tab, its price and 24-hour change live from Derive's index feed once it answers. */
 function CoinTab({ c: snap, on, onChange }) {
   const lp = useIndexPrice(snap.und, snap.index, snap.pricesTs);
   const c = lp.price ? { ...snap, index: lp.price, chg: lp.source === "live" && lp.prev > 0 ? (lp.price / lp.prev - 1) * 100 : snap.chg } : snap;
   return (
     <button type="button" role="tab" data-und={c.und} aria-selected={on} tabIndex={on ? 0 : -1} className="sl-ctab" onClick={() => onChange(c.und)}
-      aria-label={`${c.name}${Number.isFinite(c.index) ? `, ${money(c.index)}` : ""}${Number.isFinite(c.chg) ? `, ${pctText(c.chg / 100)} in 24 hours` : ""}, ${c.count} ${c.count === 1 ? "answer" : "answers"}${c.smart ? `, ${c.smart} with smart wallets` : ""}`}>
+      aria-label={`${c.name}${Number.isFinite(c.index) ? `, ${money(c.index)}` : ""}${Number.isFinite(c.chg) ? `, ${pctText(c.chg / 100)} in 24 hours` : ""}, ${c.quiet ? (QUIET_TAB[c.quiet] || "no answers now").toLowerCase() : `${c.count} ${c.count === 1 ? "answer" : "answers"}`}${c.smart ? `, ${c.smart} with smart wallets` : ""}`}>
       <CoinIcon und={c.und} />
       <span className="ct-body">
         <span className="ct-top"><b>{c.und}</b><small>{c.name}</small></span>
         <span className="ct-mid"><span className="ct-price mono">{Number.isFinite(c.index) ? money(c.index) : "Not available yet"}</span>
           {Number.isFinite(c.chg) && <span className={`ct-chg mono ${c.chg >= 0 ? "up" : "down"}`}>{pctText(c.chg / 100)}</span>}</span>
-        <span className="ct-foot">{c.failed ? "Data unavailable" : <>{c.count} {c.count === 1 ? "answer" : "answers"}{c.smart > 0 && <><i className="ct-gold" aria-hidden="true" />{c.smart}</>}{c.thin && " · thin book"}</>}</span>
+        <span className="ct-foot">{c.quiet ? QUIET_TAB[c.quiet] || "No answers now" : c.failed ? "Data unavailable" : <>{c.count} {c.count === 1 ? "answer" : "answers"}{c.smart > 0 && <><i className="ct-gold" aria-hidden="true" />{c.smart}</>}{c.thin && " · thin book"}</>}</span>
       </span>
     </button>
   );
@@ -181,7 +194,10 @@ function ChartView({ index, error, retryIndex }) {
     return { und: u, name: ASSET_NAMES[u] || u, index: byUnd[u]?.index, pricesTs: byUnd[u]?.prices_ts,
       chg: mk[u]?.chg_24h, count: rows.filter((r) => r.und === u).length, smart: meta.smart || 0,
       thin: !!byUnd[u]?.thin, failed: !!results[`questions/${u}.json`]?.error && !byUnd[u] };
-  });
+  }).concat((index?.quiet || []).filter((q) => !listed.includes(q.und)).map((q) => ({
+    und: q.und, name: ASSET_NAMES[q.und] || q.und, index: q.index, pricesTs: index.prices_ts,
+    chg: mk[q.und]?.chg_24h, count: 0, smart: 0, thin: !!q.thin, quiet: q.reason || "wide" })));
+  const quietOf = (u) => coins.find((c) => c.und === u && c.quiet);
   const asked = (params.get("coin") || "").toUpperCase();
   const und = asked || (listed.includes(decision.coin) ? decision.coin : null) || coins.find((c) => c.count)?.und || coins[0]?.und;
   const board = byUnd[und];
@@ -252,7 +268,8 @@ function ChartView({ index, error, retryIndex }) {
           {age.state === "stale" && board && <p className="page-meta" role="status">{und} option prices are {age.minutes} min old.</p>}
           {chosen && !selected && board && <p className="page-meta" role="status">The selected outcome is no longer available here. <Link to={`/q/${chosen.id}?side=${chosen.side}`}>Open its details</Link></p>}
           <div className="sl-frame">
-            {!listed.includes(und) ? <DataFailure coin={und} title={`${und} is not on this board.`} retry={retryIndex}>Choose another coin.</DataFailure>
+            {quietOf(und) ? <QuietPanel und={und} name={ASSET_NAMES[und] || und} reason={quietOf(und).quiet} />
+              : !listed.includes(und) ? <DataFailure coin={und} title={`${und} is not on this board.`} retry={retryIndex}>Choose another coin.</DataFailure>
               : !board && boardResult?.error ? <DataFailure coin={und} title={`${und} outcome data is unavailable.`} retry={boardResult.retry}>Your selected coin stays selected.</DataFailure>
               : !board ? <Loading /> : !coinFile && coinError ? <DataFailure coin={und} title={`${und} chart data is unavailable.`} retry={retryCandles}>Outcome prices are available in the list.</DataFailure>
               : !coinFile ? <Loading /> : paused ? <DataFailure coin={und} title={`${und} prices paused.`} retry={boardResult?.retry}>The last available option quotes are too old to use.</DataFailure> : !dates.length ? <div className="bd-empty" role="status"><h2>No {und} answer has a price now.</h2><p>Try another coin, or the list for the reasons.</p></div>

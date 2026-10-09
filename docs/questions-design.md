@@ -196,9 +196,9 @@ That is one snapshot per coin, so treat it as indicative. Two facts follow:
 - **That leaves seven dates per coin: 5, 6, 7, 9, 16, 23 and 30 Oct.** All seven pass for BTC at 14:00. For ETH, three pass (5, 6 and 7 Oct).
 
 **Date gate.**
-- A date tab appears when its headline level (3.3) has passed the cost and size gates in at least 3 of the last 4 hourly checks.
+- A date tab appears when its headline level (3.3) has passed the cost and size gates in at least 3 of the last 4 checks (hourly at first; one per 15-minute slot since 9 October 2026, owner's decision, so a coin hidden by a few wide prices returns within about 45 minutes).
 - The default tab is the nearest date shown.
-- A date whose gate lapses keeps its tab until it has failed 4 hourly checks in a row, so tabs do not flicker.
+- A date whose gate lapses keeps its tab until it has failed 4 checks in a row (an hour since 9 October 2026), so tabs do not flicker.
 - While a date fails, its rows show their prices but their buttons follow the level rule in 3.3.
 
 **Labels.**

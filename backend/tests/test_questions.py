@@ -1,6 +1,7 @@
 """Questions stage 1: the worked examples of docs/questions-design.md, the zone rule, the gates, the
 job's files and the off switch."""
 import gzip
+from datetime import datetime, timezone
 import json
 import math
 from pathlib import Path
@@ -403,3 +404,31 @@ def test_partial_retry_keeps_the_healthy_coin_in_the_index(tmp_path, chain14):
     qj.mark_paused(site, T14 + 500)
     renewed = json.loads((site / "questions" / "index.json").read_text())
     assert renewed["trading_valid_until"] == T14 + 500 + qj.TRADING_LEASE_SEC
+
+
+def test_gate_checks_run_once_per_15_minute_slot(chain14):
+    """Owner, 9 October 2026: a coin hidden by a few wide hours came back only hours later."""
+    state = {}
+    Q.step("BTC", chain14["BTC"], T14, BTC_SPEC, state)
+    e = next(d for d, ds in state["dates"].items() if ds["checks"])
+    n = len(state["dates"][e]["checks"])
+    Q.step("BTC", chain14["BTC"], T14 + 300, BTC_SPEC, state)   # same slot: no new check
+    assert len(state["dates"][e]["checks"]) == n
+    Q.step("BTC", chain14["BTC"], T14 + 900, BTC_SPEC, state)   # next slot: one more
+    Q.step("BTC", chain14["BTC"], T14 + 1800, BTC_SPEC, state)
+    assert len(state["dates"][e]["checks"]) == n + 2
+    assert state["dates"][e]["shown"]  # 3 passing checks within 30 minutes put the date on the board
+
+
+def test_quiet_coins_say_why():
+    now = T14
+    soon = datetime.fromtimestamp(now + 10 * 86400, tz=timezone.utc).strftime("%Y%m%d")
+    state = {"coins": {
+        "BTC": {"dates": {soon: {"zone": 6000.0}}},
+        "ETH": {"dates": {soon: {"zone": 200.0}}},
+        "CC": {"dates": {soon: {"zone": None}}},
+        "VVV": {"dates": {}},
+    }}
+    out = qj.quiet_coins(state, {"ETH": {"index": 2500.0}}, {"BTC"}, now)
+    assert [(c["und"], c["reason"]) for c in out] == [("ETH", "wide"), ("CC", "thin"), ("VVV", "none")]
+    assert out[0]["index"] == 2500.0 and out[0]["thin"] is False and out[1]["thin"] is True
