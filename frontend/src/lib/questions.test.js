@@ -242,7 +242,12 @@ describe("review: clock cutoff and prices above 99c", () => {
   it("never shows a price above 99c as 99c: that side is not offered", () => {
     expect(live(level, "no", false, T(1, 0))).toBe(false);
     expect(buyCents(level, "no", false, T(1, 0))).toBeNull();
-    expect(noPriceReason({ ...level, no: { ...level.no, state: "tail" } }, "no")).toMatch(/more than 99c/);
+    // noPriceReason reads the clock for the settling window; pinned so this date is not settling.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(T(1, 0) * 1000);
+    try {
+      expect(noPriceReason({ ...level, no: { ...level.no, state: "tail" } }, "no")).toMatch(/more than 99c/);
+    } finally { vi.useRealTimers(); }
     expect(live({ ...level, no: { ...level.no, buy: 0.99 } }, "no", false, T(1, 0))).toBe(true);
   });
 });
