@@ -94,10 +94,10 @@ describe("board maths per budget", () => {
     expect(tiny.belowMin).toBe(true);
     expect(tiny.minTotal).toBeCloseTo(tiny.minCost + 2 * 0.5 + (Math.min(0.0003 * btc.index, 0.125 * 2962) + Math.min(0.0003 * btc.index, 0.125 * 22)) * btc.spec.min, 9);
   });
-  it("stops at the size at this price for a large budget", () => {
+  it("sizes a large budget in full, flagged as larger than the book at this price", () => {
     const r = boardRows([btc], 100000, { now: NOW }).rows.find((x) => x.key === `${H}:yes`);
     expect(r.capped).toBe(true);
-    expect(r.payout).toBeLessThanOrEqual(1500 + 1e-6);
+    expect(r.payout).toBeGreaterThan(1500);
   });
   it("lists answers with no price, or below the smallest amount, under No price now with the reason", () => {
     const { rows, noPrice } = boardRows([btc], 100, { now: NOW });

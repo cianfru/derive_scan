@@ -72,8 +72,10 @@
 .sch-tip .sch-hint { color: var(--text-3); }
 
 /* The trade panel: a drawer over the chart's right side; a bottom sheet on phones. */
-.sl-panel { position: absolute; z-index: 4; top: 0; right: 0; bottom: 0; width: min(400px, 100%); padding: 20px 20px 18px; background: var(--surface-2);
-  border: 1px solid var(--border-strong); border-radius: 0 12px 12px 0; box-shadow: -18px 0 40px rgb(0 0 0 / .35); display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+/* Owner, 9 October 2026: the panel was cropped by the chart; it hangs from the chart's top edge to its own full
+   length, over whatever sits below, instead of scrolling inside the chart's height. */
+.sl-panel { position: absolute; z-index: 20; top: 0; right: 0; width: min(400px, 100%); padding: 20px 20px 18px; background: var(--surface-2);
+  border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: -18px 18px 48px rgb(0 0 0 / .4); display: flex; flex-direction: column; gap: 14px; }
 .sl-panel h2 { margin: 0; padding-right: 64px; font: 700 21px/1.25 var(--font-sans); letter-spacing: -.015em; text-wrap: balance; }
 .sl-when { margin: 4px 0 0; color: var(--text-3); font-size: 13px; }
 .sl-close { position: absolute; top: 10px; right: 12px; min-height: 44px; }
@@ -116,7 +118,7 @@
   .sl-ctabs { grid-auto-columns: 156px; }
   .sl-ctabs-wrap { scroll-snap-type: x proximity; }
   .sl-key-how { display: none; }
-  .sl-panel { position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: 100%; max-height: 86svh; border-radius: 14px 14px 0 0; box-shadow: 0 -18px 40px rgb(0 0 0 / .4); }
+  .sl-panel { position: fixed; top: auto; left: 0; right: 0; bottom: 0; width: 100%; max-height: 86svh; overflow-y: auto; border-radius: 14px 14px 0 0; box-shadow: 0 -18px 40px rgb(0 0 0 / .4); }
 }
 
 /* Keep the page to the screen's width: the chart scrolls sideways inside its frame, the tabs in their strip. */

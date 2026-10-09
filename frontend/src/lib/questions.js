@@ -163,7 +163,7 @@ export function legFee(index, price, contracts, spec) {
 }
 
 /** Everything the amount panel and the ticket show for a dollar amount on one side of a level.
- * Contracts floor to the amount step and are capped at the size at this price. */
+ * Contracts floor to the amount step; an amount larger than the size at this price is flagged, not cut. */
 export function ticket(level, sideKey, dollars, board) {
   const side = level?.[sideKey];
   const spec = board?.spec || {};
@@ -177,8 +177,10 @@ export function ticket(level, sideKey, dollars, board) {
   const perContract = side.form === "credit" ? w + net : net;
   const cap = ok(side.size) ? floorTo(side.size / w, step) : Infinity;
   let contracts = floorTo(Math.max(0, dollars) / perContract, step);
+  // No ceiling (owner, 9 October 2026: "if I want to bid $100,000, I should be able to do so"): the whole
+  // amount is sized; `capped` only says it is larger than the book shows at this price, and the firm
+  // quote prices the full amount.
   const capped = contracts > cap;
-  if (capped) contracts = cap;
   const belowMin = contracts < minimum - 1e-12;
   const premium = perContract * contracts;
   const fees = side.legs.reduce((a, [, , p]) => a + legFee(board.index, p, contracts, spec), 0);
@@ -198,8 +200,7 @@ export function ticket(level, sideKey, dollars, board) {
 /**
  * The budget convention (owner, 4 October 2026): an amount the user types is the total spend,
  * Derive's fees included. Fees are a fixed base per option plus an amount per contract, so the
- * premium is what remains after them; contracts round down to the amount step and stop at the size
- * at this price. Every place an amount is entered (the board, the guided flow, the ticket) sizes
+ * premium is what remains after them; contracts round down to the amount step, with no ceiling. Every place an amount is entered (the board, the guided flow, the ticket) sizes
  * through this, so the same amount shows the same figures everywhere.
  */
 export function budgetTicket(level, side, budget, board) {

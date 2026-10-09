@@ -85,7 +85,7 @@ describe("read-only outcome comparison", () => {
     expect(screen.queryByText("Most it pays")).toBeNull();
   });
 
-  it("keeps mismatched data unavailable and discloses the amount usable at a capped price", () => {
+  it("keeps mismatched data unavailable and says when the amount is larger than the book shows", () => {
     const wrongLevel = { ...higher, level: lower.level };
     const missingFees = { ...hype, board: { ...hypeBoard, spec: {} } };
     const capped = { ...higher, level: { ...higher.level, yes: { ...higher.level.yes, size: 60 } } };
@@ -98,9 +98,9 @@ describe("read-only outcome comparison", () => {
     cleanup();
     render(<OutcomeComparison selections={[capped]} budget={100.5} now={NOW} />);
     const card = screen.getByRole("article");
-    expect(figure(card, "Most it pays")).toBe("$60.00");
-    expect(figure(card, "You pay / most you can lose")).toContain("$24.15");
-    expect(screen.getByText(/Limited size at this price/).textContent).toBe("Limited size at this price · $24.15 of $100.50 used.");
+    // The whole budget is sized; the note says it is larger than the book at this price.
+    expect(Number(figure(card, "Most it pays").replace(/[$,]/g, ""))).toBeGreaterThan(60);
+    expect(screen.getByText(/Larger than the order book/).textContent).toBe("Larger than the order book at this price; the firm quote prices it.");
   });
 
   it("shows a full-payout breakeven at equal cost, without treating a cost above payout as even", () => {

@@ -147,7 +147,7 @@ function QuestionTicket({ und, question, answer, level, sideKey, t, board, price
         </p>
         <h3>{question} <span className="q-ticket-side">{answer} · {fullPay(level, sideKey)}</span></h3>
         {phone ? <><TradeFigures und={und} level={level} side={sideKey} t={t} summary /><TradeFacts und={und} level={level} side={sideKey} t={t} expiry={expiry || parseId(level.id)?.expiry} /></> : <OutcomePreview und={und} level={level} side={sideKey} t={t} expiry={expiry || parseId(level.id)?.expiry} settleTs={settleTs} summary />}
-        {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
+        {t.capped && <p className="q-note">Larger than Derive’s order book shows at this price ({money(t.capPayout)} of payout); the firm quote prices the full amount.</p>}
         <p className={`q-note${stale ? " warn" : ""}`}>Prices from {clock(pricesTs)}.</p>
       </section>
     );
@@ -164,7 +164,7 @@ function QuestionTicket({ und, question, answer, level, sideKey, t, board, price
           {close && <div><dt>Profit / loss if closed now<small>after the {money(paid, { cents: true })} you paid</small></dt><dd className={`mono ${tone(close.pl)}`}>{signed(close.pl)}</dd></div>}
           {close?.holdPl != null && <div><dt>If held to 08:00 UTC instead<small>{und} settling at today's price</small></dt><dd className={`mono ${tone(close.holdPl)}`}>{signed(close.holdPl)}</dd></div>}
       </dl>
-      {t.capped && <p className="q-note">Up to {money(t.capPayout)} of payout at this price; more costs more.</p>}
+      {t.capped && <p className="q-note">Larger than Derive’s order book shows at this price ({money(t.capPayout)} of payout); the firm quote prices the full amount.</p>}
       <details className="q-details">
         <summary>Order details</summary>
         <p className="q-ticket-lead">Place these two orders on Derive, in this order, to sell back.</p>
