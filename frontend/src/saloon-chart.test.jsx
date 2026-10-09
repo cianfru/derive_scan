@@ -26,7 +26,11 @@ marked.yes.smart = { delta_usd: 24000, wallets: 3 };
 // Directional traders' reading on two dates, one too thin to read, as publish_site writes them.
 smartBtc.dates[4].traders = { state: "defensive", score: -0.692, long: 7, short: 8, net_delta_usd: -15633000, gross_delta_usd: 22592000, status: "ready" };
 smartBtc.dates[5].traders = { state: null, score: null, long: 1, short: 1, net_delta_usd: 4000, gross_delta_usd: 5000, status: "too_few_wallets" };
-marked.smart_wallets = { long: 3, short: 1 };
+marked.smart_wallets = { long: 3, short: 1, wallets: [
+  { address: "0x28fb00000000000000000000000000000000aa01", side: "short", delta_usd: -42000, option_pnl: 84210.5, rank: 12 },
+  { address: "0x28fb00000000000000000000000000000000aa02", side: "long", delta_usd: 9000, option_pnl: -1500, rank: 40 },
+  { address: "0x28fb00000000000000000000000000000000aa03", side: "long", delta_usd: 3000, option_pnl: null, rank: null },
+] };
 
 beforeEach(() => {
   _resetDecision();
@@ -159,6 +163,29 @@ describe("Saloon chart page", () => {
     expect(b).toBeTruthy();
     fireEvent.keyDown(b, { key: "Enter" });
     expect(screen.getByRole("dialog", { name: "Your trade" }).textContent).toContain("Smart wallets here: 3 long · 1 short.");
+    const list = screen.getByRole("list", { name: "Smart wallets at this level" });
+    const items = within(list).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    expect(within(items[0]).getByRole("link").getAttribute("href")).toBe("/trader/0x28fb00000000000000000000000000000000aa01");
+    expect(items[0].textContent).toContain("Short $42K");
+    expect(items[0].textContent).toContain("P&L +$84.2K");
+    expect(items[1].textContent).toContain("Long $9K");
+    expect(items[1].textContent).toContain("P&L -$1.5K");
+    expect(items[2].textContent).toContain("Not available yet");
+  });
+
+  it("closes the trade panel on a click outside it, and not on a drag or inside it", () => {
+    show();
+    fireEvent.keyDown(document.querySelector(`.sch-bubble[data-key="${marked.id}:yes"]`), { key: "Enter" });
+    const panel = screen.getByRole("dialog", { name: "Your trade" });
+    const fire = (el, type, [clientX, clientY]) => fireEvent(el, new MouseEvent(type, { bubbles: true, button: 0, clientX, clientY }));
+    const click = (el, from = [10, 10], to = from) => { fire(el, "pointerdown", from); fire(el, "pointerup", to); };
+    click(panel.querySelector("header"));
+    expect(screen.queryByRole("dialog", { name: "Your trade" })).toBeTruthy();
+    click(document.querySelector(".sch-svg"), [10, 10], [80, 40]);  // moving the chart
+    expect(screen.queryByRole("dialog", { name: "Your trade" })).toBeTruthy();
+    click(document.querySelector(".sch-svg"));
+    expect(screen.queryByRole("dialog", { name: "Your trade" })).toBeNull();
   });
 
   it("uses no forecast words", () => {

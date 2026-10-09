@@ -81,9 +81,15 @@ export function tradersLead(data) {
   const tiered = list.filter((t) => t.tier === "top" || t.tier === "smart").length;
   const lead = list[0];
   const total = data.ranked_total ?? list.length;
-  let text = `${tiered.toLocaleString("en-US")} wallets of the ${list.length} shown are in the Top and Smart tiers, out of ${total.toLocaleString("en-US")} ranked`;
-  if (Number.isFinite(lead?.option_pnl)) text += `; the leader is ${lead.option_pnl >= 0 ? "up" : "down"} ${usd(Math.abs(lead.option_pnl))} in gross options PnL`;
-  return { text: `${text}.`, note: `Ranks count expired options before fees; ${STUDY}.` };
+  // parts: the same sentence with its counts lit (owner, 9 October 2026: counts in orange, the leader's PnL in its side's colour).
+  const n = (v) => ({ v: v.toLocaleString("en-US"), tone: "accent" });
+  const parts = [n(tiered), " wallets of the ", n(list.length), " shown are in the Top and Smart tiers, out of ", n(total), " ranked"];
+  if (Number.isFinite(lead?.option_pnl)) {
+    const up = lead.option_pnl >= 0;
+    parts.push(`; the leader is ${up ? "up" : "down"} `, { v: usd(Math.abs(lead.option_pnl)), tone: up ? "up" : "down" }, " in gross options PnL");
+  }
+  parts.push(".");
+  return { text: parts.map((x) => (typeof x === "string" ? x : x.v)).join(""), parts, note: `Ranks count expired options before fees; ${STUDY}.` };
 }
 
 /** Cohorts: how the most profitable results cohort holds its open options, on complete quotes only. */

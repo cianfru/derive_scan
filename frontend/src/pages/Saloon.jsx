@@ -4,6 +4,8 @@ import { useData } from "../lib/data.js";
 import { useClock } from "../lib/useClock.js";
 import { useFeeds } from "../components/Feeds.jsx";
 import { Info, Loading, RefreshNotice, Tabs } from "../components/ui.jsx";
+import WalletTag from "../components/WalletTag.jsx";
+import { usd } from "../lib/format.js";
 import { CoinIcon } from "../components/MarketVisuals.jsx";
 import SaloonHead from "../components/SaloonNotices.jsx";
 import SaloonChart, { countText, dayName, traderText } from "../components/SaloonChart.jsx";
@@ -85,6 +87,29 @@ function CoinTabs({ coins, value, onChange }) {
 }
 
 /** The trade panel over the chart: the answer, Higher or Lower, the amount (fees included), what it pays, the ticket. */
+// A click anywhere outside the trade panel closes it (owner, 9 October 2026), as Close does. A bubble picks
+// its own answer instead, a drag (moving the chart) is not a click, and popovers, other dialogs and the phone
+// backdrop (which closes by itself) are left alone.
+const KEEP_OPEN = ".sch-bubble, .sch-more, .sch-zoom button, .pop, [role='dialog'], .sl-backdrop";
+export function useOutsideClose(ref, close) {
+  const latest = useRef(close);
+  latest.current = close;
+  useEffect(() => {
+    let start = null;
+    const outside = (t) => t instanceof Element && t.isConnected && !ref.current?.contains(t) && !t.closest(KEEP_OPEN);
+    const at = (e) => [e.clientX ?? 0, e.clientY ?? 0];
+    const down = (e) => { start = (e.button ?? 0) === 0 && outside(e.target) ? at(e) : null; };
+    const up = (e) => {
+      const [x, y] = at(e);
+      if (start && Math.hypot(x - start[0], y - start[1]) < 6 && outside(e.target)) latest.current();
+      start = null;
+    };
+    document.addEventListener("pointerdown", down, true);
+    document.addEventListener("pointerup", up, true);
+    return () => { document.removeEventListener("pointerdown", down, true); document.removeEventListener("pointerup", up, true); };
+  }, [ref]);
+}
+
 function TradePanel({ und, row, rows, board, age, onPick, onClose, opener, refreshError, now }) {
   const current = useIndexPrice(und, board.index, board.prices_ts);
   const [decision, update] = useDecision();
@@ -101,6 +126,7 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose, opener, refre
     (action && !action.disabled ? action : panelRef.current?.querySelector(".sl-close"))?.focus();
   }, [ticket]);
   useEffect(() => { setTicket(false); }, [row.key]);
+  useOutsideClose(panelRef, onClose);
   const level = row.level, side = row.side, yes = side === "yes";
   const paused = age.state === "paused" || board.paused;
   const opposite = side === "yes" ? "no" : "yes";
@@ -153,7 +179,7 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose, opener, refre
         {atNow && <p className="decision-consequence">If {und} settles at {money(current.price)}, you get <b>{money(atNow.payout, { cents: true })}</b> · <b className={atNow.pl >= 0 ? "up" : "down"}>{signed(atNow.pl)}</b><Info label="About this settlement example">This example uses {current.source === "live" && current.fresh ? "the live index" : "the last available index"} and describes settlement at that price. Selling back early has a different value.</Info></p>}
         {(traders || smart) && <PhoneFold title="Traders and smart wallets" className="mt-context">
         {traders && <p className="sl-traders">Directional traders on this date: {traderText(traders)}.<Info label="About directional traders">Every Derive wallet that trades options for direction, profitable or not. Market makers, income sellers (who sell options to collect a fee) and hedgers (who buy protection) are left out. Each wallet counts long or short by its own open options on this settlement date (at least $1,000 its way). "Most of the money" weighs them by size: long or short when at least 62.5% points one way. It needs 3 traders and $10,000. Where traders lean is not where the price goes. Context, not a signal.</Info></p>}
-        {smart && <p className="sl-smart">Smart wallets here: {countText(smart)}.<Info label="About smart wallets">The most profitable directional options wallets on Derive holding options of this date at strikes inside this answer's pay zone, each counted long or short by its own position there (at least $1,000). The gold ring marks the answer at least two of them lean toward, more than lean the other way. Context, not a signal.</Info></p>}
+        {smart && <SmartWallets smart={smart} />}
         </PhoneFold>}
         {age.state === "stale" && <p className="q-note warn">Prices are {age.minutes} min old.</p>}
         <button ref={stageAction} type="button" className="btn primary lg sl-review" disabled={!ready} onClick={() => setTicket(true)}>Review trade</button>
@@ -164,6 +190,22 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose, opener, refre
       </>}
     </aside>
   );
+}
+
+// Who the smart wallets at a level are (owner, 9 October 2026: "I click on them ... I see who they are and I can see
+// their P&L"): each one's codename linking to its trader page, its side in this zone, its size there and options P&L.
+function SmartWallets({ smart }) {
+  const list = smart.wallets || [];
+  return <div className="sl-smart">
+    <p>Smart wallets here: {countText(smart)}.<Info label="About smart wallets">The most profitable directional options wallets on Derive holding options of this date at strikes inside this answer's pay zone, each counted long or short by its own position there (at least $1,000). The size is that position's delta in dollars; P&L is the wallet's options P&L on Derive so far. Open a wallet for its positions and history. The gold ring marks the answer at least two of them lean toward, more than lean the other way. Context, not a signal.</Info></p>
+    {list.length > 0 && <ul className="sl-wallets" aria-label="Smart wallets at this level">
+      {list.map((w) => <li key={w.address}>
+        <Link to={`/trader/${w.address}`} className="sl-wallet"><WalletTag address={w.address} size={18} /></Link>
+        <span className={w.side === "long" ? "up" : "down"}>{w.side === "long" ? "Long" : "Short"} <span className="mono">{usd(Math.abs(w.delta_usd))}</span></span>
+        <span className="sl-wallet-pnl">P&L <b className={w.option_pnl == null ? "" : `mono ${w.option_pnl >= 0 ? "up" : "down"}`}>{w.option_pnl == null ? "Not available yet" : `${w.option_pnl >= 0 ? "+" : ""}${usd(w.option_pnl)}`}</b></span>
+      </li>)}
+    </ul>}
+  </div>;
 }
 
 function DataFailure({ title, retry, children, coin }) {

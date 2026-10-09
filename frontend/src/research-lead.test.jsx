@@ -50,6 +50,8 @@ describe("research leads", () => {
   it("Traders and Flow", () => {
     const t = tradersLead({ ranked_total: 2404, traders: [{ tier: "top", option_pnl: 1.2e6 }, { tier: "smart", option_pnl: 5e5 }, { tier: null, option_pnl: 1e5 }] });
     expect(t.text).toBe("2 wallets of the 3 shown are in the Top and Smart tiers, out of 2,404 ranked; the leader is up $1.2M in gross options PnL.");
+    expect(t.parts.filter((x) => typeof x !== "string")).toEqual([
+      { v: "2", tone: "accent" }, { v: "3", tone: "accent" }, { v: "2,404", tone: "accent" }, { v: "$1.2M", tone: "up" }]);
     check(t);
     const f = flowLead({ coverage: { ready: false, fraction: 0.74 }, by_coin: {
       BTC: { call: { buy_premium_usd: 1000, sell_premium_usd: 500, buy_notional_usd: 9e5 }, put: { buy_premium_usd: 200, sell_premium_usd: 300 } },
