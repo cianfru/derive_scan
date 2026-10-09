@@ -331,6 +331,7 @@ svg.viz { width: 100%; height: auto; display: block; overflow: visible; }svg.viz
 /* Research leads: one plain takeaway from the data, then what limits it. */
 .lead { display: grid; gap: 4px; padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); max-width: 980px; }
 .lead-text { margin: 0; font: 500 16px/1.45 var(--font-sans); color: var(--text-1); max-width: 88ch; }
+.lead-num { font-weight: 600; } .lead-num.accent { color: var(--accent-text); } .lead-num.up { color: var(--up); } .lead-num.down { color: var(--down); }
 .lead-note { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-3); max-width: 96ch; }
 @media (max-width: 600px) { .lead { padding: 12px 14px; } .lead-text { font-size: 15px; } }
 

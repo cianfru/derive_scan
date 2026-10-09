@@ -88,7 +88,9 @@ export function Lead({ lead }) {
   if (!lead) return null;
   return (
     <div className="lead" aria-label="Takeaway" role="note">
-      <p className="lead-text">{lead.text}</p>
+      <p className="lead-text">{lead.parts
+        ? lead.parts.map((x, i) => (typeof x === "string" ? x : <b key={i} className={`lead-num ${x.tone}`}>{x.v}</b>))
+        : lead.text}</p>
       {lead.note && <p className="lead-note">{lead.note}</p>}
     </div>
   );

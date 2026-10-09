@@ -88,7 +88,16 @@
 .sl-seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sl-amount { display: grid; gap: 8px; }
 .sl-amount .label { display: inline-flex; align-items: center; gap: 4px; }
-.sl-smart { margin: 0; color: var(--sl-gold); font-size: 13px; font-weight: 600; }
+.sl-smart { margin: 0; font-size: 13px; }
+.sl-smart > p { margin: 0; color: var(--sl-gold); font-weight: 600; }
+.sl-wallets { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; }
+.sl-wallets li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; min-height: 32px; border-top: 1px solid var(--border); padding: 4px 2px 0 0; }
+.sl-wallets li:first-child { border-top: 0; }
+.sl-wallet { color: var(--text-1); text-decoration: underline; text-decoration-color: var(--border-2, var(--border)); text-underline-offset: 3px; min-width: 0; overflow: hidden; }
+.sl-wallet:hover, .sl-wallet:focus-visible { color: var(--accent); }
+.sl-wallets .up { color: var(--up); } .sl-wallets .down { color: var(--down); }
+.sl-wallet-pnl { color: var(--text-2); text-align: right; }
+@media (hover: none) { .sl-wallets li { min-height: 44px; } }
 .sl-panel .btn.primary { width: 100%; }
 .sl-foot { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; color: var(--text-3); font-size: 12px; }
 .sl-foot span { flex: 1 1 100%; }

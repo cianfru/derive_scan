@@ -12,6 +12,7 @@
 .lb-more { margin: 12px 20px 12px; padding: 8px 16px; }
 .people-page { gap: 24px; }
 .people-page > .lead { max-width: none; }
+.people-page > .lead .lead-text { max-width: none; }
 .crumbs { display: flex; align-items: center; gap: 8px; font: 500 var(--t-label)/1.4 var(--font-body); color: var(--faint); margin-bottom: -8px; }
 .crumbs a { color: var(--muted); border-bottom: 1px solid var(--seam-hi); }
 .crumbs a:hover { color: var(--fg); border-bottom-color: var(--accent-text); }
