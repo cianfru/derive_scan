@@ -88,6 +88,8 @@ function PhoneLargeTrades({ trades }) {
   </details>)}</div>;
 }
 
+const PASSIVE_HELP = "The share of this wallet's option trades where it posted the price and another trader took it. Market makers trade mostly this way: a wallet above 60%, one trading both sides of the same option on most options it touches, or one averaging more than 50 option trades a day is treated as a market maker and left out of the rankings.";
+
 function PhoneTrader({ data, error, crumb, name, book, copied, copy }) {
   return <div className="wrap page people-page trader-page trader-phone">
     <RefreshNotice error={error} />
@@ -103,6 +105,7 @@ function PhoneTrader({ data, error, crumb, name, book, copied, copy }) {
         <dl className="tm-figures">
           {data.pnl_cohort && <div><dt>Results cohort</dt><dd>{data.pnl_cohort}</dd></div>}
           {data.size_cohort && <div><dt>Size cohort</dt><dd>{data.size_cohort}</dd></div>}
+          {Number.isFinite(data.maker_share) && <div><dt>Passive share <Info label="About the passive share">{PASSIVE_HELP}</Info></dt><dd>{pct(data.maker_share, 0)}</dd></div>}
           <div><dt>Since</dt><dd className="mono">{data.first}</dd></div>
           {data.last && <div><dt>Last trade</dt><dd className="mono">{data.last}</dd></div>}
           <div><dt>Perp PnL</dt><dd className={`mono ${tone(data.perp_pnl)}`}>{usd(data.perp_pnl)}</dd></div>
@@ -281,6 +284,7 @@ export default function Trader() {
           <div><span>Win rate</span><b>{pct(data.win_rate, 0)}</b></div>
           <div><span>Expired options</span><b>{data.expired?.toLocaleString("en-US") ?? "—"}</b></div>
           <div><span>Premium traded</span><b>{usd(data.premium_traded)}</b></div>
+          {Number.isFinite(data.maker_share) && <div><span>Passive share <Info label="About the passive share">{PASSIVE_HELP}</Info></span><b>{pct(data.maker_share, 0)}</b></div>}
         </div>
       </section>
       <PnlHistory history={data.pnl_history} through={data.through} />

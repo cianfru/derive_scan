@@ -92,6 +92,9 @@ def test_the_split_classify_keeps_its_rules():
     assert history.classify_stats(stats) == "directional"
     assert history.classify_stats(stats | {"active_days": 89}) == "occasional"
     assert history.classify_stats(stats | {"maker_share": 0.61}) == "market_maker"
+    # Amendment B: more than 50 option legs a day over the active span is a market maker, whatever the maker share.
+    assert history.classify_stats(stats | {"legs": 50 * 100, "active_days": 100, "maker_share": 0.56}) == "directional"
+    assert history.classify_stats(stats | {"legs": 50 * 100 + 1, "active_days": 100, "maker_share": 0.56}) == "market_maker"
     assert history.classify_stats(stats | {"sold_share": 0.9, "otm_sold_share": 0.5}) == "income"
     assert history.classify_stats(stats | {"hedged_days_share": 0.51}) == "hedger"
     out = {f"w{i}": {"class": "directional", "option_pnl": 100 - i * 10} for i in range(12)}

@@ -54,14 +54,14 @@ from pathlib import Path
 REPAIRS = ("fractional_strikes", "paging")
 REPAIR = REPAIRS[-1]
 # 4: wallets under their owner's name (derive/wallet_alias.py, owner's decision 5 October 2026).
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6  # 6: Amendment B, the volume rule for market makers
 # The wallet files are rebuilt when the owner names change (history/wallet_aliases.json), at most
 # this often; a new day or a schema change rebuilds them anyway.
 ALIAS_REBUILD_EVERY = 3600
 # Definitions of history/surface (derive/surface_history.py); a new version rebuilds every row.
 SURFACE_VERSION = 1
 # Definitions of history/balance.json (derive/balance_history.py); a new version rebuilds its closes.
-BALANCE_VERSION = 2
+BALANCE_VERSION = 3  # 3: classes with Amendment B
 BALANCE_CLOSES = 90
 BALANCE_MIN_BUDGET = 100  # seconds of budget left for a backfill to start
 RETRY_PER_RUN = 4          # unreconciled readings read again per run
