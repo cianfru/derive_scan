@@ -11,3 +11,11 @@ describe("posse names", () => {
     expect(Object.values(POSSE).join(" ")).not.toMatch(/Rekt|Whale|Shrimp|Leviathan|Dolphin|Printer|cohort/i);
   });
 });
+
+describe("posse (i)", () => {
+  it("explains every name with its bounds", async () => {
+    const { POSSE_INFO } = await import("./posses.js");
+    expect(Object.keys(POSSE_INFO).sort()).toEqual(Object.keys(POSSE).sort());
+    for (const text of Object.values(POSSE_INFO)) expect(text).toMatch(/\$\d/);
+  });
+});

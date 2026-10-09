@@ -79,6 +79,7 @@ td.lb-who { padding-block: 10px; }
 .cohort-title { display: flex; align-items: baseline; gap: 8px 16px; flex-wrap: wrap; }
 .cohort-title h3 { font: 600 var(--t-h2)/1.25 var(--font-display); }
 .cohort-title span { font: 400 var(--t-label)/1.4 var(--font-body); color: var(--muted); }
+.cohort-title span.posse-name { display: inline-flex; align-items: center; gap: 2px; color: var(--text-1); }
 .cohort-detail > .tabs { margin-top: 8px; border-bottom: 1px solid var(--seam); }
 .cohort-totals { display: flex; gap: 12px 40px; flex-wrap: wrap; padding-block: 16px; }
 .cohort-totals > span { display: grid; gap: 6px; font: 600 var(--t-key)/1.2 var(--font-body); color: var(--faint); }

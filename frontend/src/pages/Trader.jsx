@@ -4,7 +4,6 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { usd, pct, price, ago, utc, optionLabel, strike } from "../lib/format.js";
 import { TYPE_INFO } from "../lib/traders.js";
-import { posseName } from "../lib/posses.js";
 import { codename, shortAddr } from "../lib/walletName.js";
 import { Plate, Loading, Failed, Info } from "../components/ui.jsx";
 import { WalletEmblem } from "../components/WalletTag.jsx";
@@ -12,6 +11,7 @@ import LeanBar from "../components/LeanBar.jsx";
 import { Asset } from "../components/MarketVisuals.jsx";
 import HistoryStatus, { coverageReady, GapNote } from "../components/HistoryStatus.jsx";
 import PnlHistory from "../components/PnlHistory.jsx";
+import PosseName from "../components/PosseName.jsx";
 import "../trader-mobile.css";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -104,8 +104,8 @@ function PhoneTrader({ data, error, crumb, name, book, copied, copy }) {
       <PhoneFold title="Profile details" className="tm-profile">
         <p className="tid-sub"><span className="mono tm-address" title={data.address}>{data.address}</span><button type="button" className="tid-copy" onClick={copy}>{copied ? "Copied" : "Copy"}</button></p>
         <dl className="tm-figures">
-          {data.pnl_cohort && <div><dt>Results posse</dt><dd>{posseName(data.pnl_cohort)}</dd></div>}
-          {data.size_cohort && <div><dt>Size posse</dt><dd>{posseName(data.size_cohort)}</dd></div>}
+          {data.pnl_cohort && <div><dt>Results posse</dt><dd><PosseName code={data.pnl_cohort} /></dd></div>}
+          {data.size_cohort && <div><dt>Size posse</dt><dd><PosseName code={data.size_cohort} /></dd></div>}
           {Number.isFinite(data.maker_share) && <div><dt>Passive share <Info label="About the passive share">{PASSIVE_HELP}</Info></dt><dd>{pct(data.maker_share, 0)}</dd></div>}
           <div><dt>Since</dt><dd className="mono">{data.first}</dd></div>
           {data.last && <div><dt>Last trade</dt><dd className="mono">{data.last}</dd></div>}
@@ -272,8 +272,8 @@ export default function Trader() {
             </p>
             <p className="tid-sub tid-meta">
               <span>Rank {data.rank}</span>
-              {data.pnl_cohort && <span>{posseName(data.pnl_cohort)}</span>}
-              {data.size_cohort && <span>{posseName(data.size_cohort)}</span>}
+              <PosseName code={data.pnl_cohort} />
+              <PosseName code={data.size_cohort} />
               <span>since {data.first}</span>
               {data.last && <span>last trade {data.last}</span>}
               <span>perp PnL <b className={`mono ${tone(data.perp_pnl)}`}>{usd(data.perp_pnl)}</b></span>
