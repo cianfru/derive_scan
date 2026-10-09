@@ -9,7 +9,7 @@ import WalletTag from "../components/WalletTag.jsx";
 import LeanBar from "../components/LeanBar.jsx";
 import HistoryStatus, { coverageReady, GapNote } from "../components/HistoryStatus.jsx";
 import { codename } from "../lib/walletName.js";
-import { posseName } from "../lib/posses.js";
+import PosseName from "../components/PosseName.jsx";
 import "../research-refinement.css";
 
 const PAGE_HELP = `Options traders on Derive, ranked by gross results on expired options, before fees. Market makers are left out. ${TYPE_INFO}`;
@@ -87,7 +87,7 @@ export default function Traders() {
                       <WalletTag address={t.address} name={t.name} size={28} /><Arrow />
                     </Link>
                     <span className="lb-sub">
-                      {[t.pnl_cohort, t.size_cohort].filter(Boolean).map(posseName).join(" · ") || "—"}
+                      {t.pnl_cohort || t.size_cohort ? [t.pnl_cohort, t.size_cohort].filter(Boolean).map((code, i) => <span key={code}>{i > 0 && " · "}<PosseName code={code} /></span>) : "—"}
                       {tiered(t) && <em className="tier-tag">{t.tier}</em>}
                     </span>
                   </td>

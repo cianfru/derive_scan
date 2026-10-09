@@ -5,6 +5,7 @@ import { Asset } from "./MarketVisuals.jsx";
 import { usd, utc } from "../lib/format.js";
 import { COHORT_HELP } from "../lib/explain.js";
 import { posseName } from "../lib/posses.js";
+import PosseName from "./PosseName.jsx";
 import "../research-refinement.css";
 const BOUNDS = {
   "Money Printer": "At least $1M gross profit on expired options",
@@ -108,7 +109,7 @@ export default function CohortExplorer({ cohorts, through, valuedAt, title = "Po
           {c ? (
             <>
               <div className="cohort-title">
-                <h3>{posseName(c.name)}</h3>
+                <PosseName as="h3" code={c.name} />
                 <span>{BOUNDS[c.name] || "Defined results posse"}</span>
               </div>
               <Tabs label="Posse option expiry" value={window} onChange={setWindow}

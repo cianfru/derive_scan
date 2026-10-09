@@ -5,7 +5,7 @@ import { usd, strike } from "../lib/format.js";
 import { viewReading } from "../lib/presentation.js";
 import { TYPE } from "../lib/traders.js";
 import { Plate, Tabs, Loading, Empty } from "./ui.jsx";
-import { posseName } from "../lib/posses.js";
+import PosseName from "./PosseName.jsx";
 import WalletTag from "./WalletTag.jsx";
 
 const day = (t) => new Date(t * 1000).toISOString().slice(5, 10);
@@ -49,7 +49,7 @@ function Cohorts({ cohorts }) {
         <div className="cohort-rows">
           {rows.map((c) => (
             <div key={c.name} className="cohort-row">
-              <span className="name"><b>{posseName(c.name)}</b><small className="mono">{c[win].positions} pos.</small></span>
+              <span className="name"><b><PosseName code={c.name} /></b><small className="mono">{c[win].positions} pos.</small></span>
               <DeltaBar value={c[win].net_delta_usd} max={max} score={c[win].score} />
               <span className={`delta-num ${tone(c[win].score)}`}>{c[win].net_delta_usd == null ? <Empty /> : usd(c[win].net_delta_usd)}</span>
             </div>))}
@@ -71,7 +71,7 @@ function Holders({ holders, total }) {
               return (
                 <Link key={h.address} className="holder" to={`/trader/${h.address.toLowerCase()}`}>
                   <span className="who"><WalletTag address={h.address} size={22} />
-                    <small>{h.tier ? <b>{TYPE[h.tier]}</b> : TYPE[h.class] || "Trader"} · #{h.rank}{h.pnl_cohort ? ` · ${posseName(h.pnl_cohort)}` : ""}</small></span>
+                    <small>{h.tier ? <b>{TYPE[h.tier]}</b> : TYPE[h.class] || "Trader"} · #{h.rank}{h.pnl_cohort && <> · <PosseName code={h.pnl_cohort} /></>}</small></span>
                   <span className="leg">{leg ? <>{leg.net > 0 ? "Long" : "Short"} {strike(leg.strike, "")} {leg.type === "C" ? "call" : "put"} · {day(leg.expiry)}</> : <Empty />}
                     {h.positions > 1 ? <em> +{h.positions - 1}</em> : null}</span>
                   <span className={`delta-num ${h.net_delta_usd > 0 ? "up" : h.net_delta_usd < 0 ? "down" : ""}`}>{usd(h.net_delta_usd)}</span>
