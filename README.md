@@ -156,6 +156,10 @@ The 7 October read-only public quote returned an expected and guaranteed arrival
 
 The [Rysk discussion brief](docs/rysk-design.md) covers the owner's partner call and the obligation-first mock: collateral lock and possible purchase/sale, physical settlement and no early exit, followed by premium dollars and settlement examples. A future HyperEVM/Rysk funding adapter is not implemented; Derive cash and Rysk locked collateral remain distinct.
 
+## Rysk: Receive premium (optional)
+
+Built 10 October 2026 ([details](docs/rysk-integration.md)). With `VITE_RYSK=testnet` or `mainnet` (and `VITE_QUESTIONS=1`) the trade panel's **Receive premium** tab sells an option on Rysk V12 (HyperEVM) from the user's own wallet: lock the coin to sell at a level, or USDC to buy at a level, for a firm premium paid into the wallet. One approval when needed and one signature; Rysk sends the trade. Each step is timed. Real money only for wallets on `VITE_RYSK_PILOT` (`all` for everyone, empty for nobody) while the published `trading_mainnet` switch is on. Off in every build until set. Code: `src/lib/rysk/`, `src/components/rysk/RyskTicket.jsx`; tests `src/lib/rysk/rysk.test.js`, `src/rysk-ticket.test.jsx`, bundle test.
+
 ## Live service (Railway)
 
 `backend/live/` keeps one connection to Derive's WebSocket (`ticker_slim.{instrument}.1000`) for every

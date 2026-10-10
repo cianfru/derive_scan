@@ -1,0 +1,51 @@
+/* Receive premium on Rysk: the ticket inside the Saloon's trade panel (components/rysk/RyskTicket.jsx). */
+.rysk-ticket { min-width: 0; display: grid; gap: 14px; color: var(--text-1); }
+.rk-head { display: grid; gap: 2px; margin-top: 8px; }
+.rk-head h3 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.02em; }
+.rk-head > span { font-size: 12px; color: var(--text-2); }
+.rysk-ticket > .tabs { width: 100%; }
+.rysk-ticket > .tabs button { flex: 1; min-height: 44px; padding-inline: 6px; white-space: normal; font-size: 13px; }
+.rk-dates { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.rk-dates button { min-height: 36px; font-size: 13px; color: var(--text-2); text-decoration: none; border-bottom: 1px solid transparent; }
+.rk-dates button[aria-pressed="true"] { color: var(--text-1); border-bottom-color: var(--accent); }
+.rk-levels { display: grid; }
+.rk-levels-head, .rk-level { display: grid; grid-template-columns: 1.2fr 1fr .9fr; gap: 8px; align-items: center; }
+.rk-levels-head { padding: 0 10px 6px; font-size: 12px; color: var(--text-2); }
+.rk-levels-head > span:last-child, .rk-level > span:last-child { text-align: right; }
+.rk-levels-head .info { margin-left: 2px; }
+.rk-level { min-height: 40px; padding: 0 10px; border: 1px solid transparent; border-radius: 8px; background: none; color: var(--text-1); font-size: 14px; text-align: left; cursor: pointer; }
+.rk-level:hover { background: var(--surface-1); }
+.rk-level[aria-checked="true"] { border-color: var(--accent); background: var(--surface-1); }
+.rk-level:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rk-level > span:nth-child(2) { color: var(--text-2); }
+.rk-all { justify-self: start; margin: 6px 10px 0; font-size: 13px; }
+.rk-amount { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; }
+.rk-amount .label { grid-column: 1 / -1; display: inline-flex; align-items: center; gap: 4px; }
+.rk-amount input { min-width: 0; height: 44px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface-1); color: var(--text-1); font-size: 16px; }
+.rk-amount input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rk-snap { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--text-2); }
+.rk-obligation { border: 1px solid var(--border-strong); border-radius: 8px; padding: 14px 16px; background: var(--surface-1); }
+.rk-label { margin: 0 0 6px; font-size: 12px; color: var(--text-2); }
+.rk-obligation > strong { display: block; font-size: 22px; font-weight: 500; line-height: 1.25; }
+.rk-obligation > p:not(.rk-label) { margin: 8px 0 0; font-size: 13px; line-height: 1.55; }
+.rk-terms { color: var(--text-2); }
+.rk-premium { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-block: 6px 12px; border-bottom: 1px solid var(--border); }
+.rk-premium > div { display: grid; gap: 4px; }
+.rk-premium span { font-size: 12px; color: var(--text-2); }
+.rk-premium strong { font-size: 30px; font-weight: 500; line-height: 1.1; }
+.rk-premium > small { max-width: 160px; font-size: 12px; color: var(--text-2); text-align: right; }
+.rk-wallet p { margin: 0; font-size: 13px; color: var(--text-2); line-height: 1.6; }
+.rk-wallet .q-note { margin-top: 6px; }
+.rk-go { width: 100%; min-height: 48px; }
+.rk-steps { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.rk-steps li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-3); }
+.rk-steps li.active { color: var(--text-1); }
+.rk-steps li.done, .rk-steps li.skipped { color: var(--text-2); }
+.rk-steps li.done > span:first-child::before { content: "✓ "; color: var(--up); }
+.rk-steps li.failed { color: var(--down); }
+.rk-done { margin: 0; font-size: 14px; line-height: 1.6; }
+.rk-done a { color: var(--text-1); }
+.rk-positions h4 { margin: 4px 0 6px; font-size: 14px; font-weight: 600; }
+.rk-positions ul { margin: 0; padding: 0; list-style: none; }
+.rk-positions li { display: grid; grid-template-columns: 1.6fr 1fr auto; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.rk-foot { margin: 0; font-size: 12px; color: var(--text-2); line-height: 1.6; }

@@ -13,6 +13,7 @@ import SaloonChart, { countText, dayName, traderText } from "../components/Saloo
 import QuestionTicket from "../components/QuestionTicket.jsx";
 import { PhoneFold, TradeFacts, TradeFigures } from "../components/MobileTrade.jsx";
 import { RYSK_MOCK } from "../lib/flags.js";
+import { RYSK_ON } from "../lib/rysk/config.js";
 import { FollowButton } from "../components/Follow.jsx";
 import { useIndexPrice } from "../lib/livePrice.js";
 import { useSheetFocus } from "../components/DecisionSheet.jsx";
@@ -30,7 +31,10 @@ import "../marketplace-detail.css";
 import "../saloon-chart.css";
 
 // Bubbles show the most each answer makes for one amount, as on the list, so they compare like for like.
-const RyskMock = RYSK_MOCK ? lazy(() => import("../components/RyskMock.jsx")) : null;
+const RyskMock = RYSK_MOCK && !RYSK_ON ? lazy(() => import("../components/RyskMock.jsx")) : null;
+// Receive premium on Rysk for real (VITE_RYSK); the illustration stays for preview builds without it.
+const RyskTicket = RYSK_ON ? lazy(() => import("../components/rysk/RyskTicket.jsx")) : null;
+const PREMIUM_TAB = RYSK_ON || RYSK_MOCK;
 const REF = 100;
 const QUICK = [25, 100, 500];
 const CANDLES = 72; // 12 days of 4-hour candles
@@ -147,8 +151,9 @@ function TradePanel({ und, row, rows, board, age, onPick, onClose, opener, refre
   return (
     <aside ref={panelRef} className="sl-panel" role={modal ? "dialog" : undefined} aria-modal={modal ? "true" : undefined} aria-label="Your trade" tabIndex={-1}>
       <button type="button" className="text-control sl-close" onClick={onClose}>Close</button>
-      {RYSK_MOCK && <Tabs label="Trade type" value={tradeView} onChange={(v) => { setTicket(false); setTradeView(v); }} items={[["buy", "Buy outcome"], ["premium", "Receive premium"]]} />}
-      {RYSK_MOCK && tradeView === "premium" ? <Suspense fallback={<p className="status">Loading illustrations…</p>}><RyskMock und={und} /></Suspense> : <>
+      {PREMIUM_TAB && <Tabs label="Trade type" value={tradeView} onChange={(v) => { setTicket(false); setTradeView(v); }} items={[["buy", "Buy outcome"], ["premium", "Receive premium"]]} />}
+      {PREMIUM_TAB && tradeView === "premium" ? <Suspense fallback={<p className="status">{RyskTicket ? "Loading Rysk…" : "Loading illustrations…"}</p>}>
+        {RyskTicket ? <RyskTicket und={und} settleTs={row.settleTs} near={row.k} side={side} /> : <RyskMock und={und} />}</Suspense> : <>
       <header>
         <h2>{und} {yes ? "higher" : "lower"} than {money(row.k)}?</h2>
         <p className="sl-when">{dayName(row.settleTs)}, 08:00 UTC{countdown(row.settleTs) && <> · {countdown(row.settleTs)}</>} · {und} index <span className="mono">{money(current.price)}</span><small className="decision-price-note">{current.notice}</small></p>
