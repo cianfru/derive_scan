@@ -86,3 +86,6 @@ bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sel
 1791604800,SOL,call,658.98,0.0,30.3,0.0,2
 1791604800,ZEC,call,0.0,153565.53,0.0,4483.87,4
 1791604800,ZEC,perp,25643.35,0.0,0.0,0.0,1
+1791605700,HYPE,perp,112.23,1675.12,0.0,0.0,2
+1791605700,LIT,perp,633.14,0.0,0.0,0.0,1
+1791605700,SOL,call,241.23,0.0,7.7,0.0,1
