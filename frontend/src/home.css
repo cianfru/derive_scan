@@ -1,4 +1,6 @@
-/* The card home (pages/Home.jsx): flat cards, one line and one picture each, after Apple's Mac page. */
+/* The card home (pages/Home.jsx): flat cards, one line and one picture each, after Apple's Mac page.
+   From 901px the whole grid fits the first screen (owner, 10 October 2026: "make everything tighter"):
+   three rows share the height left under the header and the heading, never under 170px a row. */
 .home { --home-gold: #e8c26a; padding-block: 40px 64px; }
 .home-intro { text-align: center; margin-bottom: 32px; }
 .home-intro h1 { margin: 0; font: 800 40px/1.1 var(--font-sans); letter-spacing: -.03em; }
@@ -21,6 +23,8 @@
 .home-tall .home-art { flex-direction: column; align-items: stretch; }
 .home-fig { font: 600 15px var(--font-mono); color: var(--text-2); letter-spacing: -.02em; }
 .home-fig.big { font-size: 34px; font-weight: 700; color: var(--text-1); }
+.home-fig.big.up { color: var(--up); } .home-fig.big.down { color: var(--down); }
+.home-fig-stack { display: grid; gap: 2px; }
 .home-hats { display: flex; } .home-hats .wtag-av + .wtag-av { margin-left: -10px; }
 .home-plus { position: absolute; right: 22px; bottom: 22px; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%;
   background: var(--surface-3, #2c2824); display: grid; place-items: center; cursor: pointer; }
@@ -47,4 +51,16 @@
   .home-hats .wtag-av { width: 34px; height: 34px; }
   .home-plus { width: 44px; height: 44px; right: 12px; bottom: 12px; }
   .home-pop-body { padding: 28px 22px; } .home-pop h2 { font-size: 28px; } .home-pop p { font-size: 16px; }
+}
+
+@media (min-width: 901px) {
+  .home { padding-block: 22px 28px; }
+  .home-intro { margin-bottom: 18px; } .home-intro h1 { font-size: clamp(28px, 3.4vh, 38px); } .home-intro p { margin-top: 6px; font-size: 15px; }
+  .home-grid { grid-auto-rows: auto; grid-template-rows: repeat(3, minmax(170px, 1fr)); height: clamp(480px, calc(100svh - 226px), 860px); gap: clamp(12px, 1.8vh, 20px); }
+  .home-card { padding: clamp(18px, 2.4vh, 28px) clamp(20px, 2.2vw, 30px); border-radius: 24px; }
+  .home-card h2 { font-size: clamp(20px, 2.7vh, 28px); }
+  .home-art-svg { max-height: min(240px, 26vh); } .home-art-sq { width: clamp(56px, 8vh, 88px); height: clamp(56px, 8vh, 88px); }
+  .home-wide .home-art-svg { width: clamp(200px, 22vw, 300px); }
+  .home-fig.big { font-size: clamp(26px, 3.6vh, 34px); }
+  .home-plus { width: 36px; height: 36px; right: 18px; bottom: 18px; }
 }
