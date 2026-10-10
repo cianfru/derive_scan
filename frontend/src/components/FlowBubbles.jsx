@@ -3,13 +3,19 @@
 // the page), the pop-out links each coin to its view on /flow, and the Flow page picks a coin with it.
 import { Link } from "react-router-dom";
 import { usd } from "../lib/format.js";
-import { BUBBLES, bubbleLayout, leanWords } from "../lib/flowBubbles.js";
+import { BUBBLES, bubbleLayout, leanParts, leanWords } from "../lib/flowBubbles.js";
 import { useElementSize } from "../lib/useElementWidth.js";
 import { CoinIcon } from "./MarketVisuals.jsx";
 import "../flow-bubbles.css";
 
 // "ETH $300K": the coin in words, the money in figures.
 const labelParts = (t) => { const i = t.indexOf(" "); return i < 0 ? t : <><b>{t.slice(0, i)}</b>{t.slice(i)}</>; };
+
+/** "63% on a rise" with the figure in the numbers' font (`Num` wraps it: the home card's own, else a mono span). */
+export function LeanText({ c, Num = ({ children }) => <span className="fb-n">{children}</span> }) {
+  const p = leanParts(c);
+  return p ? <><Num>{p.pct}%</Num> on a {p.word}</> : <>about even</>;
+}
 
 export const coinWords = (c) => `${c.und}: ${usd(c.total)} in options over 24 hours, ${leanWords(c)}`;
 
@@ -25,9 +31,9 @@ export default function FlowBubbles({ coins, className = "", rMin = 10, rMax = 3
     const cls = `fb-b ${m.lean}${picked ? (picked === m.und ? " on" : " off") : ""}`;
     const style = { left: `${(m.x - m.r).toFixed(1)}px`, top: `${(m.y - m.r).toFixed(1)}px`, width: 2 * m.r, height: 2 * m.r };
     const words = coinWords(m);
-    if (onPick) return <button key={m.und} type="button" className={cls} style={style} aria-label={words} title={words}
+    if (onPick) return <button key={m.und} type="button" className={cls} style={style} aria-label={words} title={words} data-und={m.und}
       aria-pressed={picked === m.und} onClick={() => onPick(picked === m.und ? "all" : m.und)}><CoinIcon und={m.und} /></button>;
-    if (linkTo) return <Link key={m.und} to={linkTo(m.und)} className={cls} style={style} aria-label={words} title={words}><CoinIcon und={m.und} /></Link>;
+    if (linkTo) return <Link key={m.und} to={linkTo(m.und)} className={cls} style={style} aria-label={words} title={words} data-und={m.und}><CoinIcon und={m.und} /></Link>;
     return <span key={m.und} className={cls} style={style} title={words} data-und={m.und}><CoinIcon und={m.und} /></span>;
   };
   return (
@@ -44,7 +50,7 @@ export default function FlowBubbles({ coins, className = "", rMin = 10, rMax = 3
         ))}
         {axis > 0 && <div className="fb-xw" aria-hidden="true" style={{ top: L.ph }}>
           <span className="down">{axisWords[0]}</span><span className="up">{axisWords[2]}</span>
-          <span className="fb-xw-even" style={{ left: L.evenX }}>{axisWords[1]}</span>
+          {size.w >= 300 && <span className="fb-xw-even" style={{ left: L.evenX }}>{axisWords[1]}</span>}
         </div>}
       </>}
     </div>

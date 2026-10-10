@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { bubbleLayout, dayLayout, flowCoins, leanOf, leanWords } from "./flowBubbles.js";
+import { bubbleLayout, dayLayout, flowCoins, leanOf, leanParts, leanWords } from "./flowBubbles.js";
+import { separate } from "./homeLayout.js";
 
 const coins = flowCoins({
   ETH: { call: { buy_premium_usd: 187857 * 0.45, sell_premium_usd: 93918 }, put: { buy_premium_usd: 17735, sell_premium_usd: 104256 } },
@@ -24,6 +25,8 @@ describe("flow bubbles", () => {
     expect(leanWords(coins.find((c) => c.und === "BTC"))).toBe("77% on a rise");
     expect(leanWords(coins.find((c) => c.und === "XRP"))).toBe("about even");
     expect([0.55, 0.549, 0.5, 0.451, 0.45].map(leanOf)).toEqual(["up", "even", "even", "even", "down"]);
+    expect(leanParts(zec)).toEqual({ pct: 84, word: "fall" });
+    expect(leanParts(coins.find((c) => c.und === "XRP"))).toBeNull();
   });
 
   it("places each bubble by its share exactly, larger for more money, inside the field and touching no other", () => {
@@ -55,6 +58,35 @@ describe("flow bubbles", () => {
         }
         for (const o of boxes) if (o !== b) expect(b.r <= o.l || b.l >= o.r || b.b <= o.t || b.t >= o.b).toBe(true);
       }
+    }
+  });
+
+  it("keeps two large coins with almost the same share apart on the home card's short bands", () => {
+    const close = flowCoins({ BTC: { call: { buy_premium_usd: 52000 }, put: { buy_premium_usd: 48000 } },
+      ETH: { call: { buy_premium_usd: 45900 }, put: { buy_premium_usd: 44100 } },
+      HYPE: { call: { buy_premium_usd: 9000 }, put: { buy_premium_usd: 11000 } }, SOL: { call: { buy_premium_usd: 300 } } });
+    for (const [w, h] of [[690, 64], [780, 97], [550, 80], [336, 99], [320, 124]]) {
+      const L = bubbleLayout(close, { w, h, rMin: 10, rMax: 32 });
+      for (let i = 0; i < L.marks.length; i++) for (let j = i + 1; j < L.marks.length; j++) {
+        const a = L.marks[i], b = L.marks[j];
+        expect(Math.hypot(a.x - b.x, a.y - b.y), `${w}x${h} ${a.und}/${b.und}`).toBeGreaterThanOrEqual(a.r + b.r);
+      }
+      for (const m of L.marks) { expect(m.y - m.r).toBeGreaterThanOrEqual(0); expect(m.y + m.r).toBeLessThanOrEqual(L.ph + 0.01); }
+    }
+    // Moved apart together (one above the line, one below) rather than shrunk to fit: at 780x97 they keep about 18px.
+    expect(bubbleLayout(close, { w: 780, h: 97, rMin: 10, rMax: 32 }).marks[0].r).toBeGreaterThan(15);
+  });
+
+  it("keeps every trade wholly on its side of the line, even when repeats crowd together", () => {
+    const from = 0, to = 86400, h = 172, mid = h / 2;
+    const trades = [...Array.from({ length: 6 }, (_, i) => ({ key: `r${i}`, ts: 3600 + i * 120, money: 20000, side: "rise" })),
+      ...Array.from({ length: 6 }, (_, i) => ({ key: `f${i}`, ts: 3600 + i * 120, money: 20000, side: "fall" }))];
+    const marks = separate(dayLayout(trades, { w: 1300, h, from, to }), { top: 0, bottom: h, mid, margin: 2 });
+    for (const m of marks) {
+      if (m.side === "rise") expect(m.py + m.s / 2).toBeLessThanOrEqual(mid);
+      else expect(m.py - m.s / 2).toBeGreaterThanOrEqual(mid);
+      expect(m.py - m.s / 2).toBeGreaterThanOrEqual(0);
+      expect(m.py + m.s / 2).toBeLessThanOrEqual(h);
     }
   });
 

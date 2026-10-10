@@ -4,12 +4,15 @@
 
 /**
  * Pushes overlapping icons apart vertically. Each centre stays inside the plot and inside its own half:
- * `half` 1 keeps it above the midline (long), -1 below (short), 0 anywhere. Mutates and returns `pts`
+ * `half` 1 keeps it above the midline (long), -1 below (short), 0 anywhere (with `margin`, the whole mark
+ * stays on its side). Mutates and returns `pts`
  * ({px, py, s, half, y}); icons that cannot all fit keep their nearest places and overlap a little.
  */
-export function separate(pts, { top, bottom, mid, rounds = 80 }) {
-  const lo = (p) => (p.half < 0 ? Math.max(mid, top + p.s / 2) : top + p.s / 2);
-  const hi = (p) => (p.half > 0 ? Math.min(mid, bottom - p.s / 2) : bottom - p.s / 2);
+export function separate(pts, { top, bottom, mid, rounds = 80, margin = null }) {
+  // With a `margin`, the whole mark (not only its centre) stays on its own side of the line, that far from it.
+  const edge = (p) => (margin == null ? 0 : p.s / 2 + margin);
+  const lo = (p) => (p.half < 0 ? Math.max(mid + edge(p), top + p.s / 2) : top + p.s / 2);
+  const hi = (p) => (p.half > 0 ? Math.min(mid - edge(p), bottom - p.s / 2) : bottom - p.s / 2);
   for (let k = 0; k < rounds; k++) {
     let moved = false;
     for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) {

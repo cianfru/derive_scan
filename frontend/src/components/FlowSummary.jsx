@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ago, dayTime, usd } from "../lib/format.js";
-import { dayLayout, flowCoins, leanWords } from "../lib/flowBubbles.js";
+import { dayLayout, flowCoins } from "../lib/flowBubbles.js";
 import { sentence } from "../lib/flowStories.js";
 import { separate } from "../lib/homeLayout.js";
 import { useElementSize } from "../lib/useElementWidth.js";
-import FlowBubbles from "./FlowBubbles.jsx";
+import FlowBubbles, { LeanText } from "./FlowBubbles.jsx";
 import { Asset } from "./MarketVisuals.jsx";
 import WalletTag from "./WalletTag.jsx";
 import { Info, Arrow } from "./ui.jsx";
@@ -26,27 +26,38 @@ function DayStrip({ und, trades, from, to }) {
   if (!trades.length) return <p className="fc-none">No large option trades on {und} in the last 24 hours.</p>;
   const stale = Date.now() / 1000 - to > FRESH_SEC;
   const h = size ? size.h - STRIP_AXIS : 0, mid = h / 2;
-  const marks = size ? separate(dayLayout(trades, { w: size.w, h, from, to }), { top: 0, bottom: h, mid }).sort((a, b) => b.s - a.s) : [];
+  // Each dot stays wholly on its side of the line; crowded dots may overlap within it.
+  const marks = size ? separate(dayLayout(trades, { w: size.w, h, from, to }), { top: 0, bottom: h, mid, margin: 2 }).sort((a, b) => b.s - a.s) : [];
   const largest = trades.reduce((a, b) => (b.money > a.money ? b : a));
   const shown = (active && trades.find((t) => t.key === active)) || largest;
-  const words = (t) => `${sentence(t.text)}, ${usd(t.money)} ${t.paid ? "paid" : "collected"}, ${ago(t.ts)}`;
+  const side = (t) => `gains if the price ${t.side === "rise" ? "rises" : "falls"}`;
+  const words = (t) => `${sentence(t.text)}, ${usd(t.money)} ${t.paid ? "paid" : "collected"}, ${ago(t.ts)}, ${side(t)}`;
+  // The pointer or a tap picks the nearest trade, so a dot under a crowd or too small to hit stays reachable;
+  // the dots themselves are the keyboard's way in.
+  const nearest = (e) => {
+    const r = e.currentTarget.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    let best = null, d = 36;
+    for (const m of marks) { const dm = Math.hypot(m.px - x, m.py - y) - m.s / 2; if (dm < d) { d = dm; best = m; } }
+    if (best) setActive(best.key);
+  };
   return (
     <>
-      <div className="fc-strip" ref={box}>
+      <div className="fc-strip" ref={box} onPointerMove={nearest} onPointerDown={nearest}>
         <i className="fc-line" style={{ top: mid }} />
         {marks.map((m) => (
           <button key={m.key} type="button" className={`fc-dot ${m.side}${shown.key === m.key ? " on" : ""}`} aria-label={words(m)}
-            aria-pressed={shown.key === m.key} onClick={() => setActive(m.key)} onMouseEnter={() => setActive(m.key)} onFocus={() => setActive(m.key)}
+            aria-pressed={shown.key === m.key} onClick={() => setActive(m.key)} onFocus={() => setActive(m.key)}
             style={{ left: `${(m.px - m.s / 2).toFixed(1)}px`, top: `${(m.py - m.s / 2).toFixed(1)}px`, width: m.s, height: m.s }} />
         ))}
         <div className="fc-xw" aria-hidden="true" style={{ top: h }}>
-          {stale ? <><span>{dayTime(from)}</span><span>{dayTime(to)}</span></> : <><span>24h ago</span><span>now</span></>}
+          {stale ? <><span className="fb-n">{dayTime(from)}</span><span className="fb-n">{dayTime(to)}</span></> : <><span><span className="fb-n">24h</span> ago</span><span>now</span></>}
         </div>
       </div>
       <p className="fc-read" aria-live="polite">
         <WalletTag address={shown.wallet} size={18} />
         <span><b>{sentence(shown.text)}</b> <span className="fc-read-d">{shown.detail}</span></span>
-        <span className="fc-read-m"><small>{shown.paid ? "paid" : "collected"}</small> <b className={shown.side === "rise" ? "up" : "down"}>{usd(shown.money)}</b> <small>{ago(shown.ts)}</small></span>
+        <span className="fc-read-m"><small className={`fc-read-side ${shown.side === "rise" ? "up" : "down"}`}>{side(shown)}</small>
+          <small>{shown.paid ? "paid" : "collected"}</small> <b>{usd(shown.money)}</b> <small>{ago(shown.ts)}</small></span>
       </p>
     </>
   );
@@ -65,7 +76,8 @@ function CoinFlow({ coin, trades, from, to, onClose, onViewTrades, count }) {
     <section className="fc" aria-label={`${coin.und} options flow`}>
       <div className="fc-head">
         <Asset und={coin.und} />
-        <span className="fc-sum">{coin.total > 0 ? <><b>{usd(coin.total)}</b> in options, 24h · {leanWords(coin)}</> : <>No option money recorded in the last 24 hours</>}</span>
+        <span className="fc-sum">{coin.total > 0 ? <><b>{usd(coin.total)}</b> in options, <span className="fb-n">24h</span> · <LeanText c={coin} /></>
+          : <>No option money recorded in the last <span className="fb-n">24</span> hours</>}</span>
         <span className="fc-actions">
           <Link className="text-control" to={`/coin/${coin.und}#options`}>Open {coin.und}<Arrow /></Link>
           <button type="button" className="text-control" onClick={onClose}>All markets</button>
@@ -103,6 +115,14 @@ export default function FlowSummary({ data, selected = "all", onSelect, coinTrad
   const picked = selected !== "all" ? coins.find((c) => c.und === selected)
     || { und: selected, rise: 0, fall: 0, total: 0, share: 0.5, lean: "even", split: { callsBought: 0, putsSold: 0, putsBought: 0, callsSold: 0 } } : null;
   const from = Number(data.since), to = Number(data.coverage?.end ?? data.generated_at);
+  const map = useRef(null);
+  // Closing a coin's view puts focus back on its bubble, so the keyboard keeps its place.
+  const close = () => {
+    const und = picked?.und;
+    onSelect("all");
+    const later = typeof requestAnimationFrame === "function" ? requestAnimationFrame : (f) => setTimeout(f, 0);
+    later(() => map.current?.querySelector(`[data-und="${und}"]`)?.focus());
+  };
   return (
     <section className="plate lead-plate flow-briefing" aria-label="Which way options money points, by market">
       <div className="flow-brief-head">
@@ -122,10 +142,10 @@ export default function FlowSummary({ data, selected = "all", onSelect, coinTrad
           </Info>
         </div>
       </div>
-      {coins.length ? <div className="flow-map">
+      {coins.length ? <div className="flow-map" ref={map}>
         <FlowBubbles coins={coins} onPick={onSelect} selected={selected} rMin={15} rMax={58} labels={coins.length} label={(c) => `${c.und} ${usd(c.total)}`} />
       </div> : <p className="fc-none">No option money recorded in the last 24 hours.</p>}
-      {picked && <CoinFlow coin={picked} trades={coinTrades} from={from} to={to} onClose={() => onSelect("all")} onViewTrades={onViewTrades} count={selectionCount} />}
+      {picked && <CoinFlow coin={picked} trades={coinTrades} from={from} to={to} onClose={close} onViewTrades={onViewTrades} count={selectionCount} />}
     </section>
   );
 }

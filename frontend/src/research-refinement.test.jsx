@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Options from "./pages/Options.jsx";
 import Flow from "./pages/Flow.jsx";
@@ -94,14 +94,23 @@ describe("flow views and result scope", () => {
     expect(document.querySelector(".fl-table-context").textContent).toContain("All markets · 4 of 4 perpetual trades");
   });
 
-  it("opens the coin named in the address, and All markets closes it", () => {
+  it("opens the coin named in the address, and All markets closes it", async () => {
     docs.current = { "flow.json": flow };
     render(<MemoryRouter initialEntries={["/flow?coin=ETH"]}><Flow /></MemoryRouter>);
     const view = screen.getByRole("region", { name: "ETH options flow" });
-    expect(within(view).getByText(/in options, 24h/).textContent).toContain("$500");
+    expect(view.querySelector(".fc-sum").textContent).toBe("$500 in options, 24h · 100% on a fall");
+    expect(view.querySelector(".fc-sum .fb-n:last-child").textContent).toBe("100%");
     expect(screen.getByRole("button", { name: /^ETH: / }).getAttribute("aria-pressed")).toBe("true");
+    // The readout says which way the trade gains in words; the money stays neutral.
+    const read = view.querySelector(".fc-read");
+    // The fixture's ETH trades are calls bought, which gain if the price rises.
+    expect(read.textContent).toContain("gains if the price rises");
+    expect(read.querySelector(".fc-read-m b").className).toBe("");
+    expect(within(view).getAllByRole("button", { name: /gains if the price rises$/ }).length).toBeGreaterThan(0);
     fireEvent.click(within(view).getByRole("button", { name: "All markets" }));
     expect(screen.queryByRole("region", { name: "ETH options flow" })).toBeNull();
+    // Focus goes back to the coin's bubble, not to the page.
+    await waitFor(() => expect(document.activeElement.getAttribute("data-und")).toBe("ETH"));
   });
 
   it("retains the wider sample on desktop", () => {

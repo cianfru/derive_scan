@@ -200,6 +200,7 @@ describe("card home", () => {
     expect($$(".hl-options .hl-cap > span")[0].textContent).toBe("in options, 24h");
     // ETH: puts bought $480 (fall) against calls bought $120 (rise); BTC: calls bought $300 against puts bought $100.
     expect(text(".hl-flowlead")).toBe("Most money: ETH, 80% on a fall");
+    expect(text(".hl-flowlead .n")).toBe("80%");
     const bubbles = $$(".hl-options .fb-b");
     expect(bubbles.map((b) => b.dataset.und)).toEqual(["ETH", "BTC"]);
     expect(bubbles.map((b) => b.className)).toEqual(["fb-b down", "fb-b up"]);

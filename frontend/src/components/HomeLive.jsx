@@ -19,7 +19,7 @@ import { positionDone } from "../lib/positionView.js";
 import { openPnl, pctText } from "../lib/homePnl.js";
 import { compactCount, groupIconSize, radarLayout } from "../lib/homeLayout.js";
 import { largestTrade } from "../lib/flowStories.js";
-import { flowCoins, leanWords } from "../lib/flowBubbles.js";
+import { flowCoins } from "../lib/flowBubbles.js";
 import { useFollowsDoc } from "../lib/follows.js";
 import { boardRows } from "../lib/board.js";
 import { useClock } from "../lib/useClock.js";
@@ -33,7 +33,7 @@ import { chartLevels, returnPct, smartOf } from "./SaloonChart.jsx";
 import { WalletEmblem } from "./WalletTag.jsx";
 import { Info } from "./ui.jsx";
 import BigNum from "./BigNum.jsx";
-import FlowBubbles from "./FlowBubbles.jsx";
+import FlowBubbles, { LeanText } from "./FlowBubbles.jsx";
 
 const NET = TESTNET_FILLS ? "testnet" : "mainnet";
 const N = ({ children, className = "" }) => <b className={`n${className ? ` ${className}` : ""}`}>{children}</b>;
@@ -495,7 +495,7 @@ export function OptionsLive({ card, pop = false }) {
         <span className="hl-cap">
           <span>in options, {stale ? <><N>24h</N> to {when(to)} UTC</> : <N>24h</N>}{part != null && <> · <N>{part}%</N> of <N>24h</N> recorded</>}</span>
         </span>
-        <span className="hl-flowlead">Most money: <b>{most.und}</b>, {leanWords(most)}</span>
+        <span className="hl-flowlead">Most money: <b>{most.und}</b>, <LeanText c={most} Num={N} /></span>
       </div>
       <div className="hl-band hl-flowmap" aria-hidden={pop ? undefined : "true"} onClick={pop ? undefined : pick}>
         <FlowBubbles coins={coins} rMin={pop ? 12 : 10} rMax={pop ? 40 : 32} labels={pop ? 5 : 4}
