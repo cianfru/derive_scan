@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { loadPositions } from "../lib/positions.js";
 import { TESTNET_FILLS } from "../lib/flags.js";
-import { openCount } from "../components/MySpace.jsx";
+import { useFeeds } from "../components/Feeds.jsx";
+import { openPnl, pctText } from "../lib/homePnl.js";
 import { HOME_ART } from "../components/HomeArt.jsx";
 import "../home.css";
 
@@ -14,7 +15,7 @@ export const CARDS = [
   { id: "saloon", to: "/saloon", label: "Saloon", title: "Pick higher or lower. See the cost first.", size: "tall", cta: "Enter the Saloon",
     about: "Each bubble is one answer: higher or lower than a price on a date. The figure inside is the most it makes on $100, Derive's fees included. A gold ring shows where smart wallets lean." },
   { id: "positions", to: "/saloon/mine", label: "Your positions", title: "Your P&L, at a glance.", cta: "Open your positions",
-    about: "What you hold and what it is worth now, what you sold back or settled, and your profit or loss after fees." },
+    about: "What you hold and what it is worth now, what you sold back or settled, and your profit or loss after fees. The figure on this card is your open positions at Derive's sell-back price after fees, as a share of what you paid." },
   { id: "radar", to: "/radar", label: "Radar", title: "Who's stretched, who's not.", cta: "Open the radar",
     about: "Every coin on one map: how far its price has stretched from its trend, against how the smart wallets are positioned on it." },
   { id: "traders", to: "/traders", label: "Smart traders", title: "Follow the best options traders.", cta: "Open the leaderboard",
@@ -29,18 +30,30 @@ export const CARDS = [
 
 const PLUS = <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" /></svg>;
 
+/** Your positions as one percentage: open positions at Derive's sell-back price after fees, over what
+ * was paid for them; "No open positions" when there are none. Boards load only for the coins held. */
+function PositionsFigure() {
+  const [list, setList] = useState(null);
+  useEffect(() => { try { setList(loadPositions(TESTNET_FILLS ? "testnet" : "mainnet")); } catch { setList([]); } }, []);
+  const unds = [...new Set((list || []).filter((p) => !p.closed_at).map((p) => p.und).filter(Boolean))];
+  const [feeds, files] = useFeeds(unds.map((u) => `questions/${u}.json`));
+  if (!list) return null;
+  const r = openPnl(list, Object.fromEntries(unds.map((u) => [u, files[`questions/${u}.json`]])));
+  const n = `${r.open} open`;
+  return <>{feeds}{!r.open ? <span className="home-fig">No open positions</span>
+    : r.pct == null ? <span className="home-fig">{n}</span>
+      : <span className="home-fig-stack"><span className={`home-fig big ${r.pct >= 0 ? "up" : "down"}`}>{pctText(r.pct)}</span><span className="home-fig">{n}</span></span>}</>;
+}
+
 /** Small live figures for the cards; each is left out while its file is missing. */
 function useFigures() {
   const { data: q } = useData("questions/index.json");
   const { data: t } = useData("traders.json");
   const { data: m } = useData("markets.json");
-  const [open, setOpen] = useState(null);
-  useEffect(() => { try { setOpen(openCount(loadPositions(TESTNET_FILLS ? "testnet" : "mainnet"))); } catch { setOpen(null); } }, []);
   const coins = q?.coins || [];
   const rings = coins.reduce((s, c) => s + (c.smart || 0), 0);
   return {
     saloon: coins.length ? `${coins.length} coins open${rings ? ` · ${rings} gold rings` : ""}` : null,
-    positions: open == null ? null : open ? `${open} open` : "No open positions",
     markets: m?.coins?.length ? `${m.coins.length} markets` : null,
     traders: (t?.traders || []).slice(0, 3).map((x) => x.address),
   };
@@ -77,7 +90,8 @@ export default function Home() {
               </Link>
               <div className="home-art">
                 {c.id === "traders" ? <Art addresses={figure} /> : Art ? <Art /> : null}
-                {typeof figure === "string" && <span className={`home-fig${c.id === "positions" && /^\d/.test(figure) ? " big" : ""}`}>{figure}</span>}
+                {c.id === "positions" && <PositionsFigure />}
+                {typeof figure === "string" && <span className="home-fig">{figure}</span>}
               </div>
               <button type="button" className="home-plus" aria-label={`More about ${c.label}`}
                 onClick={(e) => { e.stopPropagation(); opener.current = e.currentTarget; setPopped(c.id); }}>{PLUS}</button>
