@@ -1,11 +1,23 @@
 // The pictures on the home cards (pages/Home.jsx), one per card. The owner supplies the final icons
 // (9 October 2026: "that probably is going to be my job"); each is one entry here, so a new icon is
 // one swap. Flat, single-colour drawings in the data colours; decorative, so hidden from readers.
+import { useState } from "react";
 import { WalletEmblem } from "./WalletTag.jsx";
 
 const UP = "var(--up)", DOWN = "var(--down)", GOLD = "var(--home-gold)", LINE = "var(--border-strong)", INK = "var(--text-2)";
 
+// The owner's Saloon picture (10 October 2026: "I want to use this image for the bubbles card"), with the
+// drawn bubbles as the fallback if it does not load.
+// The owner's Saloon pictures (10 October 2026): on charcoal for the dark theme, and a copy with no
+// background for the light one; the drawn bubbles stand in if either fails to load.
 function SaloonArt() {
+  const [failed, setFailed] = useState({});
+  const pic = (key, src, cls) => (failed[key] ? <span className={cls}><SaloonDrawn /></span>
+    : <img className={`home-art-img ${cls}`} src={src} alt="" width="1536" height="1024" decoding="async"
+      onError={() => setFailed((f) => ({ ...f, [key]: true }))} />);
+  return <>{pic("dark", "/home/saloon.webp", "home-art-dark")}{pic("light", "/home/saloon-light.webp", "home-art-light")}</>;
+}
+function SaloonDrawn() {
   return (
     <svg viewBox="0 0 420 240" className="home-art-svg" aria-hidden="true" focusable="false">
       <line x1="0" y1="130" x2="420" y2="130" stroke="var(--accent)" strokeWidth="1.5" strokeDasharray="4 5" />

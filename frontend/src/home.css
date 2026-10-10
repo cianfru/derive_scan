@@ -64,3 +64,20 @@
   .home-fig.big { font-size: clamp(26px, 3.6vh, 34px); }
   .home-plus { width: 36px; height: 36px; right: 18px; bottom: 18px; }
 }
+
+/* The Saloon card's picture takes exactly the height between the heading and the figure line, edge to
+   edge, cropped to fit; its own charcoal fades into the card's. In the light theme it sits in a
+   rounded frame instead. */
+.home-tall .home-art { flex: 1 1 0; min-height: 0; flex-direction: column; align-items: stretch; gap: 10px; padding-right: 0; margin-top: 12px; }
+.home-tall .home-art .home-fig { padding-right: 52px; }
+.home-art-img { display: block; flex: 1 1 0; min-height: 0; height: 0; width: calc(100% + 60px); margin: 0 -30px; object-fit: cover; object-position: 50% 52%;
+  -webkit-mask-image: radial-gradient(ellipse 72% 78% at 52% 52%, #000 55%, transparent 100%); mask-image: radial-gradient(ellipse 72% 78% at 52% 52%, #000 55%, transparent 100%); }
+@media (min-width: 901px) { :root:not([data-theme="light"]) .home-art-img { width: calc(100% + 2 * clamp(20px, 2.2vw, 30px)); margin: 0 calc(-1 * clamp(20px, 2.2vw, 30px)); } }
+@media (max-width: 600px) { :root:not([data-theme="light"]) .home-art-img { width: calc(100% + 36px); margin: 0 -18px; } }
+.home-pop-art .home-art-img, :root:not([data-theme="light"]) .home-pop-art .home-art-img { flex: none; height: auto; width: 100%; margin: 0; max-height: 46vh; }
+
+/* Dark theme: the owner's picture; light theme: its drawn copy, sized like it. */
+.home-art-light { display: none; }
+:root[data-theme="light"] .home-art-dark { display: none; }
+:root[data-theme="light"] .home-art-light { display: block; flex: 1 1 0; min-height: 0; height: 0; width: 100%; margin: 0; border-radius: 0; object-fit: contain; -webkit-mask-image: none; mask-image: none; }
+.home-pop-art .home-art-light { height: auto; max-height: 46vh; }
