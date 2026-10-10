@@ -314,7 +314,7 @@ const FAQ = (canFill, practice) => [
 ];
 
 const EntryButton = () => (QUESTIONS_ON
-  ? <Link className="btn primary lg" to="/saloon">Enter the Saloon</Link>
+  ? <Link className="btn primary lg" to="/home">Enter Cowboy</Link>
   : <Link className="btn primary lg" to="/markets">Open the markets</Link>);
 
 function SaloonIntro({ canFill, practice }) {

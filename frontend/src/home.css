@@ -1,0 +1,50 @@
+/* The card home (pages/Home.jsx): flat cards, one line and one picture each, after Apple's Mac page. */
+.home { --home-gold: #e8c26a; padding-block: 40px 64px; }
+.home-intro { text-align: center; margin-bottom: 32px; }
+.home-intro h1 { margin: 0; font: 800 40px/1.1 var(--font-sans); letter-spacing: -.03em; }
+.home-intro p { margin: 10px auto 0; max-width: none; text-align: center; font: 500 17px var(--font-sans); color: var(--text-2); }
+.home-grid { display: grid; grid-template-columns: 1.25fr 1fr 1fr; grid-auto-rows: 250px; gap: 22px; }
+.home-card { position: relative; display: flex; flex-direction: column; background: var(--surface-1); border: 1px solid var(--border); border-radius: 28px;
+  padding: 28px 30px; overflow: hidden; cursor: pointer; transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s, border-color .2s; }
+.home-card:hover, .home-card:focus-within { transform: translateY(-4px) scale(1.012); border-color: var(--border-strong); box-shadow: 0 24px 50px rgb(0 0 0 / .4); }
+@media (prefers-reduced-motion: reduce) { .home-card, .home-card:hover, .home-card:focus-within { transform: none; transition: none; } }
+.home-tall { grid-row: span 2; } .home-wide { grid-column: span 2; }
+.home-link { color: inherit; text-decoration: none; outline: none; }
+.home-link:focus-visible h2 { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 6px; }
+.home-label { font: 700 13px var(--font-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
+.home-card h2 { margin: 10px 0 0; font: 800 28px/1.12 var(--font-sans); letter-spacing: -.025em; max-width: 15ch; }
+.home-wide h2 { max-width: 20ch; }
+.home-art { margin-top: auto; display: flex; align-items: flex-end; gap: 16px; padding-right: 52px; min-height: 0; }
+.home-art-svg { display: block; width: 100%; max-height: 240px; }
+.home-art-sq { width: 88px; height: 88px; }
+.home-wide .home-art-svg { width: 300px; margin-left: auto; }
+.home-tall .home-art { flex-direction: column; align-items: stretch; }
+.home-fig { font: 600 15px var(--font-mono); color: var(--text-2); letter-spacing: -.02em; }
+.home-fig.big { font-size: 34px; font-weight: 700; color: var(--text-1); }
+.home-hats { display: flex; } .home-hats .wtag-av + .wtag-av { margin-left: -10px; }
+.home-plus { position: absolute; right: 22px; bottom: 22px; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%;
+  background: var(--surface-3, #2c2824); display: grid; place-items: center; cursor: pointer; }
+.home-plus svg, .home-pop-x svg { width: 16px; height: 16px; stroke: var(--text-1); stroke-width: 2; stroke-linecap: round; fill: none; }
+.home-plus:hover, .home-plus:focus-visible, .home-card:hover .home-plus { background: var(--accent); }
+.home-plus:hover svg, .home-card:hover .home-plus svg { stroke: #fff; }
+.home-pop { width: min(880px, 92vw); max-height: 90vh; padding: 0; border: 1px solid var(--border-strong); border-radius: 32px; background: var(--surface-2); color: var(--text-1);
+  box-shadow: 0 40px 120px rgb(0 0 0 / .6); }
+.home-pop::backdrop { background: rgb(8 7 6 / .72); backdrop-filter: blur(6px); }
+.home-pop[open] { animation: home-pop .3s cubic-bezier(.2,.8,.2,1); }
+@keyframes home-pop { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .home-pop[open] { animation: none; } }
+.home-pop-body { position: relative; padding: 40px 44px; display: grid; gap: 14px; justify-items: start; }
+.home-pop h2 { margin: 0; font: 800 40px/1.08 var(--font-sans); letter-spacing: -.03em; max-width: 18ch; }
+.home-pop p { margin: 0; font: 500 18px/1.5 var(--font-sans); color: var(--text-2); max-width: 56ch; }
+.home-pop-art { width: 100%; max-width: 640px; } .home-pop-art .home-art-sq { width: 140px; height: 140px; }
+.home-pop-x { position: absolute; right: 24px; top: 22px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-3, #2c2824); display: grid; place-items: center; cursor: pointer; }
+@media (max-width: 900px) { .home-grid { grid-template-columns: 1fr 1fr; } .home-tall { grid-column: span 2; } }
+@media (max-width: 600px) {
+  .home { padding-block: 24px 40px; } .home-intro h1 { font-size: 28px; } .home-intro p { font-size: 15px; }
+  .home-grid { grid-auto-rows: 200px; gap: 12px; } .home-card { border-radius: 22px; padding: 18px; } .home-card h2 { font-size: 20px; }
+  .home-label { font-size: 11px; } .home-wide { grid-column: span 1; } .home-wide .home-art-svg { display: none; }
+  .home-art { padding-right: 40px; } .home-art-sq { width: 64px; height: 64px; } .home-fig.big { font-size: 24px; }
+  .home-hats .wtag-av { width: 34px; height: 34px; }
+  .home-plus { width: 44px; height: 44px; right: 12px; bottom: 12px; }
+  .home-pop-body { padding: 28px 22px; } .home-pop h2 { font-size: 28px; } .home-pop p { font-size: 16px; }
+}

@@ -136,9 +136,10 @@ it("uses the compact landing navigation with the same menus", async () => {
   expect(screen.getByRole("button", { name: "My space" })).toBeTruthy();
 });
 
-it("sends the landing into Saloon and anchors how-it-works to the non-executing payout demo", () => {
+it("sends the landing to the card home and anchors how-it-works to the non-executing payout demo", () => {
   const { container } = shell(<Landing />);
-  expect(screen.getAllByRole("link", { name: "Enter the Saloon" }).map((a) => a.getAttribute("href"))).toEqual(["/saloon", "/saloon"]);
+  expect(screen.getAllByRole("link", { name: "Enter Cowboy" }).map((a) => a.getAttribute("href"))).toEqual(["/home", "/home"]);
+  expect(within(document.querySelector("header.hdr")).getByRole("link", { name: "Cowboy home" }).getAttribute("href")).toBe("/home");
   expect(screen.getByRole("link", { name: /See how it works/ }).getAttribute("href")).toBe("#how");
   expect(screen.queryByRole("link", { name: "Open the markets" })).toBeNull();
   const intro = screen.getByRole("region", { name: /Find your level\.\s*Pick your side\./ });
