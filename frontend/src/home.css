@@ -33,20 +33,43 @@
 .home-plus:hover, .home-plus:focus-visible, .home-card:hover .home-plus { background: var(--accent); }
 .home-plus:hover svg, .home-plus:focus-visible svg, .home-card:hover .home-plus svg { stroke: var(--on-accent); }
 
-/* Saloon: the owner's picture between the title and the figure line, its charcoal dissolved into the card
-   on all four sides; the light theme shows the owner's copy with no background. */
+/* Saloon: the Saloon's own chart in miniature (components/HomeLive.jsx SaloonLive), between the title and the
+   figure line: the price as a cream line, the price now dashed in orange as on the Saloon, glass bubbles in the
+   Saloon's colours (SaloonChart palette) with dark figures, gold rings, dotted stems to the price line. */
 .home-tall .home-art { gap: 10px; margin-top: 12px; }
-.home-art-img { display: block; flex: 1 1 0; min-height: 0; height: 0; width: calc(100% + 2 * var(--pad-i)); margin: 0 calc(-1 * var(--pad-i));
-  object-fit: cover; object-position: 50% 52%;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent), linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
-  -webkit-mask-composite: source-in;
-  mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent), linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
-  mask-composite: intersect; }
-.home-art-svg { display: block; width: 100%; max-height: 240px; }
-.home-art-light { display: none; }
-:root[data-theme="light"] .home-art-dark { display: none; }
-:root[data-theme="light"] .home-art-light { display: block; flex: 1 1 0; min-height: 0; height: 0; width: 100%; margin: 0; object-fit: contain;
-  -webkit-mask-image: none; mask-image: none; }
+.hl.hl-saloon { display: flex; flex-direction: column; }
+.hl-saloon .hl-band { flex: 1 1 0; min-height: 0; margin: 0 calc(-.5 * var(--pad-i)); }
+.hl-saloon svg { position: absolute; left: 0; top: 0; display: block; }
+.home-card { --sb-up: #7fe6c6; --sb-up-hi: #e9fff6; --sb-up-lo: #3fae8a; --sb-down: #f6876f; --sb-down-hi: #fff0ea; --sb-down-lo: #c4513f;
+  --sb-up-ink: #0f3a2d; --sb-down-ink: #4a160d; --sb-gold: #f5a524; --sb-line: #e9dfcf; }
+:root[data-theme="light"] .home-card, :root[data-theme="light"] .home-pop { --sb-up: #5fd0aa; --sb-up-hi: #d9fbee; --sb-up-lo: #2f9c79;
+  --sb-down: #f07a66; --sb-down-hi: #ffe3dc; --sb-down-lo: #c4513f; --sb-gold: #d98a12; --sb-line: #8a7a66; }
+.home-pop { --sb-up: #7fe6c6; --sb-up-hi: #e9fff6; --sb-up-lo: #3fae8a; --sb-down: #f6876f; --sb-down-hi: #fff0ea; --sb-down-lo: #c4513f;
+  --sb-up-ink: #0f3a2d; --sb-down-ink: #4a160d; --sb-gold: #f5a524; --sb-line: #e9dfcf; }
+.sb-up-hi { stop-color: var(--sb-up-hi); } .sb-up-mid { stop-color: var(--sb-up); } .sb-up-lo { stop-color: var(--sb-up-lo); }
+.sb-down-hi { stop-color: var(--sb-down-hi); } .sb-down-mid { stop-color: var(--sb-down); } .sb-down-lo { stop-color: var(--sb-down-lo); }
+.sb-price { fill: none; stroke: var(--sb-line); stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round;
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / .35)); }
+:root[data-theme="light"] .sb-price { filter: drop-shadow(0 4px 8px rgb(80 60 40 / .18)); }
+.sb-now { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 7 6; opacity: .9; }
+.sb-dot { fill: var(--accent); stroke: var(--surface-1); stroke-width: 2.5; filter: drop-shadow(0 0 6px var(--accent)); }
+.sb-date { font: 600 11px var(--font-mono); fill: var(--text-3); }
+.sb-stem { stroke-width: 2; stroke-dasharray: 1 5; stroke-linecap: round; }
+.sb-stem.up, .sb-foot.up { stroke: var(--sb-up); fill: var(--sb-up); } .sb-stem.down, .sb-foot.down { stroke: var(--sb-down); fill: var(--sb-down); }
+.sb-halo { opacity: .45; } .sb-halo.up { fill: var(--sb-up); } .sb-halo.down { fill: var(--sb-down); }
+:root[data-theme="light"] .sb-halo { opacity: .3; }
+.sb-ball.up { stroke: color-mix(in srgb, var(--sb-up-hi) 70%, transparent); } .sb-ball.down { stroke: color-mix(in srgb, var(--sb-down-hi) 70%, transparent); }
+.sb-ball { stroke-width: 1; }
+.sb-shine { fill: #fff; opacity: .55; }
+.sb-gold { fill: none; stroke: var(--sb-gold); stroke-width: 3; filter: drop-shadow(0 0 5px var(--sb-gold)); }
+.sb-fig { font: 800 13px var(--font-sans); letter-spacing: -.02em; }
+.sb-fig.up { fill: var(--sb-up-ink); } .sb-fig.down { fill: var(--sb-down-ink); }
+@media (prefers-reduced-motion: no-preference) {
+  .hl-saloon .sb-ball, .hl-saloon .sb-shine, .hl-saloon .sb-fig, .hl-saloon .sb-gold, .hl-saloon .sb-halo { animation: sb-float 6s ease-in-out infinite; }
+  .hl-saloon g:nth-of-type(2n) > * { animation-delay: -2s; } .hl-saloon g:nth-of-type(3n) > * { animation-delay: -4s; }
+}
+@keyframes sb-float { 50% { transform: translateY(-3px); } }
+@media (max-width: 600px) { .home .hl.hl-saloon .hl-band { flex: none; height: 240px; } }
 .home-line { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; font: 600 15px/1.2 var(--font-sans); color: var(--text-2); }
 .home-coins { display: flex; align-items: center; padding-left: 6px; }
 .home-coins > span { width: 26px; height: 26px; margin-left: -6px; box-shadow: 0 0 0 2px var(--surface-2); }
@@ -95,13 +118,24 @@
 .bn-unit { font-size: .58em; margin-left: .05em; letter-spacing: 0; }
 .bn.up { color: var(--up); } .bn.down { color: var(--down); }
 
-/* Your positions: the figure alone, centred under the head row, on a faint glow of its side's colour. */
-.hl.hl-pos { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 8px; }
-.hl-pos .hl-cap { flex: none; min-width: 0; }
-.hl-pos .hl-cap i { font-style: normal; color: var(--text-3); }
-.hl-pos .hl-hero { font-size: var(--hero-xl); }
-.hl-pos .hl-hero .hl-of { font-size: .32em; }
+/* Your positions: the P&L of what is open, then each open position with its own, on a faint glow of its side's colour. */
+.hl.hl-pos { display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; gap: clamp(6px, 4cqh, 14px); }
+.hl-pos .hl-fig { align-items: flex-end; }
+.hl-pos .hl-cap { flex: 1 1 10ch; min-width: 0; }
 .hl-pos .hl-cap .info { margin-left: 2px; }
+.hl-plist { list-style: none; margin: 0; padding: 0; display: grid; }
+.hl-plist li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 28px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); font: 600 14px/1.2 var(--font-sans); color: var(--text-1); }
+.hl-plist .asset-icon { width: 20px; height: 20px; border-radius: 50%; }
+.hl-pname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hl-pname i { font-style: normal; color: var(--text-3); margin-left: 8px; }
+.hl-plist .n { font: 600 15px var(--font-mono); letter-spacing: -.02em; }
+.hl-pname .n { font-size: 14px; }
+.hl-plist .n.up { color: var(--up); } .hl-plist .n.down { color: var(--down); }
+.hl-pnone { font: 600 13px var(--font-sans); color: var(--text-3); }
+.hl-plist li.hl-pmore { display: block; color: var(--text-3); font-size: 13px; }
+/* Short cards (1280x720, 1024x768) keep two rows; the count above still names them all. */
+@container hc (max-height: 180px) { .hl-plist li:nth-child(n+3) { display: none; } .hl-plist li { min-height: 26px; } }
 .hl-word { font: 800 clamp(24px, min(16cqh, 11cqi), 40px)/1.05 var(--font-sans); letter-spacing: -.02em; color: var(--text-1); text-wrap: balance; }
 .hl-cue { font: 600 14px/1.3 var(--font-sans); color: var(--text-2); }
 .hl-go { color: var(--accent-text); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
@@ -228,8 +262,6 @@ html:has(.home-pop[open]) { overflow: hidden; }
 .home-pop p { margin: 0; font: 500 17px/1.55 var(--font-sans); color: var(--text-2); }
 .home-pop-stage { grid-area: stage; height: 320px; padding: 24px; display: flex; flex-direction: column; overflow: hidden; container: hc / size;
   background: var(--elev-fill); box-shadow: var(--elev-1); border: 1px solid var(--border); border-radius: 20px; }
-.home-pop-saloon .home-pop-stage { padding: 0; }
-.home-pop-stage .home-art-img, :root[data-theme="light"] .home-pop-stage .home-art-light { width: 100%; margin: 0; }
 .home-pop-cta { grid-area: cta; justify-self: start; align-self: end; }
 
 /* Alive once per tab: the cards rise in, then the bars grow and the points and trades fade in; nothing loops. */
@@ -289,3 +321,6 @@ html:has(.home-pop[open]) { overflow: hidden; }
 @media (pointer: coarse) {
   .home-pop .hl-row, .home-pop .hl-who { min-height: 44px; }
 }
+/* The Saloon chart in the pop-out fills its stage (pinned to it, so the chart never sizes its own box). */
+.home-pop-stage .hl.hl-saloon { position: relative; flex: 1 1 0; min-height: 0; width: 100%; }
+.home-pop-stage .hl-saloon .hl-band { position: absolute; inset: 0; margin: 0; }

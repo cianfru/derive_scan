@@ -253,21 +253,58 @@ describe("card home", () => {
     expect(r.priced).toBe(1);
     expect(text(".hl-pos .bn")).toBe(pctText(r.pct));
     expect($(".hl-pos .bn").classList.contains(r.pct >= 0 ? "up" : "down")).toBe(true);
-    expect($$(".hl-pos .hl-cap > span")[0].textContent).toBe(`${signed(r.pl)} on $103.01`);
+    expect($$(".hl-pos .hl-cap > span")[0].textContent).toBe("P&L now");
     expect($$(".hl-pos .hl-cap > span")[1].textContent).toBe("1 open");
+    // Each open position with its own P&L, green or red (owner: "I want to see the position that I have right now").
+    const rows = $$(".hl-plist li");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].querySelector(".hl-pname").textContent).toBe("Higher 86k9 Oct");
+    expect(rows[0].querySelector(".hl-pname + .n").textContent).toBe(pctText(r.rows[0].pct));
+    expect(rows[0].querySelector(".hl-pname + .n").classList.contains(r.rows[0].pct >= 0 ? "up" : "down")).toBe(true);
     expect(screen.getByRole("link", { name: /^Your positions/ }).getAttribute("href")).toBe("/saloon/mine");
   });
 
-  it("Your positions: the count stays the big figure when none has a price now", () => {
+  it("Your positions: lists every open position, largest first, and the card shows three", () => {
+    const p = { key: "a", id: "BTC-20261009-A-83000-89000", und: "BTC", side: "yes", lo: 83000, hi: 89000, contracts: 0.04407, paid: 103.01,
+      legs: ["BTC-20261009-83000-C", "BTC-20261009-89000-C"], exec: "hand_both", settle_ts: 1791532800 };
+    const list = [p, { ...p, key: "b", paid: 300 }, { ...p, key: "c", paid: 20, side: "no" }, { ...p, key: "d", paid: 50 }];
+    localStorage.setItem("cowboy-questions", JSON.stringify(list));
+    docs.current = { "questions/BTC.json": btc };
+    show();
+    const r = openPnl(list, { BTC: btc }, NOW);
+    expect(r.rows.map((x) => x.key)).toEqual(["b", "a", "d", "c"]);
+    const rows = $$(".home-card .hl-plist li");
+    expect(rows.map((li) => li.textContent.slice(0, 6))).toEqual(["Higher", "Higher", "Higher", "+1 mor"]);
+    expect(rows[3].textContent).toBe("+1 more");
+  });
+
+  it("Your positions: says Not valued yet and lists each with No price now while prices are paused", () => {
     const p = { key: "a", id: "BTC-20261009-A-83000-89000", und: "BTC", side: "yes", lo: 83000, hi: 89000, contracts: 0.04407, paid: 103.01,
       legs: ["BTC-20261009-83000-C", "BTC-20261009-89000-C"], exec: "hand_both", settle_ts: 1791532800 };
     localStorage.setItem("cowboy-questions", JSON.stringify([p, { ...p, key: "b" }]));
     docs.current = { "questions/BTC.json": { ...btc, paused: true } };
     show();
-    expect(text(".hl-pos .bn")).toBe("2");
-    expect(text(".hl-pos .hl-of")).toBe("open");
-    expect(text(".hl-pos .hl-cap")).toContain("Not valued yet");
+    expect(text(".hl-pos .hl-word")).toBe("Not valued yet");
+    expect(text(".hl-pos .hl-cap")).toContain("2 open");
+    expect($$(".hl-plist .hl-pnone").map((n) => n.textContent)).toEqual(["No price now", "No price now"]);
     expect(screen.getByRole("button", { name: "Why there is no value now" })).toBeTruthy();
+  });
+
+  it("Saloon: the Saloon's own chart from its files, not a picture", () => {
+    const bars = Array.from({ length: 40 }, (_, i) => [NOW - (40 - i) * 14400, btc.index, btc.index * 1.01, btc.index * 0.99, btc.index * (1 + Math.sin(i) / 100), 1]);
+    docs.current = { "questions/index.json": { prices_ts: btc.prices_ts, coins: [{ und: "BTC", smart: 2 }] }, "questions/BTC.json": btc,
+      "coins/BTC.json": { candles: { "4h": bars } } };
+    show();
+    const chart = $(".home-saloon .hl-saloon svg[role='img']");
+    expect(chart).toBeTruthy();
+    expect($(".home-saloon img[src*='/home/saloon']")).toBeNull();
+    expect(chart.querySelector(".sb-price").getAttribute("d")).toMatch(/^M/);
+    const figs = $$(".home-saloon .sb-fig").map((n) => n.textContent);
+    expect(figs.length).toBeGreaterThan(0);
+    for (const f of figs) expect(f).toMatch(/^\+[\d,.]+%$/);
+    // Every bubble's figure is in the chart's own words for screen readers, with its side and level.
+    for (const f of figs) expect(chart.getAttribute("aria-label")).toContain(`up to ${f}`);
+    expect(chart.getAttribute("aria-label")).toMatch(/^BTC over the last three days, now \$/);
   });
 
   it("keeps every card's title or says Not available yet when its file is missing or empty", () => {

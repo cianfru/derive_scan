@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import { HOME_ART } from "../components/HomeArt.jsx";
-import { HOME_LIVE, useHomePositions } from "../components/HomeLive.jsx";
+import { HOME_LIVE, SaloonLive, useHomePositions } from "../components/HomeLive.jsx";
 import { CoinIcon } from "../components/MarketVisuals.jsx";
 import { priceAge } from "../lib/questions.js";
 import { useClock } from "../lib/useClock.js";
@@ -103,8 +102,8 @@ export default function Home() {
     a.onfinish = () => { shut(); d.getAnimations({ subtree: true }).forEach((x) => x.cancel()); };
   };
   const widget = (c, pop) => {
-    const Live = HOME_LIVE[c.id], Art = HOME_ART[c.id];
-    return Live ? <Live pos={pos} pop={pop} card={c} /> : Art ? <Art /> : null;
+    const Live = HOME_LIVE[c.id];
+    return Live ? <Live pos={pos} pop={pop} card={c} /> : c.id === "saloon" ? <SaloonLive pop={pop} /> : null;
   };
   return (
     <div className="wrap page home" data-enter={enter ? "" : undefined}>

@@ -5,7 +5,7 @@
 // rest of the card, drawn in real pixels (lib/homeLayout.js). Colour only on signed money; calls and puts
 // in their own colours, regimes in theirs; orange stays interaction. While its file loads a card keeps a
 // still placeholder of its size; without its file it shows its own title and "Not available yet".
-import { Fragment, useState } from "react";
+import { Fragment, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { REGIME, strike, usd } from "../lib/format.js";
@@ -19,12 +19,15 @@ import { positionDone } from "../lib/positionView.js";
 import { openPnl, pctText } from "../lib/homePnl.js";
 import { compactCount, groupIconSize, radarLayout, swarm } from "../lib/homeLayout.js";
 import { useFollowsDoc } from "../lib/follows.js";
+import { boardRows } from "../lib/board.js";
+import { useClock } from "../lib/useClock.js";
 import { money, signed } from "../lib/questions.js";
 import { TESTNET_FILLS } from "../lib/flags.js";
 import { useElementSize, useElementWidth } from "../lib/useElementWidth.js";
 import { useFeeds } from "./Feeds.jsx";
 import { regimeCounts, stripColumns } from "./StructureBand.jsx";
 import { CoinIcon } from "./MarketVisuals.jsx";
+import { chartLevels, returnPct, smartOf } from "./SaloonChart.jsx";
 import { WalletEmblem } from "./WalletTag.jsx";
 import { Info } from "./ui.jsx";
 import BigNum from "./BigNum.jsx";
@@ -67,9 +70,123 @@ export function useHomePositions() {
   return { feeds: feeds.filter((e) => e.key !== "publication-notice"), ready: ready || !unds.length, r, follows, to, cta };
 }
 
-/** Your positions: the P&L of what is open, as one percentage of what was paid, with the dollars under
- * it; the count when none has a price now; the owner's own words when nothing is open (with the answers
- * followed, when there are some). */
+/* The Saloon in miniature (owner, 10 October 2026: the picture "is the only one that is stale ... make it
+ * consistent with the rest of the cards"): the same chart the Saloon opens on, drawn from its own files. One
+ * coin's last three days of 4-hour closes, the price now as the dashed line, and its nearest settlement dates
+ * as columns with the two levels either side of the price as bubbles: Higher above (green), Lower below (red),
+ * the figure inside the most it makes on $100, fees included, as on the Saloon; a gold ring where the Smart
+ * wallets lean that way (context, not a signal). */
+const SALOON_REF = 100, SALOON_BARS = 18;
+const smooth = (pts) => pts.reduce((d, [x, y], i) => {
+  if (!i) return `M${x},${y}`;
+  const [x0, y0] = pts[i - 1], mx = (x0 + x) / 2;
+  return `${d} C${mx},${y0} ${mx},${y} ${x},${y}`;
+}, "");
+
+export function SaloonLive({ pop = false }) {
+  const id = useId().replace(/:/g, "");
+  const now = useClock();
+  const { data: index } = useData("questions/index.json");
+  const listed = (index?.coins || []).map((c) => c.und);
+  const und = listed.includes("BTC") ? "BTC" : listed[0] || null;
+  const { data: board } = useData(und ? `questions/${und}.json` : null);
+  const { data: coin } = useData(und ? `coins/${und}.json` : null);
+  const [band, size] = useElementSize({ w: 420, h: 300 });
+  if (!index || (und && (!board || !coin))) return <Wait />;
+  const closes = (coin?.candles?.["4h"] || []).slice(-SALOON_BARS).map((c) => c[4]).filter(Number.isFinite);
+  if (!und || !board?.index || closes.length < 2) return null;
+  const rows = boardRows([board], SALOON_REF, { now }).rows;
+  const by = new Map();
+  for (const r of rows) { if (!by.has(r.expiry)) by.set(r.expiry, []); by.get(r.expiry).push(r); }
+  const dates = chartLevels([...by.keys()].sort().map((e) => ({ expiry: e, settle: by.get(e)[0].settleTs, rows: by.get(e) })), board.index)
+    .slice(0, pop ? 4 : 3).map((d) => {
+      const near = (up) => d.levels.filter((l) => (up ? l.k >= board.index : l.k < board.index))
+        .sort((a, b) => Math.abs(a.k - board.index) - Math.abs(b.k - board.index)).slice(0, 2);
+      return { ...d, show: [...near(true), ...near(false)] };
+    });
+  const W = size?.w || 420, H = size?.h || 300;
+  // The price axis is set by the bubbles shown (so they spread out as on the Saloon); the price line runs
+  // off the band where the last days went further, clipped and faded at the left edge.
+  const ks = dates.flatMap((d) => d.show.map((l) => l.k));
+  const far = Math.max(board.index * 0.012, ...ks.map((k) => Math.abs(k - board.index)));
+  const lo = board.index - far * 1.35, hi = board.index + far * 1.35, top = 6, bottom = H - 24;
+  const y = (v) => bottom - ((v - lo) / (hi - lo)) * (bottom - top);
+  const lineW = W * (dates.length ? 0.42 : 0.92);
+  const pts = closes.map((c, i) => [10 + (i / (closes.length - 1)) * (lineW - 10), y(c)]);
+  const yNow = y(board.index);
+  const colX = (i) => lineW + ((i + 0.6) / (dates.length + 0.2)) * (W - lineW - 8);
+  const rMax = Math.max(22, Math.min(36, (W - lineW) / (dates.length || 1) / 2.4)), rMin = 22;
+  const maxPct = Math.max(1, ...dates.flatMap((d) => d.show.map((l) => l.r.make / l.r.total)));
+  const label = (l) => returnPct(l.r.make, l.r.total);
+  // Bigger return, bigger bubble; a bubble never crosses the price line or its neighbour, and a level
+  // without room for a readable figure is left out (the Saloon itself shows every level).
+  for (const d of dates) {
+    const placed = [];
+    for (const up of [true, false]) {
+      let edge = yNow;
+      for (const l of d.show.filter((x) => (x.k >= board.index) === up)) {
+        const want = rMin + (rMax - rMin) * Math.sqrt(l.r.make / l.r.total / maxPct), yy = y(l.k);
+        const room = Math.abs(yy - edge) - 3;
+        const r = Math.min(want, room, up ? yy - 2 : H - 22 - yy);
+        if (r < rMin) continue;
+        placed.push({ ...l, r: l.r, rad: r, yy });
+        edge = up ? yy - r : yy + r;
+      }
+    }
+    d.placed = placed;
+  }
+  return (
+    <div className={`hl hl-saloon${pop ? " in-pop" : ""}`}>
+      <div className="hl-band" ref={band}>
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img"
+          aria-label={`${und} over the last three days, now ${money(board.index)}; ${dates.map((d) => `${shortDay(d.expiry)}: ${d.placed.map((l) => `${l.r.side === "yes" ? "Higher" : "Lower"} than ${money(l.k)} up to ${label(l)}`).join(", ")}`).join("; ")}`}>
+          <defs>
+            {["up", "down"].map((k) => (
+              <radialGradient key={k} id={`${id}-${k}`} cx="34%" cy="30%" r="75%">
+                <stop offset="0%" className={`sb-${k}-hi`} /><stop offset="55%" className={`sb-${k}-mid`} /><stop offset="100%" className={`sb-${k}-lo`} />
+              </radialGradient>
+            ))}
+            <clipPath id={`${id}-clip`}><rect x="0" y="0" width={W} height={bottom + 4} /></clipPath>
+            <linearGradient id={`${id}-fade`} x1="0" x2="1" y1="0" y2="0"><stop offset="0" stopColor="#fff" stopOpacity="0" /><stop offset=".22" stopColor="#fff" stopOpacity="1" /></linearGradient>
+            <mask id={`${id}-mask`}><rect x="0" y="0" width={W} height={H} fill={`url(#${id}-fade)`} /></mask>
+            <filter id={`${id}-glow`} x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6" /></filter>
+          </defs>
+          <g clipPath={`url(#${id}-clip)`} mask={`url(#${id}-mask)`}><path d={smooth(pts)} className="sb-price" /></g>
+          <line x1="0" x2={W} y1={yNow} y2={yNow} className="sb-now" />
+          {dates.map((d, i) => <text key={d.expiry} x={colX(i)} y={H - 6} className="sb-date" textAnchor="middle">{shortDay(d.expiry)}</text>)}
+          {dates.map((d, i) => d.placed.map((l) => {
+            const x = colX(i), yy = l.yy, r = l.rad, up = l.r.side === "yes";
+            const edge = up ? yy + r : yy - r, k = up ? "up" : "down", ring = !!smartOf(l.r);
+            return (
+              <g key={`${d.expiry}${l.k}`}>
+                <line x1={x} x2={x} y1={yNow} y2={edge} className={`sb-stem ${k}`} />
+                <circle cx={x} cy={yNow} r="2.5" className={`sb-foot ${k}`} />
+                <circle cx={x - r * 0.25} cy={yy - r * 0.2} r={r * 0.95} className={`sb-halo ${k}`} filter={`url(#${id}-glow)`} />
+                <circle cx={x} cy={yy} r={r} fill={`url(#${id}-${k})`} className={`sb-ball ${k}`} />
+                <ellipse cx={x - r * 0.32} cy={yy - r * 0.42} rx={r * 0.32} ry={r * 0.2} className="sb-shine" />
+                {ring && <circle cx={x} cy={yy} r={r + 3} className="sb-gold" />}
+                <text x={x} y={yy + 4} className={`sb-fig ${k}`} textAnchor="middle" style={{ fontSize: Math.min(15, Math.max(12, r * 0.42)) }}>{label(l)}</text>
+              </g>
+            );
+          }))}
+          <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="5" className="sb-dot" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const shortDay = (e) => (e ? `${+e.slice(6, 8)} ${SHORT_MONTHS[+e.slice(4, 6) - 1]}` : "");
+const shortLevel = (k) => (k >= 10000 ? `${(k / 1000).toFixed(k % 1000 ? 1 : 0)}k` : strike(k, ""));
+const ROWS_ON_CARD = 3;
+
+/**
+ * Your positions (owner, 10 October 2026: "I want to see the position that I have right now and the P&L of
+ * those open positions ... green or red"): the P&L of everything open as one percentage of what was paid,
+ * then each open position with its own, largest first; "No price now" on a position without a sell-back
+ * price. The owner's own words when nothing is open (with the answers followed, when there are some).
+ */
 export function PositionsLive({ pos, pop = false }) {
   if (!pos?.ready) return <Wait />;
   const { r, follows } = pos;
@@ -82,22 +199,32 @@ export function PositionsLive({ pos, pop = false }) {
         : <span className={pop ? undefined : "hl-go"}>Pick a side in the Saloon</span>}</span>
     </div>
   );
-  if (r.pct == null) return (
-    <div className="hl hl-pos">
-      <span className="hl-hero"><BigNum className="xl" text={String(r.open)} /><span className="hl-of">open</span></span>
-      <span className="hl-cap"><span>Not valued yet <Info label="Why there is no value now">Prices are paused or these answers are no longer
-        on the board, so Derive's sell-back price is not shown.</Info></span></span>
-    </div>
-  );
-  const side = r.pct >= 0 ? "up" : "down";
-  const count = r.priced === r.open ? <><N>{r.open}</N> open</> : <><N>{r.priced}</N> of <N>{r.open}</N> valued</>;
+  const side = r.pct == null ? "" : r.pct >= 0 ? "up" : "down";
+  const shown = pop ? r.rows : r.rows.slice(0, ROWS_ON_CARD);
+  const more = r.rows.length - shown.length;
   return (
-    <div className={`hl hl-pos ${side}`}>
-      <BigNum className={`xl ${side}`} text={pctText(r.pct)} />
-      <span className="hl-cap">
-        <span><N className={side}>{signed(r.pl)}</N> <i>on</i> <N>{money(r.paid, { cents: true })}</N></span>
-        <span>{count}</span>
-      </span>
+    <div className={`hl hl-pos${side ? ` ${side}` : ""}`}>
+      <div className="hl-fig">
+        {r.pct == null
+          ? <b className="hl-word">Not valued yet</b>
+          : <BigNum className={side} text={pctText(r.pct)} />}
+        <span className="hl-cap">
+          <span>{r.pct == null ? "No price now" : "P&L now"}{r.pct == null && <Info label="Why there is no value now">Prices are paused or these
+            answers are no longer on the board, so Derive's sell-back price is not shown.</Info>}</span>
+          <span><N>{r.open}</N> open{r.priced && r.priced < r.open ? <>, <N>{r.priced}</N> valued</> : null}</span>
+        </span>
+      </div>
+      <ul className="hl-plist">
+        {shown.map((x) => (
+          <li key={x.key}>
+            <CoinIcon und={x.und} />
+            <span className="hl-pname">{x.side === "yes" ? "Higher" : "Lower"} <N>{shortLevel(x.k)}</N><i>{shortDay(x.expiry)}</i></span>
+            {x.pct == null ? <span className="hl-pnone">No price now</span>
+              : <N className={x.pct >= 0 ? "up" : "down"}>{pctText(x.pct)}</N>}
+          </li>
+        ))}
+        {more > 0 && <li className="hl-pmore"><N>+{more}</N> more</li>}
+      </ul>
     </div>
   );
 }
