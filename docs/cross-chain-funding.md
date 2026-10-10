@@ -1,6 +1,6 @@
 # Funding hub: EVM deposits, wallet purchases and the Rysk preview
 
-Implemented 7 October 2026: an optional EVM funding route into the user's Derive account, wallet purchase guidance for Apple Pay, and a separate Rysk illustration. The two new flags are **off by default**. Public quotes and deterministic wallet/provider tests have been checked; no real cross-chain transfer has been signed or sent in this work. The first owner deposit is still pending.
+Implemented 7 October 2026: an optional EVM funding route into the user's Derive account, and a separate Rysk illustration. The two new flags are **off by default**. Public quotes and deterministic wallet/provider tests have been checked; no real cross-chain transfer has been signed or sent in this work. The first owner deposit is still pending.
 
 The hub shares an entry point, not a balance or product. Buying an outcome on Derive remains distinct from locking collateral to sell an option on Rysk. This build funds Derive only; it does not fund or trade on Rysk.
 
@@ -11,7 +11,7 @@ The hub shares an entry point, not a balance or product. Buying an outcome on De
 | `VITE_FUND_ANYCHAIN=1` | Requires `VITE_QUESTIONS=1` and a supported `VITE_SALOON_TRADE` mode. Adds **Pay from another chain** beside direct Ethereum USDC funding. Actual cross-chain transfers require `VITE_SALOON_TRADE=mainnet` and the existing wallet/pilot eligibility. Other modes cannot send real bridge transfers. |
 | `VITE_RYSK_MOCK=1` | Requires `VITE_QUESTIONS=1`. Adds the lazily loaded **Receive premium** illustration beside **Buy outcome**. It uses fabricated figures and has no wallet, live-price or execution action. |
 
-Unset flags remove their optional implementation from ordinary bundles. Neither flag enables the published trading switch or bypasses pilot eligibility. The existing direct Ethereum deposit and Derive link remain available. Mainnet account setup also includes Apple Pay guidance; it needs no funding-hub flag or embedded payment API.
+Unset flags remove their optional implementation from ordinary bundles. Neither flag enables the published trading switch or bypasses pilot eligibility. The existing direct Ethereum deposit and Derive link remain available.
 
 ## Supported chains and balance discovery
 
@@ -85,12 +85,6 @@ The captured Relay breakdown was:
 
 These snapshots explain why fixed destination costs weigh more heavily on a small deposit. They do not select a provider, guarantee today's cost or establish the eventual Derive credit time. The 7 October check selected Mayan rather than Relay.
 
-## Apple Pay: buy in the connected wallet
-
-Mainnet funding has **No crypto yet? Buy with Apple Pay in your wallet** guidance. The user opens their wallet's Buy screen, chooses USDC on the selected funding network (Ethereum for direct funding), chooses Apple Pay **if offered**, then returns to Cowboy to fund Derive.
-
-This is not an embedded onramp, a Cowboy payment integration or a purchase directly into Derive. The wallet's provider sets fees, identity checks, country availability and supported assets/networks. Buying USDC into the wallet and depositing it into Derive are separate steps. A connected MetaMask or Coinbase Wallet identified by its EIP-6963 announcement gets its official guide; other wallets get generic instructions and both guides. This implementation requires no owner business-onramp account or API key.
-
 ## Rysk: an illustration, not a live venue
 
 The default-off **Receive premium** tab shows covered-call and cash-secured-put examples. It first states what is locked, the possible sale or purchase, a **fabricated seven-day term from locking**, physical settlement and no early exit; premium dollars and three settlement examples follow. The figures and term are made up, actual Rysk assets/dates are unconfirmed, fees are not modelled, and no prices are fetched or orders placed.
@@ -101,5 +95,4 @@ A future HyperEVM destination adapter could share funding discovery and receipt 
 
 - Derive: [Depositing](https://docs.derive.xyz/getting-started/depositing.md), [Register bridge deposit](https://docs.derive.xyz/api-reference/onchain-actions/privateregister_bridge_deposit.md), [Pending deposits](https://docs.derive.xyz/api-reference/onchain-actions/publicget_pending_deposits.md), [Risk universes](https://docs.derive.xyz/api-reference/market-data/publicget_risk_universes.md) and [Session login](https://docs.derive.xyz/authentication/session-login.md).
 - LI.FI: [Quote API](https://docs.li.fi/api-reference/get-a-quote-for-a-token-transfer), [Transfer status](https://docs.li.fi/api-reference/check-the-status-of-a-cross-chain-transfer), [Status tracking](https://docs.li.fi/introduction/user-flows-and-examples/status-tracking) and [Current documentation catalogue](https://docs.li.fi/llms-full.txt). Public metadata is at [`/chains`](https://li.quest/v1/chains) and [`/tokens`](https://li.quest/v1/tokens); `/quote` and `/status` use `https://li.quest/v1`.
-- Wallet purchases: [MetaMask guide](https://support.metamask.io/manage-crypto/move-crypto/buy/how-to-buy-crypto-in-metamask/) and [Coinbase Wallet guide](https://help.coinbase.com/en/wallet/managing-account/buy-crypto).
 - Implementation: [quote and balance checks](../frontend/src/lib/trade/anychain.js), [wallet checks](../frontend/src/lib/trade/wallet.js), [funding state and recovery](../frontend/src/lib/trade/seat.js).

@@ -214,28 +214,3 @@ describe("funding progress", () => {
   });
 
 });
-
-describe("Apple Pay guide in FundStep", () => {
-  it("follows the chosen funding network and only names the connected announced wallet", async () => {
-    const user = userEvent.setup();
-    render(<FundStep ethUsd={3000} />);
-    await user.click(screen.getByRole("button", { name: "Pay from another chain" }));
-    await ready();
-    await user.click(screen.getByRole("button", { name: /No crypto yet\?/ }));
-    expect(screen.getByText("Choose USDC on Base.")).toBeTruthy();
-    fireEvent(window, new CustomEvent("eip6963:announceProvider", { detail: { provider: state.current.provider, info: { rdns: "io.metamask", name: "MetaMask" } } }));
-    expect(screen.getByRole("region", { name: "Buy in MetaMask" })).toBeTruthy();
-    await user.click(screen.getByRole("button", { name: "USDC on Ethereum" }));
-    expect(screen.getByText("Choose USDC on Ethereum.")).toBeTruthy();
-    expect(state.current.provider.calls).toHaveLength(0);
-  });
-
-  it("keeps real-money buying guidance out of testnet funding", async () => {
-    net.real = false; flags.MAINNET_FILLS = false; flags.TESTNET_FILLS = true;
-    render(<FundStep ethUsd={3000} />);
-    expect(screen.queryByRole("button", { name: /No crypto yet\?/ })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Pay from another chain" }));
-    expect(screen.getByText("Cross-chain funding uses real funds on mainnet. This build uses test USDC.")).toBeTruthy();
-    expect(fundingChains).not.toHaveBeenCalled();
-  });
-});

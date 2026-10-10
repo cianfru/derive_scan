@@ -154,8 +154,6 @@ Funding shows **bridge delivery → Derive account credit** as separate steps. W
 
 The 7 October read-only public quote returned an expected and guaranteed arrival of **9.46525 USDC for 10 USDC on Base**, via Mayan (Swift), with a three-second bridge estimate and a $5.50 minimum including margin. Wallet balances were mocked; no signature, approval, transfer or actual Derive credit was tested. The first owner deposit must measure total gas, arrived amount, Derive's fee and final credit time. Historical 6 October quotes are preserved separately in [the implementation and validation notes](docs/cross-chain-funding.md).
 
-Mainnet account setup also offers **Buy with Apple Pay in your wallet** guidance: buy USDC on the selected network if the wallet/provider offers it, then return to fund Derive. It is not an embedded onramp; payment fees, availability and identity checks are set by the wallet's provider. No owner business-onramp account or API key is required.
-
 The [Rysk discussion brief](docs/rysk-design.md) covers the owner's partner call and the obligation-first mock: collateral lock and possible purchase/sale, physical settlement and no early exit, followed by premium dollars and settlement examples. A future HyperEVM/Rysk funding adapter is not implemented; Derive cash and Rysk locked collateral remain distinct.
 
 ## Live service (Railway)

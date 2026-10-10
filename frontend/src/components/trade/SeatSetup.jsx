@@ -7,7 +7,6 @@ import { acceptTerms, connect, deposit, depositGasUsd, holdSend, pickAccount, re
 import ErrorDetail from "./ErrorDetail.jsx";
 import { FUND_ANYCHAIN, MAINNET_FILLS } from "../../lib/flags.js";
 import AnyChainFunding, { BridgeProgress } from "./AnyChainFunding.jsx";
-import BuyInWallet from "./BuyInWallet.jsx";
 
 export const DERIVE_TERMS_URL = "https://www.derive.xyz/terms-of-use";
 const short = (a) => (a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "");
@@ -102,7 +101,6 @@ export function FundStep({ ethUsd }) {
   const [dollars, setDollars] = useState(100);
   const [gasUsd, setGasUsd] = useState(null);
   const [method, setMethod] = useState("direct");
-  const [fundingChain, setFundingChain] = useState(null);
   useEffect(() => {
     if (FUND_ANYCHAIN && method === "bridge") { setGasUsd(null); return; }
     let live = true;
@@ -145,7 +143,7 @@ export function FundStep({ ethUsd }) {
         <button type="button" aria-pressed={method === "direct"} disabled={seat.busy} onClick={() => setMethod("direct")}>USDC on {NETWORK.chainName}</button>
         <button type="button" aria-pressed={method === "bridge"} disabled={seat.busy} onClick={() => setMethod("bridge")}>Pay from another chain</button>
       </div>}
-      {FUND_ANYCHAIN && method === "bridge" ? <AnyChainFunding onChainChange={setFundingChain} /> : <>
+      {FUND_ANYCHAIN && method === "bridge" ? <AnyChainFunding /> : <>
       <div className="tr-amount">
         <span className="q-dollar-field"><span>$</span>
           <input aria-label="Deposit amount" inputMode="decimal" value={dollars} onChange={(e) => setDollars(Math.max(0, Number(e.target.value.replace(/[^\d.]/g, "")) || 0))} />
@@ -171,7 +169,6 @@ export function FundStep({ ethUsd }) {
         ? `Send only USDC on ${NETWORK.chainName} to this address. Funded on Derive instead, it shows here after Check again.`
         : "Test USDC comes from Derive's testnet app. Funded there, it shows here after Check again."}</p>
       </>}
-      {MAINNET_FILLS && <BuyInWallet provider={seat.provider} networkName={method === "bridge" && fundingChain ? fundingChain : "Ethereum"} disabled={seat.busy} />}
       {seat.message && <p className="tr-msg">{seat.message}<ErrorDetail detail={seat.detail} /></p>}
     </div>
   );

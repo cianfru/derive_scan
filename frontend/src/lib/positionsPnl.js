@@ -1,7 +1,10 @@
 const sum = (rows, pick) => rows.reduce((a, r) => a + pick(r), 0);
 
+/** The open positions whose P&L now is known (a complete receipt, known entry fees and a sell-back value). */
+export const pricedViews = (views) => views.filter((v) => !v.pendingReceipt && v.p.journal?.cost?.fees_basis !== "unknown" && Number.isFinite(v.f.plNow));
+
 export function pnlCoverage(views, summary, pendingSettlementCount = 0) {
-  const priced = views.filter((v) => !v.pendingReceipt && v.p.journal?.cost?.fees_basis !== "unknown" && Number.isFinite(v.f.plNow));
+  const priced = pricedViews(views);
   const valued = views.filter((v) => !v.pendingReceipt && Number.isFinite(v.f.valueNow));
   const knownResults = summary.count - summary.unknown;
   const unknownOpen = views.length - priced.length;
