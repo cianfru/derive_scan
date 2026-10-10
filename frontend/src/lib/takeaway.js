@@ -118,22 +118,30 @@ export function cohortsLead(data) {
 }
 
 /** Flow: option premium bought and sold by takers, and the busiest market. */
+/** Option money per side: what gains if the price rises (calls bought, puts sold) against what gains if it falls
+ * (puts bought, calls sold), the Options layer's own measure (derive/lean.py); a spread's two halves offset. */
+export function riseFall(c) {
+  const rise = (c?.call?.buy_premium_usd || 0) + (c?.put?.sell_premium_usd || 0);
+  const fall = (c?.put?.buy_premium_usd || 0) + (c?.call?.sell_premium_usd || 0);
+  return { rise, fall, total: rise + fall };
+}
+/** "61% rise · 39% fall", or "all on a rise" when one side is empty. */
+export const riseShare = ({ rise, total }) => (total > 0 ? Math.round((rise / total) * 100) : null);
+
+/** Flow (owner, 10 October 2026: "make it look more intuitive"): the option money of the last 24 hours and how much of
+ * it gains if the price rises or falls, in plain words. */
 export function flowLead(data) {
-  const by = data?.by_coin || {};
-  let bought = 0, sold = 0, best = null, bestN = 0;
-  for (const [und, c] of Object.entries(by)) {
-    const b = (c.call?.buy_premium_usd || 0) + (c.put?.buy_premium_usd || 0);
-    const s = (c.call?.sell_premium_usd || 0) + (c.put?.sell_premium_usd || 0);
-    bought += b; sold += s;
-    const n = (c.call?.buy_notional_usd || 0) + (c.call?.sell_notional_usd || 0) + (c.put?.buy_notional_usd || 0) + (c.put?.sell_notional_usd || 0);
-    if (n > bestN) { bestN = n; best = und; }
-  }
-  if (!bought && !sold) return null;
-  let text = `Over the last 24 hours, takers bought ${usd(bought)} of option premium and sold ${usd(sold)}`;
-  if (best) text += `; ${best} saw the most options notional`;
+  let rise = 0, fall = 0;
+  for (const c of Object.values(data?.by_coin || {})) { const r = riseFall(c); rise += r.rise; fall += r.fall; }
+  const total = rise + fall;
+  if (!total) return null;
+  const up = Math.round((rise / total) * 100);
   const cov = data.coverage;
-  const gap = cov && cov.ready === false && Number.isFinite(cov.fraction) ? `The recorder covered ${Math.round(cov.fraction * 100)}% of that window; a` : "A";
-  return { text: `${text}.`, note: `${gap} taker trade shows who crossed the spread, not the wallet's whole position.` };
+  const gap = cov && cov.ready === false && Number.isFinite(cov.fraction) ? ` The recorder covered ${Math.round(cov.fraction * 100)}% of that window.` : "";
+  return {
+    text: `Traders moved ${usd(total)} through options in the last 24 hours: ${up}% into trades that gain if the price rises, ${100 - up}% into trades that gain if it falls.`,
+    note: `Buying calls or selling puts gains if the price rises; buying puts or selling calls, if it falls. Context, not a signal.${gap}`,
+  };
 }
 
 const WALLET_WORDS = { up: "Smart wallets hold long delta", defensive: "Smart wallets hold short delta", neutral: "Smart wallets' delta is balanced" };

@@ -36,13 +36,30 @@ def test_spot_legs_add_nothing_to_wallets_or_large():
 
 
 def test_perps_keep_their_own_cap_beside_larger_options(tmp_path):
-    t = NOW - 3600
-    large = [_large(t + i, "BTC-20261030-90000-C", "option", 1_000_000 + i, "0xDIR") for i in range(80)]
+    t = NOW - 7200
+    # Separate option trades a minute apart, each with its premium; options are kept by money, perps by notional.
+    large = [_large(t + 60 * i, "BTC-20261030-90000-C", "option", 1_000_000 + i, "0xDIR") for i in range(100)]
+    for i, row in enumerate(large):
+        row[9] = 100 * (i % 50) + i  # premium: not in notional order
     large += [_large(t + i, "BTC-PERP", "perp", 30_000 + i, "0xDIR") for i in range(50)]
     doc = publish_site.flow_block(_data(tmp_path, large, []), NOW, sides={"_coverage": {}})
     kinds = [r["kind"] for r in doc["large"]]
-    assert kinds.count("option") == 60 and kinds.count("perp") == 40
+    assert kinds.count("option") == 80 and kinds.count("perp") == 40
     assert min(r["notional_usd"] for r in doc["large"] if r["kind"] == "perp") == 30_010
+    kept = sorted(r["premium_usd"] for r in doc["large"] if r["kind"] == "option")
+    assert kept == sorted(row[9] for row in large if row[2] == "option")[-80:]
+
+
+def test_a_kept_option_leg_brings_its_package(tmp_path):
+    t = NOW - 7200
+    large = [_large(t + 60 * i, "BTC-20261030-90000-C", "option", 1_000_000, "0xDIR") for i in range(85)]
+    for i, row in enumerate(large):
+        row[9] = 5_000 + i
+    cheap = _large(t + 84 * 60, "BTC-20261030-95000-C", "option", 50_000, "0xDIR")  # the sold leg of the top spread
+    cheap[4], cheap[9] = "sell", 10
+    doc = publish_site.flow_block(_data(tmp_path, large + [cheap], []), NOW, sides={"_coverage": {}})
+    names = [r["instrument"] for r in doc["large"] if r["kind"] == "option"]
+    assert len(names) == 81 and "BTC-20261030-95000-C" in names
 
 
 def test_unclassed_wallets_show_no_perp_activity_and_market_makers_never_appear(tmp_path):

@@ -3,7 +3,8 @@
 Every run reads the trades since the last run (`public/get_trade_history`; each trade appears
 once per side, with the side's wallet) and appends:
 
-flow/large/YYYY-MM-DD.csv    taker legs at or above the size thresholds, one row each
+flow/large/YYYY-MM-DD.csv    taker legs at or above the size thresholds, one row each, with the other taker
+                             legs of their package (same RFQ, or same wallet and millisecond)
 flow/wallets_v2/YYYY-MM-DD.csv  per trade-time bucket and wallet: legs, perp and option notional,
                              option premium bought and sold, realised PnL, fees
 flow/sides_v2/YYYY-MM-DD.csv    per trade-time bucket, coin and kind (call, put, perp): what takers bought and sold
@@ -185,7 +186,7 @@ def sides(trades: list[dict], run_ts: int, exclude: set[str] = frozenset()) -> l
 
 
 def summarise(trades: list[dict], run_ts: int) -> tuple[list[list], list[list]]:
-    large, wallets = [], defaultdict(lambda: defaultdict(float))
+    large, wallets, takers = [], defaultdict(lambda: defaultdict(float)), []
     for t in trades:
         if reverted(t):
             continue
@@ -205,7 +206,15 @@ def summarise(trades: list[dict], run_ts: int) -> tuple[list[list], list[list]]:
         w["fees_usd"] += _f(t.get("trade_fee"))
         big = (kind == "perp" and notional >= LARGE_PERP_USD) or \
               (kind == "option" and (notional >= LARGE_OPTION_USD or premium >= LARGE_PREMIUM_USD))
-        if big and t.get("liquidity_role") == "taker":
+        if t.get("liquidity_role") == "taker":
+            takers.append((t, name, kind, amount, price, index, notional, premium, big))
+    # A large leg keeps its package (owner, 10 October 2026: the Flow page names whole trades): every taker leg
+    # of the same RFQ, and the wallet's other taker legs at the same millisecond (one order filled by several
+    # makers, or an order-book package), even when those legs are small on their own.
+    rfqs = {t.get("rfq_id") for t, *_, big in takers if big and t.get("rfq_id")}
+    moments = {(t.get("wallet"), int(t["timestamp"])) for t, *_, big in takers if big}
+    for t, name, kind, amount, price, index, notional, premium, big in takers:
+        if big or (t.get("rfq_id") and t.get("rfq_id") in rfqs) or (t.get("wallet"), int(t["timestamp"])) in moments:
             large.append([int(t["timestamp"]), name, kind, name.split("-")[0], t.get("direction"), amount, price, index,
                           round(notional, 2), round(premium, 2), t.get("wallet"), t.get("subaccount_id"),
                           int(bool(t.get("rfq_id"))), _f(t.get("realized_pnl"))])

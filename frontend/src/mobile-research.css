@@ -171,7 +171,6 @@
 
   .page.market-research-page.flow-page > .plate > .panel-head { min-height: 52px; padding-block: 10px; }
   .page.market-research-page.flow-page .flow-brief-head { padding-block: 12px; gap: 10px; }
-  .page.market-research-page.flow-page .flow-market-row { min-height: 48px; padding-block: 10px; }
   .page.market-research-page.flow-page .fl-trades-panel > .panel-head { padding-block: 0; }
   .page.market-research-page.flow-page .fl-trades-panel .panel-title { min-height: 44px; }
   .page.market-research-page.flow-page .fl-trades-panel .tabs button { min-height: 44px; padding-block: 10px; }

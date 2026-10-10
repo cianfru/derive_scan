@@ -1,7 +1,7 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import btc from "./fixtures/questions/BTC.json";
 
 const docs = vi.hoisted(() => ({ current: {} }));
@@ -15,9 +15,11 @@ import { _resetMemory, follow } from "./lib/follows.js";
 const NOW = btc.prices_ts + 60;
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW * 1000); });
 afterEach(() => { cleanup(); vi.useRealTimers(); localStorage.clear(); sessionStorage.clear(); _resetMemory(); docs.current = {}; });
+// Where a click landed, path and query.
+function Landed() { const l = useLocation(); return <p data-at={l.pathname + l.search}>landed</p>; }
 const show = () => render(
   <MemoryRouter initialEntries={["/home"]}>
-    <Routes><Route path="/home" element={<Home />} /><Route path="*" element={<p>landed</p>} /></Routes>
+    <Routes><Route path="/home" element={<Home />} /><Route path="*" element={<Landed />} /></Routes>
   </MemoryRouter>,
 );
 const $ = (sel) => document.querySelector(sel);
@@ -44,8 +46,9 @@ const TRADERS = { traders: [trader("a", 1, "top", "directional", 10051791), trad
   cohorts: { pnl: [3, 33, 132, 2353, 6750, 295, 34, 2].map((wallets, i) => ({ name: PNL[i], wallets })) } };
 const FLOW = { generated_at: NOW, since: NOW - 86400, coverage: { ready: true, end: NOW }, classes_ready: true,
   by_coin: { BTC: { call: { buy_premium_usd: 300 }, put: { buy_premium_usd: 100 } }, ETH: { call: { buy_premium_usd: 120 }, put: { buy_premium_usd: 480 } } },
-  large: [{ ts: (NOW - 3600) * 1000, kind: "option", instrument: "ETH-20261009-3050-P", direction: "buy", premium_usd: 37241 },
-    { ts: (NOW - 7200) * 1000, kind: "option", instrument: "BTC-20261030-90000-C", direction: "sell", premium_usd: 5000 },
+  large: [{ ts: (NOW - 3600) * 1000, kind: "option", underlying: "ETH", instrument: "ETH-20261009-3050-P", direction: "buy", premium_usd: 37241,
+    wallet: "0x" + "c".repeat(40), class: "top" },
+    { ts: (NOW - 7200) * 1000, kind: "option", underlying: "BTC", instrument: "BTC-20261030-90000-C", direction: "sell", premium_usd: 5000, wallet: "0x" + "d".repeat(40), class: "income" },
     { ts: (NOW - 1800) * 1000, kind: "perp", instrument: "BTC-PERP", direction: "buy", premium_usd: 0 }] };
 const INDEX = { prices_ts: NOW - 120, coins: [{ und: "BTC", smart: 3 }, { und: "ETH", smart: 1 }] };
 const ALL = { "questions/index.json": INDEX, "markets.json": MARKETS, "traders.json": TRADERS, "flow.json": FLOW };
@@ -62,7 +65,9 @@ describe("card home", () => {
     expect(describe("Radar")).toContain("HYPE");
     expect(describe("Radar")).toContain("Most stretched, below trend");
     expect(describe("Markets")).toMatch(/4 ?of ?5.*trending up/);
+    // Radar, Markets, Posses and the flow map draw charts; their readings are words beside the figures.
     expect($$(".hl-band[aria-hidden='true']").length).toBe(4);
+    expect(describe("Options flow")).toContain("Most money: ETH, 80% on a fall");
   });
 
   it("Saloon: the open coins and the gold rings, or that prices are paused", () => {
@@ -188,27 +193,45 @@ describe("card home", () => {
     expect(h[7]).toBeCloseTo(Math.sqrt(2 / 6750), 3);
   });
 
-  it("Options flow: premium bought, the split, one dot per large option trade; none until classes are ready", () => {
+  it("Options flow: the money, the coin with the most and which way it points, and one bubble per coin", () => {
     docs.current = { "flow.json": FLOW };
     show();
     expect(text(".hl-options .bn")).toBe("$1K");
-    expect(text(".hl-options .hl-split-line")).toBe("42% calls · 58% puts");
-    const dots = $$(".hl-strip .hl-dot");
-    expect(dots).toHaveLength(2);
-    expect(dots.at(-1).title).toBe("ETH 3,050 put · Oct 9 expiry · bought · $37.2K premium");
-    expect(dots.at(-1).className).toBe("hl-dot put buy top");
-    expect(dots[0].className).toBe("hl-dot call sell");
-    // Calls above the line, puts below; the later trade further right.
-    const line = parseFloat($(".hl-strip-line").style.top);
-    expect(parseFloat(dots[0].style.top)).toBeLessThan(line);
-    expect(parseFloat(dots[1].style.top)).toBeGreaterThan(line);
-    expect(parseFloat(dots[1].style.left)).toBeGreaterThan(parseFloat(dots[0].style.left));
-    expect(text(".hl-strip .hl-xw")).toBe("24h agonow");
+    expect($$(".hl-options .hl-cap > span")[0].textContent).toBe("in options, 24h");
+    // ETH: puts bought $480 (fall) against calls bought $120 (rise); BTC: calls bought $300 against puts bought $100.
+    expect(text(".hl-flowlead")).toBe("Most money: ETH, 80% on a fall");
+    expect(text(".hl-flowlead .n")).toBe("80%");
+    const bubbles = $$(".hl-options .fb-b");
+    expect(bubbles.map((b) => b.dataset.und)).toEqual(["ETH", "BTC"]);
+    expect(bubbles.map((b) => b.className)).toEqual(["fb-b down", "fb-b up"]);
+    expect(bubbles[0].title).toBe("ETH: $600 in options over 24 hours, 80% on a fall");
+    // Fall on the left, rise on the right; more money, a larger bubble.
+    expect(parseFloat(bubbles[0].style.left)).toBeLessThan(parseFloat(bubbles[1].style.left));
+    expect(parseFloat(bubbles[0].style.width)).toBeGreaterThan(parseFloat(bubbles[1].style.width));
+    // The card keeps the map; the day's largest trade waits in the pop-out.
+    expect($(".home-card .hl-trade")).toBeNull();
+    // A bubble on the card opens its coin on the Flow page.
+    fireEvent.click(bubbles[1]);
+    expect(screen.getByText("landed").dataset.at).toBe("/flow?coin=BTC");
+  });
+
+  it("Options flow pop-out: each coin links to its view, and the day's largest single trade; none until classes are ready", () => {
+    docs.current = { "flow.json": FLOW };
+    show();
+    fireEvent.click(screen.getByRole("button", { name: "More about Options flow" }));
+    const pop = $("dialog.home-pop");
+    expect(within(pop).getByRole("link", { name: "BTC: $400 in options over 24 hours, 75% on a rise" }).getAttribute("href")).toBe("/flow?coin=BTC");
+    expect(text(".home-pop .hl-trade-k")).toBe("Largest trade, 24h");
+    expect(text(".home-pop .hl-trade-what b")).toBe(`${codename("0x" + "c".repeat(40))} bought ETH puts`);
+    expect($(".home-pop .hl-trade-what > span").title).toBe("Smart wallet");
+    expect(text(".home-pop .hl-trade-what small").replace(/\u00a0/g, " ")).toBe("3,050 put · Oct 09 · 1 h ago");
+    expect(text(".home-pop .hl-trade-money")).toBe("paid$37.2K");
     cleanup();
     docs.current = { "flow.json": { ...FLOW, classes_ready: false } };
     show();
-    expect(text(".hl-options .bn")).toBe("$1K");
-    expect($$(".hl-dot")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "More about Options flow" }));
+    expect(text(".home-pop .hl-options .bn")).toBe("$1K");
+    expect($(".home-pop .hl-trade")).toBeNull();
   });
 
   it("Options flow: an old file names its window instead of the last 24 hours to now", () => {
@@ -216,9 +239,9 @@ describe("card home", () => {
     docs.current = { "flow.json": { ...FLOW, since: end - 86400, coverage: { ready: true, end } } };
     show();
     const at = (t) => { const d = new Date(t * 1000); return `${d.getUTCDate()} ${d.toUTCString().slice(8, 11)} ${d.toISOString().slice(11, 16)}`; };
-    expect($$(".hl-options .hl-cap > span")[0].textContent).toBe(`option premium bought, 24h to ${at(end)} UTC`);
-    expect(text(".hl-strip .hl-xw")).toBe(`${at(end - 86400)}${at(end)} UTC`);
-    expect(document.body.textContent).not.toContain("now");
+    expect($$(".hl-options .hl-cap > span")[0].textContent).toBe(`in options, 24h to ${at(end)} UTC`);
+    fireEvent.click(screen.getByRole("button", { name: "More about Options flow" }));
+    expect(text(".home-pop .hl-trade-k")).toBe("Largest trade");
   });
 
   it("Your positions: the owner's words when nothing is open, leading to the Saloon", () => {
@@ -305,6 +328,31 @@ describe("card home", () => {
     // Every bubble's figure is in the chart's own words for screen readers, with its side and level.
     for (const f of figs) expect(chart.getAttribute("aria-label")).toContain(`up to ${f}`);
     expect(chart.getAttribute("aria-label")).toMatch(/^BTC over the last three days, now \$/);
+  });
+
+  it("Saloon: with no bubble to show, the line on its own axis; the note only while prices are not paused", () => {
+    const bars = Array.from({ length: 40 }, (_, i) => [NOW - (40 - i) * 14400, btc.index, btc.index * 1.01, btc.index * 0.99, btc.index * (1 + Math.sin(i) / 20), 1]);
+    const quiet = { ...btc, dates: btc.dates.map((d) => ({ ...d, levels: d.levels.map((l) => ({ ...l, yes: { state: "no_quote" }, no: { state: "no_quote" } })) })) };
+    const inBand = () => {
+      const svg = $(".home-saloon .hl-saloon svg[role='img']");
+      const h = Number(svg.getAttribute("height"));
+      const ys = svg.querySelector(".sb-price").getAttribute("d").match(/-?[\d.]+/g).map(Number).filter((_, i) => i % 2 === 1);
+      return Math.min(...ys) >= 0 && Math.max(...ys) <= h;
+    };
+    docs.current = { "questions/index.json": { prices_ts: btc.prices_ts, coins: [{ und: "BTC" }] }, "questions/BTC.json": quiet, "coins/BTC.json": { candles: { "4h": bars } } };
+    show();
+    expect($$(".home-saloon .sb-fig")).toHaveLength(0);
+    expect(text(".home-saloon .sb-none")).toBe("No prices on Derive right now");
+    expect(inBand()).toBe(true);
+    cleanup();
+    // Paused: the foot says so, and the chart does not claim Derive has no prices.
+    docs.current = { "questions/index.json": { prices_ts: btc.prices_ts, coins: [{ und: "BTC" }], paused: true }, "questions/BTC.json": { ...btc, paused: true },
+      "coins/BTC.json": { candles: { "4h": bars } } };
+    show();
+    expect($$(".home-saloon .sb-fig")).toHaveLength(0);
+    expect($(".home-saloon .sb-none")).toBeNull();
+    expect(text(".home-saloon .home-line")).toBe("Prices paused");
+    expect(inBand()).toBe(true);
   });
 
   it("keeps every card's title or says Not available yet when its file is missing or empty", () => {

@@ -6,9 +6,9 @@
 // in their own colours, regimes in theirs; orange stays interaction. While its file loads a card keeps a
 // still placeholder of its size; without its file it shows its own title and "Not available yet".
 import { Fragment, useId, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import { REGIME, strike, usd } from "../lib/format.js";
+import { REGIME, ago, strike, usd } from "../lib/format.js";
 import { REGIME_COLORS, REGIME_ORDER } from "../lib/regime.js";
 import { radarPoint, viewReading } from "../lib/presentation.js";
 import { regimeGroups } from "../lib/takeaway.js";
@@ -17,11 +17,13 @@ import { codename } from "../lib/walletName.js";
 import { loadPositions } from "../lib/positions.js";
 import { positionDone } from "../lib/positionView.js";
 import { openPnl, pctText } from "../lib/homePnl.js";
-import { compactCount, groupIconSize, radarLayout, swarm } from "../lib/homeLayout.js";
+import { compactCount, groupIconSize, radarLayout } from "../lib/homeLayout.js";
+import { largestTrade } from "../lib/flowStories.js";
+import { flowCoins } from "../lib/flowBubbles.js";
 import { useFollowsDoc } from "../lib/follows.js";
 import { boardRows } from "../lib/board.js";
 import { useClock } from "../lib/useClock.js";
-import { money, signed } from "../lib/questions.js";
+import { money, priceAge, signed } from "../lib/questions.js";
 import { TESTNET_FILLS } from "../lib/flags.js";
 import { useElementSize, useElementWidth } from "../lib/useElementWidth.js";
 import { useFeeds } from "./Feeds.jsx";
@@ -31,6 +33,7 @@ import { chartLevels, returnPct, smartOf } from "./SaloonChart.jsx";
 import { WalletEmblem } from "./WalletTag.jsx";
 import { Info } from "./ui.jsx";
 import BigNum from "./BigNum.jsx";
+import FlowBubbles, { LeanText } from "./FlowBubbles.jsx";
 
 const NET = TESTNET_FILLS ? "testnet" : "mainnet";
 const N = ({ children, className = "" }) => <b className={`n${className ? ` ${className}` : ""}`}>{children}</b>;
@@ -109,11 +112,10 @@ export function SaloonLive({ pop = false }) {
   // off the band where the last days went further, clipped and faded at the left edge.
   const ks = dates.flatMap((d) => d.show.map((l) => l.k));
   const far = Math.max(board.index * 0.012, ...ks.map((k) => Math.abs(k - board.index)));
-  const lo = board.index - far * 1.35, hi = board.index + far * 1.35, top = 6, bottom = H - 24;
+  let lo = board.index - far * 1.35, hi = board.index + far * 1.35;
+  const top = 6, bottom = H - 24;
   const y = (v) => bottom - ((v - lo) / (hi - lo)) * (bottom - top);
-  const lineW = W * (dates.length ? 0.42 : 0.92);
-  const pts = closes.map((c, i) => [10 + (i / (closes.length - 1)) * (lineW - 10), y(c)]);
-  const yNow = y(board.index);
+  let lineW = W * (dates.length ? 0.42 : 0.92), yNow = y(board.index);
   const colX = (i) => lineW + ((i + 0.6) / (dates.length + 0.2)) * (W - lineW - 8);
   const rMax = Math.max(22, Math.min(36, (W - lineW) / (dates.length || 1) / 2.4)), rMin = 22;
   const maxPct = Math.max(1, ...dates.flatMap((d) => d.show.map((l) => l.r.make / l.r.total)));
@@ -135,6 +137,16 @@ export function SaloonLive({ pop = false }) {
     }
     d.placed = placed;
   }
+  // No bubble to show: the line alone, on the axis of its own closes. While prices are paused the card's
+  // foot says so; otherwise Derive quotes none of these levels now.
+  const none = !dates.some((d) => d.placed.length);
+  const paused = priceAge(board.prices_ts, now, board.paused).state === "paused";
+  if (none) {
+    const span = Math.max(...closes, board.index) - Math.min(...closes, board.index) || board.index * 0.01;
+    lo = Math.min(...closes, board.index) - span * 0.15; hi = Math.max(...closes, board.index) + span * 0.15;
+    lineW = W * 0.92; yNow = y(board.index);
+  }
+  const pts = closes.map((c, i) => [10 + (i / (closes.length - 1)) * (lineW - 10), y(c)]);
   return (
     <div className={`hl hl-saloon${pop ? " in-pop" : ""}`}>
       <div className="hl-band" ref={band}>
@@ -149,11 +161,10 @@ export function SaloonLive({ pop = false }) {
             <clipPath id={`${id}-clip`}><rect x="0" y="0" width={W} height={bottom + 4} /></clipPath>
             <linearGradient id={`${id}-fade`} x1="0" x2="1" y1="0" y2="0"><stop offset="0" stopColor="#fff" stopOpacity="0" /><stop offset=".22" stopColor="#fff" stopOpacity="1" /></linearGradient>
             <mask id={`${id}-mask`}><rect x="0" y="0" width={W} height={H} fill={`url(#${id}-fade)`} /></mask>
-            <filter id={`${id}-glow`} x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6" /></filter>
           </defs>
           <g clipPath={`url(#${id}-clip)`} mask={`url(#${id}-mask)`}><path d={smooth(pts)} className="sb-price" /></g>
           <line x1="0" x2={W} y1={yNow} y2={yNow} className="sb-now" />
-          {dates.map((d, i) => <text key={d.expiry} x={colX(i)} y={H - 6} className="sb-date" textAnchor="middle">{shortDay(d.expiry)}</text>)}
+          {!none && dates.map((d, i) => <text key={d.expiry} x={colX(i)} y={H - 6} className="sb-date" textAnchor="middle">{shortDay(d.expiry)}</text>)}
           {dates.map((d, i) => d.placed.map((l) => {
             const x = colX(i), yy = l.yy, r = l.rad, up = l.r.side === "yes";
             const edge = up ? yy + r : yy - r, k = up ? "up" : "down", ring = !!smartOf(l.r);
@@ -161,7 +172,6 @@ export function SaloonLive({ pop = false }) {
               <g key={`${d.expiry}${l.k}`}>
                 <line x1={x} x2={x} y1={yNow} y2={edge} className={`sb-stem ${k}`} />
                 <circle cx={x} cy={yNow} r="2.5" className={`sb-foot ${k}`} />
-                <circle cx={x - r * 0.25} cy={yy - r * 0.2} r={r * 0.95} className={`sb-halo ${k}`} filter={`url(#${id}-glow)`} />
                 <circle cx={x} cy={yy} r={r} fill={`url(#${id}-${k})`} className={`sb-ball ${k}`} />
                 <ellipse cx={x - r * 0.32} cy={yy - r * 0.42} rx={r * 0.32} ry={r * 0.2} className="sb-shine" />
                 {ring && <circle cx={x} cy={yy} r={r + 3} className="sb-gold" />}
@@ -170,6 +180,7 @@ export function SaloonLive({ pop = false }) {
             );
           }))}
           <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="5" className="sb-dot" />
+          {none && !paused && <text x={W - 8} y={20} textAnchor="end" className="sb-none">No prices on Derive right now</text>}
         </svg>
       </div>
     </div>
@@ -444,77 +455,58 @@ export function PossesLive({ card }) {
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-/** "ETH 3,050 put · Oct 9 expiry · bought · $37.2K premium". */
-function tradeTitle(t) {
-  const m = /^([A-Z0-9]+)-\d{4}(\d{2})(\d{2})-([\d_.]+)-([CP])$/.exec(t.instrument || "");
-  if (!m) return t.instrument || "";
-  return `${m[1]} ${strike(Number(m[4].replace("_", ".")), "")} ${m[5] === "C" ? "call" : "put"} · ${MONTHS[+m[2] - 1]} ${+m[3]} expiry · `
-    + `${t.direction === "buy" ? "bought" : "sold"} · ${usd(t.premium_usd)} premium`;
-}
 /** "7 Oct 08:30" in UTC. */
 const when = (t) => { const d = new Date(t * 1000); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.toISOString().slice(11, 16)}`; };
 /** Past this age the flow file no longer reads as "the last 24 hours" and names its window instead. */
 export const FLOW_FRESH_SEC = 2 * 3600;
 /**
- * Options flow: the option premium takers bought on Derive over 24 hours (the Flow page's figure, every
- * recorded taker, not only the large trades), split between calls and puts, over a 24-hour strip of the
- * day's largest trades: each at its exact time, calls stacked above the line and puts below, filled when
- * bought, a ring when sold, sized by premium. The strip stays hidden until wallet classes are ready, so
- * market makers never show. An old file names its window ("24h to 7 Oct 08:30 UTC") instead of "now".
+ * Options flow: the option money of the last 24 hours on Derive (the Flow page's figure, every recorded trade that
+ * crossed the spread, market makers left out) and how much of it gains if the price rises or falls (calls bought and
+ * puts sold against puts bought and calls sold, so a spread's halves offset), then the day's largest single trade as
+ * one sentence (owner, 10 October 2026: the dot strip was "kind of hard to read"): the wallet's codename, what it
+ * did in plain words, the legs, when, and the money paid or collected. The trade stays hidden until wallet classes
+ * are ready, so market makers never show. An old file names its window.
  */
-export function OptionsLive({ card }) {
+export function OptionsLive({ card, pop = false }) {
+  const navigate = useNavigate();
   const { data, loading } = useData("flow.json");
-  const [band, box] = useElementSize({ w: 640, h: 90 });
   if (loading) return <Wait />;
-  let calls = 0, puts = 0;
-  for (const c of Object.values(data?.by_coin || {})) { calls += c.call?.buy_premium_usd || 0; puts += c.put?.buy_premium_usd || 0; }
-  const bought = calls + puts;
-  if (!(bought > 0)) return <NotYet card={card} />;
-  const callPct = Math.round((calls / bought) * 100);
+  const coins = flowCoins(data?.by_coin);
+  const total = coins.reduce((s, c) => s + c.total, 0);
+  if (!(total > 0)) return <NotYet card={card} />;
+  const most = coins[0];
   const cov = data.coverage;
   const part = cov?.ready === false && Number.isFinite(cov.fraction) ? Math.round(cov.fraction * 100) : null;
-  const from = Number(data.since), to = Number(cov?.end ?? data.generated_at);
+  const to = Number(cov?.end ?? data.generated_at);
   const stale = Number.isFinite(to) && Date.now() / 1000 - to > FLOW_FRESH_SEC;
-  const trades = data.classes_ready === false || !(to > from) ? [] : (data.large || []).filter((t) => t.kind === "option" && Number.isFinite(t.premium_usd) && t.premium_usd > 0)
-    .map((t) => ({ t, x: Math.max(0, Math.min(1, (t.ts / 1000 - from) / (to - from))) }));
-  const split = <><span><N className="call">{callPct}%</N> calls</span> <span className="hl-sep">·</span> <span><N className="put">{100 - callPct}%</N> puts</span></>;
-  // The strip in pixels: the line through the middle, the axis words' row under it when there is room.
-  let strip = null;
-  if (box && trades.length) {
-    const axis = box.h >= 60 ? 16 : 0, h = box.h - axis, mid = h / 2;
-    const rMax = Math.max(6, Math.min(22, mid * 0.62)), rMin = Math.min(3, rMax / 2);
-    const maxP = Math.max(...trades.map(({ t }) => t.premium_usd));
-    const biggest = trades.reduce((a, b) => (b.t.premium_usd > a.t.premium_usd ? b : a));
-    const pad = rMax + 2;
-    const dots = swarm(trades.map((d) => ({ ...d, top: d === biggest, side: /-C$/.test(d.t.instrument) ? -1 : 1,
-      px: pad + d.x * (box.w - 2 * pad), r: rMin + (rMax - rMin) * Math.sqrt(d.t.premium_usd / maxP) })), { mid, lo: 0, hi: h })
-      .sort((a, b) => a.r - b.r);
-    strip = { dots, mid, axis };
-  }
+  // The pop-out has room for the day's largest single trade under the map; the card keeps the map.
+  const top = pop && data.classes_ready !== false ? largestTrade(data.large) : null;
+  // On the card a bubble opens its coin's view on the Flow page (the card's own link stays the keyboard path).
+  const pick = (e) => {
+    const und = e.target.closest?.("[data-und]")?.dataset.und;
+    if (und) { e.stopPropagation(); navigate(`/flow?coin=${und}`); }
+  };
   return (
-    <div className="hl hl-options">
+    <div className={`hl hl-options${top ? " with-trade" : ""}`}>
       <div className="hl-fig">
-        <BigNum text={usd(bought)} />
+        <BigNum text={usd(total)} />
         <span className="hl-cap">
-          <span>option premium bought, {stale ? <><N>24h</N> to {when(to)} UTC</> : <N>24h</N>}{part != null && <> · <N>{part}%</N> of <N>24h</N> recorded</>}</span>
-          <span className="hl-split-line">{split}</span>
+          <span>in options, {stale ? <><N>24h</N> to {when(to)} UTC</> : <N>24h</N>}{part != null && <> · <N>{part}%</N> of <N>24h</N> recorded</>}</span>
         </span>
-        <span className="hl-split" aria-hidden="true">
-          <span className="hl-split-bar"><i style={{ flexGrow: calls }} /><i style={{ flexGrow: puts }} /></span>
-          <span className="hl-split-words">{split}</span>
-        </span>
+        <span className="hl-flowlead">Most money: <b>{most.und}</b>, <LeanText c={most} Num={N} /></span>
       </div>
-      {trades.length > 0 && <div className="hl-band hl-strip" ref={band} aria-hidden="true">
-        {strip && <>
-          <i className="hl-strip-line" style={{ top: strip.mid }} />
-          {strip.dots.map((d, i) => (
-            <i key={`${d.t.ts}-${d.t.instrument}-${i}`} title={tradeTitle(d.t)}
-              className={`hl-dot ${d.side < 0 ? "call" : "put"} ${d.t.direction === "buy" ? "buy" : "sell"}${d.top ? " top" : ""}`}
-              style={{ left: `${d.px.toFixed(1)}px`, top: `${d.py.toFixed(1)}px`, width: 2 * d.r, height: 2 * d.r, "--x": d.x }} />
-          ))}
-          {strip.axis > 0 && <div className="hl-xw">{stale ? <><span>{when(from)}</span><span>{when(to)} UTC</span></>
-            : <><span><N>24h</N> ago</span><span>now</span></>}</div>}
-        </>}
+      <div className="hl-band hl-flowmap" aria-hidden={pop ? undefined : "true"} onClick={pop ? undefined : pick}>
+        <FlowBubbles coins={coins} rMin={pop ? 12 : 10} rMax={pop ? 40 : 32} labels={pop ? 5 : 4}
+          linkTo={pop ? (und) => `/flow?coin=${und}` : undefined} />
+      </div>
+      {top && <div className="hl-trade">
+        <span className="hl-trade-k">Largest trade{stale ? "" : ", 24h"}</span>
+        <span className="hl-trade-row">
+          <WalletEmblem address={top.wallet} size={30} />
+          <span className="hl-trade-what"><span title={top.who || undefined}><b>{codename(top.wallet)} {top.text}</b></span>
+            <small>{top.detail} · {ago(top.ts)}</small></span>
+          <span className="hl-trade-money"><small>{top.paid ? "paid" : "collected"}</small><N>{usd(top.money)}</N></span>
+        </span>
       </div>}
     </div>
   );

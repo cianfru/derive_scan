@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import Options from "./pages/Options.jsx";
 import Flow from "./pages/Flow.jsx";
@@ -53,16 +53,16 @@ describe("flow views and result scope", () => {
   it("starts with a phone-sized trade sample and keeps every recorded row accessible", () => {
     docs.current = { "flow.json": flow };
     show(Flow);
-    expect(document.querySelectorAll(".ft-row")).toHaveLength(5);
+    expect(document.querySelectorAll(".fl-story")).toHaveLength(5);
     expect(document.querySelector(".fw-row")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Show all 20 trades" }));
-    expect(document.querySelectorAll(".ft-row")).toHaveLength(20);
+    expect(document.querySelectorAll(".fl-story")).toHaveLength(20);
     fireEvent.click(screen.getByRole("button", { name: "Show fewer trades" }));
-    expect(document.querySelectorAll(".ft-row")).toHaveLength(5);
+    expect(document.querySelectorAll(".fl-story")).toHaveLength(5);
     const tab = screen.getByRole("tab", { name: "Large trades" });
     fireEvent.keyDown(tab, { key: "ArrowRight" });
     expect(screen.getByRole("tab", { name: "Active wallets" }).getAttribute("aria-selected")).toBe("true");
-    expect(document.querySelector(".ft-row")).toBeNull();
+    expect(document.querySelector(".fl-story")).toBeNull();
     expect(document.querySelectorAll(".fw-row")).toHaveLength(5);
     fireEvent.click(screen.getByRole("button", { name: "Show all 20 wallets" }));
     expect(document.querySelectorAll(".fw-row")).toHaveLength(20);
@@ -70,33 +70,55 @@ describe("flow views and result scope", () => {
     expect(document.querySelectorAll(".fw-row")).toHaveLength(5);
   });
 
-  it("makes a selected market's result explicit and focuses it from either view", () => {
+  it("picks a coin on the map, opens its view and focuses its trades from either view", () => {
     docs.current = { "flow.json": flow };
     show(Flow);
     fireEvent.click(screen.getByRole("tab", { name: "Active wallets" }));
-    fireEvent.click(screen.getByRole("button", { name: /BTC/ }));
-    expect(screen.getByText("BTC · 10 recorded option trades")).toBeTruthy();
+    const btc = screen.getByRole("button", { name: /^BTC: / });
+    expect(btc.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(btc);
+    expect(btc.getAttribute("aria-pressed")).toBe("true");
+    const view = screen.getByRole("region", { name: "BTC options flow" });
+    expect(within(view).getByText("Gains if the price rises")).toBeTruthy();
     expect(screen.getByText("All markets · 24h")).toBeTruthy();
     expect(document.querySelectorAll(".fw-row")).toHaveLength(5);
-    fireEvent.click(screen.getByRole("button", { name: "View BTC trades" }));
+    fireEvent.click(within(view).getByRole("button", { name: /^All 10 in the list/ }));
     expect(document.activeElement.textContent).toBe("Large trades");
     expect(screen.getByRole("tab", { name: "Large trades" }).getAttribute("aria-selected")).toBe("true");
-    expect(document.querySelectorAll(".ft-row")).toHaveLength(5);
+    expect(document.querySelectorAll(".fl-story")).toHaveLength(5);
     expect(document.querySelector(".fl-table-context").textContent).toContain("BTC · 5 of 10 trades");
-    fireEvent.click(screen.getByRole("tab", { name: "Perps" }));
-    expect(screen.getByText("BTC · 2 recorded perp trades")).toBeTruthy();
-    expect(document.querySelectorAll(".ft-row")).toHaveLength(2);
+    fireEvent.click(screen.getByRole("tab", { name: "Perpetuals" }));
+    expect(document.querySelectorAll(".fl-story")).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: "BTC · Clear" }));
-    expect(screen.queryByRole("button", { name: "View BTC trades" })).toBeNull();
-    expect(document.querySelector(".fl-table-context").textContent).toContain("All markets · 4 of 4 trades");
+    expect(screen.queryByRole("region", { name: "BTC options flow" })).toBeNull();
+    expect(document.querySelector(".fl-table-context").textContent).toContain("All markets · 4 of 4 perpetual trades");
+  });
+
+  it("opens the coin named in the address, and All markets closes it", async () => {
+    docs.current = { "flow.json": flow };
+    render(<MemoryRouter initialEntries={["/flow?coin=ETH"]}><Flow /></MemoryRouter>);
+    const view = screen.getByRole("region", { name: "ETH options flow" });
+    expect(view.querySelector(".fc-sum").textContent).toBe("$500 in options, 24h · 100% on a fall");
+    expect(view.querySelector(".fc-sum .fb-n:last-child").textContent).toBe("100%");
+    expect(screen.getByRole("button", { name: /^ETH: / }).getAttribute("aria-pressed")).toBe("true");
+    // The readout says which way the trade gains in words; the money stays neutral.
+    const read = view.querySelector(".fc-read");
+    // The fixture's ETH trades are calls bought, which gain if the price rises.
+    expect(read.textContent).toContain("gains if the price rises");
+    expect(read.querySelector(".fc-read-m b").className).toBe("");
+    expect(within(view).getAllByRole("button", { name: /gains if the price rises$/ }).length).toBeGreaterThan(0);
+    fireEvent.click(within(view).getByRole("button", { name: "All markets" }));
+    expect(screen.queryByRole("region", { name: "ETH options flow" })).toBeNull();
+    // Focus goes back to the coin's bubble, not to the page.
+    await waitFor(() => expect(document.activeElement.getAttribute("data-und")).toBe("ETH"));
   });
 
   it("retains the wider sample on desktop", () => {
     vi.stubGlobal("matchMedia", () => ({ matches: false }));
     docs.current = { "flow.json": flow };
     show(Flow);
-    expect(document.querySelectorAll(".ft-row")).toHaveLength(15);
+    expect(document.querySelectorAll(".fl-story")).toHaveLength(12);
     fireEvent.click(screen.getByRole("tab", { name: "Active wallets" }));
-    expect(document.querySelectorAll(".fw-row")).toHaveLength(15);
+    expect(document.querySelectorAll(".fw-row")).toHaveLength(12);
   });
 });

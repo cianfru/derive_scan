@@ -70,7 +70,8 @@ CANDLES_KEEP = {"4h": 500, "1d": 400}
 SIGNAL_DAYS = 120
 IV_DAYS = 14
 METRIC_DAYS = 90
-FLOW_LARGE = {"option": 60, "perp": 40}  # large rows kept per kind, biggest notional first
+FLOW_LARGE = {"option": 80, "perp": 40}  # large rows kept per kind: options by money (premium), perps by notional
+FLOW_PACKAGE_MS = 5000  # legs from one wallet within this of a kept option leg travel with it (one package)
 FLOW_WALLETS = 30
 MIXED_FIELDS = ("legs", "realized_pnl_usd", "fees_usd")  # per bucket, perp and option trades together
 RIBBON_CHAR = {"gold": "g", "blue": "b", "grey": "n"}  # "-": warm-up or no reading
@@ -625,7 +626,16 @@ def flow_block(data: Path, now: float, sides: dict | None = None) -> dict:
             by_kind[r["kind"]].append({**r, "class": cls})
     large = []
     for kind, cap in FLOW_LARGE.items():
-        large += sorted(by_kind[kind], key=lambda r: float(r["notional_usd"]), reverse=True)[:cap]
+        # Options are ranked by the money paid or collected, as the Flow page ranks its trades; a kept leg brings
+        # the rest of its package, so a spread never shows as half of itself.
+        money = (lambda r: float(r["premium_usd"] or 0)) if kind == "option" else (lambda r: float(r["notional_usd"]))
+        kept = sorted(by_kind[kind], key=money, reverse=True)[:cap]
+        if kind == "option":
+            ids = {id(r) for r in kept}
+            anchors = [(r["wallet"], r["underlying"], int(r["ts"])) for r in kept]
+            kept += [r for r in by_kind[kind] if id(r) not in ids and any(
+                w == r["wallet"] and u == r["underlying"] and abs(int(r["ts"]) - ts) <= FLOW_PACKAGE_MS for w, u, ts in anchors)]
+        large += kept
     large.sort(key=lambda r: int(r["ts"]), reverse=True)
     wallets: dict = defaultdict(lambda: defaultdict(float))
     for day in _days(2, now):

@@ -125,20 +125,6 @@ table.grid.exposure-grid { min-width: 560px; }
 .flow-legend i { width: 10px; height: 10px; display: inline-block; }
 .call-buy { background: var(--call); } .call-sell { background: var(--call-sold); }
 .put-buy { background: var(--put); } .put-sell { background: var(--put-sold); }
-.flow-market-rows { display: grid; }
-.flow-market-row { display: grid; grid-template-columns: 112px minmax(0, 1fr) 96px; gap: 24px; align-items: center; text-align: left; width: 100%; padding: 12px 24px; background: none; border: 0; border-bottom: 1px solid var(--seam); color: var(--fg); transition: background .12s; }
-.flow-market-row:last-child { border-bottom: 0; }
-.flow-market-row .asset { gap: 10px; }
-.flow-market-row .asset-icon { width: 22px; height: 22px; }
-.flow-market-row .asset b { font: 600 var(--t-title)/1.2 var(--font-display); }
-.flow-market-row:hover { background: color-mix(in srgb, var(--fg) 4%, transparent); }
-.flow-market-row:hover .asset b { text-decoration: underline; text-decoration-color: var(--seam-hi); text-underline-offset: 3px; }
-.flow-market-row:focus-visible { outline: 2px solid var(--orange); outline-offset: -2px; }
-.flow-market-row[aria-pressed=true] { box-shadow: inset 2px 0 var(--orange); background: color-mix(in srgb, var(--fg) 4%, transparent); }
-.premium-lane { display: block; min-width: 0; }
-.premium-track { display: flex; gap: 2px; height: 8px; min-width: 6px; }
-.premium-track i { display: block; flex: 1 1 0; min-width: 1px; }
-.flow-market-row > b { text-align: right; font: 500 var(--t-num)/1.4 var(--font-mono); font-variant-numeric: tabular-nums; }
 .page-meta .flow-coverage { font: inherit; color: inherit; display: inline-flex; align-items: center; gap: 2px; }
 .page-meta .flow-coverage.warn { color: var(--sig-acc); }
 
@@ -247,7 +233,6 @@ table.grid.flow-table { min-width: 0; }
 
   .flow-brief-head { padding: 14px 16px; }
   .flow-legend { gap: 6px 14px; }
-  .flow-market-row { grid-template-columns: 84px minmax(0, 1fr) 72px; gap: 12px; padding: 12px 16px; }
 }
 /* Traders: the way to the cohorts page, under the leaderboard. */
 .cohorts-link { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; padding: 14px 18px; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1); color: var(--text-1); transition: border-color 120ms var(--ease); }

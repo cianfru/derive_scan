@@ -188,6 +188,25 @@ describe("Saloon chart page", () => {
     expect(screen.queryByRole("dialog", { name: "Your trade" })).toBeNull();
   });
 
+  it("one background with a Now line, still bubbles without an aura, and a price refresh never pops them in again", () => {
+    const { container } = show();
+    const svg = container.querySelector(".sch-svg");
+    // No orange wash or glow behind the dates; the Now line runs through the latest candle.
+    expect(svg.querySelector("[fill^='url(#sch-wash'], [fill^='url(#sch-glow']")).toBeNull();
+    expect(svg.querySelector(".sch-now")).toBeTruthy();
+    expect(svg.querySelector(".sch-now-label").textContent).toBe("Now");
+    expect(svg.querySelectorAll(".sch-halo, .sch-float")).toHaveLength(0);
+    expect(svg.querySelectorAll(".sch-pop").length).toBeGreaterThan(0);
+    // The chart is rebuilt when its data changes (a price refresh) or its coin comes back: the bubbles pop in
+    // once per coin, then are drawn again in place.
+    const tabs = screen.getByRole("tablist", { name: "Coin" });
+    fireEvent.click(within(tabs).getByRole("tab", { name: /Hyperliquid/ }));
+    fireEvent.click(within(tabs).getByRole("tab", { name: /Bitcoin/ }));
+    const again = container.querySelector(".sch-svg");
+    expect(again.querySelectorAll(".sch-bubble:not(.sch-dot)").length).toBeGreaterThan(0);
+    expect(again.querySelectorAll(".sch-pop")).toHaveLength(0);
+  });
+
   it("uses no forecast words", () => {
     show();
     expect(document.body.textContent).not.toMatch(BANNED);

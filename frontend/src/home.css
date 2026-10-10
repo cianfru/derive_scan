@@ -54,21 +54,15 @@
 .sb-now { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 7 6; opacity: .9; }
 .sb-dot { fill: var(--accent); stroke: var(--surface-1); stroke-width: 2.5; filter: drop-shadow(0 0 6px var(--accent)); }
 .sb-date { font: 600 11px var(--font-mono); fill: var(--text-3); }
+.sb-none { font: 500 13px var(--font-sans); fill: var(--text-2); }
 .sb-stem { stroke-width: 2; stroke-dasharray: 1 5; stroke-linecap: round; }
 .sb-stem.up, .sb-foot.up { stroke: var(--sb-up); fill: var(--sb-up); } .sb-stem.down, .sb-foot.down { stroke: var(--sb-down); fill: var(--sb-down); }
-.sb-halo { opacity: .45; } .sb-halo.up { fill: var(--sb-up); } .sb-halo.down { fill: var(--sb-down); }
-:root[data-theme="light"] .sb-halo { opacity: .3; }
 .sb-ball.up { stroke: color-mix(in srgb, var(--sb-up-hi) 70%, transparent); } .sb-ball.down { stroke: color-mix(in srgb, var(--sb-down-hi) 70%, transparent); }
 .sb-ball { stroke-width: 1; }
 .sb-shine { fill: #fff; opacity: .55; }
 .sb-gold { fill: none; stroke: var(--sb-gold); stroke-width: 3; filter: drop-shadow(0 0 5px var(--sb-gold)); }
 .sb-fig { font: 800 13px var(--font-sans); letter-spacing: -.02em; }
 .sb-fig.up { fill: var(--sb-up-ink); } .sb-fig.down { fill: var(--sb-down-ink); }
-@media (prefers-reduced-motion: no-preference) {
-  .hl-saloon .sb-ball, .hl-saloon .sb-shine, .hl-saloon .sb-fig, .hl-saloon .sb-gold, .hl-saloon .sb-halo { animation: sb-float 6s ease-in-out infinite; }
-  .hl-saloon g:nth-of-type(2n) > * { animation-delay: -2s; } .hl-saloon g:nth-of-type(3n) > * { animation-delay: -4s; }
-}
-@keyframes sb-float { 50% { transform: translateY(-3px); } }
 @media (max-width: 600px) { .home .hl.hl-saloon .hl-band { flex: none; height: 240px; } }
 .home-line { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; font: 600 15px/1.2 var(--font-sans); color: var(--text-2); }
 .home-coins { display: flex; align-items: center; padding-left: 6px; }
@@ -171,8 +165,7 @@
 
 /* Smart traders: the leader's P&L large, the next ones as rows that share the band, hairlines between. */
 .hl-traders .hl-cap { flex: 1 1 auto; min-width: 0; }
-.hl-options .hl-cap { flex: 0 1 24ch; min-width: min(100%, 20ch); }
-.hl-options .hl-split { flex: none; }
+.hl-options .hl-cap { flex: 0 1 18ch; min-width: min(100%, 14ch); }
 .hl-who { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; color: var(--text-1); text-decoration: none; font: 600 14px/1.3 var(--font-sans); }
 .hl-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hl-sub { font-size: 12px; color: var(--text-3); }
@@ -226,23 +219,17 @@ a.hl-who:hover .hl-name, a.hl-row:hover .hl-name { color: var(--accent-text); }
 @container hc (max-width: 300px) { .hl-step .n { letter-spacing: -.07em; } }
 .hl-ends { grid-column: 1 / -1; display: flex; justify-content: space-between; font: 600 12px/15px var(--font-sans); color: var(--text-3); white-space: nowrap; }
 
-/* Options flow: premium bought, the call and put split, and the day's largest trades on a 24-hour strip
-   (layout in lib/homeLayout.js swarm), each dot ringed in the card's colour so overlaps stay readable. */
-.hl-split { display: none; }
-.hl-split-bar { display: flex; gap: 3px; height: 6px; }
-.hl-split-bar i { border-radius: 3px; background: var(--call); } .hl-split-bar i + i { background: var(--put); }
-@container hc (min-width: 560px) {
-  .hl-cap > .hl-split-line { display: none; }
-  .hl-split { display: grid; gap: 8px; width: min(260px, 34%); margin-left: auto; padding-bottom: .2em; font: 600 13px/1.3 var(--font-sans); color: var(--text-2); }
-  .hl-split-words { display: flex; justify-content: space-between; }
-  .hl-split-words .hl-sep { display: none; }
-}
-.hl-strip-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--border-strong); }
-.hl-dot { position: absolute; translate: -50% -50%; box-sizing: border-box; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--surface-1); }
-.hl-dot.buy.call { background: var(--call); } .hl-dot.buy.put { background: var(--put); }
-.hl-dot.sell { border: 1.5px solid var(--call); background: color-mix(in srgb, var(--call) 14%, var(--surface-1)); }
-.hl-dot.sell.put { border-color: var(--put); background: color-mix(in srgb, var(--put) 14%, var(--surface-1)); }
-.hl-dot.top { z-index: 1; box-shadow: 0 0 0 1.5px var(--surface-1), 0 0 0 3px var(--text-1); }
+/* Options flow: the money of the last 24 hours, the coin with the most and which way it points, and the map of
+   every coin (components/FlowBubbles.jsx); the pop-out adds the day's largest single trade. */
+.hl-flowlead { margin-left: auto; padding-bottom: .1em; font: 600 13px/1.3 var(--font-sans); color: var(--text-2); text-align: right; }
+.hl-flowlead b { color: var(--text-1); }
+@container hc (min-width: 340px) { .hl-flowlead { font-size: 14px; } }
+@container hc (max-width: 480px) { .hl-flowlead { margin-left: 0; flex-basis: 100%; text-align: left; } }
+.hl-flowmap { overflow: visible; }
+.hl-options.with-trade { grid-template-rows: auto minmax(0, 1fr) auto; }
+.home-card .hl-flowmap .fb-b { cursor: pointer; }
+/* The pop-out gives the map room under the largest trade. */
+@media (min-width: 601px) { .home-pop-options .home-pop-stage { height: 420px; } }
 
 /* The pop-out: grown out of its card (pages/Home.jsx), the text on the left, the same widget roomy on the right. */
 .home-pop { width: min(960px, 92vw); max-height: 90vh; padding: 0; overflow: auto; border: 1px solid var(--border-strong); border-radius: 28px;
@@ -267,15 +254,14 @@ html:has(.home-pop[open]) { overflow: hidden; }
 /* Alive once per tab: the cards rise in, then the bars grow and the points and trades fade in; nothing loops. */
 .home[data-enter] .home-card { animation: home-rise .5s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i) * 40ms); }
 .home[data-enter] .hl-bar i { animation: home-grow .7s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--d) * 30ms + 150ms); }
-.home[data-enter] .hl-pt, .home[data-enter] .hl-ic { animation: home-fade .5s ease both; animation-delay: calc(var(--d) * 20ms + 150ms); }
-.home[data-enter] .hl-dot { animation: home-fade .5s ease both; animation-delay: calc(var(--x) * 500ms + 150ms); }
+.home[data-enter] .hl-pt, .home[data-enter] .hl-ic, .home[data-enter] .fb-b { animation: home-fade .5s ease both; animation-delay: calc(var(--d) * 20ms + 150ms); }
 @keyframes home-rise { from { opacity: 0; translate: 0 10px; } }
 @keyframes home-fade { from { opacity: 0; } }
 @keyframes home-grow { from { transform: scaleY(0); } }
 @keyframes home-pop { from { opacity: 0; transform: scale(.94); } }
 @media (prefers-reduced-motion: reduce) {
   .home-card, .home-card:hover, .home-card:focus-within { transform: none; transition: none; }
-  .home[data-enter] .home-card, .home[data-enter] .hl-bar i, .home[data-enter] .hl-pt, .home[data-enter] .hl-ic, .home[data-enter] .hl-dot,
+  .home[data-enter] .home-card, .home[data-enter] .hl-bar i, .home[data-enter] .hl-pt, .home[data-enter] .hl-ic, .home[data-enter] .fb-b,
   .home-pop[open]:not(.grow), .home-pop[open]::backdrop { animation: none; }
 }
 
@@ -299,7 +285,7 @@ html:has(.home-pop[open]) { overflow: hidden; }
   /* Fixed band heights, shared by the loading placeholder, so a card keeps its height when its data arrives. */
   .home-radar, .home-pop-radar { --band-h: 136px; } .home-traders { --band-h: 88px; } .home-pop-traders { --band-h: 200px; }
   .home-markets { --band-h: 76px; } .home-pop-markets { --band-h: 200px; } .home-posses, .home-pop-posses { --band-h: 88px; }
-  .home-options, .home-pop-options { --band-h: 104px; }
+  .home-options { --band-h: 124px; } .home-pop-options { --band-h: 160px; }
   .hl .hl-band { height: var(--band-h, 96px); }
   .hl.hl-none { min-height: calc(var(--band-h, 96px) + 44px); }
   .home-pop-body { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto; grid-template-areas: "label x" "text text" "stage stage" "cta cta";
@@ -324,3 +310,19 @@ html:has(.home-pop[open]) { overflow: hidden; }
 /* The Saloon chart in the pop-out fills its stage (pinned to it, so the chart never sizes its own box). */
 .home-pop-stage .hl.hl-saloon { position: relative; flex: 1 1 0; min-height: 0; width: 100%; }
 .home-pop-stage .hl-saloon .hl-band { position: absolute; inset: 0; margin: 0; }
+
+/* Options flow: the day's largest trade as one sentence (owner, 10 October 2026: the dot strip was hard to read). */
+.hl-trade { display: grid; align-content: end; gap: 6px; }
+.hl-trade-k { font: 600 12px/1.3 var(--font-sans); color: var(--text-3); }
+.hl-trade-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+.hl-trade-what { display: grid; gap: 2px; min-width: 0; }
+.hl-trade-what b { font: 700 15px/1.3 var(--font-sans); color: var(--text-1); }
+.hl-trade-what > span { text-wrap: balance; }
+.hl-trade-what small { font: 500 12px/1.3 var(--font-mono); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Short cards (1280x720, 1024x768) keep the trade and drop its label row. */
+@container hc (max-height: 210px) { .hl-trade-k { display: none; } .hl-trade-row { border-top: 0; padding-top: 0; } }
+@media (max-width: 600px) { .home .hl .hl-band.hl-trade { height: auto; min-height: var(--band-h, 96px); } .hl-trade-what small { white-space: normal; } }
+.hl-trade-money { display: grid; justify-items: end; }
+.hl-trade-money small { font: 600 12px/1.3 var(--font-sans); color: var(--text-3); }
+.hl-trade-money .n { font: 700 18px/1.2 var(--font-mono); }
