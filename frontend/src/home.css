@@ -1,126 +1,291 @@
-/* The card home (pages/Home.jsx): flat cards, one line and one picture each, after Apple's Mac page.
-   From 901px the whole grid fits the first screen (owner, 10 October 2026: "make everything tighter"):
-   three rows share the height left under the header and the heading, never under 170px a row. */
-.home { --home-gold: #e8c26a; padding-block: 40px 64px; }
-.home-intro { text-align: center; margin-bottom: 32px; }
-.home-intro h1 { margin: 0; font: 800 40px/1.1 var(--font-sans); letter-spacing: -.03em; }
-.home-intro p { margin: 10px auto 0; max-width: none; text-align: center; font: 500 17px var(--font-sans); color: var(--text-2); }
+/* The card home (pages/Home.jsx, components/HomeLive.jsx), after Apple's Mac page. Every data card speaks
+   one widget language: a head row (the label, the + at its right), a figure row (one big figure and a
+   caption of at most two lines) and a chart band taking the rest, sized by the card itself (container
+   queries), never by the viewport. From 901px the whole grid fits the first screen (owner, 10 October
+   2026: "make everything tighter"): three rows share the height left under the header and the heading. */
+.home { --home-gold: #e6b34a; gap: 0; padding-block: 20px 40px; }
+:root[data-theme="light"] .home { --home-gold: #a8740f; }
+.home-intro { margin-bottom: 20px; }
+.home-intro h1 { margin: 0; font: 800 clamp(28px, 3.4vh, 40px)/1.1 var(--font-sans); letter-spacing: -.03em; }
 .home-grid { display: grid; grid-template-columns: 1.25fr 1fr 1fr; grid-auto-rows: 250px; gap: 22px; }
-.home-card { position: relative; display: flex; flex-direction: column; background: var(--surface-1); border: 1px solid var(--border); border-radius: 28px;
-  padding: 28px 30px; overflow: hidden; cursor: pointer; transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s, border-color .2s; }
-.home-card:hover, .home-card:focus-within { transform: translateY(-4px) scale(1.012); border-color: var(--border-strong); box-shadow: 0 24px 50px rgb(0 0 0 / .4); }
-@media (prefers-reduced-motion: reduce) { .home-card, .home-card:hover, .home-card:focus-within { transform: none; transition: none; } }
+
+/* The card: the approved elevation, lifted with a deeper shadow on hover or focus; a keyboard ring on the whole card. */
+.home-card { --pad-b: clamp(16px, 2.2vh, 24px); --pad-i: clamp(18px, 1.8vw, 26px);
+  position: relative; display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; container: hc / size;
+  padding: var(--pad-b) var(--pad-i); background: var(--elev-fill); box-shadow: var(--elev-1); border: 1px solid var(--border);
+  border-radius: 24px; overflow: hidden; cursor: pointer; transition: transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s, border-color .2s; }
+.home-card:hover, .home-card:focus-within { transform: translateY(-4px) scale(1.012); box-shadow: var(--elev-2); border-color: var(--border-strong); }
+.home-card:has(.home-link:focus-visible) { outline: 2px solid var(--focus); outline-offset: 3px; }
+.home-card .home-link:focus-visible { outline: none; }
 .home-tall { grid-row: span 2; } .home-wide { grid-column: span 2; }
-.home-link { color: inherit; text-decoration: none; outline: none; }
-.home-link:focus-visible h2 { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 6px; }
-.home-label { font: 700 13px var(--font-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
-.home-card h2 { margin: 10px 0 0; font: 800 28px/1.12 var(--font-sans); letter-spacing: -.025em; max-width: 15ch; }
-.home-wide h2 { max-width: 20ch; }
-.home-art { margin-top: auto; display: flex; align-items: flex-end; gap: 16px; padding-right: 52px; min-height: 0; }
-.home-art-svg { display: block; width: 100%; max-height: 240px; }
-.home-tall .home-art { flex-direction: column; align-items: stretch; }
-.home-fig { font: 600 15px var(--font-mono); color: var(--text-2); letter-spacing: -.02em; }
-/* Your positions: the P&L is the card (owner, 10 October 2026: "the numbers are too small ... we have a lot of room"). */
-.home-pnl { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
-.home-pnl-num { font: 700 clamp(56px, 9vh, 96px)/.9 var(--font-mono); letter-spacing: -.05em; color: var(--text-1); }
-.home-pnl-num.up { color: var(--up); } .home-pnl-num.down { color: var(--down); }
-.home-pnl-none { font: 700 clamp(22px, 3vh, 30px)/1.1 var(--font-sans); letter-spacing: -.02em; color: var(--text-2); }
-.home-plus { position: absolute; right: 22px; bottom: 22px; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%;
-  background: var(--surface-3, #2c2824); display: grid; place-items: center; cursor: pointer; }
+.home-link { display: block; padding-right: 44px; color: inherit; text-decoration: none; }
+.home-label { font: 600 15px/1.25 var(--font-sans); letter-spacing: -.005em; color: var(--text-2); }
+.home-card h2 { margin: 6px 0 0; font: 800 clamp(20px, 2.7vh, 28px)/1.12 var(--font-sans); letter-spacing: -.025em; max-width: 15ch; }
+.home-art { min-height: 0; margin-top: 6px; display: flex; flex-direction: column; }
+.home .n { font: 600 1em var(--font-mono); letter-spacing: -.02em; color: var(--text-1); }
+.home .n.up { color: var(--up); } .home .n.down { color: var(--down); } .home .n.call { color: var(--call); } .home .n.put { color: var(--put); }
+
+/* The +: top right of the head row on every card, 32px to see and 44px to hit. */
+.home-plus { position: absolute; top: calc(var(--pad-b) - 6px); right: calc(var(--pad-i) - 8px); width: 32px; height: 32px; padding: 0; border: 0;
+  border-radius: 50%; background: var(--surface-3); display: grid; place-items: center; cursor: pointer; transition: background .15s; }
+.home-plus::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
 .home-plus svg, .home-pop-x svg { width: 16px; height: 16px; stroke: var(--text-1); stroke-width: 2; stroke-linecap: round; fill: none; }
 .home-plus:hover, .home-plus:focus-visible, .home-card:hover .home-plus { background: var(--accent); }
-.home-plus:hover svg, .home-card:hover .home-plus svg { stroke: #fff; }
-.home-pop { width: min(880px, 92vw); max-height: 90vh; padding: 0; border: 1px solid var(--border-strong); border-radius: 32px; background: var(--surface-2); color: var(--text-1);
-  box-shadow: 0 40px 120px rgb(0 0 0 / .6); }
+.home-plus:hover svg, .home-plus:focus-visible svg, .home-card:hover .home-plus svg { stroke: var(--on-accent); }
+
+/* Saloon: the owner's picture between the title and the figure line, its charcoal dissolved into the card
+   on all four sides; the light theme shows the owner's copy with no background. */
+.home-tall .home-art { gap: 10px; margin-top: 12px; }
+.home-art-img { display: block; flex: 1 1 0; min-height: 0; height: 0; width: calc(100% + 2 * var(--pad-i)); margin: 0 calc(-1 * var(--pad-i));
+  object-fit: cover; object-position: 50% 52%;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent), linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent), linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-composite: intersect; }
+.home-art-svg { display: block; width: 100%; max-height: 240px; }
+.home-art-light { display: none; }
+:root[data-theme="light"] .home-art-dark { display: none; }
+:root[data-theme="light"] .home-art-light { display: block; flex: 1 1 0; min-height: 0; height: 0; width: 100%; margin: 0; object-fit: contain;
+  -webkit-mask-image: none; mask-image: none; }
+.home-line { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; font: 600 15px/1.2 var(--font-sans); color: var(--text-2); }
+.home-coins { display: flex; align-items: center; padding-left: 6px; }
+.home-coins > span { width: 26px; height: 26px; margin-left: -6px; box-shadow: 0 0 0 2px var(--surface-2); }
+.home-coins .home-more { margin-left: 8px; font-size: 13px; color: var(--text-3); }
+.home-line-words { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.home-ring { width: 10px; height: 10px; border: 2px solid var(--home-gold); border-radius: 50%; }
+
+/* Coin icons on the cards sit on one round chip each (most are bare marks), ringed in the card's colour where they overlap. */
+.home-coins > span, .hl-pt, .hl-ic { display: grid; place-items: center; border-radius: 50%; background: var(--surface-3); box-shadow: 0 0 0 2px var(--surface-1); }
+.home-coins .asset-icon, .hl-pt .asset-icon, .hl-ic .asset-icon { width: 72%; height: 72%; }
+
+/* The widget: a figure row over a band that takes the rest of the card. The figure grows with the card
+   (about 48px at 1280x720, 60px from 1440x900; the wide card more); a caption that cannot keep 16
+   characters beside it wraps under it, never cut. */
+.hl { --hero: clamp(40px, min(32cqh, 17cqi), 76px); --hero-xl: clamp(48px, min(44cqh, 26cqi), 104px);
+  flex: 1 1 0; min-height: 0; min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 8px; }
+.home-wide .hl { --hero: clamp(48px, min(38cqh, 10cqi), 92px); }
+.hl-fig { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 14px; min-width: 0; }
+.hl-cap { flex: 1 1 16ch; min-width: min(100%, 16ch); padding-bottom: .1em; font: 600 13px/1.3 var(--font-sans); color: var(--text-2); text-wrap: balance; }
+.hl-cap > span { display: block; }
+.hl-cap > .hl-who { display: flex; }
+.hl-cap-main { color: var(--text-1); }
+@container hc (min-width: 340px) { .hl-cap { font-size: 14px; } }
+/* Narrow cards keep the reading and drop the words the pop-out repeats (screen readers still hear them). */
+@container hc (max-width: 300px) {
+  .hl-roomy { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+.hl-band { position: relative; min-height: 0; overflow: hidden; }
+.hl-xw { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; gap: 12px;
+  font: 600 12px/14px var(--font-sans); color: var(--text-3); white-space: nowrap; pointer-events: none; }
+.hl-xw .n { color: inherit; }
+
+/* Loading: a still placeholder the size of the widget; missing: the card's own title and "Not available yet". */
+.hl-wait > i { display: block; border-radius: 12px; background: color-mix(in srgb, var(--text-3) 9%, transparent); }
+.hl-ph-fig { width: min(60%, 220px); height: calc(var(--hero) * .9); }
+.hl.hl-none { display: flex; flex-direction: column; justify-content: space-between; gap: 12px; }
+.hl-title { max-width: 16ch; font: 800 clamp(20px, min(13cqh, 8cqi), 30px)/1.12 var(--font-sans); letter-spacing: -.025em; color: var(--text-1); text-wrap: balance; }
+.hl-none .hl-cue { display: inline-flex; align-items: center; gap: 2px; }
+
+/* Display numbers (components/BigNum.jsx): sign, currency and unit smaller than the digits, a tight point. */
+.bn { font: 600 var(--hero)/.9 var(--font-mono); letter-spacing: -.04em; font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--text-1); }
+.bn.xl { font-size: var(--hero-xl); }
+.bn-dot { margin-inline: -.16em; }
+.bn-sign { font-size: .75em; margin-right: .02em; }
+.bn-cur { font-size: .6em; vertical-align: .5em; margin-right: .04em; }
+.bn-unit { font-size: .58em; margin-left: .05em; letter-spacing: 0; }
+.bn.up { color: var(--up); } .bn.down { color: var(--down); }
+
+/* Your positions: the figure alone, centred under the head row, on a faint glow of its side's colour. */
+.hl.hl-pos { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 8px; }
+.hl-pos .hl-cap { flex: none; min-width: 0; }
+.hl-pos .hl-cap i { font-style: normal; color: var(--text-3); }
+.hl-pos .hl-hero { font-size: var(--hero-xl); }
+.hl-pos .hl-hero .hl-of { font-size: .32em; }
+.hl-pos .hl-cap .info { margin-left: 2px; }
+.hl-word { font: 800 clamp(24px, min(16cqh, 11cqi), 40px)/1.05 var(--font-sans); letter-spacing: -.02em; color: var(--text-1); text-wrap: balance; }
+.hl-cue { font: 600 14px/1.3 var(--font-sans); color: var(--text-2); }
+.hl-go { color: var(--accent-text); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.home-card:has(.hl-pos.up) { background: radial-gradient(90% 70% at 0% 100%, color-mix(in srgb, var(--up) 12%, transparent), transparent 70%), var(--elev-fill); }
+.home-card:has(.hl-pos.down) { background: radial-gradient(90% 70% at 0% 100%, color-mix(in srgb, var(--down) 12%, transparent), transparent 70%), var(--elev-fill); }
+:root[data-theme="light"] .home-card:has(.hl-pos.up) { background: radial-gradient(90% 70% at 0% 100%, color-mix(in srgb, var(--up) 7%, transparent), transparent 70%), var(--elev-fill); }
+:root[data-theme="light"] .home-card:has(.hl-pos.down) { background: radial-gradient(90% 70% at 0% 100%, color-mix(in srgb, var(--down) 7%, transparent), transparent 70%), var(--elev-fill); }
+
+/* Radar: the map in miniature (layout in lib/homeLayout.js radarLayout): a field tinted long above and
+   short below, the trend as a dashed line, the coins without a wallet reading on a dashed lane under it,
+   the axis words at the field's corners and under it; the most stretched coin ringed. */
+.hl-radar .hl-cap { flex-basis: 15ch; min-width: min(100%, 15ch); }
+.hl-coin { display: inline-flex; align-items: center; gap: 10px; }
+.hl-coin .asset-icon { width: clamp(26px, calc(var(--hero) * .56), 40px); height: clamp(26px, calc(var(--hero) * .56), 40px); }
+.hl-tick { font: 800 var(--hero)/.92 var(--font-sans); letter-spacing: -.035em; color: var(--text-1); white-space: nowrap; }
+.hl-radar .hl-word { align-self: center; }
+.hl-plot { position: absolute; left: 0; right: 0; top: 0; }
+.hl-half { position: absolute; left: 0; right: 0; height: 50%; }
+.hl-half.long { top: 0; border-radius: 10px 10px 0 0; background: linear-gradient(to top, color-mix(in srgb, var(--up) 3%, transparent), color-mix(in srgb, var(--up) 11%, transparent)); }
+.hl-half.short { bottom: 0; border-radius: 0 0 10px 10px; background: linear-gradient(to bottom, color-mix(in srgb, var(--down) 3%, transparent), color-mix(in srgb, var(--down) 11%, transparent)); }
+.hl-mid { position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--border-strong); }
+.hl-zero { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px dashed var(--border-strong); }
+.hl-yw { position: absolute; padding: 6px 8px; font: 600 12px/1 var(--font-sans); color: var(--text-3); white-space: nowrap; }
+.hl-yw.long { top: 0; } .hl-yw.short { bottom: 0; }
+.hl-xw-mid { overflow: hidden; text-overflow: ellipsis; }
+@container hc (max-width: 330px) { .hl-xw-mid { display: none; } }
+@container hc (max-width: 320px) { .hl-radar .hl-coin .asset-icon { display: none; } }
+.hl-lane { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--border-strong); }
+.hl-pt { position: absolute; translate: -50% -50%; z-index: 1; }
+.hl-pt.off { z-index: 1; background: var(--surface-1); box-shadow: 0 0 0 2px var(--surface-1); outline: 1px dashed var(--text-3); outline-offset: -1px; }
+.hl-pt.off .asset-icon { opacity: .72; }
+.hl-pt.hl-lead { z-index: 2; box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 3.5px var(--text-1); }
+
+/* Smart traders: the leader's P&L large, the next ones as rows that share the band, hairlines between. */
+.hl-traders .hl-cap { flex: 1 1 auto; min-width: 0; }
+.hl-options .hl-cap { flex: 0 1 24ch; min-width: min(100%, 20ch); }
+.hl-options .hl-split { flex: none; }
+.hl-who { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; color: var(--text-1); text-decoration: none; font: 600 14px/1.3 var(--font-sans); }
+.hl-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hl-sub { font-size: 12px; color: var(--text-3); }
+@container hc (max-width: 339px) { .hl-who .wtag-av { display: none; } }
+.hl-rank.n { font-size: 12px; color: var(--text-3); }
+.hl-rows { list-style: none; margin: 0; padding: 0; display: grid; grid-auto-rows: minmax(0, 1fr); }
+.hl-rows li { display: grid; min-height: 0; border-top: 1px solid var(--border); }
+.hl-row { display: grid; grid-template-columns: 26px auto minmax(0, 1fr) auto; align-items: center; column-gap: 10px; min-height: 0;
+  color: inherit; text-decoration: none; }
+.hl-row .hl-name { font: 600 15px/1.2 var(--font-sans); color: var(--text-1); }
+.hl-row .hl-rank { min-width: 3ch; }
+.hl-row > .n:last-child { font-size: 17px; text-align: right; }
+.hl-rows.compact .hl-row { column-gap: 8px; }
+.hl-rows.compact .hl-row .hl-name { font-size: 14px; } .hl-rows.compact .hl-row > .n:last-child { font-size: 15px; }
+.hl-rows.compact .hl-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+.hl-rows.compact .hl-row .wtag-av { display: none; }
+@container hc (max-width: 290px) {
+  .hl-row { grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 8px; }
+  .hl-row .wtag-av { display: none; }
+  .hl-row .hl-name { font-size: 14px; } .hl-row > .n:last-child { font-size: 15px; }
+}
+a.hl-who:hover .hl-name, a.hl-row:hover .hl-name { color: var(--accent-text); }
+
+/* Markets: the hero count over its options markets, the coins grouped by regime, each group named under its rule. */
+.hl-hero { display: inline-flex; align-items: baseline; gap: .2em; font-size: var(--hero); white-space: nowrap; }
+.hl-of { font: 600 .42em var(--font-sans); color: var(--text-3); }
+.hl-of .n { color: var(--text-3); }
+.hl-groups { display: flex; flex-direction: column; gap: 10px; }
+.hl-groups-in { flex: 1 1 0; min-height: 0; display: flex; align-items: center; }
+.hl-icons { display: flex; align-items: flex-start; gap: 16px; }
+.hl-grp { display: grid; justify-items: start; row-gap: 7px; }
+.hl-grp-ics { display: flex; padding: 0 0 7px calc(var(--ic) * .22); border-bottom: 3px solid var(--rc); }
+.hl-ic { width: var(--ic); height: var(--ic); margin-left: calc(var(--ic) * -.22); }
+.hl-grp-name { font: 600 12px/1.25 var(--font-sans); color: var(--text-2); white-space: nowrap; }
+.hl-mix { margin: 0; display: grid; gap: 6px; }
+.hl-mix svg { display: block; border-radius: 6px; }
+.hl-mix figcaption { font: 600 12px var(--font-sans); color: var(--text-3); }
+.hl-mix-key { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 600 12px/1.3 var(--font-sans); color: var(--text-2); }
+.hl-mix-key i { display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 2px; }
+
+/* Posses: Legend to Boot Hill as one ladder of counts, profit in the up colour, loss in the down, a rule between. */
+.hl-ladder { --lg: 4px; display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr) auto; column-gap: var(--lg); row-gap: 3px; }
+@container hc (min-width: 320px) { .hl-ladder { --lg: 6px; } }
+.hl-pl-rule { position: absolute; left: 50%; top: 0; bottom: 18px; border-left: 1px dashed var(--border-strong); }
+.hl-step { min-width: 0; min-height: 0; display: grid; grid-template-rows: minmax(0, 1fr) auto; justify-items: center; row-gap: 3px; }
+.hl-bar { width: 64%; height: 100%; display: flex; align-items: flex-end; }
+.hl-bar i { display: block; width: 100%; height: calc(6px + (100% - 6px) * var(--h)); border-radius: 3px 3px 0 0; transform-origin: bottom;
+  background: linear-gradient(to top, color-mix(in srgb, var(--up) 35%, transparent), var(--up)); }
+.hl-step.down .hl-bar i { background: linear-gradient(to top, color-mix(in srgb, var(--down) 35%, transparent), var(--down)); }
+.hl-step .n { font-size: 12px; line-height: 1.2; color: var(--text-3); white-space: nowrap; }
+@container hc (max-width: 300px) { .hl-step .n { letter-spacing: -.07em; } }
+.hl-ends { grid-column: 1 / -1; display: flex; justify-content: space-between; font: 600 12px/15px var(--font-sans); color: var(--text-3); white-space: nowrap; }
+
+/* Options flow: premium bought, the call and put split, and the day's largest trades on a 24-hour strip
+   (layout in lib/homeLayout.js swarm), each dot ringed in the card's colour so overlaps stay readable. */
+.hl-split { display: none; }
+.hl-split-bar { display: flex; gap: 3px; height: 6px; }
+.hl-split-bar i { border-radius: 3px; background: var(--call); } .hl-split-bar i + i { background: var(--put); }
+@container hc (min-width: 560px) {
+  .hl-cap > .hl-split-line { display: none; }
+  .hl-split { display: grid; gap: 8px; width: min(260px, 34%); margin-left: auto; padding-bottom: .2em; font: 600 13px/1.3 var(--font-sans); color: var(--text-2); }
+  .hl-split-words { display: flex; justify-content: space-between; }
+  .hl-split-words .hl-sep { display: none; }
+}
+.hl-strip-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--border-strong); }
+.hl-dot { position: absolute; translate: -50% -50%; box-sizing: border-box; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--surface-1); }
+.hl-dot.buy.call { background: var(--call); } .hl-dot.buy.put { background: var(--put); }
+.hl-dot.sell { border: 1.5px solid var(--call); background: color-mix(in srgb, var(--call) 14%, var(--surface-1)); }
+.hl-dot.sell.put { border-color: var(--put); background: color-mix(in srgb, var(--put) 14%, var(--surface-1)); }
+.hl-dot.top { z-index: 1; box-shadow: 0 0 0 1.5px var(--surface-1), 0 0 0 3px var(--text-1); }
+
+/* The pop-out: grown out of its card (pages/Home.jsx), the text on the left, the same widget roomy on the right. */
+.home-pop { width: min(960px, 92vw); max-height: 90vh; padding: 0; overflow: auto; border: 1px solid var(--border-strong); border-radius: 28px;
+  background: var(--surface-2); color: var(--text-1); box-shadow: var(--shadow-pop); }
 .home-pop::backdrop { background: rgb(8 7 6 / .72); backdrop-filter: blur(6px); }
-.home-pop[open] { animation: home-pop .3s cubic-bezier(.2,.8,.2,1); }
-@keyframes home-pop { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .home-pop[open] { animation: none; } }
-.home-pop-body { position: relative; padding: 40px 44px; display: grid; gap: 14px; justify-items: start; }
-.home-pop h2 { margin: 0; font: 800 40px/1.08 var(--font-sans); letter-spacing: -.03em; max-width: 18ch; }
-.home-pop p { margin: 0; font: 500 18px/1.5 var(--font-sans); color: var(--text-2); max-width: 56ch; }
-.home-pop-art { width: 100%; max-width: 640px; }
-.home-pop-x { position: absolute; right: 24px; top: 22px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-3, #2c2824); display: grid; place-items: center; cursor: pointer; }
-@media (max-width: 900px) { .home-grid { grid-template-columns: 1fr 1fr; } .home-tall { grid-column: span 2; } }
+:root[data-theme="light"] .home-pop::backdrop { background: rgb(60 45 30 / .3); }
+.home-pop[open]:not(.grow) { animation: home-pop .3s cubic-bezier(.2,.8,.2,1); }
+.home-pop[open]::backdrop { animation: home-fade .2s ease both; }
+html:has(.home-pop[open]) { overflow: hidden; }
+.home-pop-body { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); grid-template-rows: auto 1fr auto;
+  grid-template-areas: "label x" "text stage" "cta stage"; gap: 14px 40px; min-height: 400px; padding: 28px 36px 36px; }
+.home-pop-body > .home-label { grid-area: label; align-self: center; }
+.home-pop-x { grid-area: x; justify-self: end; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-3);
+  display: grid; place-items: center; cursor: pointer; }
+.home-pop-text { grid-area: text; display: grid; gap: 14px; align-content: start; }
+.home-pop h2 { margin: 0; font: 800 40px/1.08 var(--font-sans); letter-spacing: -.03em; }
+.home-pop p { margin: 0; font: 500 17px/1.55 var(--font-sans); color: var(--text-2); }
+.home-pop-stage { grid-area: stage; height: 320px; padding: 24px; display: flex; flex-direction: column; overflow: hidden; container: hc / size;
+  background: var(--elev-fill); box-shadow: var(--elev-1); border: 1px solid var(--border); border-radius: 20px; }
+.home-pop-saloon .home-pop-stage { padding: 0; }
+.home-pop-stage .home-art-img, :root[data-theme="light"] .home-pop-stage .home-art-light { width: 100%; margin: 0; }
+.home-pop-cta { grid-area: cta; justify-self: start; align-self: end; }
+
+/* Alive once per tab: the cards rise in, then the bars grow and the points and trades fade in; nothing loops. */
+.home[data-enter] .home-card { animation: home-rise .5s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i) * 40ms); }
+.home[data-enter] .hl-bar i { animation: home-grow .7s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--d) * 30ms + 150ms); }
+.home[data-enter] .hl-pt, .home[data-enter] .hl-ic { animation: home-fade .5s ease both; animation-delay: calc(var(--d) * 20ms + 150ms); }
+.home[data-enter] .hl-dot { animation: home-fade .5s ease both; animation-delay: calc(var(--x) * 500ms + 150ms); }
+@keyframes home-rise { from { opacity: 0; translate: 0 10px; } }
+@keyframes home-fade { from { opacity: 0; } }
+@keyframes home-grow { from { transform: scaleY(0); } }
+@keyframes home-pop { from { opacity: 0; transform: scale(.94); } }
+@media (prefers-reduced-motion: reduce) {
+  .home-card, .home-card:hover, .home-card:focus-within { transform: none; transition: none; }
+  .home[data-enter] .home-card, .home[data-enter] .hl-bar i, .home[data-enter] .hl-pt, .home[data-enter] .hl-ic, .home[data-enter] .hl-dot,
+  .home-pop[open]:not(.grow), .home-pop[open]::backdrop { animation: none; }
+}
+
+@media (max-width: 900px) {
+  .home-grid { grid-template-columns: 1fr 1fr; }
+  .home-tall { grid-column: span 2; }
+  .home-wide { grid-column: auto; }
+}
+
 @media (max-width: 600px) {
-  .home { padding-block: 24px 40px; } .home-intro h1 { font-size: 28px; } .home-intro p { font-size: 15px; }
-  .home-grid { grid-template-columns: 1fr; grid-auto-rows: auto; gap: 12px; } .home-card { border-radius: 22px; padding: 18px; min-height: 176px; } .home-card h2 { font-size: 20px; }
-  .home-tall { grid-column: auto; min-height: 340px; } .home-tall .home-art { min-height: 200px; }
-  .home-label { font-size: 12px; } .home-wide { grid-column: auto; }
-  .home-art { padding-right: 40px; } .home-pnl-num { font-size: 52px; }
-  .home-plus { width: 44px; height: 44px; right: 12px; bottom: 12px; }
-  .home-pop-body { padding: 28px 22px; } .home-pop h2 { font-size: 28px; } .home-pop p { font-size: 16px; }
+  .home { padding-block: 20px 40px; }
+  .home-intro { margin-bottom: 16px; } .home-intro h1 { font-size: 28px; }
+  .home-grid { grid-template-columns: 1fr; grid-auto-rows: auto; gap: 12px; }
+  .home-card { --pad-b: 18px; --pad-i: 18px; border-radius: 22px; container: hc / inline-size; }
+  .home-tall, .home-wide { grid-column: auto; }
+  .home-tall { grid-row: auto; min-height: 340px; }
+  .home-positions { min-height: 168px; }
+  .home-label { font-size: 14px; }
+  .home-card .hl, .home-pop-stage .hl { --hero: clamp(40px, 14cqi, 60px); --hero-xl: clamp(52px, 19cqi, 80px); flex: none; }
+  .hl-word { font-size: clamp(24px, 9cqi, 32px); }
+  /* Fixed band heights, shared by the loading placeholder, so a card keeps its height when its data arrives. */
+  .home-radar, .home-pop-radar { --band-h: 136px; } .home-traders { --band-h: 88px; } .home-pop-traders { --band-h: 200px; }
+  .home-markets { --band-h: 76px; } .home-pop-markets { --band-h: 200px; } .home-posses, .home-pop-posses { --band-h: 88px; }
+  .home-options, .home-pop-options { --band-h: 104px; }
+  .hl .hl-band { height: var(--band-h, 96px); }
+  .hl.hl-none { min-height: calc(var(--band-h, 96px) + 44px); }
+  .home-pop-body { grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto; grid-template-areas: "label x" "text text" "stage stage" "cta cta";
+    gap: 16px; min-height: 0; padding: 20px 20px 24px; }
+  .home-pop-stage { height: auto; min-height: 220px; padding: 18px; container-type: inline-size; }
+  .home-pop-stage > .hl { flex: 1 0 auto; }
+  .home-pop-saloon .home-pop-stage { height: 220px; }
+  .home-pop h2 { font-size: 28px; } .home-pop p { font-size: 16px; }
+  .home-pop-cta { justify-self: stretch; }
 }
 
 @media (min-width: 901px) {
-  .home { padding-block: 22px 28px; }
-  .home-intro { margin-bottom: 18px; } .home-intro h1 { font-size: clamp(28px, 3.4vh, 38px); } .home-intro p { margin-top: 6px; font-size: 15px; }
-  .home-grid { grid-auto-rows: auto; grid-template-rows: repeat(3, minmax(170px, 1fr)); height: clamp(480px, calc(100svh - 226px), 860px); gap: clamp(12px, 1.8vh, 20px); }
-  .home-card { padding: clamp(18px, 2.4vh, 28px) clamp(20px, 2.2vw, 30px); border-radius: 24px; }
-  .home-card h2 { font-size: clamp(20px, 2.7vh, 28px); }
-  .home-art-svg { max-height: min(240px, 26vh); }
-  .home-plus { width: 36px; height: 36px; right: 18px; bottom: 18px; }
+  .home { padding-block: 14px 28px; }
+  .home-intro { margin-bottom: 14px; }
+  .home-grid { height: clamp(520px, calc(100svh - 136px), 860px); grid-template-rows: repeat(3, minmax(160px, 1fr)); grid-auto-rows: auto;
+    gap: clamp(12px, 1.8vh, 20px); }
 }
 
-/* The Saloon card's picture takes exactly the height between the heading and the figure line, edge to
-   edge, cropped to fit; its own charcoal fades into the card's. In the light theme it sits in a
-   rounded frame instead. */
-.home-tall .home-art { flex: 1 1 0; min-height: 0; flex-direction: column; align-items: stretch; gap: 10px; padding-right: 0; margin-top: 12px; }
-.home-tall .home-art .home-fig { padding-right: 52px; }
-.home-art-img { display: block; flex: 1 1 0; min-height: 0; height: 0; width: calc(100% + 60px); margin: 0 -30px; object-fit: cover; object-position: 50% 52%;
-  -webkit-mask-image: radial-gradient(ellipse 72% 78% at 52% 52%, #000 55%, transparent 100%); mask-image: radial-gradient(ellipse 72% 78% at 52% 52%, #000 55%, transparent 100%); }
-@media (min-width: 901px) { :root:not([data-theme="light"]) .home-art-img { width: calc(100% + 2 * clamp(20px, 2.2vw, 30px)); margin: 0 calc(-1 * clamp(20px, 2.2vw, 30px)); } }
-@media (max-width: 600px) { :root:not([data-theme="light"]) .home-art-img { width: calc(100% + 36px); margin: 0 -18px; } }
-.home-pop-art .home-art-img, :root:not([data-theme="light"]) .home-pop-art .home-art-img { flex: none; height: auto; width: 100%; margin: 0; max-height: 46vh; }
-
-/* Dark theme: the owner's picture; light theme: its drawn copy, sized like it. */
-.home-art-light { display: none; }
-:root[data-theme="light"] .home-art-dark { display: none; }
-:root[data-theme="light"] .home-art-light { display: block; flex: 1 1 0; min-height: 0; height: 0; width: 100%; margin: 0; border-radius: 0; object-fit: contain; -webkit-mask-image: none; mask-image: none; }
-.home-pop-art .home-art-light { height: auto; max-height: 46vh; }
-
-/* Live cards (components/HomeLive.jsx): one large real figure and one small exact chart, like a phone widget. */
-.hl { width: 100%; min-width: 0; display: grid; gap: clamp(8px, 1.4vh, 14px); align-content: end; }
-.hl .up { color: var(--up); } .hl .down { color: var(--down); }
-.hl-big { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.hl-big b { font: 700 clamp(40px, 6.2vh, 64px)/.95 var(--font-mono); letter-spacing: -.045em; color: var(--text-1); }
-.hl-big b small { font-size: .42em; letter-spacing: -.02em; color: var(--text-3); }
-.hl-big b.up { color: var(--up); } .hl-big b.down { color: var(--down); }
-.hl-big span { font: 600 15px/1.3 var(--font-sans); color: var(--text-2); }
-.hl-bars { width: 100%; height: clamp(40px, 6vh, 56px); display: block; }
-.hl-bars rect.up { fill: var(--up); } .hl-bars rect.down { fill: var(--down); } .hl-base { stroke: var(--border-strong); stroke-width: 1; }
-.hl-radar .hl-axis { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; text-align: center; margin-top: -2px; font: 600 11px var(--font-mono); color: var(--text-3); }
-.hl-traders { list-style: none; margin: 0; padding: 0; gap: 6px; }
-.hl-traders li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; }
-.hl-who { font: 600 14px var(--font-sans); color: var(--text-2); display: flex; gap: 8px; align-items: baseline; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hl-who small { font: 600 12px var(--font-mono); color: var(--text-3); }
-.hl-traders b { font: 700 16px var(--font-mono); letter-spacing: -.02em; }
-.hl-traders li.first { grid-template-columns: auto 1fr; grid-template-areas: "av who" "av pnl"; column-gap: 14px; row-gap: 2px; margin-bottom: 2px; }
-.hl-traders li.first .wtag-av { grid-area: av; } .hl-traders li.first .hl-who { grid-area: who; font-size: 15px; color: var(--text-1); }
-.hl-traders li.first b { grid-area: pnl; }
-.hl-traders li.first b { font-size: clamp(26px, 3.8vh, 40px); letter-spacing: -.04em; line-height: 1; }
-.hl-mix { width: 100%; height: clamp(44px, 7vh, 72px); display: block; border-radius: 6px; overflow: hidden; }
-.hl-r-MARKUP { fill: var(--up); } .hl-r-REACC { fill: var(--regime-reacc); } .hl-r-ACCUM { fill: var(--regime-accum); } .hl-r-MARKDOWN { fill: var(--down); }
-.hl-r-CAP { fill: var(--regime-cap); } .hl-r-BLOWOFF { fill: var(--regime-blowoff); } .hl-r-FLAT { fill: var(--border-strong); }
-.hl-leans { list-style: none; margin: 0; padding: 0; display: flex; gap: 10px; flex-wrap: wrap; }
-.hl-leans { gap: 18px; }
-.hl-leans li { display: flex; align-items: center; gap: 8px; font: 700 16px var(--font-sans); color: var(--text-2); }
-.hl-leans li.up { color: var(--up); } .hl-leans li.defensive { color: var(--down); }
-.hl-leans .asset-icon { width: 28px; height: 28px; border-radius: 50%; }
-.hl-options { grid-template-columns: 1fr 1fr; align-items: end; gap: 32px; }
-.hl-options .hl-big { flex-direction: column; gap: 8px; }
-.hl-options .hl-big b { font-size: clamp(48px, 8vh, 80px); }
-.hl-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; gap: 3px; }
-.hl-bar i { display: block; } .hl-bar i.up { background: var(--up); } .hl-bar i.down { flex: 1; background: var(--down); }
-.hl-split { display: grid; gap: 10px; }
-.hl-split-k { display: flex; justify-content: space-between; font: 600 14px var(--font-sans); color: var(--text-2); }
-.hl-split-k b { font: 700 22px var(--font-mono); letter-spacing: -.03em; margin-right: 6px; }
-.home-pop-live { max-width: 560px; }
-@media (max-width: 600px) {
-  .hl-options { grid-template-columns: 1fr; gap: 14px; } .hl-big b { font-size: 44px; } .hl-options .hl-big b { font-size: 48px; }
-  
+@media (pointer: coarse) {
+  .home-pop .hl-row, .home-pop .hl-who { min-height: 44px; }
 }
-.home-live .home-art { flex: 1 1 0; min-height: 0; margin-top: clamp(8px, 1.4vh, 14px); align-items: stretch; }
-.home-live .hl { align-content: space-between; }
-.home-live.home-wide .hl { align-content: end; }
-@media (max-width: 600px) { .home-live .home-art { flex: none; } .home-live .hl { align-content: end; } }

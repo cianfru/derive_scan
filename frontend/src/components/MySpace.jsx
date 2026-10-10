@@ -5,12 +5,13 @@ import { useLocation } from "react-router-dom";
 import { loadPositions, onPositionsChange } from "../lib/positions.js";
 import { useFollowsDoc } from "../lib/follows.js";
 import { TESTNET_FILLS } from "../lib/flags.js";
+import { positionDone } from "../lib/positionView.js";
 
 const NET = TESTNET_FILLS ? "testnet" : "mainnet";
 
-/** Positions still open: not sold back and not past settlement. */
+/** Positions still open, by Positions' own rule (positionDone), so the menu, the page and the home card agree. */
 export function openCount(list, now = Date.now() / 1000) {
-  return list.filter((p) => !p.closed_at && !(p.settle_ts > 0 && now >= p.settle_ts)).length;
+  return list.filter((p) => !positionDone(p, now)).length;
 }
 
 /** Renders nothing: hands the Shell the counts for "My space", which stays one menu throughout. */

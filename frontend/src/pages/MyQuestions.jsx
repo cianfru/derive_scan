@@ -10,10 +10,10 @@ import "../settle-chart.css";
 import QuestionTicket from "../components/QuestionTicket.jsx";
 import { ExposureTotal, MostLose, amount, breakevenText, groupNotes } from "../components/Exposure.jsx";
 import {
-  ANSWER, cents, closeTicket, countdown, dayLabel, findLevel, fullPay, money, noPriceReason, parseId, priceAge, questionText, signed,
+  cents, countdown, dayLabel, findLevel, fullPay, money, parseId, priceAge, signed,
 } from "../lib/questions.js";
 import {
-  closePosition, forWallet, incompleteReceipt, loadPositions, onPositionsChange, openPart, partial, persistent, positionFigures, positionStatus, prune, removePosition,
+  closePosition, forWallet, incompleteReceipt, loadPositions, onPositionsChange, partial, persistent, prune, removePosition,
   settlePosition,
 } from "../lib/positions.js";
 import { breakdownRows, closeEvent, incompleteEntryReceipt, realized, realizedSummary, remainingQty } from "../lib/realized.js";
@@ -29,6 +29,7 @@ import MySpaceBackup from "../components/MySpaceBackup.jsx";
 import PositionsReturn from "../components/PositionsReturn.jsx";
 import { followsPersistent, useFollowsDoc } from "../lib/follows.js";
 import { pnlCoverage } from "../lib/positionsPnl.js";
+import { positionDone, positionView } from "../lib/positionView.js";
 import { useClock } from "../lib/useClock.js";
 import { usePhoneLayout } from "../lib/usePhoneLayout.js";
 import PhoneDisclosure from "../components/PhoneDisclosure.jsx";
@@ -282,50 +283,6 @@ function SyncLine({ s }) {
       <Info label="Compared with Derive">{why || `Derive's positions do not match what this browser recorded, for example after a trade on another device or on Derive itself. ${diff}. Derive's records are the reference.`}</Info>
     </p>
   );
-}
-
-/**
- * Everything a position shows, from the board and the time: its figures, status, whether it can be
- * closed now and the sell-back ticket. Pure, so a group card can value all its positions from one
- * read of the board. `settle` is Derive's settlement price once published (null before).
- */
-function positionView(p, { board, now, scope, settle = null }) {
-  const q = parseId(p.id);
-  const found = board ? findLevel(board, p.id) : null;
-  const settleTs = p.settle_ts || (q ? Date.UTC(+q.expiry.slice(0, 4), +q.expiry.slice(4, 6) - 1, +q.expiry.slice(6, 8), 8) / 1000 : 0);
-  const after = now >= settleTs;
-  const paused = board ? priceAge(board.prices_ts, now, board.paused).state === "paused" : true;
-  const settling = (!after && now >= settleTs - 1800) || (after && settle == null);
-  const half = partial(p);
-  const oneTap = ONE_TAP_FILLS && p.exec === "rfq";
-  const pendingReceipt = oneTap && incompleteReceipt(p);
-  const pendingEntry = oneTap && incompleteEntryReceipt(p);
-  const entryFeesUnknown = oneTap && !Number.isFinite(p.journal?.cost?.fees);
-  const ownAccount = !!p.wallet && p.subaccount_id != null && p.subaccount_id === scope?.subaccountId
-    && String(p.wallet).toLowerCase() === String(scope?.wallet || "").toLowerCase();
-  // With no wallet connected, Close opens the panel's connect step (the panel itself refuses another
-  // wallet's or account's position); once connected, only this wallet's account sells back.
-  const canSell = oneTap && !half && (ownAccount || !scope?.wallet);
-  const op = after || p.closed_at ? p : openPart(p);
-  const t = found && !found.settled && !paused && !settling && !half && !p.closed_at
-    ? closeTicket(found.level, p.side, op.contracts, board, p.legs) : null;
-  const f = positionFigures(op, { found: paused ? null : found, settlePrice: settle, close: t, index: board?.index });
-  const real = realized(p);
-  const settleExit = pendingReceipt ? null : real.portions.find((x) => x.kind === "settle");
-  const status = positionStatus(p, { settled: f.settled, settling });
-  const reason = !found || paused ? "Prices are paused or this question is no longer on the board, so Derive's sell-back price is not shown."
-    : f.otherLegs ? "Cowboy now builds this answer from other options than the ones you hold, so it has no sell-back price for yours. Sell back on Derive at its screen price."
-      : settling ? "This date is settling: Derive averages the index from 07:30 to 08:00 UTC, and selling back has stopped."
-        : noPriceReason(found.level, p.side, false);
-  const partWhy = pendingReceipt
-    ? "Derive's trade records are still being checked. Values and settlement need a complete fill."
-    : "Cowboy prices the full answer only. With one option filled you hold that option alone; check it on Derive.";
-  const showClose = oneTap ? canSell && !after && !settling && !p.closed_at && real.open > 0 : !!t;
-  return {
-    p, q, board, found, now, settleTs, after, settle, paused, settling, half, oneTap, pendingReceipt, pendingEntry, entryFeesUnknown,
-    canSell, op, t, f, real, settleExit, status, reason, partWhy, showClose,
-    name: ANSWER[p.side], question: q ? questionText(q.und, q, q.expiry) : p.question,
-  };
 }
 
 const usdOr = (v) => (v == null ? null : usd(v));
@@ -754,7 +711,7 @@ export default function MyQuestions() {
   const setTab = (t) => setParams(t === "open" ? {} : { tab: t }, { replace: true });
   const now = useClock();
   const settleOf = (p) => p.settle_ts || 0;
-  const done = (p) => !!p.closed_at || now >= settleOf(p);
+  const done = (p) => positionDone(p, now);
   const openCount = list.filter((p) => !done(p)).length;
   const incompleteCount = list.filter((p) => !p.closed_at && partial(p) && !incompleteReceipt(p)).length;
   const rows = useMemo(() => list.filter((p) => (tab === "open" ? !done(p) : done(p)))

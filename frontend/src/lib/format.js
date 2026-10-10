@@ -61,9 +61,10 @@ export function usd(v) {
   if (!ok(v)) return DASH;
   const a = Math.abs(v), s = v < 0 ? "-" : "";
   const trim = (x, d) => x.toFixed(d).replace(/\.?0+$/, "");
-  if (a >= 1e9) return `${s}$${trim(a / 1e9, 2)}B`;
-  if (a >= 1e6) return `${s}$${trim(a / 1e6, 2)}M`;
-  if (a >= 1e3) return `${s}$${trim(a / 1e3, 1)}K`;
+  // Each unit starts where the one below would round up to 1000 ($999,960 is $1M, never $1000K).
+  if (a >= 999.995e6) return `${s}$${trim(a / 1e9, 2)}B`;
+  if (a >= 999.95e3) return `${s}$${trim(a / 1e6, 2)}M`;
+  if (a >= 999.5) return `${s}$${trim(a / 1e3, 1)}K`;
   return `${s}$${a.toFixed(0)}`;
 }
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

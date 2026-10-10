@@ -5,6 +5,7 @@ import { REGIME, SIGNAL_LABEL, usd, clock } from "./format.js";
 import { currentEngine } from "./research.js";
 import { posseName } from "./posses.js";
 import { viewReading } from "./presentation.js";
+import { REGIME_ORDER } from "./regime.js";
 
 const STUDY = "positioning is context until the options-traders study reports";
 const of = (n, m) => `${n} of ${m}`;
@@ -15,15 +16,22 @@ function regimePhrase(code, n) {
   return `${verb(n, "is", "are")} ${(REGIME[code] || "unread").toLowerCase()}`;
 }
 
-/** Markets: the regime most options markets sit in on the daily close; the wallet coverage. */
-export function marketsLead(data, now = Date.now() / 1000) {
+/** The options markets by daily regime on a current close: {all, read, n, groups}, groups largest
+ * first, ties in the structure band's order (the Markets takeaway and the home card count alike). */
+export function regimeGroups(data, now = Date.now() / 1000) {
   const all = (data?.coins || []).filter((c) => c.has_options);
   const read = all.filter((c) => c.regime_1d && currentEngine(c.engine_comparison?.["1d"], now));
-  if (!all.length) return null;
-  if (!read.length) return { text: "No options market has a current daily reading yet.", note: "Readings return after the next daily close." };
   const n = {};
   read.forEach((c) => { n[c.regime_1d] = (n[c.regime_1d] || 0) + 1; });
-  const [top, second] = Object.keys(n).sort((a, b) => n[b] - n[a]);
+  const groups = Object.keys(n).sort((a, b) => n[b] - n[a] || REGIME_ORDER.indexOf(a) - REGIME_ORDER.indexOf(b));
+  return { all, read, n, groups };
+}
+
+/** Markets: the regime most options markets sit in on the daily close; the wallet coverage. */
+export function marketsLead(data, now = Date.now() / 1000) {
+  const { all, read, n, groups: [top, second] } = regimeGroups(data, now);
+  if (!all.length) return null;
+  if (!read.length) return { text: "No options market has a current daily reading yet.", note: "Readings return after the next daily close." };
   const scope = read.length === all.length ? `${read.length} options markets` : `the ${read.length} options markets with a current daily reading`;
   let text = `${n[top]} of ${scope} ${regimePhrase(top, n[top])} on the daily close`;
   if (second) text += `; ${n[second]} ${regimePhrase(second, n[second])}`;

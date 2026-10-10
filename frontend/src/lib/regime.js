@@ -6,6 +6,8 @@ import { DASH, REGIME, REGIME_TERM, SIGNAL_LABEL, SIGNAL_TERM, CONSENSUS, CONSEN
 
 export const REGIME_COLORS = { MARKUP: "var(--up)", REACC: "var(--regime-reacc)", ACCUM: "var(--regime-accum)", MARKDOWN: "var(--down)",
   CAP: "var(--regime-cap)", BLOWOFF: "var(--regime-blowoff)", FLAT: "var(--faint)" };
+/** The regimes in the structure band's order (its strip stacks them bottom up, Trending up first). */
+export const REGIME_ORDER = ["MARKUP", "REACC", "ACCUM", "CAP", "MARKDOWN", "BLOWOFF", "FLAT"];
 
 /** Visible under the regime name: a few words. */
 export const REGIME_SHORT = {

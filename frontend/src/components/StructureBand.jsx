@@ -2,14 +2,13 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Info, Empty } from "./ui.jsx";
 import FearGreed from "./FearGreed.jsx";
 import { REGIME, SIGNAL_LABEL, CONSENSUS, signalTone, title } from "../lib/format.js";
-import { REGIME_COLORS, consensusTerm } from "../lib/regime.js";
+import { REGIME_COLORS, REGIME_ORDER as ORDER, consensusTerm } from "../lib/regime.js";
 import { currentEngine } from "../lib/research.js";
 
 // The daily market structure as one slim band above the Markets board:
 // consensus | regime mix with its daily history | signal counts (filters) | Fear & Greed.
 
-/** Stacking order of the regime strip, bottom up: Trending up first, so the 55% line reads against it. */
-const ORDER = ["MARKUP", "REACC", "ACCUM", "CAP", "MARKDOWN", "BLOWOFF", "FLAT"];
+// Stacking order of the regime strip (REGIME_ORDER), bottom up: Trending up first, so the 55% line reads against it.
 /** Every daily signal the engine can give, strongest first. Stretched includes Very stretched; Leaning down holds
  * both engine signals that share that plain label (Risk off and Light short). */
 export const LADDER = ["STRONG_LONG", "LIGHT_LONG", "ACCUMULATE", "REVIVAL_SEED_CONFIRMED", "REVIVAL_SEED", "WAIT",
