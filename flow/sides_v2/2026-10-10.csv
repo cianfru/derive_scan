@@ -1,0 +1,3 @@
+bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sell_premium_usd,legs
+1791590400,ETH,perp,0.0,1242.67,0.0,0.0,1
+1791590400,HYPE,call,9922.88,7568.09,171.1,130.5,3

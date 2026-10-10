@@ -920,3 +920,5 @@ bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sel
 1791588600,BTC,perp,2477.33,0.0,0.0,0.0,2
 1791588600,ETH,call,4973.64,2485.66,2.4,118.3,2
 1791588600,HYPE,put,0.0,843.07,0.0,9.7,1
+1791589500,ETH,call,4974.48,0.0,258.2,0.0,1
+1791589500,ETH,perp,0.0,504.56,0.0,0.0,1
