@@ -89,7 +89,7 @@ function CoinFlow({ coin, trades, from, to, onClose, onViewTrades, count }) {
         <div className="fc-day-h">
           <h3>Large trades through the day</h3>
           <span className="fc-key" aria-hidden="true"><span><i className="up" />Gains if it rises, above</span><span><i className="down" />Gains if it falls, below</span></span>
-          {count > 0 && onViewTrades && <button type="button" className="text-control" onClick={onViewTrades}>All {count} in the list<Arrow /></button>}
+          {count > 0 && onViewTrades && <button type="button" className="text-control" onClick={onViewTrades}>{count === 1 ? "See it in the list" : `All ${count} in the list`}<Arrow /></button>}
         </div>
         <DayStrip und={coin.und} trades={trades} from={from} to={to} />
       </div>
