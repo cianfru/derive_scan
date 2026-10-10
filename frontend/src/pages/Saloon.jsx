@@ -35,6 +35,8 @@ const RyskMock = RYSK_MOCK && !RYSK_ON ? lazy(() => import("../components/RyskMo
 // Receive premium on Rysk for real (VITE_RYSK); the illustration stays for preview builds without it.
 const RyskTicket = RYSK_ON ? lazy(() => import("../components/rysk/RyskTicket.jsx")) : null;
 const PREMIUM_TAB = RYSK_ON || RYSK_MOCK;
+// The Derive | Rysk switch over the chart (owner, 10 October 2026: "a tag where we can change visuals").
+const RyskView = RYSK_ON ? lazy(() => import("../components/rysk/RyskView.jsx")) : null;
 const REF = 100;
 const QUICK = [25, 100, 500];
 const CANDLES = 72; // 12 days of 4-hour candles
@@ -268,7 +270,9 @@ function ChartView({ index, error, retryIndex }) {
   const boardResult = results[`questions/${und}.json`];
   const age = board ? priceAge(board.prices_ts, now, board.paused || globalPaused) : indexAge;
   const paused = age.state === "paused";
-  const { data: coinFile, error: coinError, retry: retryCandles } = useData(und && listed.includes(und) ? `coins/${und}.json` : null);
+  const venue = RYSK_ON && params.get("venue") === "rysk" ? "rysk" : "derive";
+  const setVenue = (v) => setParams((p) => { const n = new URLSearchParams(p); if (v === "rysk") n.set("venue", "rysk"); else n.delete("venue"); n.delete("outcome"); n.delete("side"); return n; }, { replace: true });
+  const { data: coinFile, error: coinError, retry: retryCandles } = useData(und && (listed.includes(und) || venue === "rysk") ? `coins/${und}.json` : null);
   const mine = rows.filter((r) => r.und === und);
   const dates = useMemo(() => {
     const by = new Map();
@@ -312,6 +316,10 @@ function ChartView({ index, error, retryIndex }) {
       {missing.length > 0 && <p className="page-meta" role="status">{missing.join(", ")} outcome data unavailable.</p>}
       {!index || !ready ? <Loading /> : !coins.length ? <div className="bd-empty" role="status"><h2>No prices on Derive right now.</h2><p>Derive's order books are empty, so no outcome can be priced. Outcomes return here once Derive quotes again.</p></div> : <>
           <CoinTabs coins={coins} value={und} onChange={setCoin} />
+          {RYSK_ON && <div className="sl-venue"><Tabs label="Venue" value={venue} onChange={setVenue} items={[["derive", "Derive · higher or lower"], ["rysk", "Rysk · get paid to wait"]]} /></div>}
+          {venue === "rysk" ? <Suspense fallback={<Loading />}>
+            <RyskView und={und} candles={candles} price={board?.index ?? coins.find((c) => c.und === und)?.index} nowSec={now} />
+          </Suspense> : <>
           {board && <div className="sl-key">
             <p className="sl-key-mobile">
               <span><i className="up" aria-hidden="true" />Higher</span>
@@ -351,6 +359,7 @@ function ChartView({ index, error, retryIndex }) {
               <p>Smart wallets are the most profitable directional options wallets on Derive. At each level, every one holding options of that date inside the answer's pay zone counts long or short by its own position there; hover a bubble to see "Smart wallets here: 3 long · 1 short". The gold ring marks the answer at least two of them lean toward, more than lean the other way (with at least $10,000 between them, $2,000 on smaller coins). The line under the dates counts every directional trader on each date the same way, "7 long · 8 short"; its dot sits higher when most of their money is long, lower when it is short, and is bigger when more money is behind it. It needs 3 traders. Context, not a signal.</p>
             </details>
           </footer>
+          </>}
         </>}
     </div>
   );

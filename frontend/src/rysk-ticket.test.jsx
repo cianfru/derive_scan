@@ -64,7 +64,8 @@ describe("Receive premium on Rysk", () => {
     render(<RyskTicket und="ETH" settleTs={undefined} near={2600} side="yes" net={BASE} socketFactory={() => rysk} provider={wallet} fetchImpl={fetchImpl} />);
     await screen.findByText(/You lock until/);
     expect(screen.getByText("0.5 UETH")).toBeTruthy();
-    expect(screen.getByText(/If ETH settles above/)).toBeTruthy();
+    expect(screen.getByText("You sell 0.5 ETH")).toBeTruthy();
+    expect(screen.getByText("You keep 0.5 ETH")).toBeTruthy();
     expect(await screen.findByText("$12.50", {}, { timeout: 3000 })).toBeTruthy();
     const req = rysk.sent.find((m) => m.method === "request").params;
     expect(req.taker).toBe("0x0000000000000000000000000000000000000000");
@@ -85,7 +86,7 @@ describe("Receive premium on Rysk", () => {
     render(<RyskTicket und="ETH" near={2300} side="no" net={BASE} socketFactory={() => fakeRysk()} provider={null} fetchImpl={fetchImpl} />);
     await screen.findByText(/You lock until/);
     expect(screen.getByText(/USDC$/, { selector: "strong" })).toBeTruthy();
-    expect(screen.getByText(/If ETH settles below/)).toBeTruthy();
+    expect(screen.getByText("You buy 0.5 ETH")).toBeTruthy();
   });
 
   it("keeps real money to pilot wallets", async () => {

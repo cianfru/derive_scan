@@ -49,3 +49,62 @@
 .rk-positions ul { margin: 0; padding: 0; list-style: none; }
 .rk-positions li { display: grid; grid-template-columns: 1.6fr 1fr auto; gap: 8px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 13px; }
 .rk-foot { margin: 0; font-size: 12px; color: var(--text-2); line-height: 1.6; }
+
+/* The Saloon's Derive | Rysk switch and the Rysk view (components/rysk/RyskView.jsx, RyskChart.jsx). */
+.sl-venue { margin-top: 10px; }
+.sl-venue .tabs button { font-size: 14px; }
+.rysk-view { --rk-sell: #8ab4ff; --rk-sell-fill: #a9c8ff; --rk-sell-ink: #0d2147; --rk-buy: #c3a6ff; --rk-buy-fill: #d3bdff; --rk-buy-ink: #2b1452; }
+:root[data-theme="light"] .rysk-view { --rk-sell: #2f5fb8; --rk-sell-fill: #6f9be8; --rk-sell-ink: #0d2147; --rk-buy: #7a52c7; --rk-buy-fill: #a98ae6; --rk-buy-ink: #2b1452; }
+.rk-key i { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+.rk-key i.rk-sell { background: var(--rk-sell-fill); border: 1px solid var(--rk-sell); }
+.rk-key i.rk-buy { background: var(--rk-buy-fill); border: 1px solid var(--rk-buy); }
+.rk-key .info { margin-left: 4px; }
+.rk-chart { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); }
+.rk-chart svg { display: block; }
+.rk-grid { stroke: var(--border); stroke-opacity: .6; }
+.rk-axis, .rk-price-label { font: 11px var(--font-mono); fill: var(--text-3); }
+.rk-price { stroke: var(--accent); stroke-dasharray: 5 5; stroke-width: 1.2; }
+.rk-price-label { fill: var(--accent); }
+.rk-now { stroke: var(--text-2); stroke-opacity: .7; stroke-dasharray: 2 4; }
+.rk-now-label { font: 600 13px var(--font-sans); fill: var(--text-1); }
+.rk-col { stroke: var(--border); stroke-dasharray: 2 5; }
+.rk-date { font: 600 14px var(--font-sans); fill: var(--text-1); }
+.rk-left { font: 11px var(--font-mono); fill: var(--text-3); }
+.rk-c line { stroke-width: 1; }
+.rk-c.up line, .rk-c.up rect { stroke: var(--up); fill: var(--up); }
+.rk-c.down line, .rk-c.down rect { stroke: var(--down); fill: var(--down); }
+.rk-b { cursor: pointer; outline: none; }
+.rk-b circle { stroke-width: 1.5; }
+.rk-b.sell circle { fill: var(--rk-sell-fill); stroke: var(--rk-sell); }
+.rk-b.buy circle { fill: var(--rk-buy-fill); stroke: var(--rk-buy); }
+.rk-b.dot circle { fill-opacity: .55; }
+.rk-b:hover circle, .rk-b:focus-visible circle { stroke: var(--text-1); stroke-width: 2.5; }
+.rk-b.on circle { stroke: var(--accent); stroke-width: 3; }
+.rk-b-side { font: 600 11px var(--font-sans); }
+.rk-b-fig { font: 700 14px var(--font-sans); }
+.rk-b.sell .rk-b-side, .rk-b.sell .rk-b-fig { fill: var(--rk-sell-ink); }
+.rk-b.buy .rk-b-side, .rk-b.buy .rk-b-fig { fill: var(--rk-buy-ink); }
+.rk-b-level { font: 11px var(--font-mono); fill: var(--text-2); }
+.rk-panel .rysk-ticket { margin-top: 4px; }
+
+/* The settlement picture (components/rysk/FridayPicture.jsx). */
+.rk-fp { margin: 10px 0 0; }
+.rk-fp figcaption { font-size: 12px; color: var(--text-2); margin-bottom: 22px; }
+.rk-fp-line { position: relative; display: grid; grid-template-columns: 1fr 1fr; height: 10px; border-radius: 5px; overflow: visible; }
+.rk-fp-zone { background: var(--surface-3, #27231f); }
+.rk-fp-zone.below { border-radius: 5px 0 0 5px; }
+.rk-fp-zone.above { border-radius: 0 5px 5px 0; }
+.rk-fp.sell .rk-fp-zone.acts { background: var(--rk-sell, #8ab4ff); }
+.rk-fp.buy .rk-fp-zone.acts { background: var(--rk-buy, #c3a6ff); }
+.rk-fp-level { position: absolute; left: 50%; top: -6px; bottom: -6px; width: 2px; background: var(--text-1); transform: translateX(-1px); }
+.rk-fp-level b { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.rk-fp-now { position: absolute; top: 14px; transform: translateX(-50%); font-size: 11px; color: var(--accent); white-space: nowrap; }
+.rk-fp-now i { display: block; width: 8px; height: 8px; margin: 0 auto 2px; border-radius: 50%; background: var(--accent); }
+.rk-fp-out { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 30px; }
+.rk-fp-out > div { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+.rk-fp.sell .rk-fp-out > .acts { border-color: var(--rk-sell, #8ab4ff); }
+.rk-fp.buy .rk-fp-out > .acts { border-color: var(--rk-buy, #c3a6ff); }
+.rk-fp-when { font-size: 12px; color: var(--text-2); }
+.rk-fp-out b { font-size: 14px; font-weight: 600; }
+.rk-fp-out small { font-size: 12px; color: var(--text-2); }
+.rk-fp-out em { font-style: normal; font-size: 12px; color: var(--up); }

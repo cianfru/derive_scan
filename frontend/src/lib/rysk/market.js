@@ -103,3 +103,18 @@ export function capsRoom(caps, level, und) {
   }
   return { contracts, notional };
 }
+
+/**
+ * About what Rysk's smallest size of a level pays now, in dollars, from Rysk's listed APR: the yearly
+ * rate on what the trade locks (the coin at its price for a sale; the cash at the level for a purchase),
+ * for the days left. Measured against one firm quote on 10 October 2026 (0.5 ETH at $2,550: listed
+ * 67.85% gave $13.07, the firm premium was $13.07). The firm premium comes from Rysk's makers.
+ */
+export function premiumEstimate(level, market, nowSec) {
+  if (!level || level.apr == null || !market) return null;
+  const days = (level.expiry - nowSec) / 86400;
+  if (!(days > 0)) return null;
+  const size = Number(market.token.min) / 1e18;
+  const basis = level.isPut ? size * level.strike : size * (level.index || market.price);
+  return (level.apr / 100) * basis * (days / 365);
+}

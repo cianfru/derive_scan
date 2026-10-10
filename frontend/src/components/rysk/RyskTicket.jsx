@@ -16,6 +16,7 @@ import { E18, collateralUnits, contracts, premiumUnits, quoteFits, requestParams
 import { STEPS, lockAndReceive } from "../../lib/rysk/trade.js";
 import { hyperBalances } from "../../lib/rysk/rpc.js";
 import { saveRyskTrade } from "../../lib/rysk/records.js";
+import FridayPicture from "./FridayPicture.jsx";
 import "../../rysk.css";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
@@ -35,10 +36,14 @@ async function switchOpen() {
   } catch { return false; }
 }
 
-export default function RyskTicket({ und, settleTs, near, side, net = RYSK, socketFactory = ryskSocket, provider: injected, fetchImpl, now = () => Date.now() }) {
+/**
+ * `socket` and `listing` may come from the Rysk chart (one connection for both); `fixedKey` holds the
+ * ticket on the level tapped there, without its own date and level pickers.
+ */
+export default function RyskTicket({ und, settleTs, near, side, net = RYSK, socketFactory = ryskSocket, socket: shared = null, listing: sharedListing = null, fixedKey = null, price: shownPrice = null, provider: injected, fetchImpl, now = () => Date.now() }) {
   const id = useId();
   const sock = useRef(null);
-  const [listing, setListing] = useState(null);
+  const [ownListing, setListing] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [mode, setMode] = useState(side === "no" ? "put" : "call");
   const [expiry, setExpiry] = useState(null);
@@ -56,30 +61,32 @@ export default function RyskTicket({ und, settleTs, near, side, net = RYSK, sock
   const quoteRef = useRef(null), reqRef = useRef(null), sentAt = useRef(0);
   const provider = injected === undefined ? findProvider() : injected;
 
-  // One socket while the ticket is on screen: the listing on open and every minute after.
+  // One socket while the ticket is on screen (or the chart's): the listing on open and every minute after.
   useEffect(() => {
-    const s = socketFactory();
+    const s = shared || socketFactory();
     sock.current = s;
-    let live = true;
+    let live = true, timer = null;
     const read = () => Promise.all([s.call("assets"), s.call("inventory"), s.call("caps")])
       .then(([assets, inventory, caps]) => { if (live) { setListing({ assets, inventory, caps }); setLoadError(null); } })
       .catch((e) => { if (live) setLoadError(e); });
-    read();
-    const timer = setInterval(read, 60_000);
+    if (!sharedListing) { read(); timer = setInterval(read, 60_000); }
     const off = s.on("request", (f) => {
       const req = reqRef.current;
       if (f.error) { setQuoteError(f.error.message || "Rysk has no premium for this now."); return; }
       if (req && quoteFits(f.result, req, Math.floor(Date.now() / 1000))) { quoteRef.current = f.result; setQuote(f.result); setQuoteError(null); }
     });
-    return () => { live = false; clearInterval(timer); off(); s.close(); sock.current = null; };
-  }, [socketFactory]);
+    return () => { live = false; clearInterval(timer); off(); if (!shared) s.close(); sock.current = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socketFactory, shared]);
+  const listing = sharedListing || ownListing;
 
   useEffect(() => { const t = setInterval(() => setClock(Math.floor(now() / 1000)), 1000); return () => clearInterval(t); }, [now]);
 
   const market = useMemo(() => (listing ? ryskMarket(und, listing, net) : null), [listing, und, net]);
   const date = useMemo(() => market && (market.dates.find((d) => d.expiry === expiry) || nearestDate(market, settleTs)), [market, expiry, settleTs]);
   const levels = date ? date[mode] : [];
-  const level = levels.find((l) => l.key === levelKey) || nearestLevel(levels, Number.isFinite(near) ? near : market?.price);
+  const fixed = fixedKey && market ? market.dates.flatMap((d) => [...d.call, ...d.put]).find((l) => l.key === fixedKey && l.isPut === (side === "no")) : null;
+  const level = fixed || levels.find((l) => l.key === levelKey) || nearestLevel(levels, Number.isFinite(near) ? near : market?.price);
   const token = market?.token;
   const size = token && snapSize(contracts(draft || amountText(token.min)), token.min, token.max);
   const typed = contracts(draft);
@@ -183,10 +190,10 @@ export default function RyskTicket({ und, settleTs, near, side, net = RYSK, sock
   return (
     <section className="rysk-ticket" aria-labelledby={`${id}-t`}>
       <header className="rk-head">
-        <h3 id={`${id}-t`}>Receive premium on {coin}</h3>
-        <span>Rysk · {net.chainName}{net.real ? " · Real money" : " · Testnet"}</span>
+        <h3 id={`${id}-t`}>{fixed ? `${fixed.isPut ? "Buy" : "Sell"} ${coin} at ${money(fixed.strike)}` : `Receive premium on ${coin}`}</h3>
+        <span>{fixed ? `${day(fixed.expiry)}, 08:00 UTC · ` : ""}Rysk · {net.chainName}{net.real ? " · Real money" : " · Testnet"}</span>
       </header>
-      <Tabs label="What you lock" value={mode} onChange={(m) => { setMode(m); setLevelKey(null); }} items={[["call", `Sell ${coin} at a level`], ["put", `Buy ${coin} at a level`]]} />
+      {!fixed && <><Tabs label="What you lock" value={mode} onChange={(m) => { setMode(m); setLevelKey(null); }} items={[["call", `Sell ${coin} at a level`], ["put", `Buy ${coin} at a level`]]} />
       <div className="rk-dates" role="group" aria-label="Settlement date">
         {market.dates.map((d) => <button key={d.expiry} type="button" className="text-control" aria-pressed={d.expiry === date.expiry} onClick={() => { setExpiry(d.expiry); setLevelKey(null); }}>{day(d.expiry)}</button>)}
       </div>
@@ -199,7 +206,7 @@ export default function RyskTicket({ und, settleTs, near, side, net = RYSK, sock
         ))}
         {ordered.length > SHOWN && <button type="button" className="text-control rk-all" onClick={() => setAll(!all)}>{all ? "Fewer levels" : `All ${ordered.length} levels`}</button>}
         {!levels.length && <p className="q-note">Rysk lists no {mode === "call" ? "sale" : "purchase"} levels for this date.</p>}
-      </div>
+      </div></>}
       {level && <>
         <div className="rk-amount">
           <label htmlFor={`${id}-a`} className="label">Amount, {coin}<Info label="About the amount">Rysk trades in steps of {amountText(token.min)} {coin}, from {amountText(token.min)} up to {amountText(token.max)}.</Info></label>
@@ -210,9 +217,8 @@ export default function RyskTicket({ und, settleTs, near, side, net = RYSK, sock
         <section className="rk-obligation" aria-label="What you commit">
           <p className="rk-label">You lock until {day(level.expiry)}, 08:00 UTC</p>
           <strong className="mono">{lockText}</strong>
-          <p>{level.isPut
-            ? <>If {coin} settles below {money(level.strike)}, you buy {sizeText} for {usd(toNumber(lock, 6))}. Otherwise the USDC comes back.</>
-            : <>If {coin} settles above {money(level.strike)}, your {sizeText} is sold for {usd(level.strike * Number(size) / 1e18)}. Otherwise it comes back.</>}</p>
+          <FridayPicture coin={coin} level={level} size={Number(size) / 1e18} sizeText={sizeText} lockUsd={level.isPut ? toNumber(lock, 6) : null}
+            premium={premium} price={Number.isFinite(shownPrice) ? shownPrice : market.price} when={`${day(level.expiry)}, 08:00 UTC`} />
           <p className="rk-terms">Physical settlement · No early exit<Info label="About the obligation">The collateral stays locked until settlement, about two hours after 08:00 UTC on the date; there is no early exit. The premium is yours either way, and it can be smaller than a move in {coin}'s price.</Info></p>
           {overCap && <p className="q-note warn">Larger than Rysk takes on {coin} right now.</p>}
         </section>
