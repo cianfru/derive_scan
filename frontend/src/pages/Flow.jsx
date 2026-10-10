@@ -9,7 +9,7 @@ import { FlowCoverage } from "../components/AnalyticalDetails.jsx";
 import FlowSummary from "../components/FlowSummary.jsx";
 import WalletTag from "../components/WalletTag.jsx";
 import { TYPE as CLASS } from "../lib/traders.js";
-import { stories, WALLET_WORD } from "../lib/flowStories.js";
+import { sentence, stories, WALLET_WORD } from "../lib/flowStories.js";
 import "../flow-page.css";
 
 const CLASS_INFO = "Wallet types from every trade on Derive since December 2023. Directional traders who are in profit on options that have expired are ranked: Top (best fifth), Smart (the best 50, or every Top wallet when Top is larger), Profitable (the rest in profit). Directional: taking a view, not in profit. Income: mostly sells out-of-the-money options. Hedger: offsets its options with perps. Occasional: too few trades to tell. Market makers are left out.";
@@ -41,23 +41,23 @@ function Who({ w, ranked }) {
 /** A perp fill as a story: its notional is the money at stake. */
 function perpStory(t) {
   return { key: `${t.wallet}-${t.ts}-${t.instrument}`, wallet: t.wallet, und: t.underlying, kind: t.class, who: WALLET_WORD[t.class] || null,
-    ranked: t.ranked, ts: t.ts / 1000, text: `${t.direction === "buy" ? "bought" : "sold"} ${t.underlying} perpetuals`, detail: "",
-    money: Number(t.notional_usd) || 0, perp: true, times: 1 };
+    ranked: t.ranked, ts: t.ts / 1000, lastTs: t.ts / 1000, text: `${t.direction === "buy" ? "bought" : "sold"} ${t.underlying} perpetuals`,
+    detail: `follows ${t.underlying}'s price, no end date`, money: Number(t.notional_usd) || 0, perp: true, times: 1 };
 }
 
-/** One trade as a sentence: who, what in plain words, the legs, the money and when. */
+/** One trade as a sentence: who, what in plain words (the legs and the coin value they cover under it), the money
+ * paid or collected, and when (the last time, for a repeated trade). */
 function Story({ s }) {
+  const covers = !s.perp && s.notional > 0 ? ` · covers ${usd(s.notional)} of ${s.und}` : "";
   return (
     <li className="fl-story">
       <span className="fs-who"><Who w={s.wallet} ranked={s.ranked} />{s.who && <small className={s.kind === "top" || s.kind === "smart" ? "fs-smart" : undefined}>{s.who}</small>}</span>
       <span className="fs-what">
-        <span><Link to={`/coin/${s.und}#${s.perp ? "regime" : "options"}`}>{s.text}</Link>{s.times > 1 && <b className="fs-times" title={`The same trade ${s.times} times`}>×{s.times}</b>}</span>
-        {s.detail && <small>{s.detail}</small>}
+        <span><Link to={`/coin/${s.und}#${s.perp ? "regime" : "options"}`}>{sentence(s.text)}</Link>{s.times > 1 && <b className="fs-times" title={`Traded ${s.times} times within 30 minutes`}>{"\u00a0"}×{s.times}</b>}</span>
+        {s.detail && <small>{s.detail}{covers}</small>}
       </span>
-      <span className="fs-money" title={s.perp ? undefined : `Notional ${usd(s.notional)}`}>
-        <small>{s.perp ? "worth" : s.paid ? "paid" : "collected"}</small><b>{usd(s.money)}</b>
-      </span>
-      <span className="fs-time">{ago(s.ts)}</span>
+      <span className="fs-money"><small>{s.perp ? "worth" : s.paid ? "paid" : "collected"}</small><b>{usd(s.money)}</b></span>
+      <span className="fs-time">{ago(s.lastTs ?? s.ts)}</span>
     </li>
   );
 }
@@ -89,24 +89,25 @@ export default function Flow() {
   const showTrades = () => { setView("trades"); setFocusRequest((n) => n + 1); };
   return (
     <div className="wrap page people-page market-research-page flow-page research-refined">
-      <MarketResearchHeader error={error} title="Flow" description="Recorded trades and option premium across markets."
-        info="The premium overview and active wallet list cover the recorded 24-hour window across all markets. Selecting a market or instrument kind filters only the large-trade sample below."
+      <MarketResearchHeader error={error} title="Flow" description="Which way options money points, and the largest trades, over 24 hours."
+        info="The money by market and the active wallets cover every recorded trade of the last 24 hours. Choosing a market, options or perpetuals filters only the largest trades below."
         meta={<FlowCoverage coverage={data.coverage} as="span" />} />
       <Lead lead={flowLead(data)} />
-      <Plate title="What traders paid for options" className="fl-premium-panel" bodyClass="flush">
+      <Plate title="Which way options money points" className="fl-premium-panel" bodyClass="flush">
         <FlowSummary data={data} selected={selected} onSelect={(u) => { setSelected(u); setAll(false); }}
-          selectionCount={matching.length} selectionKind={kind === "option" ? "option trades" : kind === "perp" ? "perp trades" : "trades"} onViewTrades={showTrades} />
+          selectionCount={matching.length} selectionKind={kind === "option" ? "option trades" : kind === "perp" ? "perpetual trades" : "trades"} onViewTrades={showTrades} />
       </Plate>
       <div className="fl-view-switch"><Tabs label="Flow detail" value={view} onChange={setView} items={[["trades", "Large trades"], ["wallets", "Active wallets"]]} /></div>
       {view === "trades" ? <Plate title={<span ref={resultRef} tabIndex={-1}>Large trades</span>} className="fl-trades-panel" bodyClass="flush"
-        info={"The largest recorded taker trades across all markets over 24 hours (up to 80 legs): options of $100K notional or $2K premium, perps of $25K. Options sent together by one wallet read as one trade (a spread, a strangle, a roll), and the same trade repeated within 30 minutes as one line with its count. The figure is the money paid or collected, after every leg; hover it for the notional, the coin value the options cover. The market filter applies to this sample. " + CLASS_INFO}
+        info={"The largest trades of the last 24 hours across all markets: options that cost or paid at least $2,000 or cover at least $100,000 of the coin (up to 80 legs, chosen by money), perpetuals of at least $25,000. Options one wallet traded together read as one trade, with every leg of the package; the same trade repeated within 30 minutes reads as one line with its count. The figure is the money paid or collected after every leg. Perpetuals follow the coin's price with no end date: a buyer gains when it rises, a seller when it falls. " + CLASS_INFO}
         right={<>
           {selected !== "all" && <button className="text-control" onClick={() => { setSelected("all"); setAll(false); }}>{selected} · Clear</button>}
-          <Tabs label="Kind" value={kind} onChange={(k) => { setKind(k); setAll(false); }} items={[["option", "Options"], ["perp", "Perps"]]} />
+          <Tabs label="Kind" value={kind} onChange={(k) => { setKind(k); setAll(false); }} items={[["option", "Options"], ["perp", "Perpetuals"]]} />
+          <i className="fl-tab-sep" aria-hidden="true" />
+          <Tabs label="Order" value={order} onChange={setOrder} items={[["money", "Most money"], ["latest", "Latest"]]} />
         </>}>
         <div className="fl-table-context" role="status">
-          <span>{selected === "all" ? "All markets" : selected} · <b>{large.length}</b> of <b>{matching.length}</b> {kind === "option" ? "trades" : "perp trades"}</span>
-          <Tabs label="Order" value={order} onChange={setOrder} items={[["money", "Largest"], ["latest", "Latest"]]} />
+          <span>{selected === "all" ? "All markets" : selected} · <b>{large.length}</b> of <b>{matching.length}</b> {kind === "option" ? "trades" : "perpetual trades"}</span>
         </div>
         <ol className="fl-stories">
           {large.map((s) => <Story key={s.key} s={s} />)}
@@ -114,10 +115,10 @@ export default function Flow() {
         </ol>
         {(matching.length > cap || all) && <button className="btn lb-more" onClick={() => setAll((value) => !value)}>{all ? "Show fewer trades" : `Show all ${matching.length} trades`}</button>}
       </Plate> : <Plate title="Most active wallets" className="fl-wallets-panel" bodyClass="flush" right={<span className="fl-scope">All markets · 24h</span>}
-        info={"Volume and realised profit and loss per wallet from Derive's public trades over 24 hours. Premium net is what the wallet received for options sold minus what it paid for options bought. " + CLASS_INFO}>
+        info={"Trading and realised profit and loss per wallet from Derive's public trades over 24 hours. Options size is the coin value the options cover; options cash in/out is what the wallet received for options sold minus what it paid for options bought. " + CLASS_INFO}>
         <div className="fl-table-context"><span>Most active in the recorded window</span><span><b>{wallets.length}</b> of <b>{data.wallets.length}</b> wallets</span></div>
         <table className="grid flow-table wallets-table">
-          <thead><tr><th scope="col">Wallet</th><th scope="col">Type</th><th scope="col" className="num">Perp volume</th><th scope="col" className="num">Options notional</th><th scope="col" className="num">Premium net</th><th scope="col" className="num">Realised PnL</th></tr></thead>
+          <thead><tr><th scope="col">Wallet</th><th scope="col">Type</th><th scope="col" className="num">Perpetuals traded</th><th scope="col" className="num">Options size</th><th scope="col" className="num" title="Received for options sold minus paid for options bought">Options cash in/out</th><th scope="col" className="num">Realised P&amp;L</th></tr></thead>
           <tbody>
             {wallets.map((w) => {
               const net = w.premium_sold_usd - w.premium_bought_usd;
@@ -125,10 +126,10 @@ export default function Flow() {
                 <tr key={w.wallet} className="fw-row">
                   <td className="fw-who"><Who w={w.wallet} ranked={w.ranked} /></td>
                   <td className="fw-kind" data-k="Type"><Kind c={w.class} /></td>
-                  <td className="num fw-perp" data-k="Perp volume">{usd(w.perp_notional_usd)}</td>
-                  <td className="num fw-opt" data-k="Options notional">{usd(w.option_notional_usd)}</td>
-                  <td className={`num fw-net ${tone(net)}`} data-k="Premium net">{w.premium_bought_usd || w.premium_sold_usd ? usd(net) : <span className="faint">—</span>}</td>
-                  <td className={`num hero fw-pnl ${tone(w.realized_pnl_usd)}`} data-k="Realised PnL">{usd(w.realized_pnl_usd)}</td>
+                  <td className="num fw-perp" data-k="Perpetuals traded">{usd(w.perp_notional_usd)}</td>
+                  <td className="num fw-opt" data-k="Options size">{usd(w.option_notional_usd)}</td>
+                  <td className={`num fw-net ${tone(net)}`} data-k="Options cash in/out">{w.premium_bought_usd || w.premium_sold_usd ? usd(net) : <span className="faint">—</span>}</td>
+                  <td className={`num hero fw-pnl ${tone(w.realized_pnl_usd)}`} data-k="Realised P&L">{usd(w.realized_pnl_usd)}</td>
                 </tr>);
             })}
             {!wallets.length && <tr><td colSpan={6} className="faint fl-empty"><span aria-label="No recorded active wallets">—</span></td></tr>}

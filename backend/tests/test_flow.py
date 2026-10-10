@@ -30,6 +30,19 @@ def test_summarise_large_and_wallets():
     assert by["0xB"][3] == 54000.0 and by["0xC"][3] == 8500.0
 
 
+def test_a_large_leg_keeps_its_package():
+    """The cheap legs of a large trade's RFQ, and the wallet's other taker legs at the same millisecond, travel with it."""
+    big = {**_t("p", 5_000, "BTC-20261016-84000-P", "buy", 1, 2180, "0xE", index="82700"), "rfq_id": "r1"}  # $2,180 premium: large
+    small = [{**_t("q", 5_000, "BTC-20261016-82000-P", "buy", 1, 1117, "0xE", index="82700"), "rfq_id": "r1"},
+             {**_t("r", 5_000, "BTC-20261016-78000-P", "sell", 1, 254, "0xE", index="82700"), "rfq_id": "r1"},
+             _t("s", 5_000, "BTC-20261016-90000-C", "sell", 0.1, 50, "0xE", index="82700"),          # same moment, no RFQ
+             _t("t", 5_000, "BTC-20261016-90000-C", "buy", 0.1, 50, "0xF", index="82700"),           # another wallet
+             {**_t("u", 6_000, "BTC-20261016-80000-P", "buy", 1, 500, "0xE", index="82700"), "rfq_id": "r2"}]  # another RFQ
+    large, _ = flow.summarise([big, *small], run_ts=5)
+    assert sorted(r[1] for r in large) == ["BTC-20261016-78000-P", "BTC-20261016-82000-P", "BTC-20261016-84000-P", "BTC-20261016-90000-C"]
+    assert {r[10] for r in large} == {"0xE"}
+
+
 def test_update_reads_only_new_trades(tmp_path):
     feed = list(TRADES)
 

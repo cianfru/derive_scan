@@ -56,8 +56,9 @@ describe("research leads", () => {
     const f = flowLead({ coverage: { ready: false, fraction: 0.74 }, by_coin: {
       BTC: { call: { buy_premium_usd: 1000, sell_premium_usd: 500, buy_notional_usd: 9e5 }, put: { buy_premium_usd: 200, sell_premium_usd: 300 } },
       ETH: { call: { buy_premium_usd: 100, buy_notional_usd: 1e5 } } } });
-    expect(f.text).toBe("Traders paid $1.3K for options in the last 24 hours: 85% on calls, which pay if the price rises, and 15% on puts, which pay if it falls.");
-    expect(f.note).toBe("They sold $800 of options to collect premium. A trade shows who crossed the spread, not a wallet's whole position. The recorder covered 74% of that window.");
+    // Rise: calls bought $1,100 + puts sold $300; fall: puts bought $200 + calls sold $500.
+    expect(f.text).toBe("Traders moved $2.1K through options in the last 24 hours: 67% into trades that gain if the price rises, 33% into trades that gain if it falls.");
+    expect(f.note).toBe("Buying calls or selling puts gains if the price rises; buying puts or selling calls, if it falls. Context, not a signal. The recorder covered 74% of that window.");
     check(f);
   });
   it("Coin: regime and signal, then the layers that have a reading", () => {

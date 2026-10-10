@@ -83,12 +83,12 @@ describe("flow views and result scope", () => {
     expect(screen.getByRole("tab", { name: "Large trades" }).getAttribute("aria-selected")).toBe("true");
     expect(document.querySelectorAll(".fl-story")).toHaveLength(5);
     expect(document.querySelector(".fl-table-context").textContent).toContain("BTC · 5 of 10 trades");
-    fireEvent.click(screen.getByRole("tab", { name: "Perps" }));
-    expect(screen.getByText("BTC · 2 recorded perp trades")).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Perpetuals" }));
+    expect(screen.getByText("BTC · 2 recorded perpetual trades")).toBeTruthy();
     expect(document.querySelectorAll(".fl-story")).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: "BTC · Clear" }));
     expect(screen.queryByRole("button", { name: "View BTC trades" })).toBeNull();
-    expect(document.querySelector(".fl-table-context").textContent).toContain("All markets · 4 of 4 perp trades");
+    expect(document.querySelector(".fl-table-context").textContent).toContain("All markets · 4 of 4 perpetual trades");
   });
 
   it("retains the wider sample on desktop", () => {

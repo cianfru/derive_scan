@@ -54,6 +54,7 @@
 .sb-now { stroke: var(--accent); stroke-width: 2; stroke-dasharray: 7 6; opacity: .9; }
 .sb-dot { fill: var(--accent); stroke: var(--surface-1); stroke-width: 2.5; filter: drop-shadow(0 0 6px var(--accent)); }
 .sb-date { font: 600 11px var(--font-mono); fill: var(--text-3); }
+.sb-none { font: 500 13px var(--font-sans); fill: var(--text-2); }
 .sb-stem { stroke-width: 2; stroke-dasharray: 1 5; stroke-linecap: round; }
 .sb-stem.up, .sb-foot.up { stroke: var(--sb-up); fill: var(--sb-up); } .sb-stem.down, .sb-foot.down { stroke: var(--sb-down); fill: var(--sb-down); }
 .sb-halo { opacity: .45; } .sb-halo.up { fill: var(--sb-up); } .sb-halo.down { fill: var(--sb-down); }
@@ -230,7 +231,7 @@ a.hl-who:hover .hl-name, a.hl-row:hover .hl-name { color: var(--accent-text); }
    (layout in lib/homeLayout.js swarm), each dot ringed in the card's colour so overlaps stay readable. */
 .hl-split { display: none; }
 .hl-split-bar { display: flex; gap: 3px; height: 6px; }
-.hl-split-bar i { border-radius: 3px; background: var(--call); } .hl-split-bar i + i { background: var(--put); }
+.hl-split-bar i { border-radius: 3px; background: var(--up); } .hl-split-bar i + i { background: var(--down); }
 @container hc (min-width: 560px) {
   .hl-cap > .hl-split-line { display: none; }
   .hl-split { display: grid; gap: 8px; width: min(260px, 34%); margin-left: auto; padding-bottom: .2em; font: 600 13px/1.3 var(--font-sans); color: var(--text-2); }
@@ -325,8 +326,11 @@ html:has(.home-pop[open]) { overflow: hidden; }
   border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
 .hl-trade-what { display: grid; gap: 2px; min-width: 0; }
 .hl-trade-what b { font: 700 15px/1.3 var(--font-sans); color: var(--text-1); }
-.hl-trade-what .hl-times { margin-left: 8px; font-size: 13px; color: var(--text-2); }
+.hl-trade-what > span { text-wrap: balance; }
 .hl-trade-what small { font: 500 12px/1.3 var(--font-mono); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Short cards (1280x720, 1024x768) keep the trade and drop its label row. */
+@container hc (max-height: 210px) { .hl-trade-k { display: none; } .hl-trade-row { border-top: 0; padding-top: 0; } }
+@media (max-width: 600px) { .home .hl .hl-band.hl-trade { height: auto; min-height: var(--band-h, 96px); } .hl-trade-what small { white-space: normal; } }
 .hl-trade-money { display: grid; justify-items: end; }
 .hl-trade-money small { font: 600 12px/1.3 var(--font-sans); color: var(--text-3); }
 .hl-trade-money .n { font: 700 18px/1.2 var(--font-mono); }

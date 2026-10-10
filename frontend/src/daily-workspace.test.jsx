@@ -129,10 +129,12 @@ it("summarizes the recorded premium categories and selects a market for the tape
       onSelect={choose}
     />,
   );
-  // What traders paid: calls and puts bought ($80 + $50); the $20 sold sits beside HYPE, not in the total.
-  expect(screen.getByText("$130")).toBeTruthy();
-  expect(screen.getByText("paid for options · 2 markets · 24h")).toBeTruthy();
-  expect(screen.getByText("sold $20")).toBeTruthy();
+  // Every option dollar, by the way it gains: HYPE $80 of calls bought (rise) and $20 sold (fall); BTC $50 of puts bought (fall).
+  expect(screen.getByText("$150")).toBeTruthy();
+  expect(screen.getByText("in options · 2 markets · 24h")).toBeTruthy();
+  const rows = screen.getAllByRole("button", { pressed: false });
+  expect(rows[0].textContent).toBe("HYPE80% rise · 20% fall$100");
+  expect(rows[1].textContent).toBe("BTCAll fall$50");
   await userEvent.setup().click(screen.getByRole("button", { name: /HYPE/ }));
   expect(choose).toHaveBeenCalledWith("HYPE");
 });

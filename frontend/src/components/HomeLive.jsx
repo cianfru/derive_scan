@@ -8,7 +8,7 @@
 import { Fragment, useId, useState } from "react";
 import { Link } from "react-router-dom";
 import { useData } from "../lib/data.js";
-import { REGIME, strike, usd } from "../lib/format.js";
+import { REGIME, ago, strike, usd } from "../lib/format.js";
 import { REGIME_COLORS, REGIME_ORDER } from "../lib/regime.js";
 import { radarPoint, viewReading } from "../lib/presentation.js";
 import { regimeGroups } from "../lib/takeaway.js";
@@ -18,7 +18,8 @@ import { loadPositions } from "../lib/positions.js";
 import { positionDone } from "../lib/positionView.js";
 import { openPnl, pctText } from "../lib/homePnl.js";
 import { compactCount, groupIconSize, radarLayout } from "../lib/homeLayout.js";
-import { stories } from "../lib/flowStories.js";
+import { largestTrade } from "../lib/flowStories.js";
+import { riseFall } from "../lib/takeaway.js";
 import { useFollowsDoc } from "../lib/follows.js";
 import { boardRows } from "../lib/board.js";
 import { useClock } from "../lib/useClock.js";
@@ -110,11 +111,10 @@ export function SaloonLive({ pop = false }) {
   // off the band where the last days went further, clipped and faded at the left edge.
   const ks = dates.flatMap((d) => d.show.map((l) => l.k));
   const far = Math.max(board.index * 0.012, ...ks.map((k) => Math.abs(k - board.index)));
-  const lo = board.index - far * 1.35, hi = board.index + far * 1.35, top = 6, bottom = H - 24;
+  let lo = board.index - far * 1.35, hi = board.index + far * 1.35;
+  const top = 6, bottom = H - 24;
   const y = (v) => bottom - ((v - lo) / (hi - lo)) * (bottom - top);
-  const lineW = W * (dates.length ? 0.42 : 0.92);
-  const pts = closes.map((c, i) => [10 + (i / (closes.length - 1)) * (lineW - 10), y(c)]);
-  const yNow = y(board.index);
+  let lineW = W * (dates.length ? 0.42 : 0.92), yNow = y(board.index);
   const colX = (i) => lineW + ((i + 0.6) / (dates.length + 0.2)) * (W - lineW - 8);
   const rMax = Math.max(22, Math.min(36, (W - lineW) / (dates.length || 1) / 2.4)), rMin = 22;
   const maxPct = Math.max(1, ...dates.flatMap((d) => d.show.map((l) => l.r.make / l.r.total)));
@@ -136,6 +136,14 @@ export function SaloonLive({ pop = false }) {
     }
     d.placed = placed;
   }
+  // No bubble to show (Derive quotes none of these levels now): the line alone, on the axis of its own closes.
+  const none = !dates.some((d) => d.placed.length);
+  if (none) {
+    const span = Math.max(...closes, board.index) - Math.min(...closes, board.index) || board.index * 0.01;
+    lo = Math.min(...closes, board.index) - span * 0.15; hi = Math.max(...closes, board.index) + span * 0.15;
+    lineW = W * 0.92; yNow = y(board.index);
+  }
+  const pts = closes.map((c, i) => [10 + (i / (closes.length - 1)) * (lineW - 10), y(c)]);
   return (
     <div className={`hl hl-saloon${pop ? " in-pop" : ""}`}>
       <div className="hl-band" ref={band}>
@@ -154,7 +162,7 @@ export function SaloonLive({ pop = false }) {
           </defs>
           <g clipPath={`url(#${id}-clip)`} mask={`url(#${id}-mask)`}><path d={smooth(pts)} className="sb-price" /></g>
           <line x1="0" x2={W} y1={yNow} y2={yNow} className="sb-now" />
-          {dates.map((d, i) => <text key={d.expiry} x={colX(i)} y={H - 6} className="sb-date" textAnchor="middle">{shortDay(d.expiry)}</text>)}
+          {!none && dates.map((d, i) => <text key={d.expiry} x={colX(i)} y={H - 6} className="sb-date" textAnchor="middle">{shortDay(d.expiry)}</text>)}
           {dates.map((d, i) => d.placed.map((l) => {
             const x = colX(i), yy = l.yy, r = l.rad, up = l.r.side === "yes";
             const edge = up ? yy + r : yy - r, k = up ? "up" : "down", ring = !!smartOf(l.r);
@@ -171,6 +179,7 @@ export function SaloonLive({ pop = false }) {
             );
           }))}
           <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="5" className="sb-dot" />
+          {none && <text x={W - 8} y={20} textAnchor="end" className="sb-none">No prices on Derive right now</text>}
         </svg>
       </div>
     </div>
@@ -450,36 +459,37 @@ const when = (t) => { const d = new Date(t * 1000); return `${d.getUTCDate()} ${
 /** Past this age the flow file no longer reads as "the last 24 hours" and names its window instead. */
 export const FLOW_FRESH_SEC = 2 * 3600;
 /**
- * Options flow: what traders paid for options on Derive over 24 hours (the Flow page's figure, every recorded
- * taker), split between calls and puts, and under it the day's largest trade as one sentence (owner, 10 October
- * 2026: the dot strip was "kind of hard to read"): who, what in plain words ("sold ZEC calls", "bought an ETH
- * call spread", legs sent together grouped as on the Flow page), the money paid or collected and when. The
- * trade stays hidden until wallet classes are ready, so market makers never show. An old file names its window.
+ * Options flow: the option money of the last 24 hours on Derive (the Flow page's figure, every recorded trade that
+ * crossed the spread, market makers left out) and how much of it gains if the price rises or falls (calls bought and
+ * puts sold against puts bought and calls sold, so a spread's halves offset), then the day's largest single trade as
+ * one sentence (owner, 10 October 2026: the dot strip was "kind of hard to read"): the wallet's codename, what it
+ * did in plain words, the legs, when, and the money paid or collected. The trade stays hidden until wallet classes
+ * are ready, so market makers never show. An old file names its window.
  */
 export function OptionsLive({ card }) {
   const { data, loading } = useData("flow.json");
   if (loading) return <Wait />;
-  let calls = 0, puts = 0;
-  for (const c of Object.values(data?.by_coin || {})) { calls += c.call?.buy_premium_usd || 0; puts += c.put?.buy_premium_usd || 0; }
-  const bought = calls + puts;
-  if (!(bought > 0)) return <NotYet card={card} />;
-  const callPct = Math.round((calls / bought) * 100);
+  let rise = 0, fall = 0;
+  for (const c of Object.values(data?.by_coin || {})) { const r = riseFall(c); rise += r.rise; fall += r.fall; }
+  const total = rise + fall;
+  if (!(total > 0)) return <NotYet card={card} />;
+  const up = Math.round((rise / total) * 100);
   const cov = data.coverage;
   const part = cov?.ready === false && Number.isFinite(cov.fraction) ? Math.round(cov.fraction * 100) : null;
   const to = Number(cov?.end ?? data.generated_at);
   const stale = Number.isFinite(to) && Date.now() / 1000 - to > FLOW_FRESH_SEC;
-  const top = data.classes_ready === false ? null : stories(data.large)[0] || null;
-  const split = <><span><N className="call">{callPct}%</N> calls</span> <span className="hl-sep">·</span> <span><N className="put">{100 - callPct}%</N> puts</span></>;
+  const top = data.classes_ready === false ? null : largestTrade(data.large);
+  const split = <><span><N className="up">{up}%</N> rise</span> <span className="hl-sep">·</span> <span><N className="down">{100 - up}%</N> fall</span></>;
   return (
     <div className="hl hl-options">
       <div className="hl-fig">
-        <BigNum text={usd(bought)} />
+        <BigNum text={usd(total)} />
         <span className="hl-cap">
-          <span>paid for options, {stale ? <><N>24h</N> to {when(to)} UTC</> : <N>24h</N>}{part != null && <> · <N>{part}%</N> of <N>24h</N> recorded</>}</span>
+          <span>in options, {stale ? <><N>24h</N> to {when(to)} UTC</> : <N>24h</N>}{part != null && <> · <N>{part}%</N> of <N>24h</N> recorded</>}</span>
           <span className="hl-split-line">{split}</span>
         </span>
         <span className="hl-split" aria-hidden="true">
-          <span className="hl-split-bar"><i style={{ flexGrow: calls }} /><i style={{ flexGrow: puts }} /></span>
+          <span className="hl-split-bar"><i style={{ flexGrow: rise }} /><i style={{ flexGrow: fall }} /></span>
           <span className="hl-split-words">{split}</span>
         </span>
       </div>
@@ -487,8 +497,8 @@ export function OptionsLive({ card }) {
         <span className="hl-trade-k">Largest trade{stale ? "" : ", 24h"}</span>
         <span className="hl-trade-row">
           <WalletEmblem address={top.wallet} size={30} />
-          <span className="hl-trade-what"><span><b>{top.who ? `${top.who} ` : "A trader "}{top.text}</b>{top.times > 1 && <N className="hl-times">×{top.times}</N>}</span>
-            <small>{top.detail}</small></span>
+          <span className="hl-trade-what"><span title={top.who || undefined}><b>{codename(top.wallet)} {top.text}</b></span>
+            <small>{top.detail} · {ago(top.ts)}</small></span>
           <span className="hl-trade-money"><small>{top.paid ? "paid" : "collected"}</small><N>{usd(top.money)}</N></span>
         </span>
       </div>}

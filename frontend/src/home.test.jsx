@@ -190,15 +190,17 @@ describe("card home", () => {
     expect(h[7]).toBeCloseTo(Math.sqrt(2 / 6750), 3);
   });
 
-  it("Options flow: what traders paid, the split, and the day's largest trade as a sentence; none until classes are ready", () => {
+  it("Options flow: the option money, how much gains on a rise or a fall, and the day's largest trade; none until classes are ready", () => {
     docs.current = { "flow.json": FLOW };
     show();
     expect(text(".hl-options .bn")).toBe("$1K");
-    expect(text(".hl-options .hl-split-line")).toBe("42% calls · 58% puts");
-    expect($$(".hl-options .hl-cap > span")[0].textContent).toBe("paid for options, 24h");
+    // Rise: calls bought $300 + $120; fall: puts bought $100 + $480.
+    expect(text(".hl-options .hl-split-line")).toBe("42% rise · 58% fall");
+    expect($$(".hl-options .hl-cap > span")[0].textContent).toBe("in options, 24h");
     expect(text(".hl-trade-k")).toBe("Largest trade, 24h");
-    expect(text(".hl-trade-what b")).toBe("Smart wallet bought ETH puts");
-    expect(text(".hl-trade-what small")).toBe("3,050 put · Oct 09");
+    expect(text(".hl-trade-what b")).toBe(`${codename("0x" + "c".repeat(40))} bought ETH puts`);
+    expect($(".hl-trade-what > span").title).toBe("Smart wallet");
+    expect(text(".hl-trade-what small").replace(/\u00a0/g, " ")).toBe("3,050 put · Oct 09 · 1 h ago");
     expect(text(".hl-trade-money")).toBe("paid$37.2K");
     cleanup();
     docs.current = { "flow.json": { ...FLOW, classes_ready: false } };
@@ -212,7 +214,7 @@ describe("card home", () => {
     docs.current = { "flow.json": { ...FLOW, since: end - 86400, coverage: { ready: true, end } } };
     show();
     const at = (t) => { const d = new Date(t * 1000); return `${d.getUTCDate()} ${d.toUTCString().slice(8, 11)} ${d.toISOString().slice(11, 16)}`; };
-    expect($$(".hl-options .hl-cap > span")[0].textContent).toBe(`paid for options, 24h to ${at(end)} UTC`);
+    expect($$(".hl-options .hl-cap > span")[0].textContent).toBe(`in options, 24h to ${at(end)} UTC`);
     expect(text(".hl-trade-k")).toBe("Largest trade");
     expect(document.body.textContent).not.toContain("now");
   });

@@ -118,23 +118,30 @@ export function cohortsLead(data) {
 }
 
 /** Flow: option premium bought and sold by takers, and the busiest market. */
-/** Flow (owner, 10 October 2026: "make it look more intuitive"): what traders paid for options, calls against
- * puts in plain words, then what they sold. */
+/** Option money per side: what gains if the price rises (calls bought, puts sold) against what gains if it falls
+ * (puts bought, calls sold), the Options layer's own measure (derive/lean.py); a spread's two halves offset. */
+export function riseFall(c) {
+  const rise = (c?.call?.buy_premium_usd || 0) + (c?.put?.sell_premium_usd || 0);
+  const fall = (c?.put?.buy_premium_usd || 0) + (c?.call?.sell_premium_usd || 0);
+  return { rise, fall, total: rise + fall };
+}
+/** "61% rise · 39% fall", or "all on a rise" when one side is empty. */
+export const riseShare = ({ rise, total }) => (total > 0 ? Math.round((rise / total) * 100) : null);
+
+/** Flow (owner, 10 October 2026: "make it look more intuitive"): the option money of the last 24 hours and how much of
+ * it gains if the price rises or falls, in plain words. */
 export function flowLead(data) {
-  const by = data?.by_coin || {};
-  let calls = 0, puts = 0, sold = 0;
-  for (const c of Object.values(by)) {
-    calls += c.call?.buy_premium_usd || 0; puts += c.put?.buy_premium_usd || 0;
-    sold += (c.call?.sell_premium_usd || 0) + (c.put?.sell_premium_usd || 0);
-  }
-  const bought = calls + puts;
-  if (!bought && !sold) return null;
-  const text = bought
-    ? `Traders paid ${usd(bought)} for options in the last 24 hours: ${Math.round((calls / bought) * 100)}% on calls, which pay if the price rises, and ${100 - Math.round((calls / bought) * 100)}% on puts, which pay if it falls.`
-    : "Traders bought no options in the last 24 hours.";
+  let rise = 0, fall = 0;
+  for (const c of Object.values(data?.by_coin || {})) { const r = riseFall(c); rise += r.rise; fall += r.fall; }
+  const total = rise + fall;
+  if (!total) return null;
+  const up = Math.round((rise / total) * 100);
   const cov = data.coverage;
   const gap = cov && cov.ready === false && Number.isFinite(cov.fraction) ? ` The recorder covered ${Math.round(cov.fraction * 100)}% of that window.` : "";
-  return { text, note: `${sold ? `They sold ${usd(sold)} of options to collect premium. ` : ""}A trade shows who crossed the spread, not a wallet's whole position.${gap}` };
+  return {
+    text: `Traders moved ${usd(total)} through options in the last 24 hours: ${up}% into trades that gain if the price rises, ${100 - up}% into trades that gain if it falls.`,
+    note: `Buying calls or selling puts gains if the price rises; buying puts or selling calls, if it falls. Context, not a signal.${gap}`,
+  };
 }
 
 const WALLET_WORDS = { up: "Smart wallets hold long delta", defensive: "Smart wallets hold short delta", neutral: "Smart wallets' delta is balanced" };

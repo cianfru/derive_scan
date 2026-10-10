@@ -1,51 +1,49 @@
 import { usd } from "../lib/format.js";
+import { riseFall } from "../lib/takeaway.js";
 import { Asset } from "./MarketVisuals.jsx";
 import { Info, Arrow } from "./ui.jsx";
 
-// What traders paid for options, per coin (owner, 10 October 2026: the four-shade bars were "kind of hard to
-// read"): one bar per coin, calls bought against puts bought, sized by the money paid; what traders sold
-// stays a quiet figure beside it.
-export const FLOW_PARTS = [
-  ["call", "buy_premium_usd", "Calls", "call-buy"],
-  ["put", "buy_premium_usd", "Puts", "put-buy"],
-];
-/** Per coin: {und, calls, puts, bought, sold}, largest bought first; coins with no option premium left out. */
+// Which way options money points, per coin (owner, 10 October 2026: the four-shade bars were "kind of hard to
+// read"): one bar per coin, the money on trades that gain if the price rises against the money on trades that
+// gain if it falls, the Options layer's own measure, so a spread's two halves offset.
+/** Per coin: {und, rise, fall, total}, most money first; coins with no option money left out. */
 export function summarizeFlow(byCoin) {
   return Object.entries(byCoin || {})
-    .map(([und, f]) => {
-      const calls = f.call?.buy_premium_usd || 0, puts = f.put?.buy_premium_usd || 0;
-      const sold = (f.call?.sell_premium_usd || 0) + (f.put?.sell_premium_usd || 0);
-      return { und, calls, puts, bought: calls + puts, sold };
-    })
-    .filter((r) => r.bought > 0 || r.sold > 0)
-    .sort((a, b) => b.bought - a.bought || b.sold - a.sold);
+    .map(([und, f]) => ({ und, ...riseFall(f) }))
+    .filter((r) => r.total > 0)
+    .sort((a, b) => b.total - a.total);
 }
-/** Track length on a square-root scale of what was paid, so small markets stay visible. */
+/** Track length on a square-root scale of the money, so small markets stay visible. */
 export const trackWidth = (total, max) => (max > 0 && total > 0 ? Math.max(6, Math.sqrt(total / max) * 100) : 0);
-const pct = (part, whole) => Math.round((part / whole) * 100);
+
+/** "62% rise · 38% fall", or one side alone when the other is empty. */
+export function SplitWords({ rise, total }) {
+  const up = Math.round((rise / total) * 100);
+  if (up >= 100 || rise === total) return <span className="fl-split"><b className="up">All</b> rise</span>;
+  if (up <= 0 || rise === 0) return <span className="fl-split"><b className="down">All</b> fall</span>;
+  return <span className="fl-split"><b className="up">{up}%</b> rise · <b className="down">{100 - up}%</b> fall</span>;
+}
 
 export default function FlowSummary({ data, selected, onSelect, selectionCount, selectionKind = "trades", onViewTrades }) {
   const rows = summarizeFlow(data.by_coin),
-    calls = rows.reduce((s, r) => s + r.calls, 0),
-    puts = rows.reduce((s, r) => s + r.puts, 0),
-    max = rows[0]?.bought || 0;
+    total = rows.reduce((s, r) => s + r.total, 0),
+    max = rows[0]?.total || 0;
   return (
-    <section className="plate lead-plate flow-briefing" aria-label="What traders paid for options, by market">
+    <section className="plate lead-plate flow-briefing" aria-label="Which way options money points, by market">
       <div className="flow-brief-head">
         <div className="flow-total">
-          <strong>{usd(calls + puts)}</strong>
-          <span className="flow-meta">paid for options · {rows.length} markets · 24h</span>
+          <strong>{usd(total)}</strong>
+          <span className="flow-meta">in options · {rows.length} markets · 24h</span>
         </div>
         <div className="flow-legend">
-          <span><i className="call-buy" />Calls <small>pay if the price rises</small></span>
-          <span><i className="put-buy" />Puts <small>pay if the price falls</small></span>
+          <span><i className="rise" />Gains if the price rises</span>
+          <span><i className="fall" />Gains if it falls</span>
           <Info label="How to read flow">
-            Option premium every recorded taker paid in the 24-hour window, not only the large trades: a taker
-            crosses the spread, and the maker on the other side is not counted again. Bar length is what was paid,
-            on a square-root scale so small markets stay visible; the split is calls against puts. "Sold" is premium
-            takers collected by selling options. A trade may open, close, hedge or be one leg of a wider position,
-            so the split describes money by side, not a signal. Known market makers are left out. Select a market to
-            see its large trades.
+            Buying calls or selling puts gains if the price rises; buying puts or selling calls gains if it falls.
+            The money is the premium paid or received on every recorded trade of the last 24 hours that crossed the
+            spread, market makers left out. A spread puts its two halves on both sides, so they offset. Bar length is
+            the money, on a square-root scale so small markets stay visible. A trade may open, close or hedge a
+            position, so this is context, not a signal. Select a market to see its large trades.
           </Info>
         </div>
       </div>
@@ -55,14 +53,14 @@ export default function FlowSummary({ data, selected, onSelect, selectionCount, 
             onClick={() => onSelect(selected === r.und ? "all" : r.und)}>
             <Asset und={r.und} compact />
             <span className="premium-lane">
-              {r.bought > 0 ? <span className="premium-track" style={{ width: `${trackWidth(r.bought, max)}%` }}
-                aria-label={`Calls ${usd(r.calls)}, puts ${usd(r.puts)}`}>
-                {r.calls > 0 && <i className="call-buy" style={{ flexGrow: r.calls }} />}
-                {r.puts > 0 && <i className="put-buy" style={{ flexGrow: r.puts }} />}
-              </span> : <span className="faint fl-none">Nothing bought</span>}
-              {r.bought > 0 && <span className="fl-split"><b className="call">{pct(r.calls, r.bought)}%</b> calls · <b className="put">{pct(r.puts, r.bought)}%</b> puts</span>}
+              <span className="premium-track" style={{ width: `${trackWidth(r.total, max)}%` }}
+                aria-label={`Gains if the price rises ${usd(r.rise)}, gains if it falls ${usd(r.fall)}`}>
+                {r.rise > 0 && <i className="rise" style={{ flexGrow: r.rise }} />}
+                {r.fall > 0 && <i className="fall" style={{ flexGrow: r.fall }} />}
+              </span>
+              <SplitWords rise={r.rise} total={r.total} />
             </span>
-            <span className="fl-money"><b>{usd(r.bought)}</b>{r.sold > 0 && <small>sold {usd(r.sold)}</small>}</span>
+            <span className="fl-money"><b>{usd(r.total)}</b></span>
           </button>
         ))}
       </div>
