@@ -161,7 +161,6 @@ export function SaloonLive({ pop = false }) {
             <clipPath id={`${id}-clip`}><rect x="0" y="0" width={W} height={bottom + 4} /></clipPath>
             <linearGradient id={`${id}-fade`} x1="0" x2="1" y1="0" y2="0"><stop offset="0" stopColor="#fff" stopOpacity="0" /><stop offset=".22" stopColor="#fff" stopOpacity="1" /></linearGradient>
             <mask id={`${id}-mask`}><rect x="0" y="0" width={W} height={H} fill={`url(#${id}-fade)`} /></mask>
-            <filter id={`${id}-glow`} x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="6" /></filter>
           </defs>
           <g clipPath={`url(#${id}-clip)`} mask={`url(#${id}-mask)`}><path d={smooth(pts)} className="sb-price" /></g>
           <line x1="0" x2={W} y1={yNow} y2={yNow} className="sb-now" />
@@ -173,7 +172,6 @@ export function SaloonLive({ pop = false }) {
               <g key={`${d.expiry}${l.k}`}>
                 <line x1={x} x2={x} y1={yNow} y2={edge} className={`sb-stem ${k}`} />
                 <circle cx={x} cy={yNow} r="2.5" className={`sb-foot ${k}`} />
-                <circle cx={x - r * 0.25} cy={yy - r * 0.2} r={r * 0.95} className={`sb-halo ${k}`} filter={`url(#${id}-glow)`} />
                 <circle cx={x} cy={yy} r={r} fill={`url(#${id}-${k})`} className={`sb-ball ${k}`} />
                 <ellipse cx={x - r * 0.32} cy={yy - r * 0.42} rx={r * 0.32} ry={r * 0.2} className="sb-shine" />
                 {ring && <circle cx={x} cy={yy} r={r + 3} className="sb-gold" />}

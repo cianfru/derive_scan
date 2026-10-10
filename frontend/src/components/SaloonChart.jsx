@@ -128,9 +128,6 @@ function mount(host, cfg) {
     const y = (p) => m.t + ((hi - p) / (hi - lo)) * (H - m.t - m.b);
     const inv = (py) => hi - ((py - m.t) / (H - m.t - m.b)) * (hi - lo);
     const defs = el("defs", {}, svg);
-    const g = el("linearGradient", { id: "sch-wash", x1: "0", x2: "1", y1: "0", y2: "0" }, defs);
-    el("stop", { offset: "0", "stop-color": C.accent, "stop-opacity": C.light ? "0.07" : "0.10" }, g);
-    el("stop", { offset: "1", "stop-color": C.accent, "stop-opacity": "0.02" }, g);
     // Bubbles read as lit glass spheres (owner, 7 October 2026: "more depth ... some sort of 3D effect"): light from
     // the top left, a highlight, a darker lower edge, and a soft shadow on the chart beneath.
     const orb = (id, base) => {
@@ -144,35 +141,14 @@ function mount(host, cfg) {
     const shine = el("radialGradient", { id: "sch-shine", cx: "0.5", cy: "0.5", r: "0.5" }, defs);
     el("stop", { offset: "0", "stop-color": "#ffffff", "stop-opacity": "0.55" }, shine);
     el("stop", { offset: "1", "stop-color": "#ffffff", "stop-opacity": "0" }, shine);
-    const halo = (id, base) => {
-      const gr = el("radialGradient", { id, cx: "0.5", cy: "0.5", r: "0.5" }, defs);
-      el("stop", { offset: "0.55", "stop-color": base, "stop-opacity": C.light ? "0.3" : "0.42" }, gr);
-      el("stop", { offset: "1", "stop-color": base, "stop-opacity": "0" }, gr);
-    };
-    halo("sch-halo-up", C.up);
-    halo("sch-halo-down", C.down);
     const gold = el("linearGradient", { id: "sch-gold", x1: "0", y1: "0", x2: "0", y2: "1" }, defs);
     el("stop", { offset: "0", "stop-color": mix(C.gold, "#ffffff", 0.45) }, gold);
     el("stop", { offset: "0.55", "stop-color": C.gold }, gold);
     el("stop", { offset: "1", "stop-color": mix(C.gold, "#000000", 0.35) }, gold);
-    // Warm orange light behind the future, so the bubbles' shadows have something to fall on.
-    const glow = (id, op) => {
-      const gr = el("radialGradient", { id, cx: "0.5", cy: "0.5", r: "0.5" }, defs);
-      el("stop", { offset: "0", "stop-color": C.accent, "stop-opacity": op }, gr);
-      el("stop", { offset: "1", "stop-color": C.accent, "stop-opacity": "0" }, gr);
-    };
-    glow("sch-glow-a", C.light ? "0.10" : "0.16");
-    glow("sch-glow-b", C.light ? "0.07" : "0.11");
     const clip = el("clipPath", { id: "sch-plot" }, defs);
     el("rect", { x: 0, y: m.t - 8, width: W - m.r, height: H - m.t - m.b + 8 }, clip);
-    // The future is where you act: a faint orange wash from now to the last settlement.
-    el("rect", { x: futX, y: 0, width: pw - pastW, height: H - m.b, fill: "url(#sch-wash)" }, svg);
-    {
-      const fw = pw - pastW, yNow = Math.min(Math.max(m.t + (hi - index) / (hi - lo) * (H - m.t - m.b), m.t), H - m.b);
-      const glows = el("g", { class: "sch-glows" }, svg);
-      el("ellipse", { cx: futX + fw * 0.42, cy: yNow, rx: fw * 0.55, ry: (H - m.t - m.b) * 0.48, fill: "url(#sch-glow-a)" }, glows);
-      el("ellipse", { cx: futX + fw * 0.9, cy: m.t + (H - m.t - m.b) * 0.18, rx: fw * 0.38, ry: (H - m.t - m.b) * 0.36, fill: "url(#sch-glow-b)" }, glows);
-    }
+    // One background from the first candle to the last settlement (owner, 10 October 2026: "I want to have the same
+    // background. So the two things are basically together"); the Now line through the latest candle splits them.
     const plot = el("g", { "clip-path": "url(#sch-plot)" }, svg);
     const span = hi - lo, base = 10 ** Math.floor(Math.log10(span / 6));
     const step = [1, 2, 5, 10].map((x) => x * base).find((s) => span / s <= 8);
@@ -182,7 +158,7 @@ function mount(host, cfg) {
     }
     const bw = pastW / cs.length;
     const days = Math.round((cs[cs.length - 1][0] - cs[0][0]) / 86400);
-    [[0, `${days} days ago`], [cs.length - 1, "now"]].forEach(([i, label]) => {
+    [[0, `${days} days ago`]].forEach(([i, label]) => {
       el("text", { x: m.l + bw * (i + 0.5), y: H - 12, fill: C.text3, "font-size": 11, "text-anchor": i ? "end" : "start", class: "sch-history-label" }, svg).textContent = label;
     });
     // Candles and the price line repaint on each current index without redrawing unchanged bubbles.
@@ -202,7 +178,10 @@ function mount(host, cfg) {
       }
     };
     paintPrice();
-    el("line", { x1: futX, x2: futX, y1: 0, y2: H - m.b, stroke: C.strong, "stroke-width": 1 }, svg);
+    // Now: a line through the latest 4-hour candle (the one forming), named above it like the dates beside it.
+    const nowX = m.l + bw * (cs.length - 0.5);
+    el("line", { x1: nowX, x2: nowX, y1: m.t - 36, y2: H - m.b, stroke: C.text2, "stroke-opacity": 0.55, "stroke-width": 1, class: "sch-now" }, svg);
+    el("text", { x: nowX, y: m.t - 44, fill: C.text1, "font-size": phone ? 12 : 13, "font-family": "Manrope, sans-serif", "font-weight": 700, "text-anchor": "middle", class: "sch-now-label" }, svg).textContent = "Now";
     const zone = el("g", {}, plot);
     const threads = el("g", {}, plot);
     const stems = el("g", { class: "sch-stems" }, plot);
@@ -240,6 +219,9 @@ function mount(host, cfg) {
     });
     if (lane) traderLane(svg, lane);
     if (current) paintSelected();
+    // The bubbles pop in once per coin: the view is kept from here on, so a remount when prices refresh redraws
+    // them in place instead of popping them in again (owner, 10 October 2026: they "disappear and then appear again").
+    if (firstPaint) cfg.onView?.(view);
     firstPaint = false;
     if (focusedKey) {
       const buttons = [...svg.querySelectorAll(".sch-bubble")];
@@ -314,14 +296,11 @@ function mount(host, cfg) {
     const b = el("g", { class: full ? "sch-bubble" : "sch-bubble sch-dot", tabindex: 0, role: "button", "data-key": r.key,
       "aria-label": full ? `${name}. Drag to explore other levels and dates` : `${name}. Opens up when zoomed in` }, parent);
     if (current && current.key === r.key) b.classList.add("on");
-    const seed = ((l.k / Math.max(1, index)) * 997 + col * 13) % 10;
     const pop = el("g", { class: firstPaint ? "sch-pop" : "", style: `--pd:${col * 90 + rank * 45}ms` }, b);
     const orbFill = `url(#sch-orb-${yes ? "up" : "down"})`, ring = yes ? C.upRing : C.downRing;
-    // The shadow stays on the chart while the bubble floats above it.
-    const sr = full ? R : 6;
-    // A soft glow of the bubble's own colour on the side the light comes from (top left), so it lifts off the chart.
-    el("circle", { cx: cx - sr * 0.14, cy: by - sr * 0.14, r: sr * 1.32, fill: `url(#sch-halo-${yes ? "up" : "down"})`, class: "sch-halo" }, pop);
-    const fl = el("g", { class: "sch-float", style: `--dur:${(3.4 + seed * 0.18).toFixed(2)}s;--delay:-${(seed * 0.4).toFixed(2)}s` }, pop);
+    // Still and clean (owner, 10 October 2026: the aura "doesn't look great"; the float "goes only up and down ...
+    // people don't really understand what it means"): no glow behind a bubble and no motion once it has popped in.
+    const fl = el("g", {}, pop);
     const body = el("g", { class: "sch-body" }, fl);
     if (full) {
       if (smart) el("circle", { cx, cy: by, r: R + 5, fill: "none", stroke: "url(#sch-gold)", "stroke-width": 3, class: "sch-gold" }, body);
