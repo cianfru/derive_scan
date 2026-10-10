@@ -40,9 +40,9 @@ function PositionsFigure() {
   if (!list) return null;
   const r = openPnl(list, Object.fromEntries(unds.map((u) => [u, files[`questions/${u}.json`]])));
   const n = `${r.open} open`;
-  return <>{feeds}{!r.open ? <span className="home-fig">No open positions</span>
-    : r.pct == null ? <span className="home-fig">{n}</span>
-      : <span className="home-fig-stack"><span className={`home-fig big ${r.pct >= 0 ? "up" : "down"}`}>{pctText(r.pct)}</span><span className="home-fig">{n}</span></span>}</>;
+  return <>{feeds}{!r.open ? <span className="home-pnl-none">No open positions</span>
+    : r.pct == null ? <span className="home-pnl-none">{n}</span>
+      : <span className="home-pnl"><span className={`home-pnl-num ${r.pct >= 0 ? "up" : "down"}`}>{pctText(r.pct)}</span><span className="home-fig">{n}</span></span>}</>;
 }
 
 /** Small live figures for the cards; each is left out while its file is missing. */

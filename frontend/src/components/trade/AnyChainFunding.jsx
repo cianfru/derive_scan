@@ -18,7 +18,7 @@ function RouteFailure({ error }) {
 }
 
 /** Loaded with the trade panel only, and discarded entirely when FUND_ANYCHAIN is off. */
-export default function AnyChainFunding({ onChainChange }) {
+export default function AnyChainFunding() {
   const seat = useSeat(), id = useId();
   const [walletAssets, setWalletAssets] = useState({ loading: true, chains: [], tokens: {}, error: null });
   const [reload, setReload] = useState(0);
@@ -62,7 +62,6 @@ export default function AnyChainFunding({ onChainChange }) {
   const error = request.key === key && request.error;
   const expired = quote && now >= (quote.expiresAt || quote.createdAt + 60_000);
   const canQuote = !!(chain && token && Number(amount) > 0 && seat.depositAddress && !seat.busy && !pending);
-  useEffect(() => { onChainChange?.(chain?.name || null); }, [chain?.name, onChainChange]);
   useEffect(() => {
     if (!quote) return;
     setNow(Date.now());
