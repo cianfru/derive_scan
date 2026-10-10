@@ -26,6 +26,7 @@ const Cohorts = lazy(() => import("./pages/Cohorts.jsx"));
 const Questions = QUESTIONS_ON ? lazy(() => import("./pages/Questions.jsx")) : null;
 const MyQuestions = QUESTIONS_ON ? lazy(() => import("./pages/MyQuestions.jsx")) : null;
 const Saloon = QUESTIONS_ON ? lazy(() => import("./pages/Saloon.jsx")) : null;
+const Home = QUESTIONS_ON ? lazy(() => import("./pages/Home.jsx")) : null;
 // The guided flow and the per-coin Saloon retired into the chart (owner, 7 October 2026); old links land on it.
 function ToChart() {
   const { und } = useParams();
@@ -47,6 +48,7 @@ createRoot(document.getElementById("root")).render(
           <Route path="traders/cohorts" element={<Navigate to="/traders/posses" replace />} />
           <Route path="trader/:address" element={<Trader />} />
           <Route path="flow" element={<Flow />} />
+          {QUESTIONS_ON && <Route path="home" element={<Home />} />}
           {QUESTIONS_ON && <Route path="saloon" element={<Saloon />} />}
           {QUESTIONS_ON && <Route path="saloon/guided" element={<ToChart />} />}
           {QUESTIONS_ON && <Route path="saloon/following" element={<Navigate to="/saloon/mine?tab=following" replace />} />}

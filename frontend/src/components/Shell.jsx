@@ -127,12 +127,13 @@ export default function Shell() {
             // Testnet builds only: one-tap trades go to Derive's testnet. A text label with a thin accent
             // underline on every page (styles in hdr-wallet.css, inlined in these builds alone), written as a
             // separate branch so other builds stay byte-identical.
-            <Link to="/" className="logo" aria-label="Cowboy home, testnet build">
+            <Link to={QUESTIONS_ON ? "/home" : "/"} className="logo" aria-label="Cowboy home, testnet build">
               <Lockup />
               <span className="hdr-testnet mono" title="One-tap trades in this build go to Derive's testnet with test USDC. Board prices come from Derive's live market.">Testnet</span>
             </Link>
           ) : (
-            <Link to="/" className="logo" aria-label="Cowboy home">
+            // With the Saloon on, the logo opens the card home (owner, 10 October 2026); the landing stays at /.
+            <Link to={QUESTIONS_ON ? "/home" : "/"} className="logo" aria-label="Cowboy home">
               <Lockup />
             </Link>
           )}
