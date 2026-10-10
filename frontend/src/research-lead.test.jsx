@@ -56,8 +56,8 @@ describe("research leads", () => {
     const f = flowLead({ coverage: { ready: false, fraction: 0.74 }, by_coin: {
       BTC: { call: { buy_premium_usd: 1000, sell_premium_usd: 500, buy_notional_usd: 9e5 }, put: { buy_premium_usd: 200, sell_premium_usd: 300 } },
       ETH: { call: { buy_premium_usd: 100, buy_notional_usd: 1e5 } } } });
-    expect(f.text).toBe("Over the last 24 hours, takers bought $1.3K of option premium and sold $800; BTC saw the most options notional.");
-    expect(f.note).toMatch(/^The recorder covered 74% of that window/);
+    expect(f.text).toBe("Traders paid $1.3K for options in the last 24 hours: 85% on calls, which pay if the price rises, and 15% on puts, which pay if it falls.");
+    expect(f.note).toBe("They sold $800 of options to collect premium. A trade shows who crossed the spread, not a wallet's whole position. The recorder covered 74% of that window.");
     check(f);
   });
   it("Coin: regime and signal, then the layers that have a reading", () => {

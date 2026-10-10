@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compactCount, groupIconSize, radarLayout, separate, swarm } from "./homeLayout.js";
+import { compactCount, groupIconSize, radarLayout, separate } from "./homeLayout.js";
 
 const overlap = (a, b) => Math.hypot(a.px - b.px, a.py - b.py) < (a.s + b.s) / 2 - 0.5;
 
@@ -54,19 +54,7 @@ describe("home card layouts", () => {
     expect(overlap(longs[0], longs[1]) || overlap(longs[1], longs[2]) || overlap(longs[0], longs[2])).toBe(false);
   });
 
-  it("swarm: calls above the line and puts below, at their exact times, stacked rather than piled", () => {
-    const dots = [{ px: 50, r: 10, side: -1 }, { px: 52, r: 6, side: -1 }, { px: 51, r: 8, side: 1 }, { px: 200, r: 4, side: 1 }];
-    const out = swarm(dots, { mid: 50, lo: 0, hi: 100 });
-    for (const d of out) {
-      expect(d.side < 0 ? d.py < 50 : d.py > 50).toBe(true);
-      expect(d.py - d.r).toBeGreaterThanOrEqual(-0.01);
-      expect(d.py + d.r).toBeLessThanOrEqual(100.01);
-    }
-    expect(out.map((d) => d.px).sort((a, b) => a - b)).toEqual([50, 51, 52, 200]);
-    const [big, small] = [out.find((d) => d.r === 10), out.find((d) => d.r === 6)];
-    expect(Math.hypot(big.px - small.px, big.py - small.py)).toBeGreaterThanOrEqual(big.r + small.r);
-    expect(Math.abs(big.py - 50)).toBeLessThan(Math.abs(small.py - 50)); // the largest nearest the line
-  });
+
 
   it("group icons shrink to fit the width, and never under 14px", () => {
     const groups = [{ n: 9, name: "Trending up 9" }, { n: 3, name: "Cooling off 3" }];

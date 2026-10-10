@@ -17,7 +17,8 @@ import { codename } from "../lib/walletName.js";
 import { loadPositions } from "../lib/positions.js";
 import { positionDone } from "../lib/positionView.js";
 import { openPnl, pctText } from "../lib/homePnl.js";
-import { compactCount, groupIconSize, radarLayout, swarm } from "../lib/homeLayout.js";
+import { compactCount, groupIconSize, radarLayout } from "../lib/homeLayout.js";
+import { stories } from "../lib/flowStories.js";
 import { useFollowsDoc } from "../lib/follows.js";
 import { boardRows } from "../lib/board.js";
 import { useClock } from "../lib/useClock.js";
@@ -444,27 +445,19 @@ export function PossesLive({ card }) {
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-/** "ETH 3,050 put · Oct 9 expiry · bought · $37.2K premium". */
-function tradeTitle(t) {
-  const m = /^([A-Z0-9]+)-\d{4}(\d{2})(\d{2})-([\d_.]+)-([CP])$/.exec(t.instrument || "");
-  if (!m) return t.instrument || "";
-  return `${m[1]} ${strike(Number(m[4].replace("_", ".")), "")} ${m[5] === "C" ? "call" : "put"} · ${MONTHS[+m[2] - 1]} ${+m[3]} expiry · `
-    + `${t.direction === "buy" ? "bought" : "sold"} · ${usd(t.premium_usd)} premium`;
-}
 /** "7 Oct 08:30" in UTC. */
 const when = (t) => { const d = new Date(t * 1000); return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.toISOString().slice(11, 16)}`; };
 /** Past this age the flow file no longer reads as "the last 24 hours" and names its window instead. */
 export const FLOW_FRESH_SEC = 2 * 3600;
 /**
- * Options flow: the option premium takers bought on Derive over 24 hours (the Flow page's figure, every
- * recorded taker, not only the large trades), split between calls and puts, over a 24-hour strip of the
- * day's largest trades: each at its exact time, calls stacked above the line and puts below, filled when
- * bought, a ring when sold, sized by premium. The strip stays hidden until wallet classes are ready, so
- * market makers never show. An old file names its window ("24h to 7 Oct 08:30 UTC") instead of "now".
+ * Options flow: what traders paid for options on Derive over 24 hours (the Flow page's figure, every recorded
+ * taker), split between calls and puts, and under it the day's largest trade as one sentence (owner, 10 October
+ * 2026: the dot strip was "kind of hard to read"): who, what in plain words ("sold ZEC calls", "bought an ETH
+ * call spread", legs sent together grouped as on the Flow page), the money paid or collected and when. The
+ * trade stays hidden until wallet classes are ready, so market makers never show. An old file names its window.
  */
 export function OptionsLive({ card }) {
   const { data, loading } = useData("flow.json");
-  const [band, box] = useElementSize({ w: 640, h: 90 });
   if (loading) return <Wait />;
   let calls = 0, puts = 0;
   for (const c of Object.values(data?.by_coin || {})) { calls += c.call?.buy_premium_usd || 0; puts += c.put?.buy_premium_usd || 0; }
@@ -473,30 +466,16 @@ export function OptionsLive({ card }) {
   const callPct = Math.round((calls / bought) * 100);
   const cov = data.coverage;
   const part = cov?.ready === false && Number.isFinite(cov.fraction) ? Math.round(cov.fraction * 100) : null;
-  const from = Number(data.since), to = Number(cov?.end ?? data.generated_at);
+  const to = Number(cov?.end ?? data.generated_at);
   const stale = Number.isFinite(to) && Date.now() / 1000 - to > FLOW_FRESH_SEC;
-  const trades = data.classes_ready === false || !(to > from) ? [] : (data.large || []).filter((t) => t.kind === "option" && Number.isFinite(t.premium_usd) && t.premium_usd > 0)
-    .map((t) => ({ t, x: Math.max(0, Math.min(1, (t.ts / 1000 - from) / (to - from))) }));
+  const top = data.classes_ready === false ? null : stories(data.large)[0] || null;
   const split = <><span><N className="call">{callPct}%</N> calls</span> <span className="hl-sep">·</span> <span><N className="put">{100 - callPct}%</N> puts</span></>;
-  // The strip in pixels: the line through the middle, the axis words' row under it when there is room.
-  let strip = null;
-  if (box && trades.length) {
-    const axis = box.h >= 60 ? 16 : 0, h = box.h - axis, mid = h / 2;
-    const rMax = Math.max(6, Math.min(22, mid * 0.62)), rMin = Math.min(3, rMax / 2);
-    const maxP = Math.max(...trades.map(({ t }) => t.premium_usd));
-    const biggest = trades.reduce((a, b) => (b.t.premium_usd > a.t.premium_usd ? b : a));
-    const pad = rMax + 2;
-    const dots = swarm(trades.map((d) => ({ ...d, top: d === biggest, side: /-C$/.test(d.t.instrument) ? -1 : 1,
-      px: pad + d.x * (box.w - 2 * pad), r: rMin + (rMax - rMin) * Math.sqrt(d.t.premium_usd / maxP) })), { mid, lo: 0, hi: h })
-      .sort((a, b) => a.r - b.r);
-    strip = { dots, mid, axis };
-  }
   return (
     <div className="hl hl-options">
       <div className="hl-fig">
         <BigNum text={usd(bought)} />
         <span className="hl-cap">
-          <span>option premium bought, {stale ? <><N>24h</N> to {when(to)} UTC</> : <N>24h</N>}{part != null && <> · <N>{part}%</N> of <N>24h</N> recorded</>}</span>
+          <span>paid for options, {stale ? <><N>24h</N> to {when(to)} UTC</> : <N>24h</N>}{part != null && <> · <N>{part}%</N> of <N>24h</N> recorded</>}</span>
           <span className="hl-split-line">{split}</span>
         </span>
         <span className="hl-split" aria-hidden="true">
@@ -504,17 +483,14 @@ export function OptionsLive({ card }) {
           <span className="hl-split-words">{split}</span>
         </span>
       </div>
-      {trades.length > 0 && <div className="hl-band hl-strip" ref={band} aria-hidden="true">
-        {strip && <>
-          <i className="hl-strip-line" style={{ top: strip.mid }} />
-          {strip.dots.map((d, i) => (
-            <i key={`${d.t.ts}-${d.t.instrument}-${i}`} title={tradeTitle(d.t)}
-              className={`hl-dot ${d.side < 0 ? "call" : "put"} ${d.t.direction === "buy" ? "buy" : "sell"}${d.top ? " top" : ""}`}
-              style={{ left: `${d.px.toFixed(1)}px`, top: `${d.py.toFixed(1)}px`, width: 2 * d.r, height: 2 * d.r, "--x": d.x }} />
-          ))}
-          {strip.axis > 0 && <div className="hl-xw">{stale ? <><span>{when(from)}</span><span>{when(to)} UTC</span></>
-            : <><span><N>24h</N> ago</span><span>now</span></>}</div>}
-        </>}
+      {top && <div className="hl-band hl-trade">
+        <span className="hl-trade-k">Largest trade{stale ? "" : ", 24h"}</span>
+        <span className="hl-trade-row">
+          <WalletEmblem address={top.wallet} size={30} />
+          <span className="hl-trade-what"><span><b>{top.who ? `${top.who} ` : "A trader "}{top.text}</b>{top.times > 1 && <N className="hl-times">×{top.times}</N>}</span>
+            <small>{top.detail}</small></span>
+          <span className="hl-trade-money"><small>{top.paid ? "paid" : "collected"}</small><N>{usd(top.money)}</N></span>
+        </span>
       </div>}
     </div>
   );

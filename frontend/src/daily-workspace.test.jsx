@@ -129,8 +129,10 @@ it("summarizes the recorded premium categories and selects a market for the tape
       onSelect={choose}
     />,
   );
-  expect(screen.getByText("$150")).toBeTruthy();
-  expect(screen.getByText("2 markets · 24h")).toBeTruthy();
+  // What traders paid: calls and puts bought ($80 + $50); the $20 sold sits beside HYPE, not in the total.
+  expect(screen.getByText("$130")).toBeTruthy();
+  expect(screen.getByText("paid for options · 2 markets · 24h")).toBeTruthy();
+  expect(screen.getByText("sold $20")).toBeTruthy();
   await userEvent.setup().click(screen.getByRole("button", { name: /HYPE/ }));
   expect(choose).toHaveBeenCalledWith("HYPE");
 });

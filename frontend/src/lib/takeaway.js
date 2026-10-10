@@ -118,22 +118,23 @@ export function cohortsLead(data) {
 }
 
 /** Flow: option premium bought and sold by takers, and the busiest market. */
+/** Flow (owner, 10 October 2026: "make it look more intuitive"): what traders paid for options, calls against
+ * puts in plain words, then what they sold. */
 export function flowLead(data) {
   const by = data?.by_coin || {};
-  let bought = 0, sold = 0, best = null, bestN = 0;
-  for (const [und, c] of Object.entries(by)) {
-    const b = (c.call?.buy_premium_usd || 0) + (c.put?.buy_premium_usd || 0);
-    const s = (c.call?.sell_premium_usd || 0) + (c.put?.sell_premium_usd || 0);
-    bought += b; sold += s;
-    const n = (c.call?.buy_notional_usd || 0) + (c.call?.sell_notional_usd || 0) + (c.put?.buy_notional_usd || 0) + (c.put?.sell_notional_usd || 0);
-    if (n > bestN) { bestN = n; best = und; }
+  let calls = 0, puts = 0, sold = 0;
+  for (const c of Object.values(by)) {
+    calls += c.call?.buy_premium_usd || 0; puts += c.put?.buy_premium_usd || 0;
+    sold += (c.call?.sell_premium_usd || 0) + (c.put?.sell_premium_usd || 0);
   }
+  const bought = calls + puts;
   if (!bought && !sold) return null;
-  let text = `Over the last 24 hours, takers bought ${usd(bought)} of option premium and sold ${usd(sold)}`;
-  if (best) text += `; ${best} saw the most options notional`;
+  const text = bought
+    ? `Traders paid ${usd(bought)} for options in the last 24 hours: ${Math.round((calls / bought) * 100)}% on calls, which pay if the price rises, and ${100 - Math.round((calls / bought) * 100)}% on puts, which pay if it falls.`
+    : "Traders bought no options in the last 24 hours.";
   const cov = data.coverage;
-  const gap = cov && cov.ready === false && Number.isFinite(cov.fraction) ? `The recorder covered ${Math.round(cov.fraction * 100)}% of that window; a` : "A";
-  return { text: `${text}.`, note: `${gap} taker trade shows who crossed the spread, not the wallet's whole position.` };
+  const gap = cov && cov.ready === false && Number.isFinite(cov.fraction) ? ` The recorder covered ${Math.round(cov.fraction * 100)}% of that window.` : "";
+  return { text, note: `${sold ? `They sold ${usd(sold)} of options to collect premium. ` : ""}A trade shows who crossed the spread, not a wallet's whole position.${gap}` };
 }
 
 const WALLET_WORDS = { up: "Smart wallets hold long delta", defensive: "Smart wallets hold short delta", neutral: "Smart wallets' delta is balanced" };

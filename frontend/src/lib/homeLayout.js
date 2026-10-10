@@ -78,28 +78,6 @@ export function radarLayout(points, strip, { w, h }) {
     offMap: !flat && !lane ? strip.length : 0 };
 }
 
-/**
- * Large trades on one line: each dot at its exact time, calls stacked above the line and puts below
- * (`side` -1 and 1), the largest nearest the line. A dot with no free spot inside the band keeps the
- * nearest free spot clamped to the band, overlapping a little. Returns new dots with `py`.
- */
-export function swarm(dots, { mid, lo, hi, gap = 2 }) {
-  const placed = [];
-  for (const d of [...dots].sort((a, b) => b.r - a.r)) {
-    const dir = d.side;
-    const base = mid + dir * (gap + d.r);
-    const near = placed.filter((p) => p.side === dir && Math.abs(p.px - d.px) < p.r + d.r + 1);
-    const free = (y) => near.every((p) => Math.hypot(p.px - d.px, p.py - y) >= p.r + d.r + 0.75);
-    const inside = (y) => y - d.r >= lo - 0.01 && y + d.r <= hi + 0.01;
-    const cands = [base, ...near.map((p) => {
-      const dist = p.r + d.r + 1;
-      return p.py + dir * Math.sqrt(Math.max(0, dist * dist - (p.px - d.px) ** 2));
-    })].filter((y) => (y - base) * dir >= -0.01).sort((a, b) => (a - b) * dir);
-    const pick = cands.find((y) => free(y) && inside(y)) ?? cands.find(free) ?? base;
-    placed.push({ ...d, py: Math.min(hi - d.r, Math.max(lo + d.r, pick)) });
-  }
-  return placed;
-}
 
 /**
  * The coin icon size for the Markets card's regime groups: the largest, up to 40px, at which every

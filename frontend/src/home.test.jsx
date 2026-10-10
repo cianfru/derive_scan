@@ -44,8 +44,9 @@ const TRADERS = { traders: [trader("a", 1, "top", "directional", 10051791), trad
   cohorts: { pnl: [3, 33, 132, 2353, 6750, 295, 34, 2].map((wallets, i) => ({ name: PNL[i], wallets })) } };
 const FLOW = { generated_at: NOW, since: NOW - 86400, coverage: { ready: true, end: NOW }, classes_ready: true,
   by_coin: { BTC: { call: { buy_premium_usd: 300 }, put: { buy_premium_usd: 100 } }, ETH: { call: { buy_premium_usd: 120 }, put: { buy_premium_usd: 480 } } },
-  large: [{ ts: (NOW - 3600) * 1000, kind: "option", instrument: "ETH-20261009-3050-P", direction: "buy", premium_usd: 37241 },
-    { ts: (NOW - 7200) * 1000, kind: "option", instrument: "BTC-20261030-90000-C", direction: "sell", premium_usd: 5000 },
+  large: [{ ts: (NOW - 3600) * 1000, kind: "option", underlying: "ETH", instrument: "ETH-20261009-3050-P", direction: "buy", premium_usd: 37241,
+    wallet: "0x" + "c".repeat(40), class: "top" },
+    { ts: (NOW - 7200) * 1000, kind: "option", underlying: "BTC", instrument: "BTC-20261030-90000-C", direction: "sell", premium_usd: 5000, wallet: "0x" + "d".repeat(40), class: "income" },
     { ts: (NOW - 1800) * 1000, kind: "perp", instrument: "BTC-PERP", direction: "buy", premium_usd: 0 }] };
 const INDEX = { prices_ts: NOW - 120, coins: [{ und: "BTC", smart: 3 }, { und: "ETH", smart: 1 }] };
 const ALL = { "questions/index.json": INDEX, "markets.json": MARKETS, "traders.json": TRADERS, "flow.json": FLOW };
@@ -62,7 +63,8 @@ describe("card home", () => {
     expect(describe("Radar")).toContain("HYPE");
     expect(describe("Radar")).toContain("Most stretched, below trend");
     expect(describe("Markets")).toMatch(/4 ?of ?5.*trending up/);
-    expect($$(".hl-band[aria-hidden='true']").length).toBe(4);
+    // Radar, Markets and Posses draw charts; the flow card's largest trade is words, read with its figure.
+    expect($$(".hl-band[aria-hidden='true']").length).toBe(3);
   });
 
   it("Saloon: the open coins and the gold rings, or that prices are paused", () => {
@@ -188,27 +190,21 @@ describe("card home", () => {
     expect(h[7]).toBeCloseTo(Math.sqrt(2 / 6750), 3);
   });
 
-  it("Options flow: premium bought, the split, one dot per large option trade; none until classes are ready", () => {
+  it("Options flow: what traders paid, the split, and the day's largest trade as a sentence; none until classes are ready", () => {
     docs.current = { "flow.json": FLOW };
     show();
     expect(text(".hl-options .bn")).toBe("$1K");
     expect(text(".hl-options .hl-split-line")).toBe("42% calls · 58% puts");
-    const dots = $$(".hl-strip .hl-dot");
-    expect(dots).toHaveLength(2);
-    expect(dots.at(-1).title).toBe("ETH 3,050 put · Oct 9 expiry · bought · $37.2K premium");
-    expect(dots.at(-1).className).toBe("hl-dot put buy top");
-    expect(dots[0].className).toBe("hl-dot call sell");
-    // Calls above the line, puts below; the later trade further right.
-    const line = parseFloat($(".hl-strip-line").style.top);
-    expect(parseFloat(dots[0].style.top)).toBeLessThan(line);
-    expect(parseFloat(dots[1].style.top)).toBeGreaterThan(line);
-    expect(parseFloat(dots[1].style.left)).toBeGreaterThan(parseFloat(dots[0].style.left));
-    expect(text(".hl-strip .hl-xw")).toBe("24h agonow");
+    expect($$(".hl-options .hl-cap > span")[0].textContent).toBe("paid for options, 24h");
+    expect(text(".hl-trade-k")).toBe("Largest trade, 24h");
+    expect(text(".hl-trade-what b")).toBe("Smart wallet bought ETH puts");
+    expect(text(".hl-trade-what small")).toBe("3,050 put · Oct 09");
+    expect(text(".hl-trade-money")).toBe("paid$37.2K");
     cleanup();
     docs.current = { "flow.json": { ...FLOW, classes_ready: false } };
     show();
     expect(text(".hl-options .bn")).toBe("$1K");
-    expect($$(".hl-dot")).toHaveLength(0);
+    expect($(".hl-trade")).toBeNull();
   });
 
   it("Options flow: an old file names its window instead of the last 24 hours to now", () => {
@@ -216,8 +212,8 @@ describe("card home", () => {
     docs.current = { "flow.json": { ...FLOW, since: end - 86400, coverage: { ready: true, end } } };
     show();
     const at = (t) => { const d = new Date(t * 1000); return `${d.getUTCDate()} ${d.toUTCString().slice(8, 11)} ${d.toISOString().slice(11, 16)}`; };
-    expect($$(".hl-options .hl-cap > span")[0].textContent).toBe(`option premium bought, 24h to ${at(end)} UTC`);
-    expect(text(".hl-strip .hl-xw")).toBe(`${at(end - 86400)}${at(end)} UTC`);
+    expect($$(".hl-options .hl-cap > span")[0].textContent).toBe(`paid for options, 24h to ${at(end)} UTC`);
+    expect(text(".hl-trade-k")).toBe("Largest trade");
     expect(document.body.textContent).not.toContain("now");
   });
 

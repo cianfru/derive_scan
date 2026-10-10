@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, describe, it, expect, vi } from "vitest";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
 // One glyph for a missing value across the app: the em dash (lib/format.js DASH, ui.jsx Empty).
@@ -59,6 +59,8 @@ describe("missing values", () => {
       },
     };
     const flow = render(<MemoryRouter><Flow /></MemoryRouter>);
+    // Trades read as sentences (no type column); the wallets table keeps the em dash for a missing type.
+    fireEvent.click(screen.getByRole("tab", { name: "Active wallets" }));
     expect(flow.container.textContent).toContain(DASH);
     expect(missingGlyphs(flow.container)).toEqual([]);
     cleanup();

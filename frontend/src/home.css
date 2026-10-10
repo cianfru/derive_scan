@@ -237,12 +237,6 @@ a.hl-who:hover .hl-name, a.hl-row:hover .hl-name { color: var(--accent-text); }
   .hl-split-words { display: flex; justify-content: space-between; }
   .hl-split-words .hl-sep { display: none; }
 }
-.hl-strip-line { position: absolute; left: 0; right: 0; height: 1px; background: var(--border-strong); }
-.hl-dot { position: absolute; translate: -50% -50%; box-sizing: border-box; border-radius: 50%; box-shadow: 0 0 0 1.5px var(--surface-1); }
-.hl-dot.buy.call { background: var(--call); } .hl-dot.buy.put { background: var(--put); }
-.hl-dot.sell { border: 1.5px solid var(--call); background: color-mix(in srgb, var(--call) 14%, var(--surface-1)); }
-.hl-dot.sell.put { border-color: var(--put); background: color-mix(in srgb, var(--put) 14%, var(--surface-1)); }
-.hl-dot.top { z-index: 1; box-shadow: 0 0 0 1.5px var(--surface-1), 0 0 0 3px var(--text-1); }
 
 /* The pop-out: grown out of its card (pages/Home.jsx), the text on the left, the same widget roomy on the right. */
 .home-pop { width: min(960px, 92vw); max-height: 90vh; padding: 0; overflow: auto; border: 1px solid var(--border-strong); border-radius: 28px;
@@ -268,14 +262,13 @@ html:has(.home-pop[open]) { overflow: hidden; }
 .home[data-enter] .home-card { animation: home-rise .5s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i) * 40ms); }
 .home[data-enter] .hl-bar i { animation: home-grow .7s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--d) * 30ms + 150ms); }
 .home[data-enter] .hl-pt, .home[data-enter] .hl-ic { animation: home-fade .5s ease both; animation-delay: calc(var(--d) * 20ms + 150ms); }
-.home[data-enter] .hl-dot { animation: home-fade .5s ease both; animation-delay: calc(var(--x) * 500ms + 150ms); }
 @keyframes home-rise { from { opacity: 0; translate: 0 10px; } }
 @keyframes home-fade { from { opacity: 0; } }
 @keyframes home-grow { from { transform: scaleY(0); } }
 @keyframes home-pop { from { opacity: 0; transform: scale(.94); } }
 @media (prefers-reduced-motion: reduce) {
   .home-card, .home-card:hover, .home-card:focus-within { transform: none; transition: none; }
-  .home[data-enter] .home-card, .home[data-enter] .hl-bar i, .home[data-enter] .hl-pt, .home[data-enter] .hl-ic, .home[data-enter] .hl-dot,
+  .home[data-enter] .home-card, .home[data-enter] .hl-bar i, .home[data-enter] .hl-pt, .home[data-enter] .hl-ic,
   .home-pop[open]:not(.grow), .home-pop[open]::backdrop { animation: none; }
 }
 
@@ -324,3 +317,16 @@ html:has(.home-pop[open]) { overflow: hidden; }
 /* The Saloon chart in the pop-out fills its stage (pinned to it, so the chart never sizes its own box). */
 .home-pop-stage .hl.hl-saloon { position: relative; flex: 1 1 0; min-height: 0; width: 100%; }
 .home-pop-stage .hl-saloon .hl-band { position: absolute; inset: 0; margin: 0; }
+
+/* Options flow: the day's largest trade as one sentence (owner, 10 October 2026: the dot strip was hard to read). */
+.hl-trade { display: grid; align-content: end; gap: 6px; }
+.hl-trade-k { font: 600 12px/1.3 var(--font-sans); color: var(--text-3); }
+.hl-trade-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent); }
+.hl-trade-what { display: grid; gap: 2px; min-width: 0; }
+.hl-trade-what b { font: 700 15px/1.3 var(--font-sans); color: var(--text-1); }
+.hl-trade-what .hl-times { margin-left: 8px; font-size: 13px; color: var(--text-2); }
+.hl-trade-what small { font: 500 12px/1.3 var(--font-mono); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hl-trade-money { display: grid; justify-items: end; }
+.hl-trade-money small { font: 600 12px/1.3 var(--font-sans); color: var(--text-3); }
+.hl-trade-money .n { font: 700 18px/1.2 var(--font-mono); }
