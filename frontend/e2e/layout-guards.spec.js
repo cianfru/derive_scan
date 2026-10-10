@@ -66,6 +66,8 @@ const homeDocs = () => {
 
 test("the card home fits the first screen and keeps every card's contents inside", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "one run covers every viewport");
+  // 22 page loads (11 sizes in two themes): about 25 s locally, longer on CI's runners than the 30 s default.
+  test.setTimeout(120_000);
   await mockPublicData(page);
   const extra = homeDocs();
   await page.route("**/site-data/**", (route) => {
