@@ -23,7 +23,7 @@ import { riseFall } from "../lib/takeaway.js";
 import { useFollowsDoc } from "../lib/follows.js";
 import { boardRows } from "../lib/board.js";
 import { useClock } from "../lib/useClock.js";
-import { money, signed } from "../lib/questions.js";
+import { money, priceAge, signed } from "../lib/questions.js";
 import { TESTNET_FILLS } from "../lib/flags.js";
 import { useElementSize, useElementWidth } from "../lib/useElementWidth.js";
 import { useFeeds } from "./Feeds.jsx";
@@ -136,8 +136,10 @@ export function SaloonLive({ pop = false }) {
     }
     d.placed = placed;
   }
-  // No bubble to show (Derive quotes none of these levels now): the line alone, on the axis of its own closes.
+  // No bubble to show: the line alone, on the axis of its own closes. While prices are paused the card's
+  // foot says so; otherwise Derive quotes none of these levels now.
   const none = !dates.some((d) => d.placed.length);
+  const paused = priceAge(board.prices_ts, now, board.paused).state === "paused";
   if (none) {
     const span = Math.max(...closes, board.index) - Math.min(...closes, board.index) || board.index * 0.01;
     lo = Math.min(...closes, board.index) - span * 0.15; hi = Math.max(...closes, board.index) + span * 0.15;
@@ -179,7 +181,7 @@ export function SaloonLive({ pop = false }) {
             );
           }))}
           <circle cx={pts[pts.length - 1][0]} cy={pts[pts.length - 1][1]} r="5" className="sb-dot" />
-          {none && <text x={W - 8} y={20} textAnchor="end" className="sb-none">No prices on Derive right now</text>}
+          {none && !paused && <text x={W - 8} y={20} textAnchor="end" className="sb-none">No prices on Derive right now</text>}
         </svg>
       </div>
     </div>

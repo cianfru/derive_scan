@@ -305,6 +305,31 @@ describe("card home", () => {
     expect(chart.getAttribute("aria-label")).toMatch(/^BTC over the last three days, now \$/);
   });
 
+  it("Saloon: with no bubble to show, the line on its own axis; the note only while prices are not paused", () => {
+    const bars = Array.from({ length: 40 }, (_, i) => [NOW - (40 - i) * 14400, btc.index, btc.index * 1.01, btc.index * 0.99, btc.index * (1 + Math.sin(i) / 20), 1]);
+    const quiet = { ...btc, dates: btc.dates.map((d) => ({ ...d, levels: d.levels.map((l) => ({ ...l, yes: { state: "no_quote" }, no: { state: "no_quote" } })) })) };
+    const inBand = () => {
+      const svg = $(".home-saloon .hl-saloon svg[role='img']");
+      const h = Number(svg.getAttribute("height"));
+      const ys = svg.querySelector(".sb-price").getAttribute("d").match(/-?[\d.]+/g).map(Number).filter((_, i) => i % 2 === 1);
+      return Math.min(...ys) >= 0 && Math.max(...ys) <= h;
+    };
+    docs.current = { "questions/index.json": { prices_ts: btc.prices_ts, coins: [{ und: "BTC" }] }, "questions/BTC.json": quiet, "coins/BTC.json": { candles: { "4h": bars } } };
+    show();
+    expect($$(".home-saloon .sb-fig")).toHaveLength(0);
+    expect(text(".home-saloon .sb-none")).toBe("No prices on Derive right now");
+    expect(inBand()).toBe(true);
+    cleanup();
+    // Paused: the foot says so, and the chart does not claim Derive has no prices.
+    docs.current = { "questions/index.json": { prices_ts: btc.prices_ts, coins: [{ und: "BTC" }], paused: true }, "questions/BTC.json": { ...btc, paused: true },
+      "coins/BTC.json": { candles: { "4h": bars } } };
+    show();
+    expect($$(".home-saloon .sb-fig")).toHaveLength(0);
+    expect($(".home-saloon .sb-none")).toBeNull();
+    expect(text(".home-saloon .home-line")).toBe("Prices paused");
+    expect(inBand()).toBe(true);
+  });
+
   it("keeps every card's title or says Not available yet when its file is missing or empty", () => {
     const check = () => {
       for (const c of CARDS.filter((x) => !["saloon", "positions"].includes(x.id))) {
