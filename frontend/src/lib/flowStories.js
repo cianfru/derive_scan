@@ -68,12 +68,16 @@ export function story(g) {
       : what === "together" ? `traded ${legs.length} ${g.und} options together`
         : `${verb} ${plural ? "" : `${article(g.und)} `}${g.und} ${what}`;
   const kind = first.class;
+  // Which way the trade points: the money on legs that gain if the price rises (calls bought, puts sold)
+  // against the money on legs that gain if it falls (puts bought, calls sold), the Flow page's own measure.
+  const rise = legs.filter((l) => (l.type === "call") === l.buy).reduce((s, l) => s + l.premium, 0);
+  const fall = legs.reduce((s, l) => s + l.premium, 0) - rise;
   return {
     key: `${g.wallet}-${first.ts}-${g.und}`, wallet: g.wallet, und: g.und, kind, who: WALLET_WORD[kind] || null, ranked: legs.some((l) => l.ranked),
     ts: Math.min(...legs.map((l) => l.ts)) / 1000, legs,
     // The trade's form: coin, each leg's side, strike, type and date, and its size against the first leg.
     text, shape: `${g.und}:${legs.map((l) => `${l.buy ? "+" : "-"}${l.k}${l.type}${l.expiry}x${((Number(l.amount) || 0) / (Number(first.amount) || 1)).toFixed(3)}`).join(",")}`,
-    verb, paid: bought, money: Math.abs(net), gross: paid + got,
+    verb, paid: bought, money: Math.abs(net), gross: paid + got, rise, fall, side: rise >= fall ? "rise" : "fall",
     // Each leg and the date stay whole on a line (no-break spaces); lines break only at the dots.
     detail: (expiries.size > 1
       ? legs.map((l) => `${l.buy ? "buy" : "sell"} ${strike(l.k, "")} ${l.type} ${l.expiryLabel}`)
@@ -93,7 +97,7 @@ export function mergeRepeats(list) {
     const prev = out.find((o) => o.wallet === s.wallet && o.shape === s.shape && o.paid === s.paid && s.ts - o.lastTs <= REPEAT_SEC);
     if (!prev) { out.push({ ...s, times: 1, lastTs: s.ts, single: s.money }); continue; }
     prev.times += 1; prev.lastTs = s.ts; prev.gross += s.gross; prev.notional += s.notional; prev.block = prev.block || s.block;
-    prev.money += s.money; prev.single = Math.max(prev.single, s.money);
+    prev.money += s.money; prev.rise += s.rise; prev.fall += s.fall; prev.single = Math.max(prev.single, s.money);
   }
   return out;
 }

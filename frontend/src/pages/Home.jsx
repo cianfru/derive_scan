@@ -24,8 +24,8 @@ export const CARDS = [
     about: "For each coin with options: the market's regime, how the Smart wallets are positioned, and what option prices say, for the next 7 and 30 days. The figure counts options markets on the daily close." },
   { id: "posses", to: "/traders/posses", label: "Posses", title: "Legends to Boot Hill.", cta: "Open the posses",
     about: "Every options trader grouped by results on expired options, from Legend (at least $1M profit) to Boot Hill (more than $1M lost), and by size, with how each group is positioned. Market makers left out. Context, not a signal." },
-  { id: "options", to: "/flow", label: "Options flow", title: "What traders bought, and the big trades.", size: "wide", cta: "Open flow",
-    about: "Option premium takers bought on Derive over the last 24 hours, split between calls and puts. Each dot is one of the day's largest trades (up to 60): calls above the line, puts below, filled when bought, a ring when sold. Market makers left out." },
+  { id: "options", to: "/flow", label: "Options flow", title: "Where options money points.", size: "wide", cta: "Open flow",
+    about: "Every coin with options on one map. Each bubble is the option money traded on that coin over the last 24 hours, placed by how much of it went into trades that gain if the price rises (buying calls, selling puts) or if it falls (buying puts, selling calls). Open a coin to see its trades. Market makers left out. Context, not a signal." },
 ];
 
 const PLUS = <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v12M2 8h12" /></svg>;

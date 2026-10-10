@@ -70,25 +70,38 @@ describe("flow views and result scope", () => {
     expect(document.querySelectorAll(".fw-row")).toHaveLength(5);
   });
 
-  it("makes a selected market's result explicit and focuses it from either view", () => {
+  it("picks a coin on the map, opens its view and focuses its trades from either view", () => {
     docs.current = { "flow.json": flow };
     show(Flow);
     fireEvent.click(screen.getByRole("tab", { name: "Active wallets" }));
-    fireEvent.click(screen.getByRole("button", { name: /BTC/ }));
-    expect(screen.getByText("BTC · 10 recorded option trades")).toBeTruthy();
+    const btc = screen.getByRole("button", { name: /^BTC: / });
+    expect(btc.getAttribute("aria-pressed")).toBe("false");
+    fireEvent.click(btc);
+    expect(btc.getAttribute("aria-pressed")).toBe("true");
+    const view = screen.getByRole("region", { name: "BTC options flow" });
+    expect(within(view).getByText("Gains if the price rises")).toBeTruthy();
     expect(screen.getByText("All markets · 24h")).toBeTruthy();
     expect(document.querySelectorAll(".fw-row")).toHaveLength(5);
-    fireEvent.click(screen.getByRole("button", { name: "View BTC trades" }));
+    fireEvent.click(within(view).getByRole("button", { name: /^All 10 in the list/ }));
     expect(document.activeElement.textContent).toBe("Large trades");
     expect(screen.getByRole("tab", { name: "Large trades" }).getAttribute("aria-selected")).toBe("true");
     expect(document.querySelectorAll(".fl-story")).toHaveLength(5);
     expect(document.querySelector(".fl-table-context").textContent).toContain("BTC · 5 of 10 trades");
     fireEvent.click(screen.getByRole("tab", { name: "Perpetuals" }));
-    expect(screen.getByText("BTC · 2 recorded perpetual trades")).toBeTruthy();
     expect(document.querySelectorAll(".fl-story")).toHaveLength(2);
     fireEvent.click(screen.getByRole("button", { name: "BTC · Clear" }));
-    expect(screen.queryByRole("button", { name: "View BTC trades" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "BTC options flow" })).toBeNull();
     expect(document.querySelector(".fl-table-context").textContent).toContain("All markets · 4 of 4 perpetual trades");
+  });
+
+  it("opens the coin named in the address, and All markets closes it", () => {
+    docs.current = { "flow.json": flow };
+    render(<MemoryRouter initialEntries={["/flow?coin=ETH"]}><Flow /></MemoryRouter>);
+    const view = screen.getByRole("region", { name: "ETH options flow" });
+    expect(within(view).getByText(/in options, 24h/).textContent).toContain("$500");
+    expect(screen.getByRole("button", { name: /^ETH: / }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(within(view).getByRole("button", { name: "All markets" }));
+    expect(screen.queryByRole("region", { name: "ETH options flow" })).toBeNull();
   });
 
   it("retains the wider sample on desktop", () => {

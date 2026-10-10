@@ -1,73 +1,131 @@
-import { usd } from "../lib/format.js";
-import { riseFall } from "../lib/takeaway.js";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { ago, dayTime, usd } from "../lib/format.js";
+import { dayLayout, flowCoins, leanWords } from "../lib/flowBubbles.js";
+import { sentence } from "../lib/flowStories.js";
+import { separate } from "../lib/homeLayout.js";
+import { useElementSize } from "../lib/useElementWidth.js";
+import FlowBubbles from "./FlowBubbles.jsx";
 import { Asset } from "./MarketVisuals.jsx";
+import WalletTag from "./WalletTag.jsx";
 import { Info, Arrow } from "./ui.jsx";
 
-// Which way options money points, per coin (owner, 10 October 2026: the four-shade bars were "kind of hard to
-// read"): one bar per coin, the money on trades that gain if the price rises against the money on trades that
-// gain if it falls, the Options layer's own measure, so a spread's two halves offset.
-/** Per coin: {und, rise, fall, total}, most money first; coins with no option money left out. */
-export function summarizeFlow(byCoin) {
-  return Object.entries(byCoin || {})
-    .map(([und, f]) => ({ und, ...riseFall(f) }))
-    .filter((r) => r.total > 0)
-    .sort((a, b) => b.total - a.total);
-}
-/** Track length on a square-root scale of the money, so small markets stay visible. */
-export const trackWidth = (total, max) => (max > 0 && total > 0 ? Math.max(6, Math.sqrt(total / max) * 100) : 0);
+// Which way options money points (owner, 10 October 2026: the bubbles are "so much cool"; "a user clicking on a
+// specific coin and see a more detailed view"): every coin as a bubble on one map, and a picked coin's own view,
+// how its money splits and its large trades through the day.
 
-/** "62% rise · 38% fall", or one side alone when the other is empty. */
-export function SplitWords({ rise, total }) {
-  const up = Math.round((rise / total) * 100);
-  if (up >= 100 || rise === total) return <span className="fl-split"><b className="up">All</b> rise</span>;
-  if (up <= 0 || rise === 0) return <span className="fl-split"><b className="down">All</b> fall</span>;
-  return <span className="fl-split"><b className="up">{up}%</b> rise · <b className="down">{100 - up}%</b> fall</span>;
+/** Past this age the flow file no longer reads as "the last 24 hours" and names its window instead. */
+const FRESH_SEC = 2 * 3600;
+const STRIP_AXIS = 18;
+
+/** One coin's large trades through the day, rise above the line and fall below, with the one under the pointer
+ * (else the largest) read out in a sentence under the strip. `trades` are stories (lib/flowStories.js). */
+function DayStrip({ und, trades, from, to }) {
+  const [box, size] = useElementSize({ w: 640, h: 150 });
+  const [active, setActive] = useState(null);
+  if (!trades.length) return <p className="fc-none">No large option trades on {und} in the last 24 hours.</p>;
+  const stale = Date.now() / 1000 - to > FRESH_SEC;
+  const h = size ? size.h - STRIP_AXIS : 0, mid = h / 2;
+  const marks = size ? separate(dayLayout(trades, { w: size.w, h, from, to }), { top: 0, bottom: h, mid }).sort((a, b) => b.s - a.s) : [];
+  const largest = trades.reduce((a, b) => (b.money > a.money ? b : a));
+  const shown = (active && trades.find((t) => t.key === active)) || largest;
+  const words = (t) => `${sentence(t.text)}, ${usd(t.money)} ${t.paid ? "paid" : "collected"}, ${ago(t.ts)}`;
+  return (
+    <>
+      <div className="fc-strip" ref={box}>
+        <i className="fc-line" style={{ top: mid }} />
+        {marks.map((m) => (
+          <button key={m.key} type="button" className={`fc-dot ${m.side}${shown.key === m.key ? " on" : ""}`} aria-label={words(m)}
+            aria-pressed={shown.key === m.key} onClick={() => setActive(m.key)} onMouseEnter={() => setActive(m.key)} onFocus={() => setActive(m.key)}
+            style={{ left: `${(m.px - m.s / 2).toFixed(1)}px`, top: `${(m.py - m.s / 2).toFixed(1)}px`, width: m.s, height: m.s }} />
+        ))}
+        <div className="fc-xw" aria-hidden="true" style={{ top: h }}>
+          {stale ? <><span>{dayTime(from)}</span><span>{dayTime(to)}</span></> : <><span>24h ago</span><span>now</span></>}
+        </div>
+      </div>
+      <p className="fc-read" aria-live="polite">
+        <WalletTag address={shown.wallet} size={18} />
+        <span><b>{sentence(shown.text)}</b> <span className="fc-read-d">{shown.detail}</span></span>
+        <span className="fc-read-m"><small>{shown.paid ? "paid" : "collected"}</small> <b className={shown.side === "rise" ? "up" : "down"}>{usd(shown.money)}</b> <small>{ago(shown.ts)}</small></span>
+      </p>
+    </>
+  );
 }
 
-export default function FlowSummary({ data, selected, onSelect, selectionCount, selectionKind = "trades", onViewTrades }) {
-  const rows = summarizeFlow(data.by_coin),
-    total = rows.reduce((s, r) => s + r.total, 0),
-    max = rows[0]?.total || 0;
+/** A picked coin: its option money and which way it points, how the money splits by what was bought and sold,
+ * and its large trades through the day. */
+function CoinFlow({ coin, trades, from, to, onClose, onViewTrades, count }) {
+  const s = coin.split;
+  const max = Math.max(1, s.callsBought, s.putsSold, s.putsBought, s.callsSold);
+  const sides = [
+    { k: "up", title: "Gains if the price rises", sum: coin.rise, rows: [["Bought calls", s.callsBought], ["Sold puts", s.putsSold]] },
+    { k: "down", title: "Gains if it falls", sum: coin.fall, rows: [["Bought puts", s.putsBought], ["Sold calls", s.callsSold]] },
+  ];
+  return (
+    <section className="fc" aria-label={`${coin.und} options flow`}>
+      <div className="fc-head">
+        <Asset und={coin.und} />
+        <span className="fc-sum">{coin.total > 0 ? <><b>{usd(coin.total)}</b> in options, 24h · {leanWords(coin)}</> : <>No option money recorded in the last 24 hours</>}</span>
+        <span className="fc-actions">
+          <Link className="text-control" to={`/coin/${coin.und}#options`}>Open {coin.und}<Arrow /></Link>
+          <button type="button" className="text-control" onClick={onClose}>All markets</button>
+        </span>
+      </div>
+      {coin.total > 0 && <div className="fc-split">
+        {sides.map((side) => (
+          <div key={side.k} className={`fc-side ${side.k}`}>
+            <div className="fc-side-h"><h3>{side.title}</h3><b>{usd(side.sum)}</b></div>
+            {side.rows.map(([label, v]) => (
+              <div key={label} className="fc-row">
+                <span>{label}</span>
+                <span className="fc-bar" aria-hidden="true"><i style={{ width: `${Math.max(v > 0 ? 1 : 0, (v / max) * 100)}%` }} /></span>
+                <b>{usd(v)}</b>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>}
+      <div className="fc-day">
+        <div className="fc-day-h">
+          <h3>Large trades through the day</h3>
+          <span className="fc-key" aria-hidden="true"><span><i className="up" />Gains if it rises, above</span><span><i className="down" />Gains if it falls, below</span></span>
+          {count > 0 && onViewTrades && <button type="button" className="text-control" onClick={onViewTrades}>All {count} in the list<Arrow /></button>}
+        </div>
+        <DayStrip und={coin.und} trades={trades} from={from} to={to} />
+      </div>
+    </section>
+  );
+}
+
+export default function FlowSummary({ data, selected = "all", onSelect, coinTrades = [], selectionCount = 0, onViewTrades }) {
+  const coins = flowCoins(data.by_coin);
+  const total = coins.reduce((sum, c) => sum + c.total, 0);
+  const picked = selected !== "all" ? coins.find((c) => c.und === selected)
+    || { und: selected, rise: 0, fall: 0, total: 0, share: 0.5, lean: "even", split: { callsBought: 0, putsSold: 0, putsBought: 0, callsSold: 0 } } : null;
+  const from = Number(data.since), to = Number(data.coverage?.end ?? data.generated_at);
   return (
     <section className="plate lead-plate flow-briefing" aria-label="Which way options money points, by market">
       <div className="flow-brief-head">
         <div className="flow-total">
           <strong>{usd(total)}</strong>
-          <span className="flow-meta">in options · {rows.length} markets · 24h</span>
+          <span className="flow-meta">in options · {coins.length} markets · 24h</span>
         </div>
         <div className="flow-legend">
-          <span><i className="rise" />Gains if the price rises</span>
-          <span><i className="fall" />Gains if it falls</span>
+          <span className="flow-hint">{coins.length ? "Pick a coin to see its trades" : ""}</span>
           <Info label="How to read flow">
-            Buying calls or selling puts gains if the price rises; buying puts or selling calls gains if it falls.
-            The money is the premium paid or received on every recorded trade of the last 24 hours that crossed the
-            spread, market makers left out. A spread puts its two halves on both sides, so they offset. Bar length is
-            the money, on a square-root scale so small markets stay visible. A trade may open, close or hedge a
-            position, so this is context, not a signal. Select a market to see its large trades.
+            Each bubble is one coin: its size is the option money traded on it over the last 24 hours, and it sits
+            left or right by how much of that money went into trades that gain if the price falls (buying puts,
+            selling calls) or rises (buying calls, selling puts). The ring is green when more than 55% points to a
+            rise, red when more than 55% points to a fall, grey in between. The money is the premium paid or received
+            on every recorded trade that crossed the spread, market makers left out; a spread's two halves offset. A
+            trade may open, close or hedge a position, so this is context, not a signal.
           </Info>
         </div>
       </div>
-      <div className="flow-market-rows">
-        {rows.map((r) => (
-          <button key={r.und} type="button" className="flow-market-row" aria-pressed={selected === r.und}
-            onClick={() => onSelect(selected === r.und ? "all" : r.und)}>
-            <Asset und={r.und} compact />
-            <span className="premium-lane">
-              <span className="premium-track" style={{ width: `${trackWidth(r.total, max)}%` }}
-                aria-label={`Gains if the price rises ${usd(r.rise)}, gains if it falls ${usd(r.fall)}`}>
-                {r.rise > 0 && <i className="rise" style={{ flexGrow: r.rise }} />}
-                {r.fall > 0 && <i className="fall" style={{ flexGrow: r.fall }} />}
-              </span>
-              <SplitWords rise={r.rise} total={r.total} />
-            </span>
-            <span className="fl-money"><b>{usd(r.total)}</b></span>
-          </button>
-        ))}
-      </div>
-      {selected !== "all" && onViewTrades && <div className="flow-selection">
-        <span>{selected} · {selectionCount} recorded {selectionKind}</span>
-        <button type="button" className="text-control" onClick={onViewTrades}>View {selected} trades<Arrow /></button>
-      </div>}
+      {coins.length ? <div className="flow-map">
+        <FlowBubbles coins={coins} onPick={onSelect} selected={selected} rMin={15} rMax={58} labels={coins.length} label={(c) => `${c.und} ${usd(c.total)}`} />
+      </div> : <p className="fc-none">No option money recorded in the last 24 hours.</p>}
+      {picked && <CoinFlow coin={picked} trades={coinTrades} from={from} to={to} onClose={() => onSelect("all")} onViewTrades={onViewTrades} count={selectionCount} />}
     </section>
   );
 }

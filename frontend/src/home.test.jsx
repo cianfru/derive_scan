@@ -1,7 +1,7 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import btc from "./fixtures/questions/BTC.json";
 
 const docs = vi.hoisted(() => ({ current: {} }));
@@ -15,9 +15,11 @@ import { _resetMemory, follow } from "./lib/follows.js";
 const NOW = btc.prices_ts + 60;
 beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(NOW * 1000); });
 afterEach(() => { cleanup(); vi.useRealTimers(); localStorage.clear(); sessionStorage.clear(); _resetMemory(); docs.current = {}; });
+// Where a click landed, path and query.
+function Landed() { const l = useLocation(); return <p data-at={l.pathname + l.search}>landed</p>; }
 const show = () => render(
   <MemoryRouter initialEntries={["/home"]}>
-    <Routes><Route path="/home" element={<Home />} /><Route path="*" element={<p>landed</p>} /></Routes>
+    <Routes><Route path="/home" element={<Home />} /><Route path="*" element={<Landed />} /></Routes>
   </MemoryRouter>,
 );
 const $ = (sel) => document.querySelector(sel);
@@ -63,8 +65,9 @@ describe("card home", () => {
     expect(describe("Radar")).toContain("HYPE");
     expect(describe("Radar")).toContain("Most stretched, below trend");
     expect(describe("Markets")).toMatch(/4 ?of ?5.*trending up/);
-    // Radar, Markets and Posses draw charts; the flow card's largest trade is words, read with its figure.
-    expect($$(".hl-band[aria-hidden='true']").length).toBe(3);
+    // Radar, Markets, Posses and the flow map draw charts; their readings are words beside the figures.
+    expect($$(".hl-band[aria-hidden='true']").length).toBe(4);
+    expect(describe("Options flow")).toContain("Most money: ETH, 80% on a fall");
   });
 
   it("Saloon: the open coins and the gold rings, or that prices are paused", () => {
@@ -190,23 +193,44 @@ describe("card home", () => {
     expect(h[7]).toBeCloseTo(Math.sqrt(2 / 6750), 3);
   });
 
-  it("Options flow: the option money, how much gains on a rise or a fall, and the day's largest trade; none until classes are ready", () => {
+  it("Options flow: the money, the coin with the most and which way it points, and one bubble per coin", () => {
     docs.current = { "flow.json": FLOW };
     show();
     expect(text(".hl-options .bn")).toBe("$1K");
-    // Rise: calls bought $300 + $120; fall: puts bought $100 + $480.
-    expect(text(".hl-options .hl-split-line")).toBe("42% rise · 58% fall");
     expect($$(".hl-options .hl-cap > span")[0].textContent).toBe("in options, 24h");
-    expect(text(".hl-trade-k")).toBe("Largest trade, 24h");
-    expect(text(".hl-trade-what b")).toBe(`${codename("0x" + "c".repeat(40))} bought ETH puts`);
-    expect($(".hl-trade-what > span").title).toBe("Smart wallet");
-    expect(text(".hl-trade-what small").replace(/\u00a0/g, " ")).toBe("3,050 put · Oct 09 · 1 h ago");
-    expect(text(".hl-trade-money")).toBe("paid$37.2K");
+    // ETH: puts bought $480 (fall) against calls bought $120 (rise); BTC: calls bought $300 against puts bought $100.
+    expect(text(".hl-flowlead")).toBe("Most money: ETH, 80% on a fall");
+    const bubbles = $$(".hl-options .fb-b");
+    expect(bubbles.map((b) => b.dataset.und)).toEqual(["ETH", "BTC"]);
+    expect(bubbles.map((b) => b.className)).toEqual(["fb-b down", "fb-b up"]);
+    expect(bubbles[0].title).toBe("ETH: $600 in options over 24 hours, 80% on a fall");
+    // Fall on the left, rise on the right; more money, a larger bubble.
+    expect(parseFloat(bubbles[0].style.left)).toBeLessThan(parseFloat(bubbles[1].style.left));
+    expect(parseFloat(bubbles[0].style.width)).toBeGreaterThan(parseFloat(bubbles[1].style.width));
+    // The card keeps the map; the day's largest trade waits in the pop-out.
+    expect($(".home-card .hl-trade")).toBeNull();
+    // A bubble on the card opens its coin on the Flow page.
+    fireEvent.click(bubbles[1]);
+    expect(screen.getByText("landed").dataset.at).toBe("/flow?coin=BTC");
+  });
+
+  it("Options flow pop-out: each coin links to its view, and the day's largest single trade; none until classes are ready", () => {
+    docs.current = { "flow.json": FLOW };
+    show();
+    fireEvent.click(screen.getByRole("button", { name: "More about Options flow" }));
+    const pop = $("dialog.home-pop");
+    expect(within(pop).getByRole("link", { name: "BTC: $400 in options over 24 hours, 75% on a rise" }).getAttribute("href")).toBe("/flow?coin=BTC");
+    expect(text(".home-pop .hl-trade-k")).toBe("Largest trade, 24h");
+    expect(text(".home-pop .hl-trade-what b")).toBe(`${codename("0x" + "c".repeat(40))} bought ETH puts`);
+    expect($(".home-pop .hl-trade-what > span").title).toBe("Smart wallet");
+    expect(text(".home-pop .hl-trade-what small").replace(/\u00a0/g, " ")).toBe("3,050 put · Oct 09 · 1 h ago");
+    expect(text(".home-pop .hl-trade-money")).toBe("paid$37.2K");
     cleanup();
     docs.current = { "flow.json": { ...FLOW, classes_ready: false } };
     show();
-    expect(text(".hl-options .bn")).toBe("$1K");
-    expect($(".hl-trade")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "More about Options flow" }));
+    expect(text(".home-pop .hl-options .bn")).toBe("$1K");
+    expect($(".home-pop .hl-trade")).toBeNull();
   });
 
   it("Options flow: an old file names its window instead of the last 24 hours to now", () => {
@@ -215,8 +239,8 @@ describe("card home", () => {
     show();
     const at = (t) => { const d = new Date(t * 1000); return `${d.getUTCDate()} ${d.toUTCString().slice(8, 11)} ${d.toISOString().slice(11, 16)}`; };
     expect($$(".hl-options .hl-cap > span")[0].textContent).toBe(`in options, 24h to ${at(end)} UTC`);
-    expect(text(".hl-trade-k")).toBe("Largest trade");
-    expect(document.body.textContent).not.toContain("now");
+    fireEvent.click(screen.getByRole("button", { name: "More about Options flow" }));
+    expect(text(".home-pop .hl-trade-k")).toBe("Largest trade");
   });
 
   it("Your positions: the owner's words when nothing is open, leading to the Saloon", () => {

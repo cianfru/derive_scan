@@ -16,7 +16,10 @@ describe("flow stories", () => {
     ]);
     const by = Object.fromEntries(s.map((x) => [x.text, x]));
     expect(Object.keys(by).sort()).toEqual(["bought a BTC call spread", "sold ETH puts", "sold a BTC strangle"]);
-    expect(by["bought a BTC call spread"]).toMatchObject({ paid: true, money: 522, gross: 1008 });
+    expect(by["bought a BTC call spread"]).toMatchObject({ paid: true, money: 522, gross: 1008, rise: 765, fall: 243, side: "rise" });
+    // Calls sold gain if the price falls, puts sold if it rises: the strangle's calls outweigh its puts.
+    expect(by["sold a BTC strangle"]).toMatchObject({ rise: 264, fall: 533, side: "fall" });
+    expect(by["sold ETH puts"]).toMatchObject({ rise: 5583, fall: 0, side: "rise" });
     expect(plain(by["bought a BTC call spread"].detail)).toBe("buy 86,000 call · sell 88,000 call · Oct 16");
     expect(by["sold a BTC strangle"]).toMatchObject({ paid: false, money: 797 });
     expect(by["sold ETH puts"]).toMatchObject({ paid: false, money: 5583 });

@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, it, expect, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { viewReading } from "./lib/presentation.js";
@@ -115,28 +115,33 @@ it("opens Money Printer exposure and changes the expiry window without changing 
     "/coin/HYPE#wallets",
   );
 });
-it("summarizes the recorded premium categories and selects a market for the tape", async () => {
+it("draws every coin with option money as a bubble and picks a market with it", async () => {
   const choose = vi.fn();
-  render(
-    <FlowSummary
-      data={{
-        by_coin: {
-          HYPE: { call: { buy_premium_usd: 80, sell_premium_usd: 20 } },
-          BTC: { put: { buy_premium_usd: 50 } },
-        },
-      }}
-      selected="all"
-      onSelect={choose}
-    />,
-  );
+  const data = {
+    by_coin: {
+      HYPE: { call: { buy_premium_usd: 80, sell_premium_usd: 20 } },
+      BTC: { put: { buy_premium_usd: 50 } },
+    },
+  };
+  const { rerender } = render(<MemoryRouter><FlowSummary data={data} selected="all" onSelect={choose} /></MemoryRouter>);
   // Every option dollar, by the way it gains: HYPE $80 of calls bought (rise) and $20 sold (fall); BTC $50 of puts bought (fall).
   expect(screen.getByText("$150")).toBeTruthy();
   expect(screen.getByText("in options · 2 markets · 24h")).toBeTruthy();
-  const rows = screen.getAllByRole("button", { pressed: false });
-  expect(rows[0].textContent).toBe("HYPE80% rise · 20% fall$100");
-  expect(rows[1].textContent).toBe("BTCAll fall$50");
-  await userEvent.setup().click(screen.getByRole("button", { name: /HYPE/ }));
+  const hype = screen.getByRole("button", { name: "HYPE: $100 in options over 24 hours, 80% on a rise" });
+  expect(screen.getByRole("button", { name: "BTC: $50 in options over 24 hours, 100% on a fall" })).toBeTruthy();
+  await userEvent.setup().click(hype);
   expect(choose).toHaveBeenCalledWith("HYPE");
+  // Picked: the coin's view, how its money splits, and a second click or All markets goes back to every market.
+  rerender(<MemoryRouter><FlowSummary data={data} selected="HYPE" onSelect={choose} /></MemoryRouter>);
+  const view = screen.getByRole("region", { name: "HYPE options flow" });
+  const row = (label) => within(view).getByText(label).parentElement.textContent;
+  expect(row("Bought calls")).toBe("Bought calls$80");
+  expect(row("Sold calls")).toBe("Sold calls$20");
+  expect(within(view).getByText("No large option trades on HYPE in the last 24 hours.")).toBeTruthy();
+  await userEvent.setup().click(within(view).getByRole("button", { name: "All markets" }));
+  expect(choose).toHaveBeenLastCalledWith("all");
+  await userEvent.setup().click(screen.getByRole("button", { name: /^HYPE: / }));
+  expect(choose).toHaveBeenLastCalledWith("all");
 });
 it("uses the same Fear and Greed value for the dial, needle and band name", () => {
   render(

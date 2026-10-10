@@ -6,7 +6,7 @@
 // in their own colours, regimes in theirs; orange stays interaction. While its file loads a card keeps a
 // still placeholder of its size; without its file it shows its own title and "Not available yet".
 import { Fragment, useId, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { REGIME, ago, strike, usd } from "../lib/format.js";
 import { REGIME_COLORS, REGIME_ORDER } from "../lib/regime.js";
@@ -19,7 +19,7 @@ import { positionDone } from "../lib/positionView.js";
 import { openPnl, pctText } from "../lib/homePnl.js";
 import { compactCount, groupIconSize, radarLayout } from "../lib/homeLayout.js";
 import { largestTrade } from "../lib/flowStories.js";
-import { riseFall } from "../lib/takeaway.js";
+import { flowCoins, leanWords } from "../lib/flowBubbles.js";
 import { useFollowsDoc } from "../lib/follows.js";
 import { boardRows } from "../lib/board.js";
 import { useClock } from "../lib/useClock.js";
@@ -33,6 +33,7 @@ import { chartLevels, returnPct, smartOf } from "./SaloonChart.jsx";
 import { WalletEmblem } from "./WalletTag.jsx";
 import { Info } from "./ui.jsx";
 import BigNum from "./BigNum.jsx";
+import FlowBubbles from "./FlowBubbles.jsx";
 
 const NET = TESTNET_FILLS ? "testnet" : "mainnet";
 const N = ({ children, className = "" }) => <b className={`n${className ? ` ${className}` : ""}`}>{children}</b>;
@@ -468,34 +469,39 @@ export const FLOW_FRESH_SEC = 2 * 3600;
  * did in plain words, the legs, when, and the money paid or collected. The trade stays hidden until wallet classes
  * are ready, so market makers never show. An old file names its window.
  */
-export function OptionsLive({ card }) {
+export function OptionsLive({ card, pop = false }) {
+  const navigate = useNavigate();
   const { data, loading } = useData("flow.json");
   if (loading) return <Wait />;
-  let rise = 0, fall = 0;
-  for (const c of Object.values(data?.by_coin || {})) { const r = riseFall(c); rise += r.rise; fall += r.fall; }
-  const total = rise + fall;
+  const coins = flowCoins(data?.by_coin);
+  const total = coins.reduce((s, c) => s + c.total, 0);
   if (!(total > 0)) return <NotYet card={card} />;
-  const up = Math.round((rise / total) * 100);
+  const most = coins[0];
   const cov = data.coverage;
   const part = cov?.ready === false && Number.isFinite(cov.fraction) ? Math.round(cov.fraction * 100) : null;
   const to = Number(cov?.end ?? data.generated_at);
   const stale = Number.isFinite(to) && Date.now() / 1000 - to > FLOW_FRESH_SEC;
-  const top = data.classes_ready === false ? null : largestTrade(data.large);
-  const split = <><span><N className="up">{up}%</N> rise</span> <span className="hl-sep">·</span> <span><N className="down">{100 - up}%</N> fall</span></>;
+  // The pop-out has room for the day's largest single trade under the map; the card keeps the map.
+  const top = pop && data.classes_ready !== false ? largestTrade(data.large) : null;
+  // On the card a bubble opens its coin's view on the Flow page (the card's own link stays the keyboard path).
+  const pick = (e) => {
+    const und = e.target.closest?.("[data-und]")?.dataset.und;
+    if (und) { e.stopPropagation(); navigate(`/flow?coin=${und}`); }
+  };
   return (
-    <div className="hl hl-options">
+    <div className={`hl hl-options${top ? " with-trade" : ""}`}>
       <div className="hl-fig">
         <BigNum text={usd(total)} />
         <span className="hl-cap">
           <span>in options, {stale ? <><N>24h</N> to {when(to)} UTC</> : <N>24h</N>}{part != null && <> · <N>{part}%</N> of <N>24h</N> recorded</>}</span>
-          <span className="hl-split-line">{split}</span>
         </span>
-        <span className="hl-split" aria-hidden="true">
-          <span className="hl-split-bar"><i style={{ flexGrow: rise }} /><i style={{ flexGrow: fall }} /></span>
-          <span className="hl-split-words">{split}</span>
-        </span>
+        <span className="hl-flowlead">Most money: <b>{most.und}</b>, {leanWords(most)}</span>
       </div>
-      {top && <div className="hl-band hl-trade">
+      <div className="hl-band hl-flowmap" aria-hidden={pop ? undefined : "true"} onClick={pop ? undefined : pick}>
+        <FlowBubbles coins={coins} rMin={pop ? 12 : 10} rMax={pop ? 40 : 32} labels={pop ? 5 : 4}
+          linkTo={pop ? (und) => `/flow?coin=${und}` : undefined} />
+      </div>
+      {top && <div className="hl-trade">
         <span className="hl-trade-k">Largest trade{stale ? "" : ", 24h"}</span>
         <span className="hl-trade-row">
           <WalletEmblem address={top.wallet} size={30} />

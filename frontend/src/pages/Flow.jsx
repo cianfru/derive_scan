@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useData } from "../lib/data.js";
 import { usd, ago } from "../lib/format.js";
 import { Plate, Tabs, Loading, Failed, Lead } from "../components/ui.jsx";
@@ -9,7 +9,7 @@ import { FlowCoverage } from "../components/AnalyticalDetails.jsx";
 import FlowSummary from "../components/FlowSummary.jsx";
 import WalletTag from "../components/WalletTag.jsx";
 import { TYPE as CLASS } from "../lib/traders.js";
-import { sentence, stories, WALLET_WORD } from "../lib/flowStories.js";
+import { groupTrades, sentence, stories, WALLET_WORD } from "../lib/flowStories.js";
 import "../flow-page.css";
 
 const CLASS_INFO = "Wallet types from every trade on Derive since December 2023. Directional traders who are in profit on options that have expired are ranked: Top (best fifth), Smart (the best 50, or every Top wallet when Top is larger), Profitable (the rest in profit). Directional: taking a view, not in profit. Income: mostly sells out-of-the-money options. Hedger: offsets its options with perps. Occasional: too few trades to tell. Market makers are left out.";
@@ -64,7 +64,10 @@ function Story({ s }) {
 
 export default function Flow() {
   const { data, error } = useData("flow.json", 2 * 60_000);
-  const [selected, setSelected] = useState("all");
+  // The picked coin lives in the address (?coin=ETH), so the home card's bubbles open it and a link keeps it.
+  const [params, setParams] = useSearchParams();
+  const selected = (params.get("coin") || "").toUpperCase() || "all";
+  const setSelected = (und) => setParams((p) => { const next = new URLSearchParams(p); if (und === "all") next.delete("coin"); else next.set("coin", und); return next; }, { replace: true });
   const [kind, setKind] = useState("option");
   const [order, setOrder] = useState("money");
   const [all, setAll] = useState(false);
@@ -86,7 +89,7 @@ export default function Flow() {
     : inMarket.filter((t) => t.kind === "perp").map(perpStory).sort(order === "latest" ? (a, b) => b.ts - a.ts : (a, b) => b.money - a.money);
   const large = all ? matching : matching.slice(0, cap);
   const wallets = allWallets ? data.wallets : data.wallets.slice(0, cap);
-  const showTrades = () => { setView("trades"); setFocusRequest((n) => n + 1); };
+  const showTrades = () => { setView("trades"); setKind("option"); setFocusRequest((n) => n + 1); };
   return (
     <div className="wrap page people-page market-research-page flow-page research-refined">
       <MarketResearchHeader error={error} title="Flow" description="Which way options money points, and the largest trades, over 24 hours."
@@ -95,7 +98,7 @@ export default function Flow() {
       <Lead lead={flowLead(data)} />
       <Plate title="Which way options money points" className="fl-premium-panel" bodyClass="flush">
         <FlowSummary data={data} selected={selected} onSelect={(u) => { setSelected(u); setAll(false); }}
-          selectionCount={matching.length} selectionKind={kind === "option" ? "option trades" : kind === "perp" ? "perpetual trades" : "trades"} onViewTrades={showTrades} />
+          coinTrades={selected === "all" ? [] : groupTrades(inMarket)} selectionCount={selected === "all" ? 0 : stories(inMarket).length} onViewTrades={showTrades} />
       </Plate>
       <div className="fl-view-switch"><Tabs label="Flow detail" value={view} onChange={setView} items={[["trades", "Large trades"], ["wallets", "Active wallets"]]} /></div>
       {view === "trades" ? <Plate title={<span ref={resultRef} tabIndex={-1}>Large trades</span>} className="fl-trades-panel" bodyClass="flush"
