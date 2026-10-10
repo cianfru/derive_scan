@@ -79,11 +79,13 @@ function palette(theme) {
   return {
     light,
     up: cssVar("--up") || "#9fe6c7", down: cssVar("--down") || "#f4968b",
-    upFill: light ? cssVar("--up") || "#1f6b4d" : "#2f5a4a", downFill: light ? cssVar("--down") || "#a93a2e" : "#6a3530",
-    upRing: light ? "#134a35" : cssVar("--up") || "#9fe6c7", downRing: light ? "#7a2219" : cssVar("--down") || "#f4968b",
+    // Bright glass bubbles with dark figures (owner, 10 October 2026: "make it look like the image").
+    upFill: light ? "#5fd0aa" : "#7fe6c6", downFill: light ? "#f07a66" : "#f6876f",
+    upRing: light ? "#2f9c79" : "#b9f5e0", downRing: light ? "#c4513f" : "#ffc0b2",
+    upInk: "#0f3a2d", downInk: "#4a160d",
     ink: "#ffffff", text1: cssVar("--text-1") || "#f7f3ed", text2: cssVar("--text-2") || "#e4ded5", text3: cssVar("--text-3") || "#c6beb2",
     border: cssVar("--border") || "#3b352f", strong: cssVar("--border-strong") || "#5a5148", ground: cssVar("--ground") || "#0e0d0b",
-    surface: cssVar("--surface-2") || "#1e1b18", accent: cssVar("--accent") || "#ff5e00", gold: light ? "#a8740f" : "#e6b34a",
+    surface: cssVar("--surface-2") || "#1e1b18", accent: cssVar("--accent") || "#ff5e00", gold: light ? "#d98a12" : "#f5a524",
   };
 }
 
@@ -133,18 +135,18 @@ function mount(host, cfg) {
     // the top left, a highlight, a darker lower edge, and a soft shadow on the chart beneath.
     const orb = (id, base) => {
       const gr = el("radialGradient", { id, cx: "0.36", cy: "0.3", r: "0.78", fx: "0.32", fy: "0.24" }, defs);
-      el("stop", { offset: "0", "stop-color": mix(base, "#ffffff", C.light ? 0.38 : 0.34) }, gr);
-      el("stop", { offset: "0.5", "stop-color": base }, gr);
-      el("stop", { offset: "1", "stop-color": mix(base, "#000000", C.light ? 0.22 : 0.32) }, gr);
+      el("stop", { offset: "0", "stop-color": mix(base, "#ffffff", 0.55) }, gr);
+      el("stop", { offset: "0.55", "stop-color": base }, gr);
+      el("stop", { offset: "1", "stop-color": mix(base, "#000000", C.light ? 0.14 : 0.2) }, gr);
     };
     orb("sch-orb-up", C.upFill);
     orb("sch-orb-down", C.downFill);
     const shine = el("radialGradient", { id: "sch-shine", cx: "0.5", cy: "0.5", r: "0.5" }, defs);
-    el("stop", { offset: "0", "stop-color": "#ffffff", "stop-opacity": C.light ? "0.32" : "0.24" }, shine);
+    el("stop", { offset: "0", "stop-color": "#ffffff", "stop-opacity": "0.55" }, shine);
     el("stop", { offset: "1", "stop-color": "#ffffff", "stop-opacity": "0" }, shine);
     const halo = (id, base) => {
       const gr = el("radialGradient", { id, cx: "0.5", cy: "0.5", r: "0.5" }, defs);
-      el("stop", { offset: "0.6", "stop-color": base, "stop-opacity": C.light ? "0.22" : "0.3" }, gr);
+      el("stop", { offset: "0.55", "stop-color": base, "stop-opacity": C.light ? "0.3" : "0.42" }, gr);
       el("stop", { offset: "1", "stop-color": base, "stop-opacity": "0" }, gr);
     };
     halo("sch-halo-up", C.up);
@@ -194,7 +196,7 @@ function mount(host, cfg) {
       });
       const yi = y(price);
       if (yi > m.t - 8 && yi < H - m.b) {
-        el("line", { x1: m.l, x2: W - m.r, y1: yi, y2: yi, stroke: C.text1, "stroke-width": 1, "stroke-dasharray": "5 4", "stroke-opacity": 0.7 }, live);
+        el("line", { x1: m.l, x2: W - m.r, y1: yi, y2: yi, stroke: C.accent, "stroke-width": 1.6, "stroke-dasharray": "7 6", "stroke-opacity": 0.9 }, live);
         el("rect", { x: W - m.r + 2, y: yi - 10, width: m.r - 4, height: 20, rx: 3, fill: C.text1 }, liveTag);
         el("text", { x: W - m.r + 8, y: yi + 4, fill: C.ground, "font-size": 11, "font-weight": 600 }, liveTag).textContent = fmtP(price);
       }
@@ -203,7 +205,8 @@ function mount(host, cfg) {
     el("line", { x1: futX, x2: futX, y1: 0, y2: H - m.b, stroke: C.strong, "stroke-width": 1 }, svg);
     const zone = el("g", {}, plot);
     const threads = el("g", {}, plot);
-    geo = { y, inv, futX, colW, m, W, H, zone, threads, R, phone, cols: dates.map((_, i) => futX + colW * (i + 0.5)) };
+    const stems = el("g", { class: "sch-stems" }, plot);
+    geo = { y, inv, futX, colW, m, W, H, zone, threads, stems, R, phone, cols: dates.map((_, i) => futX + colW * (i + 0.5)) };
     dates.forEach((d, i) => {
       const cx = geo.cols[i];
       el("line", { x1: cx, x2: cx, y1: m.t - 6, y2: H - m.b, stroke: C.text3, "stroke-opacity": 0.5, "stroke-dasharray": "3 5" }, svg);
@@ -221,6 +224,15 @@ function mount(host, cfg) {
         el("title", {}, g).textContent = `${fmtP(k)}: no price now`;
       }
       for (const l of visible) if (!big.includes(l)) bubble(plot, d, l, cx, false, i);
+      // Dotted stems from the price to each bubble, as in the owner's picture: where each answer sits
+      // against the price now.
+      const yp = y(index);
+      if (yp > m.t && yp < H - m.b) big.forEach((l) => {
+        const by = y(l.k), up = l.r.side === "yes", col = up ? C.upFill : C.downFill, edge = by + (by < yp ? R : -R);
+        if (Math.abs(edge - yp) < 4) return;
+        el("line", { x1: cx, x2: cx, y1: yp, y2: edge, stroke: col, "stroke-width": 1.4, "stroke-dasharray": "2 4", "stroke-linecap": "round", "stroke-opacity": 0.75 }, stems);
+        el("circle", { cx, cy: edge + (by < yp ? 5 : -5), r: 2.6, fill: col }, stems);
+      });
       big.forEach((l, j) => bubble(plot, d, l, cx, true, i, j));
       const above = d.levels.filter((l) => y(l.k) <= m.t + R * 0.7), below = d.levels.filter((l) => y(l.k) >= H - m.b - R * 0.7);
       if (above.length) more(svg, cx, m.t - 2, true, above, d);
@@ -315,9 +327,11 @@ function mount(host, cfg) {
       if (smart) el("circle", { cx, cy: by, r: R + 5, fill: "none", stroke: "url(#sch-gold)", "stroke-width": 3, class: "sch-gold" }, body);
       el("circle", { cx, cy: by, r: R, fill: orbFill, stroke: ring, "stroke-width": 1.2, "stroke-opacity": 0.85 }, body);
       el("ellipse", { cx: cx - R * 0.28, cy: by - R * 0.42, rx: R * 0.42, ry: R * 0.24, fill: "url(#sch-shine)", class: "sch-shine" }, body);
-      const label = returnPct(r.make, r.total), long = label.length > 6;
-      el("text", { x: cx, y: by + 4, fill: C.ink, "font-size": long ? (phone ? 9.5 : 10.5) : phone ? 11 : 12, "font-weight": 700, "text-anchor": "middle",
-        stroke: "rgba(0,0,0,.35)", "stroke-width": 2, "paint-order": "stroke", "stroke-linejoin": "round" }, body).textContent = label;
+      const label = returnPct(r.make, r.total), long = label.length > 6, ink = yes ? C.upInk : C.downInk;
+      const a = R * 0.2, ay = by - R * 0.36;
+      el("path", { d: yes ? `M${cx - a} ${ay + a * 0.45}L${cx} ${ay - a * 0.55}L${cx + a} ${ay + a * 0.45}Z` : `M${cx - a} ${ay - a * 0.45}L${cx} ${ay + a * 0.55}L${cx + a} ${ay - a * 0.45}Z`,
+        fill: ink, "fill-opacity": 0.85, class: "sch-arrow" }, body);
+      el("text", { x: cx, y: by + R * 0.3, fill: ink, "font-size": long ? (phone ? 10 : 11) : phone ? 12 : 13, "font-weight": 800, "font-family": "Manrope, sans-serif", "letter-spacing": "-0.02em", "text-anchor": "middle" }, body).textContent = label;
       el("text", { x: cx + R + (smart ? 11 : 6), y: by + 4, fill: C.text3, "font-size": 10.5 }, fl).textContent = levelText(l.k);
     } else {
       el("circle", { cx, cy: by, r: 6, fill: orbFill, stroke: smart ? "url(#sch-gold)" : ring, "stroke-width": smart ? 2 : 1 }, body);
@@ -439,8 +453,7 @@ function mount(host, cfg) {
     el("circle", { cx: 0, cy: 0, r: geo.R + 5, fill: "none", stroke: "url(#sch-gold)", "stroke-width": 3, class: "gring" }, g);
     el("circle", { cx: 0, cy: 0, r: geo.R + 3, fill: "url(#sch-orb-up)", stroke: C.upRing, "stroke-width": 1.5, class: "gbody" }, g);
     el("ellipse", { cx: -(geo.R + 3) * 0.28, cy: -(geo.R + 3) * 0.42, rx: (geo.R + 3) * 0.5, ry: (geo.R + 3) * 0.3, fill: "url(#sch-shine)" }, g);
-    el("text", { x: 0, y: 4, fill: C.ink, "font-size": 13, "font-weight": 700, "text-anchor": "middle", class: "gtext",
-      stroke: "rgba(0,0,0,.35)", "stroke-width": 2, "paint-order": "stroke", "stroke-linejoin": "round" }, g);
+    el("text", { x: 0, y: 4, fill: C.upInk, "font-size": 13, "font-weight": 800, "font-family": "Manrope, sans-serif", "text-anchor": "middle", class: "gtext" }, g);
     el("text", { x: 0, y: -geo.R - 14, fill: C.text1, "font-size": 11, "text-anchor": "middle", class: "glab" }, g);
     return g;
   }
@@ -449,6 +462,7 @@ function mount(host, cfg) {
     g.style.transition = "none";
     g.style.transform = `translate(${px}px, ${py}px)`;
     g.querySelector(".gbody").setAttribute("fill", `url(#sch-orb-${yes ? "up" : "down"})`);
+    g.querySelector(".gtext").setAttribute("fill", yes ? C.upInk : C.downInk);
     g.querySelector(".gbody").setAttribute("stroke", yes ? C.upRing : C.downRing);
     g.querySelector(".gring").setAttribute("stroke-opacity", smartOf(r) ? 1 : 0);
     g.querySelector(".glab").textContent = `${yes ? "Higher" : "Lower"} ${money(tl.k)} · ${dayName(td.settle)}`;
