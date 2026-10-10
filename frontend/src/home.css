@@ -18,8 +18,6 @@
 .home-wide h2 { max-width: 20ch; }
 .home-art { margin-top: auto; display: flex; align-items: flex-end; gap: 16px; padding-right: 52px; min-height: 0; }
 .home-art-svg { display: block; width: 100%; max-height: 240px; }
-.home-art-sq { width: 88px; height: 88px; }
-.home-wide .home-art-svg { width: 300px; margin-left: auto; }
 .home-tall .home-art { flex-direction: column; align-items: stretch; }
 .home-fig { font: 600 15px var(--font-mono); color: var(--text-2); letter-spacing: -.02em; }
 /* Your positions: the P&L is the card (owner, 10 October 2026: "the numbers are too small ... we have a lot of room"). */
@@ -27,7 +25,6 @@
 .home-pnl-num { font: 700 clamp(56px, 9vh, 96px)/.9 var(--font-mono); letter-spacing: -.05em; color: var(--text-1); }
 .home-pnl-num.up { color: var(--up); } .home-pnl-num.down { color: var(--down); }
 .home-pnl-none { font: 700 clamp(22px, 3vh, 30px)/1.1 var(--font-sans); letter-spacing: -.02em; color: var(--text-2); }
-.home-hats { display: flex; } .home-hats .wtag-av + .wtag-av { margin-left: -10px; }
 .home-plus { position: absolute; right: 22px; bottom: 22px; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%;
   background: var(--surface-3, #2c2824); display: grid; place-items: center; cursor: pointer; }
 .home-plus svg, .home-pop-x svg { width: 16px; height: 16px; stroke: var(--text-1); stroke-width: 2; stroke-linecap: round; fill: none; }
@@ -42,15 +39,15 @@
 .home-pop-body { position: relative; padding: 40px 44px; display: grid; gap: 14px; justify-items: start; }
 .home-pop h2 { margin: 0; font: 800 40px/1.08 var(--font-sans); letter-spacing: -.03em; max-width: 18ch; }
 .home-pop p { margin: 0; font: 500 18px/1.5 var(--font-sans); color: var(--text-2); max-width: 56ch; }
-.home-pop-art { width: 100%; max-width: 640px; } .home-pop-art .home-art-sq { width: 140px; height: 140px; }
+.home-pop-art { width: 100%; max-width: 640px; }
 .home-pop-x { position: absolute; right: 24px; top: 22px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: var(--surface-3, #2c2824); display: grid; place-items: center; cursor: pointer; }
 @media (max-width: 900px) { .home-grid { grid-template-columns: 1fr 1fr; } .home-tall { grid-column: span 2; } }
 @media (max-width: 600px) {
   .home { padding-block: 24px 40px; } .home-intro h1 { font-size: 28px; } .home-intro p { font-size: 15px; }
-  .home-grid { grid-auto-rows: 200px; gap: 12px; } .home-card { border-radius: 22px; padding: 18px; } .home-card h2 { font-size: 20px; }
-  .home-label { font-size: 11px; } .home-wide { grid-column: span 1; } .home-wide .home-art-svg { display: none; }
-  .home-art { padding-right: 40px; } .home-art-sq { width: 64px; height: 64px; } .home-pnl-num { font-size: 52px; }
-  .home-hats .wtag-av { width: 34px; height: 34px; }
+  .home-grid { grid-template-columns: 1fr; grid-auto-rows: auto; gap: 12px; } .home-card { border-radius: 22px; padding: 18px; min-height: 176px; } .home-card h2 { font-size: 20px; }
+  .home-tall { grid-column: auto; min-height: 340px; } .home-tall .home-art { min-height: 200px; }
+  .home-label { font-size: 12px; } .home-wide { grid-column: auto; }
+  .home-art { padding-right: 40px; } .home-pnl-num { font-size: 52px; }
   .home-plus { width: 44px; height: 44px; right: 12px; bottom: 12px; }
   .home-pop-body { padding: 28px 22px; } .home-pop h2 { font-size: 28px; } .home-pop p { font-size: 16px; }
 }
@@ -61,8 +58,7 @@
   .home-grid { grid-auto-rows: auto; grid-template-rows: repeat(3, minmax(170px, 1fr)); height: clamp(480px, calc(100svh - 226px), 860px); gap: clamp(12px, 1.8vh, 20px); }
   .home-card { padding: clamp(18px, 2.4vh, 28px) clamp(20px, 2.2vw, 30px); border-radius: 24px; }
   .home-card h2 { font-size: clamp(20px, 2.7vh, 28px); }
-  .home-art-svg { max-height: min(240px, 26vh); } .home-art-sq { width: clamp(56px, 8vh, 88px); height: clamp(56px, 8vh, 88px); }
-  .home-wide .home-art-svg { width: clamp(200px, 22vw, 300px); }
+  .home-art-svg { max-height: min(240px, 26vh); }
   .home-plus { width: 36px; height: 36px; right: 18px; bottom: 18px; }
 }
 
@@ -82,3 +78,49 @@
 :root[data-theme="light"] .home-art-dark { display: none; }
 :root[data-theme="light"] .home-art-light { display: block; flex: 1 1 0; min-height: 0; height: 0; width: 100%; margin: 0; border-radius: 0; object-fit: contain; -webkit-mask-image: none; mask-image: none; }
 .home-pop-art .home-art-light { height: auto; max-height: 46vh; }
+
+/* Live cards (components/HomeLive.jsx): one large real figure and one small exact chart, like a phone widget. */
+.hl { width: 100%; min-width: 0; display: grid; gap: clamp(8px, 1.4vh, 14px); align-content: end; }
+.hl .up { color: var(--up); } .hl .down { color: var(--down); }
+.hl-big { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.hl-big b { font: 700 clamp(40px, 6.2vh, 64px)/.95 var(--font-mono); letter-spacing: -.045em; color: var(--text-1); }
+.hl-big b small { font-size: .42em; letter-spacing: -.02em; color: var(--text-3); }
+.hl-big b.up { color: var(--up); } .hl-big b.down { color: var(--down); }
+.hl-big span { font: 600 15px/1.3 var(--font-sans); color: var(--text-2); }
+.hl-bars { width: 100%; height: clamp(40px, 6vh, 56px); display: block; }
+.hl-bars rect.up { fill: var(--up); } .hl-bars rect.down { fill: var(--down); } .hl-base { stroke: var(--border-strong); stroke-width: 1; }
+.hl-radar .hl-axis { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; text-align: center; margin-top: -2px; font: 600 11px var(--font-mono); color: var(--text-3); }
+.hl-traders { list-style: none; margin: 0; padding: 0; gap: 6px; }
+.hl-traders li { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; }
+.hl-who { font: 600 14px var(--font-sans); color: var(--text-2); display: flex; gap: 8px; align-items: baseline; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hl-who small { font: 600 12px var(--font-mono); color: var(--text-3); }
+.hl-traders b { font: 700 16px var(--font-mono); letter-spacing: -.02em; }
+.hl-traders li.first { grid-template-columns: auto 1fr; grid-template-areas: "av who" "av pnl"; column-gap: 14px; row-gap: 2px; margin-bottom: 2px; }
+.hl-traders li.first .wtag-av { grid-area: av; } .hl-traders li.first .hl-who { grid-area: who; font-size: 15px; color: var(--text-1); }
+.hl-traders li.first b { grid-area: pnl; }
+.hl-traders li.first b { font-size: clamp(26px, 3.8vh, 40px); letter-spacing: -.04em; line-height: 1; }
+.hl-mix { width: 100%; height: clamp(44px, 7vh, 72px); display: block; border-radius: 6px; overflow: hidden; }
+.hl-r-MARKUP { fill: var(--up); } .hl-r-REACC { fill: var(--regime-reacc); } .hl-r-ACCUM { fill: var(--regime-accum); } .hl-r-MARKDOWN { fill: var(--down); }
+.hl-r-CAP { fill: var(--regime-cap); } .hl-r-BLOWOFF { fill: var(--regime-blowoff); } .hl-r-FLAT { fill: var(--border-strong); }
+.hl-leans { list-style: none; margin: 0; padding: 0; display: flex; gap: 10px; flex-wrap: wrap; }
+.hl-leans { gap: 18px; }
+.hl-leans li { display: flex; align-items: center; gap: 8px; font: 700 16px var(--font-sans); color: var(--text-2); }
+.hl-leans li.up { color: var(--up); } .hl-leans li.defensive { color: var(--down); }
+.hl-leans .asset-icon { width: 28px; height: 28px; border-radius: 50%; }
+.hl-options { grid-template-columns: 1fr 1fr; align-items: end; gap: 32px; }
+.hl-options .hl-big { flex-direction: column; gap: 8px; }
+.hl-options .hl-big b { font-size: clamp(48px, 8vh, 80px); }
+.hl-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; gap: 3px; }
+.hl-bar i { display: block; } .hl-bar i.up { background: var(--up); } .hl-bar i.down { flex: 1; background: var(--down); }
+.hl-split { display: grid; gap: 10px; }
+.hl-split-k { display: flex; justify-content: space-between; font: 600 14px var(--font-sans); color: var(--text-2); }
+.hl-split-k b { font: 700 22px var(--font-mono); letter-spacing: -.03em; margin-right: 6px; }
+.home-pop-live { max-width: 560px; }
+@media (max-width: 600px) {
+  .hl-options { grid-template-columns: 1fr; gap: 14px; } .hl-big b { font-size: 44px; } .hl-options .hl-big b { font-size: 48px; }
+  
+}
+.home-live .home-art { flex: 1 1 0; min-height: 0; margin-top: clamp(8px, 1.4vh, 14px); align-items: stretch; }
+.home-live .hl { align-content: space-between; }
+.home-live.home-wide .hl { align-content: end; }
+@media (max-width: 600px) { .home-live .home-art { flex: none; } .home-live .hl { align-content: end; } }

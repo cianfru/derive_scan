@@ -6,6 +6,7 @@ import { TESTNET_FILLS } from "../lib/flags.js";
 import { useFeeds } from "../components/Feeds.jsx";
 import { openPnl, pctText } from "../lib/homePnl.js";
 import { HOME_ART } from "../components/HomeArt.jsx";
+import { HOME_LIVE } from "../components/HomeLive.jsx";
 import "../home.css";
 
 // The card home (owner, 9 October 2026, after Apple's "Why you'll love Mac" page): one card per part
@@ -45,18 +46,12 @@ function PositionsFigure() {
       : <span className="home-pnl"><span className={`home-pnl-num ${r.pct >= 0 ? "up" : "down"}`}>{pctText(r.pct)}</span><span className="home-fig">{n}</span></span>}</>;
 }
 
-/** Small live figures for the cards; each is left out while its file is missing. */
+/** The Saloon card's figure line; left out while its file is missing. */
 function useFigures() {
   const { data: q } = useData("questions/index.json");
-  const { data: t } = useData("traders.json");
-  const { data: m } = useData("markets.json");
   const coins = q?.coins || [];
   const rings = coins.reduce((s, c) => s + (c.smart || 0), 0);
-  return {
-    saloon: coins.length ? `${coins.length} coins open${rings ? ` · ${rings} gold rings` : ""}` : null,
-    markets: m?.coins?.length ? `${m.coins.length} markets` : null,
-    traders: (t?.traders || []).slice(0, 3).map((x) => x.address),
-  };
+  return { saloon: coins.length ? `${coins.length} coins open${rings ? ` · ${rings} gold rings` : ""}` : null };
 }
 
 export default function Home() {
@@ -83,15 +78,15 @@ export default function Home() {
           const Art = HOME_ART[c.id];
           const figure = fig[c.id];
           return (
-            <article key={c.id} className={`home-card${c.size ? ` home-${c.size}` : ""}`} onClick={() => navigate(c.to)}>
+            <article key={c.id} className={`home-card${c.size ? ` home-${c.size}` : ""}${HOME_LIVE[c.id] ? " home-live" : ""}`} onClick={() => navigate(c.to)}>
               <Link to={c.to} className="home-link" onClick={(e) => e.stopPropagation()}>
                 <span className="home-label">{c.label}</span>
-                <h2>{c.title}</h2>
+                <h2 className={HOME_LIVE[c.id] ? "sr-only" : undefined}>{c.title}</h2>
               </Link>
               <div className="home-art">
-                {c.id === "traders" ? <Art addresses={figure} /> : Art ? <Art /> : null}
+                {HOME_LIVE[c.id] ? (() => { const Live = HOME_LIVE[c.id]; return <Live />; })() : Art ? <Art /> : null}
                 {c.id === "positions" && <PositionsFigure />}
-                {typeof figure === "string" && <span className="home-fig">{figure}</span>}
+                {figure && <span className="home-fig">{figure}</span>}
               </div>
               <button type="button" className="home-plus" aria-label={`More about ${c.label}`}
                 onClick={(e) => { e.stopPropagation(); opener.current = e.currentTarget; setPopped(c.id); }}>{PLUS}</button>
@@ -106,7 +101,8 @@ export default function Home() {
           <span className="home-label">{card.label}</span>
           <h2 id="home-pop-title">{card.title}</h2>
           <p>{card.about}</p>
-          {HOME_ART[card.id] && card.id !== "traders" && <div className="home-pop-art">{(() => { const Art = HOME_ART[card.id]; return <Art />; })()}</div>}
+          {HOME_LIVE[card.id] ? <div className="home-pop-art home-pop-live">{(() => { const Live = HOME_LIVE[card.id]; return <Live />; })()}</div>
+            : HOME_ART[card.id] && <div className="home-pop-art">{(() => { const Art = HOME_ART[card.id]; return <Art />; })()}</div>}
           <Link className="btn primary lg" to={card.to} onClick={() => setPopped(null)}>{card.cta}</Link>
         </div>}
       </dialog>
