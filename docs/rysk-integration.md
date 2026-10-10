@@ -26,6 +26,14 @@ Each step is timed (owner: "we should actually chrono this time") and shown in t
 
 Calls lock the coin's own token on HyperEVM: WHYPE (wrap HYPE first), UBTC, UETH, USOL, PURR, UPUMP. Rysk also runs on Ethereum (WETH, WBTC; puts in USDC or USDT), not used yet.
 
+## On the Saloon chart
+
+Builds with `VITE_RYSK` add a switch under the coin tabs, "Derive · higher or lower" (unchanged) and "Rysk · get paid to wait" (`?venue=rysk`, `components/rysk/RyskView.jsx`, `RyskChart.jsx`). The Rysk view draws the coin's 4-hour candles, a Now line and one column per Friday Rysk lists; each level is a bubble, blue above the price (sell: lock the coin) and lilac below it (buy: lock USDC), with about what Rysk's smallest size pays now, worked out from Rysk's listed APR on what it locks for the days left (it matched the live quote: $13.07). A bubble opens the panel held on that level with a picture of the settlement (`FridayPicture.jsx`): the level splitting the price line, the price now, and what you end with on each side, the premium on both. One Rysk connection serves the chart and the panel.
+
+## Lab site
+
+The owner's test site (10 October 2026: "test it somewhere without touching anything"): Vercel project `cowboy-lab`, the same repository, root `frontend`, built only from the `lab` branch (its ignore-build rule skips every other branch), with `VITE_QUESTIONS=1` and `VITE_RYSK=mainnet`; `VITE_RYSK_PILOT` holds the owner's wallet. Its vercel.app address needs a Vercel login. cowboy.trading (`torq`, from `main`) is not changed.
+
 ## Switches
 
 | Variable (Vercel) | Effect |
