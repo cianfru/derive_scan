@@ -48,3 +48,5 @@ bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sel
 1791688500,LIT,perp,944.48,0.0,0.0,0.0,1
 1791688500,PUMP,perp,868.74,0.0,0.0,0.0,1
 1791688500,VVV,perp,677.84,0.0,0.0,0.0,2
+1791689400,BTC,perp,829.21,0.0,0.0,0.0,1
+1791689400,ETH,call,501.28,501.31,0.5,5.64,2
