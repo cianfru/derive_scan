@@ -168,3 +168,5 @@ bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sel
 1791712800,PUMP,perp,0.0,795.83,0.0,0.0,1
 1791712800,XRP,call,417.59,0.0,11.88,0.0,1
 1791713700,PUMP,perp,578.18,0.0,0.0,0.0,1
+1791713700,ETH,perp,0.0,2818.61,0.0,0.0,3
+1791713700,ZEC,call,0.0,12370.81,0.0,133.0,1
