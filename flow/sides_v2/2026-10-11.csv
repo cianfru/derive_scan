@@ -225,3 +225,6 @@ bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sel
 1791725400,ETH,perp,0.0,1413.51,0.0,0.0,1
 1791725400,BTC,perp,0.0,5007.19,0.0,0.0,1
 1791725400,ETH,perp,0.0,2826.51,0.0,0.0,4
+1791726300,BTC,perp,830.22,0.0,0.0,0.0,1
+1791726300,ETH,perp,437.29,4237.1,0.0,0.0,5
+1791727200,BTC,call,4149.48,4149.48,0.0,84.16,2
