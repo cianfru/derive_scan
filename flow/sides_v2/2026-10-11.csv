@@ -70,3 +70,5 @@ bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sel
 1791693000,HYPE,put,0.0,10779.63,0.0,16.51,2
 1791693000,ZEC,call,0.0,25849.15,0.0,492.01,3
 1791693000,ZEC,put,0.0,12308.64,0.0,51.87,1
+1791693900,BTC,put,0.0,33167.71,0.0,18.0,2
+1791693900,HYPE,perp,850.8,3401.23,0.0,0.0,5
