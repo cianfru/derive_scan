@@ -131,3 +131,19 @@ export async function lockAndReceive({
     throw e;
   }
 }
+
+/** HYPE's wrapped token on HyperEVM (and its testnet): what selling HYPE at a level locks. */
+export const WHYPE = "0x5555555555555555555555555555555555555555";
+
+/**
+ * Wrap native HYPE into WHYPE (WHYPE's deposit(), one wallet transaction), so a sale at a level can lock
+ * it. Moves the wallet to the build's chain first; waits for the receipt and never sends twice.
+ */
+export async function wrapHype({ provider, wallet, net, units, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), receiptTries = 120 }) {
+  await switchFundingChain(provider, wallet, { id: net.chainId, metamask: net.metamask });
+  const hash = await ask(provider, "eth_sendTransaction", [{ from: wallet, to: WHYPE, value: `0x${BigInt(units).toString(16)}`, data: "0xd0e30db0" }]);
+  const r = await receipt(provider, hash, { tries: receiptTries, sleep });
+  if (!r) throw fail("rysk_wrap_pending", "Wrapping is still pending. Check your wallet before trying again.", { hash });
+  if (Number(r.status) !== 1) throw fail("rysk_wrap_failed", "Wrapping failed on HyperEVM.", { hash });
+  return hash;
+}

@@ -99,6 +99,19 @@ describe("Receive premium on Rysk", () => {
     expect(go.disabled).toBe(true);
   });
 
+  it("offers to wrap HYPE when selling HYPE and the wallet holds HYPE but no WHYPE", async () => {
+    const user = userEvent.setup();
+    const rpc = vi.fn(async (url, init) => {
+      const body = JSON.parse(init.body);
+      const result = body.method === "eth_getBalance" ? `0x${(100n * 10n ** 18n).toString(16)}` : "0x0"; // 100 HYPE, no WHYPE, no USDC
+      return { ok: true, json: async () => ({ jsonrpc: "2.0", id: 1, result }) };
+    });
+    render(<RyskTicket und="HYPE" near={95} side="yes" net={BASE} socketFactory={() => fakeRysk()} provider={fakeWallet({ chainId: 999 })} fetchImpl={rpc} />);
+    await screen.findByText(/You lock until/);
+    await user.click(screen.getByRole("button", { name: "Connect wallet" }));
+    expect(await screen.findByRole("button", { name: /^Wrap 25 HYPE to WHYPE$/ })).toBeTruthy();
+  });
+
   it("says so when Rysk lists nothing for the coin", async () => {
     render(<RyskTicket und="DOGE" net={BASE} socketFactory={() => fakeRysk()} provider={null} fetchImpl={fetchImpl} />);
     expect(await screen.findByText("Rysk lists no DOGE options on HyperEVM now.")).toBeTruthy();

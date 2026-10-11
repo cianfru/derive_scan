@@ -7,7 +7,7 @@ import inventory from "../../fixtures/rysk/inventory.json";
 import caps from "../../fixtures/rysk/caps.json";
 import { capsRoom, nearestDate, nearestLevel, ryskCoins, ryskMarket } from "./market.js";
 import { CONFIRMATION_TYPES, collateralUnits, confirmationBody, confirmationTypedData, contracts, echoes, premiumUnits, quoteFits, requestParams, snapSize } from "./order.js";
-import { lockAndReceive } from "./trade.js";
+import { WHYPE, lockAndReceive, wrapHype } from "./trade.js";
 import { parseRyskPilot, ryskPilot } from "./config.js";
 import { fakeWallet } from "../trade/fakeWallet.js";
 
@@ -207,6 +207,17 @@ describe("locking and receiving the premium", () => {
     f.fetchImpl.mockImplementation(async (url, init) => ({ ok: true, json: async () => ({ ...JSON.parse(init.body), price: "1", gasFee: "1" }) }));
     await expect(lockAndReceive({ provider: f.provider, wallet: getAddress(f.provider.address), net: NET, socket: f.socket, level, quote: async () => quoteFor(req), fetchImpl: f.fetchImpl, sleep: async () => {} }))
       .rejects.toMatchObject({ code: "rysk_fee" });
+  });
+});
+
+describe("wrapping HYPE for a sale", () => {
+  it("moves to HyperEVM and calls WHYPE's deposit with exactly the HYPE missing, once", async () => {
+    const provider = fakeWallet({ chainId: 1 });
+    await wrapHype({ provider, wallet: getAddress(provider.address), net: NET, units: 25n * 10n ** 18n, sleep: async () => {} });
+    const sent = provider.calls.filter((c) => c.method === "eth_sendTransaction");
+    expect(sent).toHaveLength(1);
+    expect(sent[0].params[0]).toMatchObject({ to: WHYPE, data: "0xd0e30db0", value: `0x${(25n * 10n ** 18n).toString(16)}` });
+    expect(provider.calls.find((c) => c.method === "wallet_switchEthereumChain").params[0].chainId).toBe("0x3e7");
   });
 });
 

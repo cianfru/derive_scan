@@ -13,7 +13,7 @@ import { RYSK, ryskPilot } from "../../lib/rysk/config.js";
 import { ryskSocket } from "../../lib/rysk/socket.js";
 import { capsRoom, nearestDate, nearestLevel, ryskMarket } from "../../lib/rysk/market.js";
 import { E18, collateralUnits, contracts, premiumUnits, quoteFits, requestParams, snapSize, strikeE8, toNumber } from "../../lib/rysk/order.js";
-import { STEPS, lockAndReceive } from "../../lib/rysk/trade.js";
+import { STEPS, WHYPE, lockAndReceive, wrapHype } from "../../lib/rysk/trade.js";
 import { hyperBalances } from "../../lib/rysk/rpc.js";
 import { saveRyskTrade } from "../../lib/rysk/records.js";
 import FridayPicture from "./FridayPicture.jsx";
@@ -58,7 +58,8 @@ export default function RyskTicket({ und, settleTs, near, side, net = RYSK, sock
   const [clock, setClock] = useState(() => Math.floor(now() / 1000));
   const [run, setRun] = useState({ phase: "idle", steps: {} });
   const [positions, setPositions] = useState(null);
-  const quoteRef = useRef(null), reqRef = useRef(null), sentAt = useRef(0);
+  const quoteRef = useRef(null), reqRef = useRef(null), sentAt = useRef(0), firstAsk = useRef(0);
+  const [wrap, setWrap] = useState({ phase: "idle" });
   const provider = injected === undefined ? findProvider() : injected;
 
   // One socket while the ticket is on screen (or the chart's): the listing on open and every minute after.
@@ -104,7 +105,8 @@ export default function RyskTicket({ und, settleTs, near, side, net = RYSK, sock
     setQuote(null);
     setQuoteError(null);
     if (!req || overCap || !sock.current) return undefined;
-    const ask = () => { sentAt.current = Date.now(); sock.current?.send("request", req).catch((e) => setQuoteError(e.message)); };
+    firstAsk.current = 0;
+    const ask = () => { sentAt.current = Date.now(); if (!firstAsk.current) firstAsk.current = sentAt.current; sock.current?.send("request", req).catch((e) => setQuoteError(e.message)); };
     const first = setTimeout(ask, 500);
     const again = setInterval(() => {
       const q = quoteRef.current, t = Math.floor(Date.now() / 1000);
@@ -184,6 +186,15 @@ export default function RyskTicket({ und, settleTs, near, side, net = RYSK, sock
   const shownLevels = all ? ordered : ordered.slice(0, SHOWN);
   const needCollateral = balances && lock != null ? balances.tokens[(level.isPut ? level.collateral : token.address).toLowerCase()] : null;
   const short_ = needCollateral != null && lock != null && needCollateral < lock;
+  // Selling HYPE locks WHYPE: offer to wrap what is missing when the wallet holds enough HYPE (with gas to spare).
+  const wrapNeed = short_ && !level.isPut && token.address.toLowerCase() === WHYPE ? lock - needCollateral : null;
+  const canWrap = wrapNeed != null && balances?.hype != null && balances.hype > wrapNeed + 10n ** 16n;
+  const silent = !quote && !quoteError && firstAsk.current && Date.now() - firstAsk.current > 20_000;
+  async function doWrap() {
+    setWrap({ phase: "running" });
+    try { await wrapHype({ provider, wallet, net, units: wrapNeed }); setWrap({ phase: "idle" }); refreshWallet(wallet); }
+    catch (e) { setWrap({ phase: "failed", message: e?.source === "wallet" || e?.code === 4001 ? "Your wallet declined." : e.message }); }
+  }
   const running = run.phase === "running";
   const canTrade = wallet && quote && left > 5 && !overCap && pilotOk && !running && run.phase !== "done" && !short_;
 
@@ -224,7 +235,7 @@ export default function RyskTicket({ und, settleTs, near, side, net = RYSK, sock
         </section>
         <div className="rk-premium" aria-live="polite">
           <div><span>Premium now</span><strong className="mono">{premium != null ? usd(premium) : "—"}</strong></div>
-          <small>{quote ? <>{quote.apy != null && <>{Number(quote.apy).toFixed(1)}% APR · </>}valid {Math.max(0, left)} s</> : quoteError ? <>{quoteError}</> : "Asking Rysk's makers…"}<Info label="About the premium">A firm price from Rysk's makers for exactly this trade, paid in USDC into your wallet when the trade goes through. Rysk takes a small gas fee from it, shown before you sign. No fee goes to Cowboy.</Info></small>
+          <small>{quote ? <>{quote.apy != null && <>{Number(quote.apy).toFixed(1)}% APR · </>}valid {Math.max(0, left)} s</> : quoteError ? <>{quoteError}</> : silent ? "No premium from Rysk's makers right now." : "Asking Rysk's makers…"}<Info label="About the premium">A firm price from Rysk's makers for exactly this trade, paid in USDC into your wallet when the trade goes through. Rysk takes a small gas fee from it, shown before you sign. No fee goes to Cowboy.</Info></small>
         </div>
       </>}
 
@@ -234,6 +245,8 @@ export default function RyskTicket({ und, settleTs, near, side, net = RYSK, sock
           : <button type="button" className="btn" onClick={connect}>Connect wallet</button>}
         {walletError && <p className="q-note warn">{walletError}</p>}
         {short_ && <p className="q-note warn">Your wallet holds less {level.isPut ? level.collateralToken.symbol : token.symbol} on {net.chainName} than this locks.</p>}
+        {canWrap && <button type="button" className="btn rk-wrap" disabled={wrap.phase === "running"} onClick={doWrap}>{wrap.phase === "running" ? "Wrapping…" : `Wrap ${amountText(wrapNeed)} HYPE to WHYPE`}</button>}
+        {wrap.phase === "failed" && <p className="q-note warn">{wrap.message}</p>}
         {wallet && !pilotOk && <p className="q-note">Trading on Rysk is open to pilot wallets first.</p>}
       </div>
 

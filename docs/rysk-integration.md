@@ -32,7 +32,7 @@ Builds with `VITE_RYSK` add a switch under the coin tabs, "Derive · higher or l
 
 ## Lab site
 
-The owner's test site (10 October 2026: "test it somewhere without touching anything"): Vercel project `cowboy-lab`, the same repository, root `frontend`, built only from the `lab` branch (its ignore-build rule skips every other branch), with `VITE_QUESTIONS=1` and `VITE_RYSK=mainnet`; `VITE_RYSK_PILOT` holds the owner's wallet. Its vercel.app address needs a Vercel login. cowboy.trading (`torq`, from `main`) is not changed.
+The owner's test site (10 October 2026: "test it somewhere without touching anything"): Vercel project `cowboy-lab`, the same repository, root `frontend`, built only from the `lab` branch (its ignore-build rule skips every other branch), with `VITE_QUESTIONS=1` and `VITE_RYSK=testnet` since 11 October 2026 (owner: no $1,000 test with real money; Rysk's testnet on HyperEVM testnet, chain 998, lists HYPE only: sell at a level locks WHYPE, 10 HYPE minimum, and the ticket offers to wrap HYPE; buy at a level locks Rysk's test USDC). Test HYPE comes from Hyperliquid's testnet faucet; Rysk's test USDC from Rysk (no public faucet). A premium that never comes reads "No premium from Rysk's makers right now." after 20 s. Its vercel.app address needs a Vercel login. cowboy.trading (`torq`, from `main`) is not changed.
 
 ## Switches
 
