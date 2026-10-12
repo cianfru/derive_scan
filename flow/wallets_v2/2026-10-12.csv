@@ -1,0 +1,3 @@
+bucket_ts,wallet,legs,perp_notional_usd,option_notional_usd,premium_bought_usd,premium_sold_usd,realized_pnl_usd,fees_usd
+1791763200,0x43ba0a8D1f585055815D72d18bbb10CA8cD42261,1,12.66,0.0,0.0,0.0,0.0,0.0
+1791763200,0xE3F16770C0A336103d7c24B34A4AfcBf6fb17583,1,12.66,0.0,0.0,0.0,0.0,0.01
