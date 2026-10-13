@@ -1,0 +1,7 @@
+bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sell_premium_usd,legs
+1791849600,DOGE,perp,0.0,549.8,0.0,0.0,1
+1791849600,ETH,call,0.0,26698.67,0.0,2165.34,1
+1791849600,ETH,perp,3668.05,1242.57,0.0,0.0,5
+1791849600,HYPE,perp,302.23,1617.02,0.0,0.0,3
+1791849600,SOL,perp,1056.62,0.0,0.0,0.0,1
+1791849600,ZEC,perp,1166.45,1168.29,0.0,0.0,3
