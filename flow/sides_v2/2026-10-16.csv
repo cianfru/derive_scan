@@ -1,0 +1,6 @@
+bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sell_premium_usd,legs
+1792108800,ETH,call,0.0,26713.06,0.0,2073.93,1
+1792108800,HYPE,call,0.0,163417.5,0.0,2060.0,1
+1792108800,HYPE,perp,5542.3,0.0,0.0,0.0,3
+1792108800,HYPE,put,0.0,163417.5,0.0,1420.0,1
+1792108800,LINK,perp,0.0,999.16,0.0,0.0,1
