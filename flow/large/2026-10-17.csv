@@ -1,0 +1,3 @@
+ts,instrument,kind,underlying,direction,amount,price,index_price,notional_usd,premium_usd,wallet,subaccount_id,rfq,realized_pnl
+1792195882430,HYPE-20261225-150-P,option,HYPE,sell,500.0,69.49,80.122069498389,40061.03,34745.0,0x570c453d097c67dd9e44eAD7B6d9ba1055057C60,107941,0,0.0
+1792195882461,HYPE-20261225-150-P,option,HYPE,buy,500.0,69.31,80.122069498389,40061.03,34655.0,0x570c453d097c67dd9e44eAD7B6d9ba1055057C60,107941,1,64.963379151
