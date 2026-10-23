@@ -1,0 +1,3 @@
+bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sell_premium_usd,legs
+1792713600,ETH,call,71556.67,71556.67,2214.66,28.39,2
+1792713600,ETH,perp,0.0,16646.76,0.0,0.0,1
