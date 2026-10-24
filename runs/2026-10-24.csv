@@ -948,3 +948,9 @@ slot,fetched_at,key,ok,secs,error
 1792864800,1792864893,v3_mainnet:XAUT,1,1.15,
 1792864800,1792864893,v3_mainnet:XRP,1,1.17,
 1792864800,1792864893,v3_mainnet:ZEC,0,,public/get_all_instruments: -32603 Internal error
+1792864800,1792865150,questions:v3_mainnet,1,,
+1792864800,1792865150,v3_mainnet:ADA,1,1.44,
+1792864800,1792865150,v3_mainnet:BTC,1,2.96,
+1792864800,1792865150,v3_mainnet:HYPE,1,2.0,
+1792864800,1792865150,v3_mainnet:VVV,1,1.01,
+1792864800,1792865150,v3_mainnet:ZEC,1,1.97,
