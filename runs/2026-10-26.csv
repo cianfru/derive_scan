@@ -311,3 +311,16 @@ slot,fetched_at,key,ok,secs,error
 1792991700,1792991849,v3_mainnet:XAUT,0,,public/get_all_instruments: 9000 Order confirmation timeout Order confirmation timeout
 1792991700,1792991849,v3_mainnet:XRP,0,,public/get_all_instruments: 9000 Order confirmation timeout Order confirmation timeout
 1792991700,1792991849,v3_mainnet:ZEC,0,,public/get_all_instruments: 9000 Order confirmation timeout Order confirmation timeout
+1792991700,1792992067,questions:v3_mainnet,1,,
+1792991700,1792992067,v3_mainnet:ADA,1,0.71,
+1792991700,1792992067,v3_mainnet:BTC,1,1.81,
+1792991700,1792992067,v3_mainnet:CC,1,0.54,
+1792991700,1792992067,v3_mainnet:ETH,1,1.59,
+1792991700,1792992067,v3_mainnet:HYPE,1,1.24,
+1792991700,1792992067,v3_mainnet:LIT,1,0.68,
+1792991700,1792992067,v3_mainnet:PUMP,1,0.64,
+1792991700,1792992067,v3_mainnet:SOL,1,0.97,
+1792991700,1792992067,v3_mainnet:VVV,1,0.64,
+1792991700,1792992067,v3_mainnet:XAUT,1,0.77,
+1792991700,1792992067,v3_mainnet:XRP,1,0.75,
+1792991700,1792992067,v3_mainnet:ZEC,1,0.89,
