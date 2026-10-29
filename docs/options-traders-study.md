@@ -64,6 +64,21 @@ Otherwise the result is "context, not a signal", and positioning is shown withou
 - Hedges inside a wallet that uses another venue cannot be seen.
 - Derive's V3 docs describe public trades as anonymised; wallet-level tracking may stop when V3 replaces V2.
 
+### Operational details for the test (fixed 29 October 2026, before running; the owner: "Run part 2")
+
+The rules above leave a few choices open. They are fixed here, before the test's code reads the data:
+
+- **Data.** The data branch's day files from the rebuild's first day to the newest finished day, wallets under their owner's name (history.canonical_rows), options only (perp rows serve only the hedger class). Classes at the time come from `balance_history.Replay` (history.classify's rules with Amendment B), recomputed at every close; a trade day uses the classes of the close before it.
+- **Training ranking.** At the close of 30 June 2025, every wallet classed directional then is ranked by its realised option PnL on the options that expired from 1 June 2024 to 30 June 2025 (premium received minus paid plus contracts held at expiry times the settlement value, as Part 1 defines option PnL; every trade in such an option happened before its expiry, so all of them count). Tiers as history.rank_tiers: Top is the best fifth of all directional wallets at that close (their count times 0.20, rounded), among those with positive PnL; Smart adds the next best up to 50 (none while Top has 50 or more); Profitable is every directional wallet with positive PnL. Fixed for the whole test.
+- **Positioning,** per underlying (BTC, ETH) and day d: each wallet's net option delta added on the underlying over days d-6 to d (the day files' `delta_usd`: buys of calls and sales of puts add, buys of puts and sales of calls subtract), counting a trade day only while the wallet was directional at the close before it. The share is the tier's sum of those nets over the sum of every directional wallet's absolute net: the tier's delta added as a share of all directional delta added, between -1 and +1. The denominator is gross because the directional total itself nets to near zero on many days. No reading on a day when no directional wallet added delta.
+- **Days scored:** from 7 July 2025 (the first day whose seven trade days all fall in July) to the newest day whose outcome is complete for that horizon.
+- **Outcome:** the underlying's change from Derive's daily index close of day d (00:00 UTC after it) to the close h days later, h = 3, 7 and 14 (`candles/{UND}/1d.csv`).
+- **Spearman** with average ranks for ties. **Bootstrap:** calendar weeks (Monday to Sunday) of scored days as blocks, drawn with replacement up to as many days, 10,000 times with a fixed seed; the 99% interval runs from the 0.5th to the 99.5th percentile.
+- **Random sets:** 1,000 sets of wallets classed directional at the close of 30 June 2025, each as large as Top, drawn without replacement (fixed seed), scored with the same BTC 7-day statistic.
+- **Halves:** the scored days split in two by date, equal counts.
+- **Reported, not deciding:** Smart and Profitable (the main statistic, BTC and ETH), all directional wallets, the 3- and 14-day horizons, and the counts behind each figure.
+- **Already seen before running:** Addendum A's settlement record (7 October 2026, a different reading) and the exploration behind Reflex's Derive drawer (28 October 2026: open delta and delta added by the Smart wallets, ranked at each close and ranked on 27 October, around BTC tops). Neither computed this statistic, its walk-forward ranking or its test window.
+
 ## In the app before any verdict
 
 - Priced outcomes (built 2 October 2026): the price ranges option prices imply per expiry, drawn on the coin chart; labelled as market pricing, never as a forecast.
