@@ -131,3 +131,34 @@ Owner, 9 October 2026, on a top-tier wallet with 9,551 settled options won and 9
 - **Left as it is.** A grey zone of 31 top-tier wallets above 50% maker or 40% both sides (about 10% of the tier's PnL) stays directional: patient limit-order traders also post prices. Each trader page shows its passive share so a reader can judge.
 - **Scope.** It applies everywhere the classes apply: the tiers, the Saloon's gold rings and traders' line, the Radar's Smart balance (its backfill is rebuilt with the new classes), Flow and the leaderboard. Addendum A's result above was computed with the earlier classes; it is rerun with these classes before it is quoted again.
 
+
+## Addendum C: the Smart wallets as ranked at the time, before BTC's turns (DRAFT, 29 October 2026: awaiting the owner's approval; nothing is computed under it before then)
+
+Owner, 28 October 2026: on Derive, "when big smart wallets start to go short or start buying puts" is when the market rolled over. 29 October: "let's make a study for the derived data". Reflex's market history page shows it in its Derive options drawer (Reflex `docs/reviews/derive-smart-wallets.md`), from Cowboy's daily counts (`derive/smart_counts.py`, `history/smart_counts.json`).
+
+### Already seen
+
+The exploration of 28 October 2026 looked at every close from December 2023 to 27 October 2026 with both rankings, around nine BTC tops. Ranked at the time, the Smart wallets were short before a top about as often as on any day (2 of 9, against 31% of days), and most of their put buying came after the turn; today's ranking, looking back, reads otherwise by hindsight. The past is therefore description here. The verdict uses only closes after this addendum is approved.
+
+### Readings (each close, BTC options, the Smart wallets as ranked at that close)
+
+- **Short share:** wallets net short over wallets net long or short ($1,000 of open delta or more), from `history/smart_counts.json`.
+- **Turn:** the short share's change over the last 28 closes.
+- **Put pressure:** the premium paid on new long puts over the last 28 closes, over the average 28-close sum of the 84 closes before them.
+- **Outcome:** BTC's daily index close change over the next 30 days (14 days reported, not deciding).
+
+### Test (out of sample)
+
+- Window: every close from the day of approval until at least 180 closes have a complete 30-day outcome (about seven months).
+- Main statistic: Spearman rank correlation between the turn and the next 30-day change, with a block bootstrap by 30-close blocks for the interval (neighbouring closes share most of their outcome).
+- Reported with it: the put pressure's correlation with the same outcome; ETH's own readings against ETH's price; the readings in the 28 closes before each BTC top the drawer marks in the window (the highest close within 30 days either side, followed by a fall of 15% or more within 90), never deciding.
+
+### Bar
+
+"Signal" only if all of these hold:
+1. the turn's correlation with the next 30-day BTC change is -0.10 or lower, with the 99% bootstrap interval below zero;
+2. the put pressure's correlation is negative too;
+3. ETH's turn has the same sign against ETH's price;
+4. the same sign in both halves of the window.
+
+Otherwise the drawer's readings stay "context, not a signal". No probability, odds, likely or predict wording in either app.
