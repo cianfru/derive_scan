@@ -132,7 +132,7 @@ Owner, 9 October 2026, on a top-tier wallet with 9,551 settled options won and 9
 - **Scope.** It applies everywhere the classes apply: the tiers, the Saloon's gold rings and traders' line, the Radar's Smart balance (its backfill is rebuilt with the new classes), Flow and the leaderboard. Addendum A's result above was computed with the earlier classes; it is rerun with these classes before it is quoted again.
 
 
-## Addendum C: the Smart wallets as ranked at the time, before BTC's turns (DRAFT, 29 October 2026: awaiting the owner's approval; nothing is computed under it before then)
+## Addendum C: the Smart wallets as ranked at the time, before BTC's turns (APPROVED by the owner on 29 October 2026 as written, before any result: "Addendum C approved as drafted")
 
 Owner, 28 October 2026: on Derive, "when big smart wallets start to go short or start buying puts" is when the market rolled over. 29 October: "let's make a study for the derived data". Reflex's market history page shows it in its Derive options drawer (Reflex `docs/reviews/derive-smart-wallets.md`), from Cowboy's daily counts (`derive/smart_counts.py`, `history/smart_counts.json`).
 
@@ -149,7 +149,7 @@ The exploration of 28 October 2026 looked at every close from December 2023 to 2
 
 ### Test (out of sample)
 
-- Window: every close from the day of approval until at least 180 closes have a complete 30-day outcome (about seven months).
+- Window: every close from the day of approval (the first is the close of 29 October 2026, 00:00 UTC on 30 October) until at least 180 closes have a complete 30-day outcome (about seven months).
 - Main statistic: Spearman rank correlation between the turn and the next 30-day change, with a block bootstrap by 30-close blocks for the interval (neighbouring closes share most of their outcome).
 - Reported with it: the put pressure's correlation with the same outcome; ETH's own readings against ETH's price; the readings in the 28 closes before each BTC top the drawer marks in the window (the highest close within 30 days either side, followed by a fall of 15% or more within 90), never deciding.
 
