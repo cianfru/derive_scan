@@ -36,6 +36,9 @@ keeps no history. Files:
   radar.json          the last 30 daily closes of every coin with options: the engine's z-score and
                       saved reading, and the Smart wallets' delta balance (history/balance.json) for
                       7 and 30 days, with the live gates; read by the Radar page only
+  smart_counts.json   the last 120 daily closes of history/smart_counts.json (derive/smart_counts.py): the
+                      Smart wallets net long and net short of BTC, ETH and all options, and their premium on
+                      new puts; read by Reflex's market history page, not by this app
 """
 from __future__ import annotations
 
@@ -1115,6 +1118,12 @@ def build(data: Path, site: Path, now: float | None = None) -> dict:
         _write(site / "radar.json", radar)
     else:
         (site / "radar.json").unlink(missing_ok=True)
+    from derive import smart_counts
+    counts = smart_counts.publish(data)
+    if counts:
+        _write(site / "smart_counts.json", {"generated_at": int(now), **counts})
+    else:
+        (site / "smart_counts.json").unlink(missing_ok=True)
     flow = flow_block(data, now, flows)
     tp = data / "history" / "traders.json"
     ranked = {t["address"].lower() for t in json.loads(tp.read_text())["traders"]} if tp.exists() else set()
