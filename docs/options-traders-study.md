@@ -79,6 +79,26 @@ The rules above leave a few choices open. They are fixed here, before the test's
 - **Reported, not deciding:** Smart and Profitable (the main statistic, BTC and ETH), all directional wallets, the 3- and 14-day horizons, and the counts behind each figure.
 - **Already seen before running:** Addendum A's settlement record (7 October 2026, a different reading) and the exploration behind Reflex's Derive drawer (28 October 2026: open delta and delta added by the Smart wallets, ranked at each close and ranked on 27 October, around BTC tops). Neither computed this statistic, its walk-forward ranking or its test window.
 
+### Result (run 29 October 2026, after the operational details above were committed)
+
+Run: `python research/part2/run.py DATA_DIR` on the data branch's day files from 1 December 2023 to 28 October 2026 (1,063 days, none missing) and Derive's daily index candles.
+
+**Verdict: the bar is not met. Positioning stays context, not a signal.**
+
+- **Training (to the close of 30 June 2025):** 1,160 wallets classed directional; 294 with positive PnL on the options that expired from 1 June 2024 to 30 June 2025. Top is the best fifth of all 1,160, so 232 wallets (the smallest PnL among them $74); Smart equals Top, since Top is larger than 50; Profitable holds the 294.
+- **Test:** 472 days scored at the 7-day horizon, 7 July 2025 to 21 October 2026. Of the 232 Top wallets, 105 added BTC delta while directional in the test window, and 140 added ETH delta.
+
+| Tier, 7 days | BTC Spearman | BTC 99% interval | BTC halves | ETH Spearman | ETH 99% interval |
+|---|---|---|---|---|---|
+| Top (decides) | +0.040 | -0.160 to +0.229 | -0.042, +0.187 | +0.192 | +0.0045 to +0.349 |
+| Smart (same wallets as Top) | +0.040 | -0.160 to +0.229 | -0.042, +0.187 | +0.192 | +0.0045 to +0.349 |
+| Profitable | +0.040 | -0.161 to +0.228 | -0.042, +0.186 | +0.188 | +0.002 to +0.347 |
+| All directional (control) | +0.022 | -0.175 to +0.233 | +0.033, +0.123 | +0.147 | -0.056 to +0.330 |
+
+- **The bar, one by one.** 1. BTC's Spearman is +0.040, under 0.10, and its 99% interval includes zero: not met. 2. Negative in the first half (to 27 February 2026), positive in the second: not met. 3. 83.6% of the 1,000 random sets of directional wallets score below Top; their 95th percentile is +0.074 (median -0.052): not met. 4. ETH has the same sign: met.
+- **Other horizons, Top (reported):** BTC -0.020 at 3 days (99% interval -0.178 to +0.142) and +0.069 at 14 days (-0.143 to +0.271); ETH +0.150 at 3 days (+0.007 to +0.284) and +0.238 at 14 days (+0.029 to +0.418).
+- **What it means.** On BTC, the skilled wallets' share of the delta added over a week said almost nothing about BTC's next week (or the next 3 or 14 days). On ETH the relation is positive and its interval sits just above zero, but all directional wallets show nearly as much (+0.147, and +0.276 at 14 days), so it is not a mark of skill, and ETH does not decide the verdict. The positioning views stay in the app as context, without any claim. Addendum C (approved 29 October 2026) tests the drawer's own reading on the closes after its approval.
+
 ## In the app before any verdict
 
 - Priced outcomes (built 2 October 2026): the price ranges option prices imply per expiry, drawn on the coin chart; labelled as market pricing, never as a forecast.
