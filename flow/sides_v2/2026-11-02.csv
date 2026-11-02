@@ -1,0 +1,8 @@
+bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sell_premium_usd,legs
+1793577600,BTC,perp,1565.95,783.42,0.0,0.0,3
+1793577600,DOGE,perp,525.43,525.85,0.0,0.0,2
+1793577600,ETH,perp,4326.15,7057.91,0.0,0.0,15
+1793577600,LIT,perp,15.88,0.0,0.0,0.0,1
+1793577600,SOL,perp,1050.19,526.24,0.0,0.0,3
+1793577600,XRP,perp,1000.5,685.52,0.0,0.0,2
+1793577600,ZEC,perp,2469.62,1236.83,0.0,0.0,3
