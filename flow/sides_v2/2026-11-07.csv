@@ -652,3 +652,4 @@ bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sel
 1794075300,LIT,perp,2932.51,0.0,0.0,0.0,4
 1794075300,ZEC,call,0.0,3804.74,0.0,40.05,1
 1794076200,ETH,perp,0.0,1000.63,0.0,0.0,1
+1794076200,PUMP,perp,0.0,502.08,0.0,0.0,1
