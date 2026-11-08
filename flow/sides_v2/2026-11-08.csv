@@ -633,3 +633,6 @@ bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sel
 1794168000,XRP,perp,13.81,2001.32,0.0,0.0,3
 1794168000,ZEC,perp,1993.94,1998.73,0.0,0.0,2
 1794168900,HYPE,perp,0.0,80.48,0.0,0.0,1
+1794168900,ETH,perp,4450.48,0.0,0.0,0.0,5
+1794168900,HYPE,perp,7728.33,209.03,0.0,0.0,11
+1794168900,XAUT,put,0.0,4051.92,0.0,36.6,1
