@@ -129,3 +129,7 @@ bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sel
 1794114000,LINK,perp,1000.66,0.0,0.0,0.0,1
 1794114000,ZEC,perp,1266.62,0.0,0.0,0.0,1
 1794114900,ETH,perp,272.55,0.0,0.0,0.0,1
+1794114900,ETH,perp,1201.85,0.0,0.0,0.0,2
+1794114900,HYPE,call,0.0,77.24,0.0,6.09,1
+1794114900,PUMP,perp,4.25,0.0,0.0,0.0,1
+1794115800,ETH,perp,0.0,2998.2,0.0,0.0,1
