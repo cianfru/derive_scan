@@ -613,3 +613,6 @@ bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sel
 1794164400,ETH,perp,0.0,4946.8,0.0,0.0,5
 1794164400,HYPE,perp,0.0,198.48,0.0,0.0,2
 1794164400,LINK,perp,0.0,999.85,0.0,0.0,1
+1794165300,ETH,call,200.74,0.0,13.36,0.0,1
+1794165300,HYPE,perp,77.7,0.0,0.0,0.0,1
+1794165300,LINK,perp,1000.8,0.0,0.0,0.0,1
