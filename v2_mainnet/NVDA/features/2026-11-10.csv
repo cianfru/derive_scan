@@ -196,3 +196,10 @@ ts,feature,value
 1794295800,pc_oi_ratio,0.5
 1794295800,perp_basis,0.0
 1794295800,perp_oi_contracts,7.5
+1794296700,funding_1h,6.25e-06
+1794296700,funding_ann,0.05475000000000001
+1794296700,index_price,181.21
+1794296700,option_oi_contracts,3.0
+1794296700,pc_oi_ratio,0.5
+1794296700,perp_basis,0.0
+1794296700,perp_oi_contracts,7.5
