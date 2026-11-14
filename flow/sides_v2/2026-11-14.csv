@@ -1,0 +1,8 @@
+bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sell_premium_usd,legs
+1794614400,ADA,perp,1554.7,0.0,0.0,0.0,3
+1794614400,BNB,perp,700.94,0.0,0.0,0.0,2
+1794614400,BTC,perp,6693.11,2049.81,0.0,0.0,10
+1794614400,DOGE,perp,2032.83,0.0,0.0,0.0,4
+1794614400,ETH,perp,44958.68,23721.88,0.0,0.0,22
+1794614400,HYPE,perp,2269.78,0.0,0.0,0.0,5
+1794614400,SOL,perp,1702.52,7995.22,0.0,0.0,5
