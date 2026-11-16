@@ -1,0 +1,3 @@
+ts,instrument,kind,underlying,direction,amount,price,index_price,notional_usd,premium_usd,wallet,subaccount_id,rfq,realized_pnl
+1794789633133,BTC-20261127-50000-P,option,BTC,buy,3.0,82.0,64839.796842370735,194519.39,246.0,0x9141e3D5C16E0478F7FC7F74e125A3ae09173D27,74304,0,0.0
+1794789667180,ETH-PERP,perp,ETH,sell,16.57,1810.5,1811.639119961129,29999.99,0.0,0x43ba0a8D1f585055815D72d18bbb10CA8cD42261,62858,0,0.0
