@@ -1,0 +1,2 @@
+ts,instrument,kind,underlying,direction,amount,price,index_price,notional_usd,premium_usd,wallet,subaccount_id,rfq,realized_pnl
+1794966998586,SOL-PERP,perp,SOL,sell,389.546,74.165,74.197121156624,28890.68,0.0,0xe7f220648b3424688201fad5F48D924dE0BAecBA,74760,0,-193.314720956056
