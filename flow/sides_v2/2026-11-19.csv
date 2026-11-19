@@ -1,0 +1,6 @@
+bucket_ts,underlying,kind,buy_notional_usd,sell_notional_usd,buy_premium_usd,sell_premium_usd,legs
+1795046400,BTC,perp,2998.07,9591.62,0.0,0.0,5
+1795046400,ETH,perp,0.0,4820.33,0.0,0.0,5
+1795046400,HYPE,perp,0.0,339.35,0.0,0.0,1
+1795046400,PUMP,perp,0.0,183.71,0.0,0.0,2
+1795046400,ZEC,perp,0.0,1266.54,0.0,0.0,4
