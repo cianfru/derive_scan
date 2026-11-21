@@ -34,6 +34,7 @@ No public third-party retail front end, Telegram bot, mobile app, wallet tracker
 - **Hyperliquid HIP-4.** Launched May 2026 and permissionless since late August: binaries and "scaled options" inside the perp account, about $150M of volume by late September. It is the largest structural threat, because it has users from day one.
 - **Others.** Limitless (Base), Predict.fun, DeepBook Predict on Sui (whitelist only) and Kalshi (regulated, US).
 - **Rysk (HyperEVM).** About $50M TVL. Covered calls and cash-secured puts.
+- **Toros (toros.finance, read 27 October 2026).** Leveraged tokens from dHEDGE: 140 ERC-20 vaults on Arbitrum, Base, Optimism, Polygon and Ethereum, built on Aave, GMX, Flat Money and a Hyperliquid perps account. About $5.0M TVL, $6.8M volume over 30 days, $2.7B all time. Fee per buy and per sell only (0.1-0.25%, no holding fee). Options products run on their own "perpetual options" (Flat Money contracts, no expiry, continuous premium): Protected Leveraged Tokens (a leveraged BTC long with an options floor, 0.66-2% per trade), a Covered Call LP that is the counterparty (about $0.5M) and a Short Volatility vault (about $0.7M), each with a payoff picture at one month. Retail features: stop sells and take profit run by a keeper, email alerts on sudden moves, achievements and quarterly P&L leaderboard seasons with ranks. Not on Derive.
 
 ## What it means
 

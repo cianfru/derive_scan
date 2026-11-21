@@ -1,7 +1,7 @@
 import { SIGNAL_LABEL } from "./format.js";
 import { readingState } from "./analytics.js";
 
-export const ASSET_NAMES = { CC: "Canton", LIT: "Lighter", PUMP: "Pump.fun", VVV: "Venice", XAUT: "Tether Gold", ZEC: "Zcash", BTC: "Bitcoin", ETH: "Ethereum", SOL: "Solana", HYPE: "Hyperliquid", ADA: "Cardano", XRP: "XRP", DOGE: "Dogecoin", AVAX: "Avalanche", LINK: "Chainlink", BNB: "BNB", SUI: "Sui", TRUMP: "Official Trump", AAVE: "Aave", TON: "Toncoin", BCH: "Bitcoin Cash" };
+export const ASSET_NAMES = { CC: "Canton", LIT: "Lighter", PUMP: "Pump.fun", VVV: "Venice", XAUT: "Tether Gold", ZEC: "Zcash", BTC: "Bitcoin", ETH: "Ethereum", SOL: "Solana", HYPE: "Hyperliquid", ADA: "Cardano", XRP: "XRP", DOGE: "Dogecoin", AVAX: "Avalanche", LINK: "Chainlink", BNB: "BNB", SUI: "Sui", TRUMP: "Official Trump", AAVE: "Aave", TON: "Toncoin", BCH: "Bitcoin Cash", DRV: "Derive", NVDA: "Nvidia", US500: "US 500 index", US100: "US Tech 100 index", WTI: "WTI crude oil" };
 export const STATE_NAMES = { up: "Upward tone", defensive: "Defensive tone", neutral: "Balanced tone" };
 export const WINDOWS = { "7d": { name: "7-day options", engine: "1D close", options: "7d tenor / 24h flow", wallets: "Expiry within 7d" }, "30d": { name: "30-day options", engine: "1D close", options: "30d tenor / 7d flow", wallets: "Expiry within 30d" } };
 // Pipeline states read as plain words (owner, 4 October 2026): "Updating" for a reading past its

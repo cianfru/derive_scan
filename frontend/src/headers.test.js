@@ -14,6 +14,8 @@ it("permits the shipped theme bootstrap and the configured Derive endpoints", ()
   expect(policy).toContain("wss://testnet.api.derive.xyz");
   const connect = policy.match(/connect-src[^;]+/)[0];
   for (const origin of ["https://li.quest", "https://ethereum-rpc.publicnode.com", "https://base-rpc.publicnode.com", "https://arbitrum-one-rpc.publicnode.com", "https://rpc.hyperliquid.xyz"]) expect(connect).toContain(origin);
+  // Rysk (Receive premium, VITE_RYSK builds): its taker socket, gas-fee endpoint and HyperEVM's RPCs.
+  for (const origin of ["wss://v12.rysk.finance", "https://v12.rysk.finance", "wss://rip-testnet.rysk.finance", "https://rip-testnet.rysk.finance", "https://rpc.hyperliquid-testnet.xyz"]) expect(connect).toContain(origin);
   expect(connect).not.toContain("*");
   expect(policy).toContain("frame-ancestors 'none'");
   expect(policy).toContain("object-src 'none'");
