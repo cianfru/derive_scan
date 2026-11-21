@@ -64,21 +64,36 @@ SURFACE_VERSION = 1
 BALANCE_VERSION = 3  # 3: classes with Amendment B
 BALANCE_CLOSES = 90
 BALANCE_MIN_BUDGET = 100  # seconds of budget left for a backfill to start
+SMART_COUNTS_RETRY = 86400  # a failed close of history/smart_counts.json is tried again a day later
+SMART_COUNTS_START = "2026-10-21"  # derive/smart_counts.py START, repeated here for the standard-library due check
 RETRY_PER_RUN = 4          # unreconciled readings read again per run
 RETRY_EVERY = 6 * 3600     # seconds between two tries of one reading
 
 
 def is_due(out: Path, now: float) -> bool:
-    """A finished day not yet read, a repair not finished, surface rows not yet written, or the
-    balance backfill pending once wallets are classed (no network; standard library only)."""
+    """A finished day not yet read, a repair not finished, surface rows not yet written, the
+    balance backfill pending once wallets are classed, or closes missing from history/smart_counts.json
+    (no network; standard library only)."""
     p = out / "history" / "state.json"
     state = json.loads(p.read_text()) if p.exists() else {}
     done = state.get("done_through")
     last = (datetime.fromtimestamp(now - 3600, timezone.utc) - timedelta(days=1)).date()
     retry_due = any(item[3] <= now for item in state.get("retry") or ())
+    classed = (out / "history" / "wallets.json").exists()
     return done is None or date.fromisoformat(done) < last or retry_due or (bool(done) and (
         state.get("repaired") != REPAIR or state.get("surface") != SURFACE_VERSION or state.get("surface_through") != done
-        or (state.get("balance") != BALANCE_VERSION and (out / "history" / "wallets.json").exists())))
+        or (state.get("balance") != BALANCE_VERSION and classed)
+        or (classed and done >= SMART_COUNTS_START and _smart_counts_through(out) < done
+            and now - state.get("smart_counts_failed_at", 0) >= SMART_COUNTS_RETRY)))
+
+
+def _smart_counts_through(out: Path) -> str:
+    """The newest close in history/smart_counts.json ("" without one), read with the standard library."""
+    p = out / "history" / "smart_counts.json"
+    try:
+        return json.loads(p.read_text()).get("through") or ""
+    except (FileNotFoundError, ValueError):
+        return ""
 
 
 def queue_retries(state: dict, anomalies: list[dict], now: float) -> None:
@@ -252,7 +267,8 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
     # The balance backfill never shares a run with the surface rebuild.
     surface_ready = state.get("surface") == SURFACE_VERSION and "surface_pending" not in state
     added = []
-    backfilled = None
+    backfilled = counted = None
+    built = settlements = None      # the close just classed, for the Smart wallets' counts
     try:
         day, last = history.next_day(state), history.last_complete_day(now)
         while day <= last and time.monotonic() - t0 < budget:
@@ -324,6 +340,7 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
             meta = {"as_of": int(as_of), "through": state["done_through"], "schema_version": SCHEMA_VERSION, **gaps(state),
                     "aliases": scan["aliases"], "built_at": int(now)}
             positions = history.tier_positions(held, classes)
+            built = (classes, held, scan)
             (out / "history" / "wallets.json").write_text(json.dumps({**meta, "wallets": classes}, separators=(",", ":")))
             (out / "history" / "positions.json").write_text(json.dumps(
                 {**meta, "positions": positions, "directional_book": history.directional_book(held, classes)}, separators=(",", ":")))
@@ -337,6 +354,8 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
             surface_step(out, state, lambda: time.monotonic() - t0 < budget)
             backfilled = balance_step(out, state, added=bool(added), surface_ready=surface_ready and not repaired_now, now=now,
                                       left=budget - (time.monotonic() - t0))
+            counted = smart_counts_step(out, state, settlements=settlements, built=built, now=now,
+                                        left=budget - (time.monotonic() - t0))
     finally:
         if own:
             from derive.wallet_alias import detach
@@ -351,7 +370,30 @@ async def run(out: Path, budget: float, now: float | None = None, client=None) -
         out_doc["retry_pending"] = len(state["retry"])
     if backfilled is not None:
         out_doc["balance_closes"] = backfilled
+    if counted:
+        out_doc["smart_counts"] = counted
     return out_doc
+
+
+def smart_counts_step(out: Path, state: dict, *, settlements: dict | None, built: tuple | None, now: float,
+                      left: float) -> int | None:
+    """The Smart wallets' daily counts for Reflex's drawer (derive/smart_counts.py): the closes missing up to the
+    newest complete day, within the budget left (the close just classed in this run always). Never fails the step:
+    an error waits SMART_COUNTS_RETRY before the next try. Returns the closes added."""
+    from derive import balance_history, history, smart_counts
+
+    done = state.get("done_through")
+    if not done or state.get("repaired") != REPAIR or done < history.last_complete_day(now).isoformat() \
+            or now - state.get("smart_counts_failed_at", 0) < SMART_COUNTS_RETRY \
+            or not (out / "history" / "wallets.json").exists() or not smart_counts.missing(out, done):
+        return None
+    try:
+        return smart_counts.catch_up(out, done, settlements or balance_history.load_settlements(out), built, left)
+    except Exception as exc:  # the counts must never fail the history step
+        print(f"smart counts failed: {exc!r}")
+        state["smart_counts_failed_at"] = now
+        history.save_state(out, state)
+        return None
 
 
 def main() -> None:

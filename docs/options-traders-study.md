@@ -64,6 +64,41 @@ Otherwise the result is "context, not a signal", and positioning is shown withou
 - Hedges inside a wallet that uses another venue cannot be seen.
 - Derive's V3 docs describe public trades as anonymised; wallet-level tracking may stop when V3 replaces V2.
 
+### Operational details for the test (fixed 29 October 2026, before running; the owner: "Run part 2")
+
+The rules above leave a few choices open. They are fixed here, before the test's code reads the data:
+
+- **Data.** The data branch's day files from the rebuild's first day to the newest finished day, wallets under their owner's name (history.canonical_rows), options only (perp rows serve only the hedger class). Classes at the time come from `balance_history.Replay` (history.classify's rules with Amendment B), recomputed at every close; a trade day uses the classes of the close before it.
+- **Training ranking.** At the close of 30 June 2025, every wallet classed directional then is ranked by its realised option PnL on the options that expired from 1 June 2024 to 30 June 2025 (premium received minus paid plus contracts held at expiry times the settlement value, as Part 1 defines option PnL; every trade in such an option happened before its expiry, so all of them count). Tiers as history.rank_tiers: Top is the best fifth of all directional wallets at that close (their count times 0.20, rounded), among those with positive PnL; Smart adds the next best up to 50 (none while Top has 50 or more); Profitable is every directional wallet with positive PnL. Fixed for the whole test.
+- **Positioning,** per underlying (BTC, ETH) and day d: each wallet's net option delta added on the underlying over days d-6 to d (the day files' `delta_usd`: buys of calls and sales of puts add, buys of puts and sales of calls subtract), counting a trade day only while the wallet was directional at the close before it. The share is the tier's sum of those nets over the sum of every directional wallet's absolute net: the tier's delta added as a share of all directional delta added, between -1 and +1. The denominator is gross because the directional total itself nets to near zero on many days. No reading on a day when no directional wallet added delta.
+- **Days scored:** from 7 July 2025 (the first day whose seven trade days all fall in July) to the newest day whose outcome is complete for that horizon.
+- **Outcome:** the underlying's change from Derive's daily index close of day d (00:00 UTC after it) to the close h days later, h = 3, 7 and 14 (`candles/{UND}/1d.csv`).
+- **Spearman** with average ranks for ties. **Bootstrap:** calendar weeks (Monday to Sunday) of scored days as blocks, drawn with replacement up to as many days, 10,000 times with a fixed seed; the 99% interval runs from the 0.5th to the 99.5th percentile.
+- **Random sets:** 1,000 sets of wallets classed directional at the close of 30 June 2025, each as large as Top, drawn without replacement (fixed seed), scored with the same BTC 7-day statistic.
+- **Halves:** the scored days split in two by date, equal counts.
+- **Reported, not deciding:** Smart and Profitable (the main statistic, BTC and ETH), all directional wallets, the 3- and 14-day horizons, and the counts behind each figure.
+- **Already seen before running:** Addendum A's settlement record (7 October 2026, a different reading) and the exploration behind Reflex's Derive drawer (28 October 2026: open delta and delta added by the Smart wallets, ranked at each close and ranked on 27 October, around BTC tops). Neither computed this statistic, its walk-forward ranking or its test window.
+
+### Result (run 29 October 2026, after the operational details above were committed)
+
+Run: `python research/part2/run.py DATA_DIR` on the data branch's day files from 1 December 2023 to 28 October 2026 (1,063 days, none missing) and Derive's daily index candles.
+
+**Verdict: the bar is not met. Positioning stays context, not a signal.**
+
+- **Training (to the close of 30 June 2025):** 1,160 wallets classed directional; 294 with positive PnL on the options that expired from 1 June 2024 to 30 June 2025. Top is the best fifth of all 1,160, so 232 wallets (the smallest PnL among them $74); Smart equals Top, since Top is larger than 50; Profitable holds the 294.
+- **Test:** 472 days scored at the 7-day horizon, 7 July 2025 to 21 October 2026. Of the 232 Top wallets, 105 added BTC delta while directional in the test window, and 140 added ETH delta.
+
+| Tier, 7 days | BTC Spearman | BTC 99% interval | BTC halves | ETH Spearman | ETH 99% interval |
+|---|---|---|---|---|---|
+| Top (decides) | +0.040 | -0.160 to +0.229 | -0.042, +0.187 | +0.192 | +0.0045 to +0.349 |
+| Smart (same wallets as Top) | +0.040 | -0.160 to +0.229 | -0.042, +0.187 | +0.192 | +0.0045 to +0.349 |
+| Profitable | +0.040 | -0.161 to +0.228 | -0.042, +0.186 | +0.188 | +0.002 to +0.347 |
+| All directional (control) | +0.022 | -0.175 to +0.233 | +0.033, +0.123 | +0.147 | -0.056 to +0.330 |
+
+- **The bar, one by one.** 1. BTC's Spearman is +0.040, under 0.10, and its 99% interval includes zero: not met. 2. Negative in the first half (to 27 February 2026), positive in the second: not met. 3. 83.6% of the 1,000 random sets of directional wallets score below Top; their 95th percentile is +0.074 (median -0.052): not met. 4. ETH has the same sign: met.
+- **Other horizons, Top (reported):** BTC -0.020 at 3 days (99% interval -0.178 to +0.142) and +0.069 at 14 days (-0.143 to +0.271); ETH +0.150 at 3 days (+0.007 to +0.284) and +0.238 at 14 days (+0.029 to +0.418).
+- **What it means.** On BTC, the skilled wallets' share of the delta added over a week said almost nothing about BTC's next week (or the next 3 or 14 days). On ETH the relation is positive and its interval sits just above zero, but all directional wallets show nearly as much (+0.147, and +0.276 at 14 days), so it is not a mark of skill, and ETH does not decide the verdict. The positioning views stay in the app as context, without any claim. Addendum C (approved 29 October 2026) tests the drawer's own reading on the closes after its approval.
+
 ## In the app before any verdict
 
 - Priced outcomes (built 2 October 2026): the price ranges option prices imply per expiry, drawn on the coin chart; labelled as market pricing, never as a forecast.
@@ -131,3 +166,34 @@ Owner, 9 October 2026, on a top-tier wallet with 9,551 settled options won and 9
 - **Left as it is.** A grey zone of 31 top-tier wallets above 50% maker or 40% both sides (about 10% of the tier's PnL) stays directional: patient limit-order traders also post prices. Each trader page shows its passive share so a reader can judge.
 - **Scope.** It applies everywhere the classes apply: the tiers, the Saloon's gold rings and traders' line, the Radar's Smart balance (its backfill is rebuilt with the new classes), Flow and the leaderboard. Addendum A's result above was computed with the earlier classes; it is rerun with these classes before it is quoted again.
 
+
+## Addendum C: the Smart wallets as ranked at the time, before BTC's turns (APPROVED by the owner on 29 October 2026 as written, before any result: "Addendum C approved as drafted")
+
+Owner, 28 October 2026: on Derive, "when big smart wallets start to go short or start buying puts" is when the market rolled over. 29 October: "let's make a study for the derived data". Reflex's market history page shows it in its Derive options drawer (Reflex `docs/reviews/derive-smart-wallets.md`), from Cowboy's daily counts (`derive/smart_counts.py`, `history/smart_counts.json`).
+
+### Already seen
+
+The exploration of 28 October 2026 looked at every close from December 2023 to 27 October 2026 with both rankings, around nine BTC tops. Ranked at the time, the Smart wallets were short before a top about as often as on any day (2 of 9, against 31% of days), and most of their put buying came after the turn; today's ranking, looking back, reads otherwise by hindsight. The past is therefore description here. The verdict uses only closes after this addendum is approved.
+
+### Readings (each close, BTC options, the Smart wallets as ranked at that close)
+
+- **Short share:** wallets net short over wallets net long or short ($1,000 of open delta or more), from `history/smart_counts.json`.
+- **Turn:** the short share's change over the last 28 closes.
+- **Put pressure:** the premium paid on new long puts over the last 28 closes, over the average 28-close sum of the 84 closes before them.
+- **Outcome:** BTC's daily index close change over the next 30 days (14 days reported, not deciding).
+
+### Test (out of sample)
+
+- Window: every close from the day of approval (the first is the close of 29 October 2026, 00:00 UTC on 30 October) until at least 180 closes have a complete 30-day outcome (about seven months).
+- Main statistic: Spearman rank correlation between the turn and the next 30-day change, with a block bootstrap by 30-close blocks for the interval (neighbouring closes share most of their outcome).
+- Reported with it: the put pressure's correlation with the same outcome; ETH's own readings against ETH's price; the readings in the 28 closes before each BTC top the drawer marks in the window (the highest close within 30 days either side, followed by a fall of 15% or more within 90), never deciding.
+
+### Bar
+
+"Signal" only if all of these hold:
+1. the turn's correlation with the next 30-day BTC change is -0.10 or lower, with the 99% bootstrap interval below zero;
+2. the put pressure's correlation is negative too;
+3. ETH's turn has the same sign against ETH's price;
+4. the same sign in both halves of the window.
+
+Otherwise the drawer's readings stay "context, not a signal". No probability, odds, likely or predict wording in either app.
