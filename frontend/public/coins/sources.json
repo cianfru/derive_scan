@@ -87,6 +87,36 @@
       "file": "XAUT-ink.svg",
       "derived_from": "XAUT.svg",
       "change": "white fills (#fff) set to #23292f so the mark shows on the light theme; gold kept"
+    },
+    {
+      "symbol": "DRV",
+      "source": "https://framerusercontent.com/images/aePbLKT4q63tbSS4AnqgPCGNU.svg (Derive's mark from derive.xyz, retrieved 2026-11-21, refitted to 24x24)",
+      "file": "DRV.svg"
+    },
+    {
+      "symbol": "NVDA",
+      "source": "https://raw.githubusercontent.com/simple-icons/simple-icons/develop/icons/nvidia.svg (CC0, retrieved 2026-11-21, Nvidia green)",
+      "file": "NVDA.svg"
+    },
+    {
+      "symbol": "US500",
+      "source": "drawn for Cowboy (index mark)",
+      "file": "US500.svg"
+    },
+    {
+      "symbol": "US100",
+      "source": "drawn for Cowboy (index mark)",
+      "file": "US100.svg"
+    },
+    {
+      "symbol": "WTI",
+      "source": "drawn for Cowboy (oil drop)",
+      "file": "WTI.svg"
+    },
+    {
+      "symbol": "ANT",
+      "source": "drawn for Cowboy (lettermark)",
+      "file": "ANT.svg"
     }
   ]
 }
