@@ -395,3 +395,9 @@ ts,feature,value
 1795364100,option_oi_contracts,0.0
 1795364100,perp_basis,0.0
 1795364100,perp_oi_contracts,0.5
+1795365000,funding_1h,1.25e-05
+1795365000,funding_ann,0.10950000000000001
+1795365000,index_price,89.76
+1795365000,option_oi_contracts,0.0
+1795365000,perp_basis,0.0
+1795365000,perp_oi_contracts,0.5
